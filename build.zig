@@ -31,20 +31,31 @@ pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
     // ============================================================
-    //                    Prepare shared libs:
+    //                    Modules:
     // ============================================================
 
+    const ecs_module = b.createModule(.{
+        .root_source_file = .{ .path = "src/ecs/ecs.zig" },
+    });
+
+    const game_module = b.createModule(.{
+        .root_source_file = .{ .path = "src/game/game.zig" },
+    });
+    game_module.addImport("ecs", ecs_module);
+
     // ============================================================
-    //                   Prepare desktop files:
+    //                   Desktop files:
     // ============================================================
 
     // Executable file to run the game in the terminal
     const desktop_exe = b.addExecutable(.{
         .name = name,
-        .root_source_file = .{ .path = "src/main_terminal.zig" },
+        .root_source_file = .{ .path = "src/terminal/main.zig" },
         .target = desktop_target,
         .optimize = optimize,
     });
+    desktop_exe.root_module.addImport("ecs", ecs_module);
+    desktop_exe.root_module.addImport("game", game_module);
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
@@ -52,15 +63,17 @@ pub fn build(b: *std.Build) !void {
     b.installArtifact(desktop_exe);
 
     // ============================================================
-    //                Prepare files for the Playdate:
+    //                   Playdate files:
     // ============================================================
 
     const lib = b.addSharedLibrary(.{
         .name = "pdex",
-        .root_source_file = .{ .path = "src/main_playdate.zig" },
+        .root_source_file = .{ .path = "src/playdate/main.zig" },
         .optimize = optimize,
         .target = b.host,
     });
+    lib.root_module.addImport("ecs", ecs_module);
+    lib.root_module.addImport("game", game_module);
     _ = writer.addCopyFile(lib.getEmittedBin(), "pdex" ++ switch (os_tag) {
         .windows => ".dll",
         .macos => ".dylib",
@@ -70,11 +83,13 @@ pub fn build(b: *std.Build) !void {
 
     const elf = b.addExecutable(.{
         .name = "pdex.elf",
-        .root_source_file = .{ .path = "src/main_playdate.zig" },
+        .root_source_file = .{ .path = "src/playdate/main.zig" },
         .target = playdate_target,
         .optimize = optimize,
         .pic = true,
     });
+    elf.root_module.addImport("ecs", ecs_module);
+    elf.root_module.addImport("game", game_module);
     elf.link_emit_relocs = true;
     elf.entry = .{ .symbol_name = "eventHandler" };
 
@@ -144,7 +159,7 @@ pub fn build(b: *std.Build) !void {
         .install_dir = .prefix,
         .install_subdir = "pdx_source_dir",
     });
-    
+
     const emulate_cmd = b.addSystemCommand(&.{pd_simulator_path});
     emulate_cmd.addDirectorySourceArg(pdx_path);
     emulate_cmd.setName("PlaydateSimulator");
@@ -153,7 +168,6 @@ pub fn build(b: *std.Build) !void {
     emulate_step.dependOn(&emulate_cmd.step);
     emulate_step.dependOn(b.getInstallStep());
 
-
     // ------------------------------------------------------------
     //                Step to run tests
     // ------------------------------------------------------------
@@ -161,10 +175,12 @@ pub fn build(b: *std.Build) !void {
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
     const unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/ecs.zig" },
+        .root_source_file = .{ .path = "src/terminal/main.zig" },
         .target = desktop_target,
         .optimize = optimize,
     });
+    unit_tests.root_module.addImport("ecs", ecs_module);
+    unit_tests.root_module.addImport("game", game_module);
 
     const run_unit_tests = b.addRunArtifact(unit_tests);
 

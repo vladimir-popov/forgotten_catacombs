@@ -1,27 +1,33 @@
 const std = @import("std");
+const fmt = std.fmt;
+const fs = std.fs;
 const os = std.os;
 const sys = std.os.system;
+
+pub const Error = error{
+    FormatOrIOError,
+} || fs.File.OpenError || os.ReadError || os.WriteError || os.TermiosGetError || os.TermiosSetError;
 
 const ESC = '\x1b';
 
 /// Control Sequence Introducer
 inline fn csi(comptime sfx: []const u8) *const [2 + sfx.len:0]u8 {
     comptime {
-        return std.fmt.comptimePrint("\x1b[{s}", .{sfx});
+        return fmt.comptimePrint("\x1b[{s}", .{sfx});
     }
 }
 
 /// Moves the cursor on `count` symbols to the right.
-pub inline fn cursorRight(comptime count: u8) *const [std.fmt.count("\x1b[{d}", .{count}):0]u8 {
+pub inline fn cursorRight(comptime count: u8) *const [fmt.count("\x1b[{d}", .{count}):0]u8 {
     comptime {
-        return std.fmt.comptimePrint("\x1b[{d}C", .{count});
+        return fmt.comptimePrint("\x1b[{d}C", .{count});
     }
 }
 
 /// Moves the cursor on `count` symbols down.
-pub inline fn cursorDown(comptime count: u8) *const [std.fmt.count("\x1b[{d}", .{count}):0]u8 {
+pub inline fn cursorDown(comptime count: u8) *const [fmt.count("\x1b[{d}", .{count}):0]u8 {
     comptime {
-        return std.fmt.comptimePrint("\x1b[{d}B", .{count});
+        return fmt.comptimePrint("\x1b[{d}B", .{count});
     }
 }
 
@@ -53,8 +59,8 @@ const RM_HIDE_CU = csi("?25l");
 // CUP – Cursor Position
 const CUP = csi("H");
 
-pub inline fn format_set_cursor_position(writer: anytype, row: u32, col: u32) !void {
-    return try std.fmt.format(writer, "\x1b[{d};{d}H", .{ row, col });
+pub inline fn formatSetCursorPosition(writer: anytype, row: u8, col: u8) Error!void {
+    return fmt.format(writer, "\x1b[{d};{d}H", .{ row, col }) catch return error.FormatOrIOError;
 }
 
 // DSR – Device Status Report
@@ -70,19 +76,19 @@ const SGR_INVERT_COLORS = csi("7m");
 
 inline fn italic(comptime str: []const u8) *const [7 + str.len:0]u8 {
     comptime {
-        return std.fmt.comptimePrint("{s}{s}{s}", .{ SGR_ITALIC, str, SGR_RESET });
+        return fmt.comptimePrint("{s}{s}{s}", .{ SGR_ITALIC, str, SGR_RESET });
     }
 }
 
 inline fn bold(comptime str: []const u8) *const [7 + str.len:0]u8 {
     comptime {
-        return std.fmt.comptimePrint("{s}{s}{s}", .{ SGR_BOLD, str, SGR_RESET });
+        return fmt.comptimePrint("{s}{s}{s}", .{ SGR_BOLD, str, SGR_RESET });
     }
 }
 
 inline fn underline(comptime str: []const u8) *const [7 + str.len:0]u8 {
     comptime {
-        return std.fmt.comptimePrint("{s}{s}{s}", .{ SGR_UNDERLINE, str, SGR_RESET });
+        return fmt.comptimePrint("{s}{s}{s}", .{ SGR_UNDERLINE, str, SGR_RESET });
     }
 }
 
@@ -91,11 +97,11 @@ pub const PressedKeyboardButton = struct { code: [3]u8, len: usize };
 pub const Terminal = struct {
     const Self = @This();
 
-    tty: std.fs.File,
+    tty_file: fs.File,
     original_termios: os.termios,
 
-    pub fn init() !Terminal {
-        const tty = try std.fs.openFileAbsolute("/dev/tty", .{ .mode = .read_write });
+    pub fn init() Error!Terminal {
+        const tty = try fs.openFileAbsolute("/dev/tty", .{ .mode = .read_write });
         errdefer tty.close();
 
         const original_termios = try os.tcgetattr(tty.handle);
@@ -141,36 +147,40 @@ pub const Terminal = struct {
 
         try os.tcsetattr(tty.handle, .FLUSH, raw);
 
-        return Terminal{ .tty = tty, .original_termios = original_termios };
+        return Terminal{ .tty_file = tty, .original_termios = original_termios };
     }
 
     pub fn deinit(self: Self) void {
-        os.tcsetattr(self.tty.handle, .FLUSH, self.original_termios) catch unreachable;
-        self.tty.close();
+        os.tcsetattr(self.tty_file.handle, .FLUSH, self.original_termios) catch unreachable;
+        self.tty_file.close();
     }
 
-    pub fn readPressedKey(self: Self) !PressedKeyboardButton {
+    pub fn draw(self: Self, str: []const u8) Error!void {
+        _ = try self.tty_file.write(str);
+    }
+
+    pub fn readPressedKey(self: Self) Error!PressedKeyboardButton {
         var buffer: [3]u8 = undefined;
-        const len = try self.tty.read(&buffer);
+        const len = try self.tty_file.read(&buffer);
         return PressedKeyboardButton{ .code = buffer, .len = len };
     }
 
-    pub fn clearScreen(self: Self) !void {
+    pub fn clearScreen(self: Self) Error!void {
         // Put cursor to the left upper corner
-        try self.tty.write(CUP);
+        try self.tty_file.write(CUP);
         // Erase all lines on the screen
-        try self.tty.write(ED_FROM_START);
+        try self.tty_file.write(ED_FROM_START);
     }
 
-    pub fn hide_cursor(self: Self) !void {
-        try self.tty.write(RM_HIDE_CU);
+    pub fn hideCursor(self: Self) Error!void {
+        try self.tty_file.write(RM_HIDE_CU);
     }
 
-    pub fn show_cursor(self: Self) !void {
-        try self.tty.write(SM_SHOW_CU);
+    pub fn showCursor(self: Self) Error!void {
+        try self.tty_file.write(SM_SHOW_CU);
     }
 
-    pub fn set_cursor_position(self: Self, row: u32, col: u32) !void {
-        try format_set_cursor_position(self.tty.writer(), row, col);
+    pub fn setCursorPosition(self: Self, row: u8, col: u8) Error!void {
+        try formatSetCursorPosition(self.tty_file.writer(), row, col);
     }
 };
