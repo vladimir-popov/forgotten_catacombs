@@ -29,8 +29,11 @@ pub fn deinit(self: Self) void {
 pub fn runtime(self: *Self) game.Runtime(Self) {
     return .{
         .environment = self,
+        .rows = 150,
+        .cols = 150,
         .vtable = .{
             .drawSprite = drawSprite,
+            .readButton = readButton,
         },
     };
 }
@@ -44,6 +47,15 @@ pub fn log(self: Self, comptime fmt: []const u8, args: anytype) void {
 }
 
 // ======== Private methods: ==============
+
+fn readButton(self: *Self) anyerror!?game.Button.Type {
+    var button: api.PDButtons = undefined;
+    self.playdate.system.getButtonState(&button, null, null);
+    if (button == 0)
+        return null
+    else
+        return @intCast(button);
+}
 
 fn drawSprite(self: *Self, sprite: *const game.Sprite, row: u8, col: u8) anyerror!void {
     self.log("Draw {s}", .{sprite.letter});

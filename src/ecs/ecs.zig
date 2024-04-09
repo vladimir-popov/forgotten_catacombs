@@ -323,6 +323,7 @@ pub fn Game(comptime Components: anytype, comptime Runtime: type) type {
         inner_state: *anyopaque,
 
         /// A runtime in which the game is run.
+        /// It can contains game settings and functions, which are used in the systems.
         runtime: Runtime,
 
         /// private typed getter of the inner state
@@ -360,7 +361,7 @@ pub fn Game(comptime Components: anytype, comptime Runtime: type) type {
             }
         }
 
-        const EntityBuilder = struct {
+        pub const EntityBuilder = struct {
             const EB = @This();
 
             entity: Entity,
