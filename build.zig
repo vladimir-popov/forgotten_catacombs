@@ -43,6 +43,10 @@ pub fn build(b: *std.Build) !void {
     });
     game_module.addImport("ecs", ecs_module);
 
+    const utf8_module = b.createModule(.{
+        .root_source_file = .{ .path = "src/utf8/utf8.zig" },
+    });
+
     // ============================================================
     //                   Desktop files:
     // ============================================================
@@ -56,6 +60,7 @@ pub fn build(b: *std.Build) !void {
     });
     desktop_exe.root_module.addImport("ecs", ecs_module);
     desktop_exe.root_module.addImport("game", game_module);
+    desktop_exe.root_module.addImport("utf8", utf8_module);
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
@@ -174,13 +179,16 @@ pub fn build(b: *std.Build) !void {
 
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
+    const test_filters = b.option([]const []const u8, "test-filter", "Skip tests that do not match any filter") orelse &[0][]const u8{};
     const unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/terminal/main.zig" },
+        .root_source_file = .{ .path = "src/utf8/Buffer.zig" },
         .target = desktop_target,
         .optimize = optimize,
+        .filters = test_filters,
     });
     unit_tests.root_module.addImport("ecs", ecs_module);
     unit_tests.root_module.addImport("game", game_module);
+    desktop_exe.root_module.addImport("utf8", utf8_module);
 
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
