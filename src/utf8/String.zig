@@ -74,7 +74,12 @@ pub fn symbolAfter(self: String, b_idx: usize) ?Symbol {
     return .{ .index = idx, .len = n };
 }
 
-/// Returns a count of symbols in utf-8 encoding in the string.
+/// Returns the count of bytes in this string.
+pub fn bytesCount(self: String) usize {
+    return self.bytes.items.len;
+}
+
+/// Returns the count of symbols in utf-8 encoding in the string.
 /// Control sequences are not counted.
 pub fn symbolsCount(self: String) usize {
     var i: usize = 0;
@@ -116,7 +121,7 @@ pub fn appendRepeate(self: *String, str: []const u8, count: usize) Error!void {
     }
 }
 
-/// Replaces `source.len` symbols of this string by the symbols
+/// Replaces `source.symbolsCount()` symbols of this string by the symbols
 /// of the source string. Begins from the `left_pad_symbols` symbol.
 /// If the length of this string less than `left_pad_symbols`, then
 /// appropriate count of spaces will be appended.
@@ -126,29 +131,31 @@ pub fn appendRepeate(self: *String, str: []const u8, count: usize) Error!void {
 /// or:
 /// "abc".merge("123", 5) == "abc  123"
 ///
-pub fn merge(self: *String, source: String, left_pad_symbols: u16) Error!String {
+pub fn merge(self: *String, source: String, left_pad_symbols: usize) Error!void {
     // find an start index of the left_pad_symbols + 1 symbol
     // from which replacement should become
-    var left_pad_index: ?usize = self.indexOfSymbol(left_pad_symbols + 1);
+    var left_pad_index: ?usize = self.indexOfSymbol(left_pad_symbols);
 
     // This string is shorter than left_pad_symbols.
     // Let's fill it by appropriate count of spaces
     if (left_pad_index == null) {
         const scount = self.symbolsCount();
         try self.appendRepeate(" ", left_pad_symbols - scount);
-        left_pad_index = self.bytes.len;
+        left_pad_index = self.bytes.items.len;
     }
-    // Now, let's find an end index of a symbol till which
+    // Now, let's find an index of the last byte of the symbol till which
     // replacement should happened
     const source_symbols = source.symbolsCount();
-    const appendix = if (self.indexOfSymbol(source_symbols + left_pad_symbols + 1)) |app_s| {
-        var app: [self.bytes.items.len - app_s.index]u8 = undefined;
-        @memcpy(&app, self.bytes.items[app_s.index..]);
-        app;
-    } else null;
 
-    try self.bytes.resize(left_pad_index);
-    try self.append(source.bytes);
+    var appendix: ?[]u8 = null;
+    if (self.indexOfSymbol(source_symbols + left_pad_symbols)) |app_idx| {
+        appendix = try self.bytes.allocator.alloc(u8, self.bytes.items.len - app_idx);
+        @memcpy(appendix.?.ptr, self.bytes.items[app_idx..]);
+    }
+    defer if (appendix) |app| self.bytes.allocator.free(app);
+
+    try self.bytes.resize(left_pad_index orelse 0);
+    try self.append(source.bytes.items);
     if (appendix) |app| {
         try self.append(app);
     }
@@ -199,4 +206,32 @@ test "the 3 symbol should have index 10" {
     const u8str = try String.init("ⒶⒷⒸ\x1bⒹ", alloc);
     defer u8str.deinit();
     try std.testing.expectEqual(10, u8str.indexOfSymbol(3));
+}
+
+test "merge in the middle" {
+    // given:
+    var str1 = try String.init(".......", std.testing.allocator);
+    defer str1.deinit();
+    var str2 = try String.init("***", std.testing.allocator);
+    defer str2.deinit();
+
+    // when:
+    try str1.merge(str2, 2);
+    
+    // then:
+    try std.testing.expectEqualStrings("..***..", str1.bytes.items);
+}
+
+test "merge to short string" {
+    // given:
+    var str1 = try String.init("", std.testing.allocator);
+    defer str1.deinit();
+    var str2 = try String.init("***", std.testing.allocator);
+    defer str2.deinit();
+
+    // when:
+    try str1.merge(str2, 2);
+    
+    // then:
+    try std.testing.expectEqualStrings("  ***", str1.bytes.items);
 }
