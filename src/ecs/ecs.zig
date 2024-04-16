@@ -151,9 +151,9 @@ fn ComponentsManager(comptime ComponentTypes: anytype) type {
             }
         }
 
-        fn removeAllForEntityOpaque(ptr: *anyopaque, entity: Entity) void {
+        fn removeAllForEntityOpaque(ptr: *anyopaque, entity: *Entity) void {
             var cm: *Self = @ptrCast(@alignCast(ptr));
-            cm.removeAllForEntity(entity);
+            cm.removeAllForEntity(entity.*);
         }
     };
 }
@@ -190,12 +190,12 @@ const EntitiesManager = struct {
     };
 
     inner_state: InnerState,
-    removeAllComponentsForEntity: *const fn (components_manager: *anyopaque, entity: Entity) void,
+    removeAllComponentsForEntity: *const fn (components_manager: *anyopaque, entity: *Entity) void,
 
     pub fn init(
         alloc: std.mem.Allocator,
         components_manager: *anyopaque,
-        removeAllComponentsForEntity: *const fn (components_manager: *anyopaque, entity: Entity) void,
+        removeAllComponentsForEntity: *const fn (components_manager: *anyopaque, entity: *Entity) void,
     ) Self {
         return .{
             .removeAllComponentsForEntity = removeAllComponentsForEntity,
@@ -212,9 +212,9 @@ const EntitiesManager = struct {
     pub fn deinit(self: *Self) void {
         var itr = self.inner_state.entities.iterator();
         while (itr.next()) |entity| {
-            self.inner_state.components_ptr.removeAllComponentsForEntity(entity);
+            self.removeAllComponentsForEntity(self.inner_state.components_ptr, entity.key_ptr);
         }
-        self.entities.deinit();
+        self.inner_state.entities.deinit();
     }
 
     /// Generates an unique id for the new entity, puts it to the inner storage,

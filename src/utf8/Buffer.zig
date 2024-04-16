@@ -34,8 +34,8 @@ pub inline fn linesCount(self: Buffer) usize {
     return self.lines.items.len;
 }
 
-pub inline fn get(self: Buffer, idx: usize) ?String {
-    return if (self.lines.items.len > idx) self.lines.items[idx] else null;
+pub inline fn get(self: Buffer, idx: usize) ?*String {
+    return if (self.lines.items.len > idx) &self.lines.items[idx] else null;
 }
 
 pub fn addLine(self: *Buffer, line: []const u8) Error!void {
@@ -80,6 +80,16 @@ inline fn getLengthOfLine(self: Buffer, idx: usize) ?usize {
         return line.bytesCount();
     } else {
         return null;
+    }
+}
+
+/// Merges string `str` with line `row` starting from the `col` symbol.
+/// Does nothing if lines are not enough.
+pub fn mergeLine(self: *Buffer, str: []const u8, row: u8, col: u8) Error!void {
+    if (self.get(row)) |line| {
+        const string = try String.init(str, self.lines.allocator);
+        defer string.deinit();
+        try line.merge(string, col);
     }
 }
 
@@ -129,6 +139,30 @@ test "should recover to the same string" {
     defer std.testing.allocator.free(str);
 
     try std.testing.expectEqualStrings(data, str);
+}
+
+test "merge line" {
+    // given:
+    const str =
+        \\.........
+        \\.........
+        \\.........
+    ;
+    const expected =
+        \\.........
+        \\...###...
+        \\.........
+    ;
+    var first = try Buffer.parse(str, std.testing.allocator);
+    defer first.deinit();
+
+    // when:
+    try first.mergeLine("###", 1, 3);
+    const actual = try first.toCString(std.testing.allocator);
+    defer std.testing.allocator.free(actual);
+
+    // then:
+    try std.testing.expectEqualStrings(expected, actual);
 }
 
 test "merge middle buffer" {

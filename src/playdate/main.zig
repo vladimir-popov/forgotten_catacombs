@@ -1,5 +1,5 @@
 const std = @import("std");
-const game = @import("game");
+const gm = @import("game");
 const api = @import("api.zig");
 const tools = @import("tools");
 
@@ -24,13 +24,13 @@ var playdate_error_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) v
 const GlobalState = struct {
     alloc: std.mem.Allocator,
     environment: Environment,
-    game: game.ForgottenCatacomb(Environment).Game,
+    game: gm.ForgottenCatacomb(Environment).Game,
 
     pub fn create(playdate: *api.PlaydateAPI) *GlobalState {
         var state: *GlobalState = @ptrCast(@alignCast(playdate.system.realloc(null, @sizeOf(GlobalState))));
         state.alloc = Allocator.allocator(playdate);
         state.environment = Environment.init(playdate);
-        state.game = game.ForgottenCatacomb(Environment).init(state.environment.runtime(), state.alloc);
+        state.game = gm.ForgottenCatacomb(Environment).init(state.environment.runtime(), state.alloc);
         return state;
     }
 };

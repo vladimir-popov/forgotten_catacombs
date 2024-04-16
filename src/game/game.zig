@@ -9,7 +9,6 @@ const panic = std.debug.panic;
 pub usingnamespace cmp;
 
 pub const Button = struct {
-
     pub const Type = u8;
 
     pub const Left: Type = (1 << 0);
@@ -21,6 +20,19 @@ pub const Button = struct {
 
     pub inline fn isMove(btn: Type) bool {
         return (Up | Down | Left | Right) & btn > 0;
+    }
+};
+
+/// Possible events which can be passed between systems.
+pub const Events = enum {
+    const Self = @This();
+
+    pub const count = @typeInfo(Self).Enum.fields.len;
+
+    buttonWasPressed,
+
+    pub fn index(self: Self) u8 {
+        return @intFromEnum(self);
     }
 };
 
@@ -37,6 +49,15 @@ pub fn Runtime(comptime Environment: type) type {
         cols: u8,
         environment: *Environment,
         vtable: VTable,
+        events: std.StaticBitSet(Events.count) = std.StaticBitSet(Events.count).initEmpty(),
+
+        pub fn fireEvent(self: *Self, event: Events) void {
+            self.events.set(event.index());
+        }
+
+        pub fn isEventFired(self: Self, event: Events) bool {
+            return self.events.isSet(event.index());
+        }
 
         pub fn drawSprite(self: *Self, sprite: *const cmp.Sprite, row: u8, col: u8) !void {
             try self.vtable.drawSprite(self.environment, sprite, row, col);
@@ -63,12 +84,20 @@ pub fn ForgottenCatacomb(comptime Environment: type) type {
             // Initialize systems:
             game.registerSystem(handleInput);
             game.registerSystem(render);
+
+            game.registerSystem(cleanupEvents);
             return game;
+        }
+
+        fn cleanupEvents(game: *Game) anyerror!void {
+            game.runtime.events.setRangeValue(.{ .start = 0, .end = Events.count }, false);
         }
 
         fn handleInput(game: *Game) anyerror!void {
             const btn = try game.runtime.readButton() orelse return;
             if (!Button.isMove(btn)) return;
+
+            game.runtime.fireEvent(Events.buttonWasPressed);
 
             const step = 10;
             var itr = game.entitiesIterator();
@@ -87,6 +116,9 @@ pub fn ForgottenCatacomb(comptime Environment: type) type {
         }
 
         fn render(game: *Game) anyerror!void {
+            if (!game.runtime.isEventFired(Events.buttonWasPressed))
+                return;
+
             var itr = game.entitiesIterator();
             while (itr.next()) |entity| {
                 if (game.getComponent(entity, cmp.Position)) |position| {
