@@ -1,9 +1,8 @@
 const std = @import("std");
 const gm = @import("game");
 const tty = @import("tty.zig");
-const utf8 = @import("utf8");
 
-const Environment = @import("Environment.zig");
+const Runtime = @import("Runtime.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -13,13 +12,15 @@ pub fn main() !void {
         //fail test; can't try in defer as defer is executed after we return
         if (deinit_status == .leak) @panic("MEMORY LEAK DETECTED!");
     }
-    var env = try Environment.init(30, 30, alloc);
-    defer env.deinit();
-    var game = gm.ForgottenCatacomb(Environment).init(env.runtime(), alloc);
+    var arena = std.heap.ArenaAllocator.init(alloc);
+    var runtime = try Runtime.init(&arena, 30, 30);
+    defer runtime.deinit();
+    var game = gm.ForgottenCatacomb.init(alloc, runtime.any());
     defer game.deinit();
 
-    const exit = tty.Keyboard.Button{ .control = tty.Keyboard.ControlButton.ESC };
-    while (!tty.Keyboard.isKeyPressed(exit)) {
-        game.tick();
-    }
+    try runtime.run(&game);
+}
+
+test {
+    std.testing.refAllDecls(@This());
 }

@@ -293,23 +293,22 @@ test "EntitiesManager: iterator" {
     try std.testing.expectEqual(e1 + e2, entitiesSum);
 }
 
-pub fn System(comptime GameType: type) type {
-    return *const fn (game: *GameType) anyerror!void;
-}
-
 /// The global manager of all resources of the game. It must be a singleton.
 /// Every operations over entities and components should be done with this
 /// object.
-pub fn Game(comptime Components: anytype, comptime Runtime: type) type {
+pub fn Game(comptime Components: anytype, comptime Events: anytype, comptime Runtime: type) type {
     return struct {
         const Self = @This();
+
+        const System = *const fn (game: *Self) anyerror!void;
 
         const InnerState = struct {
             /// The allocator which is used for creating this inner state.
             alloc: std.mem.Allocator,
             components: ComponentsManager(Components),
             entities: EntitiesManager,
-            systems: std.ArrayList(System(Self)),
+            systems: std.ArrayList(System),
+            events: std.StaticBitSet(Events.count) = std.StaticBitSet(Events.count).initEmpty(),
 
             pub fn deinit(self: *@This()) void {
                 self.entities.deinit();
@@ -331,7 +330,7 @@ pub fn Game(comptime Components: anytype, comptime Runtime: type) type {
             return @ptrCast(@alignCast(self.inner_state));
         }
 
-        pub fn init(runtime: Runtime, alloc: std.mem.Allocator) Self {
+        pub fn init(alloc: std.mem.Allocator, runtime: Runtime) Self {
             const state = alloc.create(InnerState) catch |err|
                 std.debug.panic("The memory error {any} happened on crating the inner state of the game.", .{err});
             state.alloc = alloc;
@@ -341,7 +340,7 @@ pub fn Game(comptime Components: anytype, comptime Runtime: type) type {
                 &state.components,
                 ComponentsManager(Components).removeAllForEntityOpaque,
             );
-            state.systems = std.ArrayList(System(Self)).init(alloc);
+            state.systems = std.ArrayList(System).init(alloc);
 
             return .{ .runtime = runtime, .inner_state = state };
         }
@@ -350,7 +349,19 @@ pub fn Game(comptime Components: anytype, comptime Runtime: type) type {
             self.st().deinit();
         }
 
-        pub fn registerSystem(self: *Self, system: System(Self)) void {
+        pub fn fireEvent(self: *Self, event: Events) void {
+            self.st().events.set(event.index());
+        }
+
+        pub fn isEventFired(self: Self, event: Events) bool {
+            return self.st().events.isSet(event.index());
+        }
+
+        fn cleanupEvents(self: *Self) anyerror!void {
+            self.st().events.setRangeValue(.{ .start = 0, .end = Events.count }, false);
+        }
+
+        pub fn registerSystem(self: *Self, system: System) void {
             self.st().systems.append(system) catch |err|
                 std.debug.panic("The memory error {any} happened on registration system.", .{err});
         }
@@ -359,6 +370,7 @@ pub fn Game(comptime Components: anytype, comptime Runtime: type) type {
             for (self.st().systems.items) |system| {
                 try system(self);
             }
+            try self.cleanupEvents();
         }
 
         pub const EntityBuilder = struct {

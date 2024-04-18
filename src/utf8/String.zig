@@ -15,17 +15,29 @@ const String = @This();
 
 bytes: std.ArrayList(u8),
 
+pub fn init(alloc: std.mem.Allocator) String {
+    return .{ .bytes = std.ArrayList(u8).init(alloc) };
+}
+
 /// Allocates the byte arrays with allocator `alloc`,
 /// and copies all symbols from the string `str`.
-pub fn init(str: []const u8, alloc: std.mem.Allocator) Error!String {
+pub fn initParse(alloc: std.mem.Allocator, str: []const u8) Error!String {
     var bytes = try std.ArrayList(u8).initCapacity(alloc, str.len);
     try bytes.insertSlice(0, str);
     return .{ .bytes = bytes };
 }
 
 /// Allocates `capacity_in_bytes` bytes  with allocator `alloc`,
-pub fn initWithCapacity(capacity_in_bytes: usize, alloc: std.mem.Allocator) Error!String {
+pub fn initWithCapacity(alloc: std.mem.Allocator, capacity_in_bytes: usize) Error!String {
     return .{ .bytes = try std.ArrayList(u8).initCapacity(alloc, capacity_in_bytes) };
+}
+
+pub fn initFill(alloc: std.mem.Allocator, char: u8, count: usize) Error!String {
+    var res = String{ .bytes = try std.ArrayList(u8).initCapacity(alloc, count) };
+    for (0..count) |_| {
+        try res.bytes.append(char);
+    }
+    return res;
 }
 
 /// Frees memory allocated for this sting.
@@ -175,63 +187,63 @@ pub fn merge(self: *String, source: String, left_pad_symbols: usize) Error!void 
 
 test "should return expected symbol at specified index" {
     const alloc = std.testing.allocator;
-    const u8str = try String.init("ⒶⒷ", alloc);
+    const u8str = try String.initParse(alloc, "ⒶⒷ");
     defer u8str.deinit();
     try std.testing.expectEqual(Symbol{ .index = 0, .len = 3 }, u8str.symbolAfter(0));
 }
 
 test "should return the next symbol after the index" {
     const alloc = std.testing.allocator;
-    const u8str = try String.init("ⒶⒷ", alloc);
+    const u8str = try String.initParse(alloc, "ⒶⒷ");
     defer u8str.deinit();
     try std.testing.expectEqual(Symbol{ .index = 3, .len = 3 }, u8str.symbolAfter(1));
 }
 
 test "symbols count" {
     const alloc = std.testing.allocator;
-    const u8str = try String.init("ⒶⒷⒸ", alloc);
+    const u8str = try String.initParse(alloc, "ⒶⒷⒸ");
     defer u8str.deinit();
     try std.testing.expectEqual(3, u8str.symbolsCount());
 }
 
 test "should not count escape symbols" {
     const alloc = std.testing.allocator;
-    const u8str = try String.init("ⒶⒷⒸ\x1bⒹ", alloc);
+    const u8str = try String.initParse(alloc, "ⒶⒷⒸ\x1bⒹ");
     defer u8str.deinit();
     try std.testing.expectEqual(4, u8str.symbolsCount());
 }
 
 test "the 3 symbol should have index 10" {
     const alloc = std.testing.allocator;
-    const u8str = try String.init("ⒶⒷⒸ\x1bⒹ", alloc);
+    const u8str = try String.initParse(alloc, "ⒶⒷⒸ\x1bⒹ");
     defer u8str.deinit();
     try std.testing.expectEqual(10, u8str.indexOfSymbol(3));
 }
 
 test "merge in the middle" {
     // given:
-    var str1 = try String.init(".......", std.testing.allocator);
+    var str1 = try String.initParse(std.testing.allocator, ".......");
     defer str1.deinit();
-    var str2 = try String.init("***", std.testing.allocator);
+    var str2 = try String.initParse(std.testing.allocator, "***");
     defer str2.deinit();
 
     // when:
     try str1.merge(str2, 2);
-    
+
     // then:
     try std.testing.expectEqualStrings("..***..", str1.bytes.items);
 }
 
 test "merge to short string" {
     // given:
-    var str1 = try String.init("", std.testing.allocator);
+    var str1 = try String.initParse(std.testing.allocator, "");
     defer str1.deinit();
-    var str2 = try String.init("***", std.testing.allocator);
+    var str2 = try String.initParse(std.testing.allocator, "***");
     defer str2.deinit();
 
     // when:
     try str1.merge(str2, 2);
-    
+
     // then:
     try std.testing.expectEqualStrings("  ***", str1.bytes.items);
 }

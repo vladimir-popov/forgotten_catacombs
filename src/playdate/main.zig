@@ -4,7 +4,7 @@ const api = @import("api.zig");
 const tools = @import("tools");
 
 const Allocator = @import("Allocator.zig");
-const Environment = @import("Environment.zig");
+const Runtime = @import("Runtime.zig");
 
 const CurrentPlatform = tools.Platform.Playdate;
 
@@ -23,14 +23,14 @@ var playdate_error_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) v
 
 const GlobalState = struct {
     alloc: std.mem.Allocator,
-    environment: Environment,
-    game: gm.ForgottenCatacomb(Environment).Game,
+    runtime: Runtime,
+    game: gm.ForgottenCatacomb.Game,
 
     pub fn create(playdate: *api.PlaydateAPI) *GlobalState {
         var state: *GlobalState = @ptrCast(@alignCast(playdate.system.realloc(null, @sizeOf(GlobalState))));
         state.alloc = Allocator.allocator(playdate);
-        state.environment = Environment.init(playdate);
-        state.game = gm.ForgottenCatacomb(Environment).init(state.environment.runtime(), state.alloc);
+        state.runtime = Runtime.init(playdate);
+        state.game = gm.ForgottenCatacomb.init(state.alloc, state.runtime.any());
         return state;
     }
 };
@@ -51,7 +51,7 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
 
 fn update_and_render(userdata: ?*anyopaque) callconv(.C) c_int {
     const gst: *GlobalState = @ptrCast(@alignCast(userdata.?));
-    gst.environment.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorWhite));
+    gst.runtime.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorWhite));
     gst.game.tick() catch |err|
         std.debug.panic("Error {any} on game tick", .{err});
 

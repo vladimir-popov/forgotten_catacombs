@@ -177,26 +177,33 @@ pub fn build(b: *std.Build) !void {
     //                Step to run tests
     // ------------------------------------------------------------
 
-    // Creates a step for unit testing. This only builds the test executable
-    // but does not run it.
     const test_filters = b.option([]const []const u8, "test-filter", "Skip tests that do not match any filter") orelse &[0][]const u8{};
-    const unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/utf8/Buffer.zig" },
+    const ut_utf8 = b.addTest(.{
+        .root_source_file = .{ .path = "src/utf8/utf8.zig" },
         .target = desktop_target,
         .optimize = optimize,
         .filters = test_filters,
     });
-    unit_tests.root_module.addImport("ecs", ecs_module);
-    unit_tests.root_module.addImport("game", game_module);
-    desktop_exe.root_module.addImport("utf8", utf8_module);
+    const run_ut_utf8 = b.addRunArtifact(ut_utf8);
 
-    const run_unit_tests = b.addRunArtifact(unit_tests);
+    const ut_terminal = b.addTest(.{
+        .root_source_file = .{ .path = "src/terminal/main.zig" },
+        .target = desktop_target,
+        .optimize = optimize,
+        .filters = test_filters,
+    });
+    ut_terminal.root_module.addImport("ecs", ecs_module);
+    ut_terminal.root_module.addImport("game", game_module);
+    ut_terminal.root_module.addImport("utf8", utf8_module);
+
+    const run_ut_terminal = b.addRunArtifact(ut_terminal);
 
     // Similar to creating the run step earlier, this exposes a `test` step to
     // the `zig build --help` menu, providing a way for the user to request
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&run_unit_tests.step);
+    test_step.dependOn(&run_ut_utf8.step);
+    test_step.dependOn(&run_ut_terminal.step);
 }
 
 pub fn addCopyDirectory(

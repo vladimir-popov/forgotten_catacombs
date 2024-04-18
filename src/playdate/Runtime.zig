@@ -26,11 +26,9 @@ pub fn deinit(self: Self) void {
     self.playdate.system.realloc(self.font, 0);
 }
 
-pub fn runtime(self: *Self) game.Runtime(Self) {
+pub fn any(self: *Self) game.AnyRuntime {
     return .{
-        .environment = self,
-        .rows = 150,
-        .cols = 150,
+        .context = self,
         .vtable = .{
             .drawSprite = drawSprite,
             .readButton = readButton,
@@ -48,7 +46,8 @@ pub fn log(self: Self, comptime fmt: []const u8, args: anytype) void {
 
 // ======== Private methods: ==============
 
-fn readButton(self: *Self) anyerror!?game.Button.Type {
+fn readButton(ptr: *anyopaque) anyerror!?game.Button.Type {
+    var self: *Self = @ptrCast(@alignCast(ptr));
     var button: api.PDButtons = undefined;
     self.playdate.system.getButtonState(&button, null, null);
     if (button == 0)
@@ -57,7 +56,8 @@ fn readButton(self: *Self) anyerror!?game.Button.Type {
         return @intCast(button);
 }
 
-fn drawSprite(self: *Self, sprite: *const game.Sprite, row: u8, col: u8) anyerror!void {
+fn drawSprite(ptr: *anyopaque, sprite: *const game.Sprite, row: u8, col: u8) anyerror!void {
+    var self: *Self = @ptrCast(@alignCast(ptr));
     self.log("Draw {s}", .{sprite.letter});
     _ = self.playdate.graphics.drawText(sprite.letter.ptr, sprite.letter.len, .UTF8Encoding, col, row);
 }

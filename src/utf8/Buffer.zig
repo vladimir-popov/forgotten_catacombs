@@ -21,7 +21,7 @@ pub fn deinit(self: Buffer) void {
     self.lines.deinit();
 }
 
-pub fn parse(str: []const u8, alloc: std.mem.Allocator) Error!Buffer {
+pub fn parseInit(alloc: std.mem.Allocator, str: []const u8) Error!Buffer {
     var self: Buffer = Buffer.init(alloc);
     var t = std.mem.tokenizeAny(u8, str, "\r\n");
     while (t.next()) |line| {
@@ -40,10 +40,15 @@ pub inline fn get(self: Buffer, idx: usize) ?*String {
 
 pub fn addLine(self: *Buffer, line: []const u8) Error!void {
     const s_ptr = try self.lines.addOne();
-    s_ptr.* = try String.init(line, self.lines.allocator);
+    s_ptr.* = try String.initParse(self.lines.allocator, line);
 }
 
-pub fn addEmptyLine(self: *Buffer, capacity_in_bytes: usize) Error!void {
+pub fn addEmptyLine(self: *Buffer) Error!void {
+    const s_ptr = try self.lines.addOne();
+    s_ptr.* = String.init(self.lines.allocator);
+}
+
+pub fn addEmptyLineWithCapacity(self: *Buffer, capacity_in_bytes: usize) Error!void {
     const s_ptr = try self.lines.addOne();
     s_ptr.* = try String.initWithCapacity(capacity_in_bytes, self.lines.allocator);
 }
@@ -86,21 +91,23 @@ inline fn getLengthOfLine(self: Buffer, idx: usize) ?usize {
 /// Merges string `str` with line `row` starting from the `col` symbol.
 /// Does nothing if lines are not enough.
 pub fn mergeLine(self: *Buffer, str: []const u8, row: u8, col: u8) Error!void {
-    if (self.get(row)) |line| {
-        const string = try String.init(str, self.lines.allocator);
-        defer string.deinit();
-        try line.merge(string, col);
+    try self.addAbsentLines(row);
+    const string = try String.initParse(self.lines.allocator, str);
+    defer string.deinit();
+    try self.lines.items[row].merge(string, col);
+}
+
+fn addAbsentLines(self: *Buffer, expected_lines_count: u8) Error!void {
+    if (expected_lines_count > self.lines.items.len) {
+        for (0..(expected_lines_count - self.lines.items.len + 1)) |_| {
+            try self.addEmptyLine();
+        }
     }
 }
 
-pub fn merge(self: *Buffer, other: Buffer, lines_pad: usize, left_symbols_pad: usize) Error!void {
+pub fn merge(self: *Buffer, other: Buffer, lines_pad: u8, left_symbols_pad: u8) Error!void {
     // add lines till pad
-    if (lines_pad > self.lines.items.len) {
-        const max_len = @max(self.getLengthOfLine(0) orelse 0, other.getLengthOfLine(0) orelse 0);
-        for (0..(lines_pad - self.lines.items.len + 1)) |_| {
-            try self.addEmptyLine(max_len + left_symbols_pad);
-        }
-    }
+    try self.addAbsentLines(lines_pad);
     // merge intersection
     const min_len = @min(self.lines.items.len - lines_pad, other.lines.items.len);
     for (0..min_len) |i| {
@@ -113,7 +120,7 @@ test "parse string" {
         \\12345
         \\67890
     ;
-    const buffer = try Buffer.parse(data, std.testing.allocator);
+    const buffer = try Buffer.parseInit(std.testing.allocator, data);
     defer buffer.deinit();
 
     try std.testing.expectEqual(2, buffer.linesCount());
@@ -121,7 +128,7 @@ test "parse string" {
 
 test "should crop \r and \n symbols" {
     const data = "12345\n";
-    const buffer = try Buffer.parse(data, std.testing.allocator);
+    const buffer = try Buffer.parseInit(std.testing.allocator, data);
     defer buffer.deinit();
 
     try std.testing.expectEqual(1, buffer.linesCount());
@@ -132,7 +139,7 @@ test "should recover to the same string" {
         \\12345
         \\67890
     ;
-    const buffer = try Buffer.parse(data, std.testing.allocator);
+    const buffer = try Buffer.parseInit(std.testing.allocator, data);
     defer buffer.deinit();
 
     const str = try buffer.toCString(std.testing.allocator);
@@ -153,12 +160,29 @@ test "merge line" {
         \\...###...
         \\.........
     ;
-    var first = try Buffer.parse(str, std.testing.allocator);
-    defer first.deinit();
+    var buffer = try Buffer.parseInit(std.testing.allocator, str);
+    defer buffer.deinit();
 
     // when:
-    try first.mergeLine("###", 1, 3);
-    const actual = try first.toCString(std.testing.allocator);
+    try buffer.mergeLine("###", 1, 3);
+    const actual = try buffer.toCString(std.testing.allocator);
+    defer std.testing.allocator.free(actual);
+
+    // then:
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "merge line with empty buffer" {
+    const expected =
+        \\
+        \\   ###
+    ;
+    var buffer = Buffer.init(std.testing.allocator);
+    defer buffer.deinit();
+
+    // when:
+    try buffer.mergeLine("###", 1, 3);
+    const actual = try buffer.toCString(std.testing.allocator);
     defer std.testing.allocator.free(actual);
 
     // then:
@@ -172,9 +196,9 @@ test "merge middle buffer" {
         \\.........
         \\.........
     ;
-    var first = try Buffer.parse(str, std.testing.allocator);
+    var first = try Buffer.parseInit(std.testing.allocator, str);
     defer first.deinit();
-    var second = try Buffer.parse("###", std.testing.allocator);
+    var second = try Buffer.parseInit(std.testing.allocator, "###");
     defer second.deinit();
     const expected =
         \\.........
@@ -208,9 +232,9 @@ test "merge bigger buffer" {
         \\...###.
         \\...######
     ;
-    var first = try Buffer.parse(str1, std.testing.allocator);
+    var first = try Buffer.parseInit(std.testing.allocator, str1);
     defer first.deinit();
-    var second = try Buffer.parse(str2, std.testing.allocator);
+    var second = try Buffer.parseInit(std.testing.allocator, str2);
     defer second.deinit();
 
     // when:
@@ -234,9 +258,9 @@ test "merge buffers with utf-8 symbols" {
         \\█☺█
         \\███
     ;
-    var first = try Buffer.parse(str, std.testing.allocator);
+    var first = try Buffer.parseInit(std.testing.allocator, str);
     defer first.deinit();
-    var second = try Buffer.parse("☺", std.testing.allocator);
+    var second = try Buffer.parseInit(std.testing.allocator, "☺");
     defer second.deinit();
 
     // when:

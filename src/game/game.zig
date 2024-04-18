@@ -36,97 +36,79 @@ pub const Events = enum {
     }
 };
 
-pub fn Runtime(comptime Environment: type) type {
-    return struct {
-        const Self = @This();
+pub const AnyRuntime = struct {
+    const Self = @This();
 
-        const VTable = struct {
-            readButton: *const fn (state: *Environment) anyerror!?Button.Type,
-            drawSprite: *const fn (state: *Environment, sprite: *const cmp.Sprite, row: u8, col: u8) anyerror!void,
-        };
-
-        rows: u8,
-        cols: u8,
-        environment: *Environment,
-        vtable: VTable,
-        events: std.StaticBitSet(Events.count) = std.StaticBitSet(Events.count).initEmpty(),
-
-        pub fn fireEvent(self: *Self, event: Events) void {
-            self.events.set(event.index());
-        }
-
-        pub fn isEventFired(self: Self, event: Events) bool {
-            return self.events.isSet(event.index());
-        }
-
-        pub fn drawSprite(self: *Self, sprite: *const cmp.Sprite, row: u8, col: u8) !void {
-            try self.vtable.drawSprite(self.environment, sprite, row, col);
-        }
-
-        pub fn readButton(self: Self) !?Button.Type {
-            return try self.vtable.readButton(self.environment);
-        }
+    const VTable = struct {
+        readButton: *const fn (context: *anyopaque) anyerror!?Button.Type,
+        drawSprite: *const fn (context: *anyopaque, sprite: *const cmp.Sprite, row: u8, col: u8) anyerror!void,
     };
-}
 
-pub fn ForgottenCatacomb(comptime Environment: type) type {
-    return struct {
-        const Self = @This();
-        pub const Game = ecs.Game(cmp.AllComponents, Runtime(Environment));
+    context: *anyopaque,
+    vtable: VTable,
 
-        pub fn init(runtime: Runtime(Environment), alloc: std.mem.Allocator) Game {
-            var game: Game = Game.init(runtime, alloc);
+    pub fn drawSprite(self: *Self, sprite: *const cmp.Sprite, row: u8, col: u8) !void {
+        try self.vtable.drawSprite(self.context, sprite, row, col);
+    }
 
-            // Create entities:
-            const entity = game.newEntity();
-            ent.Player(entity);
+    pub fn readButton(self: Self) !?Button.Type {
+        return try self.vtable.readButton(self.context);
+    }
+};
 
-            // Initialize systems:
-            game.registerSystem(handleInput);
-            game.registerSystem(render);
+pub const ForgottenCatacomb = struct {
+    const Self = @This();
+    pub const Game = ecs.Game(cmp.AllComponents, Events, AnyRuntime);
 
-            game.registerSystem(cleanupEvents);
-            return game;
+
+    pub fn init(alloc: std.mem.Allocator, runtime: AnyRuntime) Game {
+        var game: Game = Game.init(alloc, runtime);
+
+        // Create entities:
+        const entity = game.newEntity();
+        ent.Player(entity);
+
+        // Initialize systems:
+        game.registerSystem(handleInput);
+        game.registerSystem(render);
+
+        return game;
+    }
+
+    fn handleInput(game: *Game) anyerror!void {
+        const btn = try game.runtime.readButton() orelse return;
+        if (!Button.isMove(btn)) return;
+
+        game.fireEvent(Events.buttonWasPressed);
+
+        const step = 1;
+        // TODO: find a way to get a level map here and replace const 50 by rows/cols
+        var entities = game.entitiesIterator();
+        while (entities.next()) |entity| {
+            if (game.getComponent(entity, cmp.Position)) |position| {
+                if (btn & Button.Up > 0 and position.row >= step)
+                    position.row -= step;
+                if (btn & Button.Down > 0 and position.row < (50 - step))
+                    position.row += step;
+                if (btn & Button.Left > 0 and position.col >= step)
+                    position.col -= step;
+                if (btn & Button.Right > 0 and position.col < (50 - step))
+                    position.col += step;
+            }
         }
+    }
 
-        fn cleanupEvents(game: *Game) anyerror!void {
-            game.runtime.events.setRangeValue(.{ .start = 0, .end = Events.count }, false);
-        }
+    fn render(game: *Game) anyerror!void {
+        if (!game.isEventFired(Events.buttonWasPressed))
+            return;
 
-        fn handleInput(game: *Game) anyerror!void {
-            const btn = try game.runtime.readButton() orelse return;
-            if (!Button.isMove(btn)) return;
-
-            game.runtime.fireEvent(Events.buttonWasPressed);
-
-            const step = 10;
-            var itr = game.entitiesIterator();
-            while (itr.next()) |entity| {
-                if (game.getComponent(entity, cmp.Position)) |position| {
-                    if (btn & Button.Up > 0 and position.row >= step)
-                        position.row -= step;
-                    if (btn & Button.Down > 0 and position.row < (game.runtime.rows - step))
-                        position.row += step;
-                    if (btn & Button.Left > 0 and position.col >= step)
-                        position.col -= step;
-                    if (btn & Button.Right > 0 and position.col < (game.runtime.cols - step))
-                        position.col += step;
+        var itr = game.entitiesIterator();
+        while (itr.next()) |entity| {
+            if (game.getComponent(entity, cmp.Position)) |position| {
+                if (game.getComponent(entity, cmp.Sprite)) |sprite| {
+                    try game.runtime.drawSprite(sprite, position.row, position.col);
                 }
             }
         }
-
-        fn render(game: *Game) anyerror!void {
-            if (!game.runtime.isEventFired(Events.buttonWasPressed))
-                return;
-
-            var itr = game.entitiesIterator();
-            while (itr.next()) |entity| {
-                if (game.getComponent(entity, cmp.Position)) |position| {
-                    if (game.getComponent(entity, cmp.Sprite)) |sprite| {
-                        try game.runtime.drawSprite(sprite, position.row, position.col);
-                    }
-                }
-            }
-        }
-    };
-}
+    }
+};

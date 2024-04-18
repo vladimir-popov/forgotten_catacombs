@@ -4,21 +4,46 @@ const c = std.c;
 
 /// Functions and constants for format text and produce special sequences.
 pub const Text = struct {
-    /// Moves the cursor on `count` symbols to the right.
+    const ESC = '\x1b';
+
+    // ED - Erase Display
+    const ED_FROM_START = csi("J");
+    const ED_TO_END = csi("1J");
+    const ED_FULL = csi("2J");
+
+    // SM – Set Mode
+    const SM_SHOW_CU = csi("?25h");
+
+    // RM – Reset Mode
+    const RM_HIDE_CU = csi("?25l");
+
+    // CUP – Cursor Position
+    const CUP = csi("H");
+
+    // DSR – Device Status Report
+    const DSR_GET_POSISION = csi("6n");
+
+    // SGR – Select Graphic Rendition
+    // Text decoration
+    const SGR_RESET = csi("m");
+    const SGR_BOLD = csi("1m");
+    const SGR_ITALIC = csi("3m");
+    const SGR_UNDERLINE = csi("4m");
+    const SGR_INVERT_COLORS = csi("7m");
+
     pub inline fn cursorRight(comptime count: u8) *const [fmt.count("\x1b[{d}", .{count}):0]u8 {
         comptime {
             return fmt.comptimePrint("\x1b[{d}C", .{count});
         }
     }
 
-    /// Moves the cursor on `count` symbols down.
     pub inline fn cursorDown(comptime count: u8) *const [fmt.count("\x1b[{d}", .{count}):0]u8 {
         comptime {
             return fmt.comptimePrint("\x1b[{d}B", .{count});
         }
     }
 
-    pub inline fn setCursor(comptime row: u8, col: u8) *const [fmt.count("\x1b[{d};{d}H", .{ row, col }):0]u8 {
+    pub inline fn setCursorPosition(comptime row: u8, comptime col: u8) *const [fmt.count("\x1b[{d};{d}H", .{ row, col }):0]u8 {
         comptime {
             return fmt.comptimePrint("\x1b[{d};{d}H", .{ row, col });
         }
@@ -49,108 +74,8 @@ pub const Text = struct {
         }
     }
 
-    const ESC = '\x1b';
-
-    // ED - Erase Display
-    const ED_FROM_START = csi("J");
-    const ED_TO_END = csi("1J");
-    const ED_FULL = csi("2J");
-
-    // SM – Set Mode
-    const SM_SHOW_CU = csi("?25h");
-
-    // RM – Reset Mode
-    const RM_HIDE_CU = csi("?25l");
-
-    // CUP – Cursor Position
-    const CUP = csi("H");
-
-    // DSR – Device Status Report
-    const DSR_GET_POSISION = csi("6n");
-
-    // SGR – Select Graphic Rendition
-    // Text decoration
-    const SGR_RESET = csi("m");
-    const SGR_BOLD = csi("1m");
-    const SGR_ITALIC = csi("3m");
-    const SGR_UNDERLINE = csi("4m");
-    const SGR_INVERT_COLORS = csi("7m");
-};
-
-pub const Keyboard = struct {
-    /// The not printable control buttons
-    pub const ControlButton = enum(u8) {
-        ENTER = 13,
-        ESC = 27,
-        BACKSPACE = 127,
-        UP = 'A',
-        DOWN = 'B',
-        LEFT = 'D',
-        RIGHT = 'C',
-
-        pub inline fn code(comptime self: ControlButton) u8 {
-            return @intFromEnum(self);
-        }
-    };
-
-    /// A keyboard buttons with printable character
-    pub const CharButton = struct { char: u8 };
-
-    /// Read code of a pressed keyboard button
-    pub const PressedButton = struct {
-        bytes: [3]u8,
-        len: usize,
-
-        pub fn button(self: @This()) Button {
-            if (self.len == 1) {
-                switch (self.bytes[0]) {
-                    ControlButton.ESC.code() => return Button{ .control = .ESC },
-                    ControlButton.ENTER.code() => return Button{ .control = .ENTER },
-                    ControlButton.BACKSPACE.code() => return Button{ .control = .BACKSPACE },
-                    ' '...'~' => return Button{ .char = CharButton{ .char = self.bytes[0] } },
-                    else => return Button{ .unknown = self },
-                }
-            }
-            if (self.len == 3) {
-                switch (self.bytes[2]) {
-                    ControlButton.UP.code() => return Button{ .control = .UP },
-                    ControlButton.DOWN.code() => return Button{ .control = .DOWN },
-                    ControlButton.LEFT.code() => return Button{ .control = .LEFT },
-                    ControlButton.RIGHT.code() => return Button{ .control = .RIGHT },
-                    else => return Button{ .unknown = self },
-                }
-            }
-            return Button{ .unknown = self };
-        }
-    };
-
-    pub const ButtonTag = enum { control, char, unknown };
-
-    /// Keyboard buttons
-    pub const Button = union(ButtonTag) {
-        control: ControlButton,
-        char: CharButton,
-        unknown: PressedButton,
-    };
-
-    pub fn readPressedKey() Button {
-        var buffer: [3]u8 = undefined;
-        const len = c.read(c.STDIN_FILENO, &buffer, buffer.len);
-        const btn = PressedButton{ .bytes = buffer, .len = @intCast(len) };
-        return btn.button();
-    }
-
-    pub fn isKeyPressed(comptime expected: Button) bool {
-        const btn = readPressedKey();
-        const expected_tag = @as(ButtonTag, expected);
-        const actual_tag = @as(ButtonTag, btn);
-        if (expected_tag != actual_tag)
-            return false;
-        switch (expected_tag) {
-            .char => return btn.char == expected.char,
-            .control => return btn.control == expected.control,
-            .unknown => return std.mem.eql(u8, btn.unknown.bytes, expected.unknown.bytes),
-        }
+    pub fn writeSetCursorPosition(writer: std.io.AnyWriter, row: u8, col: u8) !void {
+        try std.fmt.format(writer, "\x1b[{d};{d}H", .{ row, col });
     }
 };
 
@@ -213,11 +138,17 @@ pub const Display = struct {
     }
 
     pub fn exitFromRawMode(original_termios: c.termios) void {
+        clearScreen();
         _ = c.tcsetattr(c.STDIN_FILENO, .FLUSH, &original_termios);
     }
 
-    pub fn write(str: []const u8) void {
+    pub inline fn write(str: []const u8) void {
         _ = c.write(c.STDOUT_FILENO, str.ptr, str.len);
+    }
+
+    pub const writer = std.io.AnyWriter{ .context = undefined, .writeFn = writeFn };
+    fn writeFn(_: *const anyopaque, bytes: []const u8) anyerror!usize {
+        return @intCast(c.write(c.STDOUT_FILENO, bytes.ptr, bytes.len));
     }
 
     pub fn clearScreen() void {
@@ -227,6 +158,10 @@ pub const Display = struct {
         write(Text.ED_FROM_START);
     }
 
+    pub inline fn setCursorPosition(row: u8, col: u8) void {
+        _ = c.printf("\x1b[%d;%dH", row, col);
+    }
+
     pub fn hideCursor() void {
         write(Text.RM_HIDE_CU);
     }
@@ -234,8 +169,88 @@ pub const Display = struct {
     pub fn showCursor() void {
         write(Text.SM_SHOW_CU);
     }
+};
 
-    pub fn setCursorPosition(comptime row: u8, col: u8) void {
-        write(Text.setCursor(row, col));
+pub const Keyboard = struct {
+    /// The not printable control buttons
+    pub const ControlButton = enum(u8) {
+        ENTER = 13,
+        ESC = 27,
+        BACKSPACE = 127,
+        UP = 'A',
+        DOWN = 'B',
+        LEFT = 'D',
+        RIGHT = 'C',
+
+        pub inline fn code(comptime self: ControlButton) u8 {
+            return @intFromEnum(self);
+        }
+    };
+
+    /// A keyboard buttons with printable character
+    pub const CharButton = struct { char: u8 };
+
+    /// Read code of a pressed keyboard button
+    pub const PressedButton = struct {
+        bytes: [3]u8,
+        len: usize,
+
+        pub fn button(self: @This()) Button {
+            if (self.len == 1) {
+                switch (self.bytes[0]) {
+                    ControlButton.ESC.code() => return Button{ .control = .ESC },
+                    ControlButton.ENTER.code() => return Button{ .control = .ENTER },
+                    ControlButton.BACKSPACE.code() => return Button{ .control = .BACKSPACE },
+                    ' '...'~' => return Button{ .char = CharButton{ .char = self.bytes[0] } },
+                    else => return Button{ .unknown = self },
+                }
+            }
+            if (self.len == 3) {
+                switch (self.bytes[2]) {
+                    ControlButton.UP.code() => return Button{ .control = .UP },
+                    ControlButton.DOWN.code() => return Button{ .control = .DOWN },
+                    ControlButton.LEFT.code() => return Button{ .control = .LEFT },
+                    ControlButton.RIGHT.code() => return Button{ .control = .RIGHT },
+                    else => return Button{ .unknown = self },
+                }
+            }
+            return Button{ .unknown = self };
+        }
+    };
+
+    pub const ButtonTag = enum { control, char, unknown };
+
+    /// Keyboard buttons
+    pub const Button = union(ButtonTag) {
+        control: ControlButton,
+        char: CharButton,
+        unknown: PressedButton,
+    };
+
+    pub fn readPressedKey() ?Button {
+        var buffer: [3]u8 = undefined;
+        const len = c.read(c.STDIN_FILENO, &buffer, buffer.len);
+        if (len > 0) {
+            const btn = PressedButton{ .bytes = buffer, .len = @intCast(len) };
+            return btn.button();
+        } else {
+            return null;
+        }
+    }
+
+    pub fn isKeyPressed(comptime expected: Button) bool {
+        if (readPressedKey()) |btn| {
+            const expected_tag = @as(ButtonTag, expected);
+            const actual_tag = @as(ButtonTag, btn);
+            if (expected_tag != actual_tag)
+                return false;
+            switch (expected_tag) {
+                .char => return btn.char == expected.char,
+                .control => return btn.control == expected.control,
+                .unknown => return std.mem.eql(u8, btn.unknown.bytes, expected.unknown.bytes),
+            }
+        } else {
+            return false;
+        }
     }
 };
