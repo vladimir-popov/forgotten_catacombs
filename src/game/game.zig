@@ -29,6 +29,7 @@ pub const Events = enum {
 
     pub const count = @typeInfo(Self).Enum.fields.len;
 
+    gameHasBeenInitialized,
     buttonWasPressed,
 
     pub fn index(self: Self) u8 {
@@ -60,7 +61,6 @@ pub const ForgottenCatacomb = struct {
     const Self = @This();
     pub const Game = ecs.Game(cmp.AllComponents, Events, AnyRuntime);
 
-
     pub fn init(alloc: std.mem.Allocator, runtime: AnyRuntime) Game {
         var game: Game = Game.init(alloc, runtime);
 
@@ -72,6 +72,7 @@ pub const ForgottenCatacomb = struct {
         game.registerSystem(handleInput);
         game.registerSystem(render);
 
+        game.fireEvent(Events.gameHasBeenInitialized);
         return game;
     }
 
@@ -99,7 +100,7 @@ pub const ForgottenCatacomb = struct {
     }
 
     fn render(game: *Game) anyerror!void {
-        if (!game.isEventFired(Events.buttonWasPressed))
+        if (!(game.isEventFired(Events.gameHasBeenInitialized) or game.isEventFired(Events.buttonWasPressed)))
             return;
 
         var itr = game.entitiesIterator();

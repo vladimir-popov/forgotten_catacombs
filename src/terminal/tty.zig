@@ -227,7 +227,7 @@ pub const Keyboard = struct {
         unknown: PressedButton,
     };
 
-    pub fn readPressedKey() ?Button {
+    pub fn readPressedButton() ?Button {
         var buffer: [3]u8 = undefined;
         const len = c.read(c.STDIN_FILENO, &buffer, buffer.len);
         if (len > 0) {
@@ -239,7 +239,7 @@ pub const Keyboard = struct {
     }
 
     pub fn isKeyPressed(comptime expected: Button) bool {
-        if (readPressedKey()) |btn| {
+        if (readPressedButton()) |btn| {
             const expected_tag = @as(ButtonTag, expected);
             const actual_tag = @as(ButtonTag, btn);
             if (expected_tag != actual_tag)

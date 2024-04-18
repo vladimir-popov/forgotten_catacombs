@@ -91,7 +91,7 @@ inline fn getLengthOfLine(self: Buffer, idx: usize) ?usize {
 /// Merges string `str` with line `row` starting from the `col` symbol.
 /// Does nothing if lines are not enough.
 pub fn mergeLine(self: *Buffer, str: []const u8, row: u8, col: u8) Error!void {
-    try self.addAbsentLines(row);
+    try self.addAbsentLines(row + 1);
     const string = try String.initParse(self.lines.allocator, str);
     defer string.deinit();
     try self.lines.items[row].merge(string, col);

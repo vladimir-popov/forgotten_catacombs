@@ -10,15 +10,18 @@ buffer: utf8.Buffer,
 termios: std.c.termios,
 rows: u8,
 cols: u8,
+pressed_button: ?tty.Keyboard.Button = null,
 
 pub fn init(arena: *std.heap.ArenaAllocator, rows: u8, cols: u8) !Self {
-    return .{
+    const instance = Self{
         .arena = arena,
         .buffer = utf8.Buffer.init(arena.allocator()),
         .termios = tty.Display.enterRawMode(),
         .rows = rows,
         .cols = cols,
     };
+    tty.Display.hideCursor();
+    return instance;
 }
 
 pub fn deinit(self: Self) void {
@@ -43,13 +46,23 @@ pub fn resetBuffer(self: *Self) void {
     self.buffer = utf8.Buffer.init(self.arena.allocator());
 }
 
-const exit = tty.Keyboard.Button{ .control = tty.Keyboard.ControlButton.ESC };
 pub fn run(self: *Self, game: *gm.ForgottenCatacomb.Game) !void {
     tty.Display.clearScreen();
-    while (!tty.Keyboard.isKeyPressed(exit)) {
+    while (!self.isExit()) {
         try game.tick();
         try self.drawBuffer(0, 0);
         self.resetBuffer();
+    }
+}
+
+fn isExit(self: Self) bool {
+    if (self.pressed_button) |btn| {
+        switch (btn) {
+            .control => return btn.control == tty.Keyboard.ControlButton.ESC,
+            else => return false,
+        }
+    } else {
+        return false;
     }
 }
 
@@ -63,8 +76,10 @@ pub fn any(self: *Self) gm.AnyRuntime {
     };
 }
 
-fn readButton(_: *anyopaque) anyerror!?gm.Button.Type {
-    if (tty.Keyboard.readPressedKey()) |key| {
+fn readButton(ptr: *anyopaque) anyerror!?gm.Button.Type {
+    var self: *Self = @ptrCast(@alignCast(ptr));
+    self.pressed_button = tty.Keyboard.readPressedButton();
+    if (self.pressed_button) |key| {
         switch (key) {
             .char => switch (key.char.char) {
                 'f' => return gm.Button.B,
