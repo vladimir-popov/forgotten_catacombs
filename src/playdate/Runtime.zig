@@ -1,8 +1,8 @@
 const std = @import("std");
 const api = @import("api.zig");
-const game = @import("game");
+const gm = @import("game");
 const tools = @import("tools");
-const cmp = game.components;
+const cmp = gm.components;
 
 const Self = @This();
 
@@ -26,12 +26,13 @@ pub fn deinit(self: Self) void {
     self.playdate.system.realloc(self.font, 0);
 }
 
-pub fn any(self: *Self) game.AnyRuntime {
+pub fn any(self: *Self) gm.AnyRuntime {
     return .{
         .context = self,
         .vtable = .{
-            .drawSprite = drawSprite,
             .readButton = readButton,
+            .drawLevel = drawLevel,
+            .drawSprite = drawSprite,
         },
     };
 }
@@ -46,7 +47,7 @@ pub fn log(self: Self, comptime fmt: []const u8, args: anytype) void {
 
 // ======== Private methods: ==============
 
-fn readButton(ptr: *anyopaque) anyerror!?game.Button.Type {
+fn readButton(ptr: *anyopaque) anyerror!?gm.Button.Type {
     var self: *Self = @ptrCast(@alignCast(ptr));
     var button: api.PDButtons = undefined;
     self.playdate.system.getButtonState(&button, null, null);
@@ -56,7 +57,9 @@ fn readButton(ptr: *anyopaque) anyerror!?game.Button.Type {
         return @intCast(button);
 }
 
-fn drawSprite(ptr: *anyopaque, sprite: *const game.Sprite, row: u8, col: u8) anyerror!void {
+fn drawLevel(_: *anyopaque, _: *const gm.Level) anyerror!void {}
+
+fn drawSprite(ptr: *anyopaque, sprite: *const gm.Sprite, row: u8, col: u8) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     self.log("Draw {s}", .{sprite.letter});
     _ = self.playdate.graphics.drawText(sprite.letter.ptr, sprite.letter.len, .UTF8Encoding, col, row);

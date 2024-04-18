@@ -15,7 +15,7 @@ pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(alloc);
     var runtime = try Runtime.init(&arena, 30, 30);
     defer runtime.deinit();
-    var game = gm.ForgottenCatacomb.init(alloc, runtime.any());
+    var game = try gm.ForgottenCatacomb.init(alloc, runtime.any());
     defer game.deinit();
 
     try runtime.run(&game);

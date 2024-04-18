@@ -26,11 +26,11 @@ const GlobalState = struct {
     runtime: Runtime,
     game: gm.ForgottenCatacomb.Game,
 
-    pub fn create(playdate: *api.PlaydateAPI) *GlobalState {
+    pub fn create(playdate: *api.PlaydateAPI) !*GlobalState {
         var state: *GlobalState = @ptrCast(@alignCast(playdate.system.realloc(null, @sizeOf(GlobalState))));
         state.alloc = Allocator.allocator(playdate);
         state.runtime = Runtime.init(playdate);
-        state.game = gm.ForgottenCatacomb.init(state.alloc, state.runtime.any());
+        state.game = try gm.ForgottenCatacomb.init(state.alloc, state.runtime.any());
         return state;
     }
 };
@@ -41,7 +41,8 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
         .EventInit => {
             playdate_error_to_console = playdate.system.@"error";
 
-            const global_state: *anyopaque = GlobalState.create(playdate);
+            const global_state: *anyopaque = GlobalState.create(playdate) catch |err|
+                std.debug.panic("Error {any} on init global state", .{err});
             playdate.system.setUpdateCallback(update_and_render, global_state);
         },
         else => {},

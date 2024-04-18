@@ -42,18 +42,23 @@ pub const AnyRuntime = struct {
 
     const VTable = struct {
         readButton: *const fn (context: *anyopaque) anyerror!?Button.Type,
+        drawLevel: *const fn (context: *anyopaque, level: *const cmp.Level) anyerror!void,
         drawSprite: *const fn (context: *anyopaque, sprite: *const cmp.Sprite, row: u8, col: u8) anyerror!void,
     };
 
     context: *anyopaque,
     vtable: VTable,
 
-    pub fn drawSprite(self: *Self, sprite: *const cmp.Sprite, row: u8, col: u8) !void {
-        try self.vtable.drawSprite(self.context, sprite, row, col);
-    }
-
     pub fn readButton(self: Self) !?Button.Type {
         return try self.vtable.readButton(self.context);
+    }
+
+    pub fn drawLevel(self: Self, level: *const cmp.Level) !void {
+        try self.vtable.drawLevel(self.context, level);
+    }
+
+    pub fn drawSprite(self: *Self, sprite: *const cmp.Sprite, row: u8, col: u8) !void {
+        try self.vtable.drawSprite(self.context, sprite, row, col);
     }
 };
 
@@ -61,12 +66,13 @@ pub const ForgottenCatacomb = struct {
     const Self = @This();
     pub const Game = ecs.Game(cmp.AllComponents, Events, AnyRuntime);
 
-    pub fn init(alloc: std.mem.Allocator, runtime: AnyRuntime) Game {
+    pub fn init(alloc: std.mem.Allocator, runtime: AnyRuntime) !Game {
         var game: Game = Game.init(alloc, runtime);
 
         // Create entities:
         const entity = game.newEntity();
-        ent.Player(entity);
+        try ent.Level(entity, alloc, 20, 50);
+        ent.Player(entity, 2, 2);
 
         // Initialize systems:
         game.registerSystem(handleInput);
@@ -82,19 +88,22 @@ pub const ForgottenCatacomb = struct {
 
         game.fireEvent(Events.buttonWasPressed);
 
-        const step = 1;
-        // TODO: find a way to get a level map here and replace const 50 by rows/cols
+        const level = game.getComponents(cmp.Level)[0];
         var entities = game.entitiesIterator();
         while (entities.next()) |entity| {
             if (game.getComponent(entity, cmp.Position)) |position| {
-                if (btn & Button.Up > 0 and position.row >= step)
-                    position.row -= step;
-                if (btn & Button.Down > 0 and position.row < (50 - step))
-                    position.row += step;
-                if (btn & Button.Left > 0 and position.col >= step)
-                    position.col -= step;
-                if (btn & Button.Right > 0 and position.col < (50 - step))
-                    position.col += step;
+                var new_position: cmp.Position = position.*;
+                if (btn & Button.Up > 0)
+                    new_position.row -= 1;
+                if (btn & Button.Down > 0)
+                    new_position.row += 1;
+                if (btn & Button.Left > 0)
+                    new_position.col -= 1;
+                if (btn & Button.Right > 0)
+                    new_position.col += 1;
+
+                if (!level.hasWall(new_position))
+                    position.* = new_position;
             }
         }
     }
@@ -102,6 +111,9 @@ pub const ForgottenCatacomb = struct {
     fn render(game: *Game) anyerror!void {
         if (!(game.isEventFired(Events.gameHasBeenInitialized) or game.isEventFired(Events.buttonWasPressed)))
             return;
+
+        const level = game.getComponents(cmp.Level)[0];
+        try game.runtime.drawLevel(&level);
 
         var itr = game.entitiesIterator();
         while (itr.next()) |entity| {

@@ -75,7 +75,7 @@ fn ComponentArray(comptime C: type) type {
     };
 }
 
-/// The dynamically generated in compile time structure,
+/// Generated in compile time structure,
 /// which has  fields for every type from the `ComponentTypes` array.
 fn ComponentsMap(comptime ComponentTypes: anytype) type {
     var fields: [ComponentTypes.len]std.builtin.Type.StructField = undefined;
@@ -127,6 +127,10 @@ fn ComponentsManager(comptime ComponentTypes: anytype) type {
             inline for (@typeInfo(CM).Struct.fields) |field| {
                 @field(self.inner_state.components_map, field.name).deinit();
             }
+        }
+
+        pub fn getAll(self: Self, comptime C: type) []const C {
+            return @field(self.inner_state.components_map, @typeName(C)).components.items;
         }
 
         /// Returns the pointer to the component for the entity, if it was added before, or null.
@@ -297,6 +301,7 @@ test "EntitiesManager: iterator" {
 /// Every operations over entities and components should be done with this
 /// object.
 pub fn Game(comptime Components: anytype, comptime Events: anytype, comptime Runtime: type) type {
+    // TODO: add compile check of all anytypes with description of expectations
     return struct {
         const Self = @This();
 
@@ -394,6 +399,10 @@ pub fn Game(comptime Components: anytype, comptime Events: anytype, comptime Run
 
         pub fn getComponent(self: Self, entity: Entity, comptime C: type) ?*C {
             return self.st().components.getForEntity(entity, C);
+        }
+
+        pub fn getComponents(self: Self, comptime C: type) []const C {
+            return self.st().components.getAll(C);
         }
     };
 }
