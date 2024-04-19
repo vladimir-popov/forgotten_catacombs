@@ -2,11 +2,13 @@ const std = @import("std");
 const ecs = @import("ecs");
 const cmp = @import("components.zig");
 const ent = @import("entities.zig");
+const bsp = @import("bsp.zig");
 
 const panic = std.debug.panic;
 
 // ========= Export: ======================
 pub usingnamespace cmp;
+pub usingnamespace bsp;
 
 pub const Button = struct {
     pub const Type = u8;
@@ -66,12 +68,16 @@ pub const ForgottenCatacomb = struct {
     const Self = @This();
     pub const Game = ecs.Game(cmp.AllComponents, Events, AnyRuntime);
 
-    pub fn init(alloc: std.mem.Allocator, runtime: AnyRuntime) !Game {
+    pub fn init(
+        alloc: std.mem.Allocator,
+        rand: std.Random,
+        runtime: AnyRuntime,
+    ) !Game {
         var game: Game = Game.init(alloc, runtime);
 
         // Create entities:
         const entity = game.newEntity();
-        try ent.Level(entity, alloc, 20, 50);
+        try ent.Level(entity, alloc, rand, 40, 150);
         ent.Player(entity, 2, 2);
 
         // Initialize systems:
@@ -102,7 +108,7 @@ pub const ForgottenCatacomb = struct {
                 if (btn & Button.Right > 0)
                     new_position.col += 1;
 
-                if (!level.hasWall(new_position))
+                if (!level.walls.hasWall(new_position))
                     position.* = new_position;
             }
         }

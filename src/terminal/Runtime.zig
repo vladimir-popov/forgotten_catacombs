@@ -103,7 +103,7 @@ fn readButton(ptr: *anyopaque) anyerror!?gm.Button.Type {
 
 fn drawLevel(ptr: *anyopaque, level: *const gm.Level) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
-    try Render.drawLevel(self.arena.allocator(), &self.buffer, level);
+    try Render.drawWalls(self.arena.allocator(), &self.buffer, &level.walls);
 }
 
 fn drawSprite(ptr: *anyopaque, sprite: *const gm.Sprite, row: u8, col: u8) anyerror!void {

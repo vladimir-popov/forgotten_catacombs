@@ -2,10 +2,10 @@ const std = @import("std");
 const gm = @import("game");
 const utf8 = @import("utf8");
 
-pub fn drawLevel(alloc: std.mem.Allocator, buffer: *utf8.Buffer, level: *const gm.Level) !void {
-    var line = try alloc.alloc(u8, level.cols);
+pub fn drawWalls(alloc: std.mem.Allocator, buffer: *utf8.Buffer, walls: *const gm.Level.Walls) !void {
+    var line = try alloc.alloc(u8,walls.cols);
     defer alloc.free(line);
-    for (level.walls.items) |row| {
+    for (walls.bitsets.items) |row| {
         for (0..row.capacity()) |i| {
             line[i] = if (row.isSet(i)) '#' else ' ';
         }
@@ -14,20 +14,26 @@ pub fn drawLevel(alloc: std.mem.Allocator, buffer: *utf8.Buffer, level: *const g
     }
 }
 
-test "Draw level" {
+test "Draw walls" {
     // given:
     const alloc = std.testing.allocator;
     var buffer = utf8.Buffer.init(alloc);
     defer buffer.deinit();
-    const level = try gm.Level.init(alloc, 3, 5);
-    defer level.deinit();
+    var walls = try gm.Level.Walls.initEmpty(alloc, 3, 5);
+    defer walls.deinit();
+    walls.setWalls(1, 1, 5);
+    walls.setWall(2, 1);
+    walls.setWall(2, 5);
+    walls.setWalls(3, 1, 5);
+
+    defer walls.deinit();
     const expected =
         \\#####
         \\#   #
         \\#####
     ;
     // when:
-    try drawLevel(alloc, &buffer, &level);
+    try drawWalls(alloc, &buffer, &walls);
 
     // then:
     const actual = try buffer.toCString(alloc);

@@ -6,6 +6,12 @@ pub fn Player(entity_builder: anytype, init_row: u8, init_col: u8) void {
     entity_builder.addComponent(cmp.Sprite, .{ .letter = "@" });
 }
 
-pub fn Level(entity_builder: anytype, alloc: std.mem.Allocator, rows: u8, cols:u8) !void {
-    entity_builder.addComponent(cmp.Level, try cmp.Level.init(alloc, rows, cols));
+pub fn Level(
+    entity_builder: anytype,
+    alloc: std.mem.Allocator,
+    rand: std.Random,
+    rows: u8,
+    cols: u8,
+) !void {
+    entity_builder.addComponent(cmp.Level, try cmp.Level.init(alloc, rand, rows, cols));
 }

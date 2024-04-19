@@ -178,6 +178,15 @@ pub fn build(b: *std.Build) !void {
     // ------------------------------------------------------------
 
     const test_filters = b.option([]const []const u8, "test-filter", "Skip tests that do not match any filter") orelse &[0][]const u8{};
+    
+    const ut_game = b.addTest(.{
+        .root_source_file = .{ .path = "src/game/game.zig" },
+        .target = desktop_target,
+        .optimize = optimize,
+        .filters = test_filters,
+    });
+    const run_ut_game = b.addRunArtifact(ut_game);
+
     const ut_utf8 = b.addTest(.{
         .root_source_file = .{ .path = "src/utf8/utf8.zig" },
         .target = desktop_target,
@@ -202,6 +211,7 @@ pub fn build(b: *std.Build) !void {
     // the `zig build --help` menu, providing a way for the user to request
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
+    test_step.dependOn(&run_ut_game.step);
     test_step.dependOn(&run_ut_utf8.step);
     test_step.dependOn(&run_ut_terminal.step);
 }
