@@ -16,18 +16,26 @@ fn ComponentArray(comptime C: type) type {
         components: std.ArrayList(C),
         entity_index: std.AutoHashMap(Entity, u8),
         index_entity: std.AutoHashMap(u8, Entity),
+        deinit_component: *const fn (component: C) void,
 
         /// Creates instances of the inner storages.
-        fn init(alloc: std.mem.Allocator) Self {
+        fn init(
+            alloc: std.mem.Allocator,
+            deinit_component: *const fn (component: C) void,
+        ) Self {
             return .{
                 .components = std.ArrayList(C).init(alloc),
                 .entity_index = std.AutoHashMap(Entity, u8).init(alloc),
                 .index_entity = std.AutoHashMap(u8, Entity).init(alloc),
+                .deinit_component = deinit_component,
             };
         }
 
-        /// Deinits the inner storages.
+        /// Deinits the inner storages and components.
         fn deinit(self: *Self) void {
+            for (self.components.items) |component| {
+                self.deinit_component(component);
+            }
             self.components.deinit();
             self.entity_index.deinit();
             self.index_entity.deinit();
@@ -59,6 +67,9 @@ fn ComponentArray(comptime C: type) type {
                 _ = self.index_entity.remove(idx);
                 _ = self.entity_index.remove(entity);
 
+                // deinit the component before removing
+                self.deinit_component(self.components.items[idx]);
+
                 const last_idx: u8 = @intCast(self.components.items.len - 1);
                 if (idx == last_idx) {
                     _ = self.components.pop();
@@ -76,13 +87,36 @@ fn ComponentArray(comptime C: type) type {
 }
 
 /// Generated in compile time structure,
-/// which has  fields for every type from the `ComponentTypes` array.
-fn ComponentsMap(comptime ComponentTypes: anytype) type {
-    var fields: [ComponentTypes.len]std.builtin.Type.StructField = undefined;
-    for (ComponentTypes, 0..) |t, i| {
-        fields[i] = .{
-            .name = @typeName(t),
-            .type = ComponentArray(t),
+/// which has  fields for every type from the `ComponentsUnion` union.
+fn ComponentsMap(comptime ComponentsUnion: anytype) type {
+    const type_info = @typeInfo(ComponentsUnion);
+    switch (type_info) {
+        .Union => {},
+        else => @compileError(std.fmt.comptimePrint("Components have to be grouped to the tagged union, but found {any}", .{type_info})),
+    }
+    const union_fields = type_info.Union.fields;
+    if (union_fields.len == 0) {
+        @compileError("At least one component should exist");
+    }
+
+    // every type in the union should be unique:
+    var tmp: [union_fields.len]std.builtin.Type.UnionField = undefined;
+    @memcpy(&tmp, union_fields);
+    std.sort.pdq(std.builtin.Type.UnionField, &tmp, {}, compareUnionFields);
+    for (0..tmp.len - 1) |i| {
+        if (tmp[i].type == tmp[i + 1].type) {
+            @compileError(std.fmt.comptimePrint(
+                "Both fields `{s}` and `{s}` have the same type `{any}` in the `{s}`, but components should have unique types.",
+                .{ tmp[i].name, tmp[i + 1].name, tmp[i].type, @typeName(ComponentsUnion) },
+            ));
+        }
+    }
+
+    var struct_fields: [union_fields.len]std.builtin.Type.StructField = undefined;
+    for (union_fields, 0..) |f, i| {
+        struct_fields[i] = .{
+            .name = @typeName(f.type),
+            .type = ComponentArray(f.type),
             .default_value = null,
             .is_comptime = false,
             .alignment = 0,
@@ -91,40 +125,64 @@ fn ComponentsMap(comptime ComponentTypes: anytype) type {
     return @Type(.{
         .Struct = .{
             .layout = .auto,
-            .fields = fields[0..],
+            .fields = struct_fields[0..],
             .decls = &[_]std.builtin.Type.Declaration{},
             .is_tuple = false,
         },
     });
 }
 
+/// Compares types of the two union fields. Used to check uniqueness of the components
+fn compareUnionFields(_: void, a: std.builtin.Type.UnionField, b: std.builtin.Type.UnionField) bool {
+    return a.type != b.type;
+}
+
 /// The manager of the components.
-fn ComponentsManager(comptime ComponentTypes: anytype) type {
+fn ComponentsManager(comptime ComponentsUnion: type) type {
     return struct {
         const Self = @This();
-        const CM = ComponentsMap(ComponentTypes);
 
         const InnerState = struct {
-            components_map: CM,
+            components_map: ComponentsMap(ComponentsUnion),
         };
 
         inner_state: InnerState,
 
         /// Initializes every field of the inner components map.
         /// The allocator is used for allocate inner storages.
-        pub fn init(alloc: std.mem.Allocator) Self {
-            var components_map: CM = undefined;
+        pub fn init(
+            alloc: std.mem.Allocator,
+            comptime deinit_components: *const fn (component: ComponentsUnion) void,
+        ) Self {
+            var components_map: ComponentsMap(ComponentsUnion) = undefined;
 
-            inline for (@typeInfo(CM).Struct.fields) |field| {
-                @field(components_map, field.name) = field.type.init(alloc);
+            const Arrays = @typeInfo(ComponentsMap(ComponentsUnion)).Struct.fields;
+            const Components = @typeInfo(ComponentsUnion).Union.fields;
+            inline for (Arrays, Components) |array, field| {
+                @field(components_map, array.name) =
+                    array.type.init(alloc, deinitComponent(field.name, field.type, deinit_components).deinit);
             }
 
-            return .{ .inner_state = .{ .components_map = components_map } };
+            return .{ .inner_state = .{
+                .components_map = components_map,
+            } };
+        }
+
+        fn deinitComponent(
+            comptime fieldName: []const u8,
+            comptime C: type,
+            deinit_components: *const fn (component: ComponentsUnion) void,
+        ) type {
+            return struct {
+                fn deinit(component: C) void {
+                    deinit_components(@unionInit(ComponentsUnion, fieldName, component));
+                }
+            };
         }
 
         /// Cleans up all inner storages.
         pub fn deinit(self: *Self) void {
-            inline for (@typeInfo(CM).Struct.fields) |field| {
+            inline for (@typeInfo(ComponentsMap(ComponentsUnion)).Struct.fields) |field| {
                 @field(self.inner_state.components_map, field.name).deinit();
             }
         }
@@ -139,7 +197,7 @@ fn ComponentsManager(comptime ComponentTypes: anytype) type {
         }
 
         /// Adds the component of the type `C` to the entity.
-        pub fn addToEntity(self: *Self, entity: Entity, comptime C: type, component: anytype) void {
+        pub fn addToEntity(self: *Self, entity: Entity, comptime C: anytype, component: C) void {
             @field(self.inner_state.components_map, @typeName(C)).addToEntity(entity, component);
         }
 
@@ -150,28 +208,27 @@ fn ComponentsManager(comptime ComponentTypes: anytype) type {
 
         /// Removes all components from all stores which belong to the entity.
         pub fn removeAllForEntity(self: *Self, entity: Entity) void {
-            inline for (@typeInfo(CM).Struct.fields) |field| {
+            inline for (@typeInfo(ComponentsMap(ComponentsUnion)).Struct.fields) |field| {
                 @field(self.inner_state.components_map, field.name).removeFromEntity(entity);
             }
         }
 
-        fn removeAllForEntityOpaque(ptr: *anyopaque, entity: *Entity) void {
+        fn removeAllForEntityOpaque(ptr: *anyopaque, entity: Entity) void {
             var cm: *Self = @ptrCast(@alignCast(ptr));
-            cm.removeAllForEntity(entity.*);
+            cm.removeAllForEntity(entity);
         }
     };
 }
 
 test "ComponentsManager: Add/Get/Remove component" {
-    const TestComponent = struct { tag: []const u8 = undefined };
-    var manager = ComponentsManager(.{TestComponent}).init(std.testing.allocator);
+    var manager = ComponentsManager(TestComponents).init(std.testing.allocator, TestComponents.deinitAll);
     defer manager.deinit();
 
     // should return the component, which was added before
     const entity = 1;
-    manager.addToEntity(entity, TestComponent, .{ .tag = "test" });
+    manager.addToEntity(entity, TestComponent, try TestComponent.init(123));
     var component = manager.getForEntity(entity, TestComponent);
-    try std.testing.expectEqualStrings("test", component.?.tag);
+    try std.testing.expectEqual(123, component.?.state.items[0]);
 
     // should return null for entity, without requested component
     component = manager.getForEntity(entity + 1, TestComponent);
@@ -181,6 +238,8 @@ test "ComponentsManager: Add/Get/Remove component" {
     manager.removeFromEntity(entity, TestComponent);
     component = manager.getForEntity(entity, TestComponent);
     try std.testing.expectEqual(null, component);
+
+    // and finally, no memory leak should happened
 }
 
 /// The manager of the entities.
@@ -194,12 +253,12 @@ const EntitiesManager = struct {
     };
 
     inner_state: InnerState,
-    removeAllComponentsForEntity: *const fn (components_manager: *anyopaque, entity: *Entity) void,
+    removeAllComponentsForEntity: *const fn (components_manager: *anyopaque, entity: Entity) void,
 
     pub fn init(
         alloc: std.mem.Allocator,
         components_manager: *anyopaque,
-        removeAllComponentsForEntity: *const fn (components_manager: *anyopaque, entity: *Entity) void,
+        removeAllComponentsForEntity: *const fn (components_manager: *anyopaque, entity: Entity) void,
     ) Self {
         return .{
             .removeAllComponentsForEntity = removeAllComponentsForEntity,
@@ -216,7 +275,7 @@ const EntitiesManager = struct {
     pub fn deinit(self: *Self) void {
         var itr = self.inner_state.entities.iterator();
         while (itr.next()) |entity| {
-            self.removeAllComponentsForEntity(self.inner_state.components_ptr, entity.key_ptr);
+            self.removeAllComponentsForEntity(self.inner_state.components_ptr, entity.key_ptr.*);
         }
         self.inner_state.entities.deinit();
     }
@@ -258,31 +317,33 @@ const EntitiesManager = struct {
 };
 
 test "EntitiesManager: Add/Remove" {
-    const TestComponent = struct { tag: []const u8 = undefined };
-    const CM = ComponentsManager(.{TestComponent});
-    var cm = CM.init(std.testing.allocator);
+    var cm = ComponentsManager(TestComponents).init(std.testing.allocator, TestComponents.deinitAll);
     defer cm.deinit();
 
-    var em = EntitiesManager.init(std.testing.allocator, &cm, CM.removeAllForEntityOpaque);
+    var em = EntitiesManager.init(
+        std.testing.allocator,
+        &cm,
+        ComponentsManager(TestComponents).removeAllForEntityOpaque,
+    );
     defer em.deinit();
 
     const entity = em.newEntity();
-    cm.addToEntity(entity, TestComponent, .{ .tag = "test" });
+    cm.addToEntity(entity, TestComponent, try TestComponent.init(123));
+    try std.testing.expectEqual(123, cm.getForEntity(entity, TestComponent).?.state.items[0]);
 
-    // when:
     em.removeEntity(entity);
-
-    // then:
     try std.testing.expectEqual(null, cm.getForEntity(entity, TestComponent));
 }
 
 test "EntitiesManager: iterator" {
-    const TestComponent = struct { tag: []const u8 = undefined };
-    const CM = ComponentsManager(.{TestComponent});
-    var cm = CM.init(std.testing.allocator);
+    var cm = ComponentsManager(TestComponents).init(std.testing.allocator, TestComponents.deinitAll);
     defer cm.deinit();
 
-    var em = EntitiesManager.init(std.testing.allocator, &cm, CM.removeAllForEntityOpaque);
+    var em = EntitiesManager.init(
+        std.testing.allocator,
+        &cm,
+        ComponentsManager(TestComponents).removeAllForEntityOpaque,
+    );
     defer em.deinit();
 
     const e1 = em.newEntity();
@@ -335,11 +396,11 @@ pub fn Game(comptime Components: anytype, comptime Events: anytype, comptime Run
             return @ptrCast(@alignCast(self.inner_state));
         }
 
-        pub fn init(alloc: std.mem.Allocator, runtime: Runtime) Self {
+        pub fn init(alloc: std.mem.Allocator, runtime: Runtime, comptime components_deinit: *const fn (component: Components) void) Self {
             const state = alloc.create(InnerState) catch |err|
                 std.debug.panic("The memory error {any} happened on crating the inner state of the game.", .{err});
             state.alloc = alloc;
-            state.components = ComponentsManager(Components).init(alloc);
+            state.components = ComponentsManager(Components).init(alloc, components_deinit);
             state.entities = EntitiesManager.init(
                 alloc,
                 &state.components,
@@ -406,3 +467,30 @@ pub fn Game(comptime Components: anytype, comptime Events: anytype, comptime Run
         }
     };
 }
+
+// Just for tests:
+
+const TestComponent = struct {
+    const Self = @This();
+    state: std.ArrayList(u8),
+    fn init(value: u8) !Self {
+        var instance: Self = .{ .state = try std.ArrayList(u8).initCapacity(std.testing.allocator, 1) };
+        try instance.state.append(value);
+        return instance;
+    }
+
+    fn deinit(self: Self) void {
+        self.state.deinit();
+    }
+};
+const TestComponents = union(enum) {
+    const Self = @This();
+
+    foo: TestComponent,
+
+    pub fn deinitAll(self: Self) void {
+        switch (self) {
+            .foo => self.foo.deinit(),
+        }
+    }
+};

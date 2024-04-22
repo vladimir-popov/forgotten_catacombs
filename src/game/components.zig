@@ -62,4 +62,18 @@ pub const Level = struct {
     }
 };
 
-pub const AllComponents = .{ Position, Health, Sprite, Level };
+pub const Components = union(enum) {
+    const Self = @This();
+
+    position: Position,
+    health: Health,
+    sprite: Sprite,
+    level: Level,
+
+    pub fn deinit(self: Self) void {
+        switch (self) {
+            .level => self.level.deinit(),
+            else => {}
+        }
+    }
+};

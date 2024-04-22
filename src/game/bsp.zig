@@ -15,7 +15,7 @@ pub fn generateMap(
     // arena is used to build a BSP tree, which can be destroyed
     // right after completing the map.
     var arena = std.heap.ArenaAllocator.init(alloc);
-    defer _ = arena.reset(.free_all);
+    defer _ = arena.deinit();
     // BSP helps to mark regions for rooms without intersections
     const root = try BSP.buildTree(&arena, rand, rows, cols, min_rows, min_cols);
     // the generator is about filling by walls the regions marked with BSP
@@ -143,6 +143,7 @@ const BSP = struct {
         return self.first == null and self.second == null;
     }
 
+    // This is a private method. Arena should be create
     fn buildTree(
         arena: *std.heap.ArenaAllocator,
         rand: std.Random,

@@ -66,14 +66,14 @@ pub const AnyRuntime = struct {
 
 pub const ForgottenCatacomb = struct {
     const Self = @This();
-    pub const Game = ecs.Game(cmp.AllComponents, Events, AnyRuntime);
+    pub const Game = ecs.Game(cmp.Components, Events, AnyRuntime);
 
     pub fn init(
         alloc: std.mem.Allocator,
         rand: std.Random,
         runtime: AnyRuntime,
     ) !Game {
-        var game: Game = Game.init(alloc, runtime);
+        var game: Game = Game.init(alloc, runtime, cmp.Components.deinit);
 
         // Create entities:
         const entity = game.newEntity();

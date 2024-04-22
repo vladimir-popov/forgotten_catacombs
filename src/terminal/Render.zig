@@ -26,7 +26,6 @@ test "Draw walls" {
     walls.setWall(2, 5);
     walls.setWalls(3, 1, 5);
 
-    defer walls.deinit();
     const expected =
         \\#####
         \\#   #
