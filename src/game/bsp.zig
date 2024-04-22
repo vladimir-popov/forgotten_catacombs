@@ -30,7 +30,7 @@ const SimpleRoomGenerator = struct {
     rand: std.Random,
     walls: Walls,
 
-    fn bspNodeHandler(self: *Self) BSP.TraverseCallback {
+    fn bspNodeHandler(self: *Self) BSP.TraverseHandler {
         return .{ .ptr = self, .handle = handleNode };
     }
 
@@ -198,22 +198,22 @@ const BSP = struct {
         }
     }
 
-    const TraverseCallback = struct {
+    const TraverseHandler = struct {
         ptr: *anyopaque,
-        /// ptr - pointer to the context of the callback
+        /// ptr - pointer to the context of the handler
         /// node - the current node of the tree
         /// depth - the current depth
         handle: *const fn (ptr: *anyopaque, node: *BSP, depth: u8) anyerror!void,
     };
 
     /// Traverse all nodes of this tree and pass them to the callback.
-    fn traverse(self: *BSP, init_depth: u8, callback: TraverseCallback) !void {
-        try callback.handle(callback.ptr, self, init_depth);
+    fn traverse(self: *BSP, init_depth: u8, handler: TraverseHandler) !void {
+        try handler.handle(handler.ptr, self, init_depth);
         if (self.first) |first| {
-            try traverse(first, init_depth + 1, callback);
+            try traverse(first, init_depth + 1, handler);
         }
         if (self.second) |second| {
-            try traverse(second, init_depth + 1, callback);
+            try traverse(second, init_depth + 1, handler);
         }
     }
 };
@@ -237,7 +237,7 @@ const ValidateNodes = struct {
     min_rows: u8,
     min_cols: u8,
 
-    fn bspNodeHandler(self: *ValidateNodes) BSP.TraverseCallback {
+    fn bspNodeHandler(self: *ValidateNodes) BSP.TraverseHandler {
         return .{ .ptr = self, .handle = validate };
     }
 

@@ -29,8 +29,6 @@ pub const Button = struct {
 pub const Events = enum {
     const Self = @This();
 
-    pub const count = @typeInfo(Self).Enum.fields.len;
-
     gameHasBeenInitialized,
     buttonWasPressed,
 
@@ -44,19 +42,21 @@ pub const AnyRuntime = struct {
 
     const VTable = struct {
         readButton: *const fn (context: *anyopaque) anyerror!?Button.Type,
-        drawLevel: *const fn (context: *anyopaque, level: *const cmp.Level) anyerror!void,
+        drawWalls: *const fn (context: *anyopaque, walls: *const cmp.Level.Walls) anyerror!void,
         drawSprite: *const fn (context: *anyopaque, sprite: *const cmp.Sprite, row: u8, col: u8) anyerror!void,
     };
 
     context: *anyopaque,
+    alloc: std.mem.Allocator,
+    rand: std.Random,
     vtable: VTable,
 
     pub fn readButton(self: Self) !?Button.Type {
         return try self.vtable.readButton(self.context);
     }
 
-    pub fn drawLevel(self: Self, level: *const cmp.Level) !void {
-        try self.vtable.drawLevel(self.context, level);
+    pub fn drawWalls(self: Self, walls: *const cmp.Level.Walls) !void {
+        try self.vtable.drawWalls(self.context, walls);
     }
 
     pub fn drawSprite(self: *Self, sprite: *const cmp.Sprite, row: u8, col: u8) !void {
@@ -68,16 +68,12 @@ pub const ForgottenCatacomb = struct {
     const Self = @This();
     pub const Game = ecs.Game(cmp.Components, Events, AnyRuntime);
 
-    pub fn init(
-        alloc: std.mem.Allocator,
-        rand: std.Random,
-        runtime: AnyRuntime,
-    ) !Game {
-        var game: Game = Game.init(alloc, runtime, cmp.Components.deinit);
+    pub fn init(runtime: AnyRuntime) !Game {
+        var game: Game = Game.init(runtime.alloc, runtime, cmp.Components.deinit);
 
         // Create entities:
         const entity = game.newEntity();
-        try ent.Level(entity, alloc, rand, 40, 150);
+        try ent.Level(entity, runtime.alloc, runtime.rand, 40, 150);
         ent.Player(entity, 2, 2);
 
         // Initialize systems:
@@ -119,7 +115,7 @@ pub const ForgottenCatacomb = struct {
             return;
 
         const level = game.getComponents(cmp.Level)[0];
-        try game.runtime.drawLevel(&level);
+        try game.runtime.drawWalls(&level.walls);
 
         var itr = game.entitiesIterator();
         while (itr.next()) |entity| {

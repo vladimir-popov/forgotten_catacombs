@@ -6,22 +6,22 @@ const Render = @import("Render.zig");
 
 const Self = @This();
 
+alloc: std.mem.Allocator,
 arena: *std.heap.ArenaAllocator,
+rand: std.Random,
 buffer: utf8.Buffer,
 termios: std.c.termios,
-rows: u8,
-cols: u8,
 // the last read button through readButton function.
 // it is used as a buffer to check ESC outside the readButton function
 pressed_button: ?tty.Keyboard.Button = null,
 
-pub fn init(arena: *std.heap.ArenaAllocator, rows: u8, cols: u8) !Self {
+pub fn init(alloc: std.mem.Allocator, rand: std.Random, arena: *std.heap.ArenaAllocator) !Self {
     const instance = Self{
+        .alloc = alloc,
         .arena = arena,
+        .rand = rand,
         .buffer = utf8.Buffer.init(arena.allocator()),
         .termios = tty.Display.enterRawMode(),
-        .rows = rows,
-        .cols = cols,
     };
     tty.Display.hideCursor();
     return instance;
@@ -33,7 +33,10 @@ pub fn deinit(self: Self) void {
     _ = self.arena.reset(.free_all);
 }
 
-pub fn run(self: *Self, game: *gm.ForgottenCatacomb.Game) !void {
+/// Run the main loop for game, which should be
+/// the *gm.ForgottenCatacomb.Game
+/// or *DungeonsGenerator.Game
+pub fn run(self: *Self, game: anytype) !void {
     tty.Display.clearScreen();
     while (!self.isExit()) {
         try game.tick();
@@ -54,13 +57,13 @@ fn isExit(self: Self) bool {
 }
 
 // row & col begin from 1
-fn drawBuffer(self: Self, row: u8, col: u8) !void {
-    try self.writeBuffer(tty.Display.writer, row, col);
+fn drawBuffer(self: Self, rows_pad: u8, cols_pad: u8) !void {
+    try self.writeBuffer(tty.Display.writer, rows_pad, cols_pad);
 }
 
-fn writeBuffer(self: Self, writer: std.io.AnyWriter, row: u8, col: u8) !void {
-    for (self.buffer.lines.items, row..) |line, i| {
-        try tty.Text.writeSetCursorPosition(writer, @intCast(i), col);
+fn writeBuffer(self: Self, writer: std.io.AnyWriter, rows_pad: u8, cols_pad: u8) !void {
+    for (self.buffer.lines.items, rows_pad..) |line, i| {
+        try tty.Text.writeSetCursorPosition(writer, @intCast(i), cols_pad);
         _ = try writer.write(line.bytes.items);
     }
 }
@@ -73,9 +76,11 @@ fn resetBuffer(self: *Self) void {
 pub fn any(self: *Self) gm.AnyRuntime {
     return .{
         .context = self,
+        .alloc = self.alloc,
+        .rand = self.rand,
         .vtable = .{
             .readButton = readButton,
-            .drawLevel = drawLevel,
+            .drawWalls = drawWalls,
             .drawSprite = drawSprite,
         },
     };
@@ -87,6 +92,7 @@ fn readButton(ptr: *anyopaque) anyerror!?gm.Button.Type {
     if (self.pressed_button) |key| {
         switch (key) {
             .char => switch (key.char.char) {
+                ' ' => return gm.Button.A,
                 'f' => return gm.Button.B,
                 'd' => return gm.Button.A,
                 'h' => return gm.Button.Left,
@@ -101,9 +107,9 @@ fn readButton(ptr: *anyopaque) anyerror!?gm.Button.Type {
     return null;
 }
 
-fn drawLevel(ptr: *anyopaque, level: *const gm.Level) anyerror!void {
+fn drawWalls(ptr: *anyopaque, walls: *const gm.Level.Walls) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
-    try Render.drawWalls(self.arena.allocator(), &self.buffer, &level.walls);
+    try Render.drawWalls(self.arena.allocator(), &self.buffer, walls);
 }
 
 fn drawSprite(ptr: *anyopaque, sprite: *const gm.Sprite, row: u8, col: u8) anyerror!void {

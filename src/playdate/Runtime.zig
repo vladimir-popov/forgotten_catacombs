@@ -3,6 +3,7 @@ const api = @import("api.zig");
 const gm = @import("game");
 const tools = @import("tools");
 const cmp = gm.components;
+const Allocator = @import("Allocator.zig");
 
 const Self = @This();
 
@@ -27,11 +28,16 @@ pub fn deinit(self: Self) void {
 }
 
 pub fn any(self: *Self) gm.AnyRuntime {
+    var millis: c_uint = undefined;
+    _ = self.playdate.system.getSecondsSinceEpoch(&millis);
+    var rnd = std.Random.DefaultPrng.init(@intCast(millis));
     return .{
         .context = self,
+        .alloc = Allocator.allocator(self.playdate),
+        .rand = rnd.random(),
         .vtable = .{
             .readButton = readButton,
-            .drawLevel = drawLevel,
+            .drawWalls = drawWalls,
             .drawSprite = drawSprite,
         },
     };
@@ -57,7 +63,7 @@ fn readButton(ptr: *anyopaque) anyerror!?gm.Button.Type {
         return @intCast(button);
 }
 
-fn drawLevel(_: *anyopaque, _: *const gm.Level) anyerror!void {}
+fn drawWalls(_: *anyopaque, _: *const gm.Level.Walls) anyerror!void {}
 
 fn drawSprite(ptr: *anyopaque, sprite: *const gm.Sprite, row: u8, col: u8) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));

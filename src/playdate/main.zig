@@ -3,7 +3,6 @@ const gm = @import("game");
 const api = @import("api.zig");
 const tools = @import("tools");
 
-const Allocator = @import("Allocator.zig");
 const Runtime = @import("Runtime.zig");
 
 const CurrentPlatform = tools.Platform.Playdate;
@@ -22,20 +21,13 @@ pub fn panic(
 var playdate_error_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) void = undefined;
 
 const GlobalState = struct {
-    alloc: std.mem.Allocator,
-    rand: std.Random,
     runtime: Runtime,
     game: gm.ForgottenCatacomb.Game,
 
     pub fn create(playdate: *api.PlaydateAPI) !*GlobalState {
-        var millis: c_uint = undefined;
-        _ = playdate.system.getSecondsSinceEpoch(&millis);
-        var rand = std.Random.DefaultPrng.init(@intCast(millis));
         var state: *GlobalState = @ptrCast(@alignCast(playdate.system.realloc(null, @sizeOf(GlobalState))));
-        state.alloc = Allocator.allocator(playdate);
-        state.rand = rand.random();
         state.runtime = Runtime.init(playdate);
-        state.game = try gm.ForgottenCatacomb.init(state.alloc, state.rand, state.runtime.any());
+        state.game = try gm.ForgottenCatacomb.init(state.runtime.any());
         return state;
     }
 };

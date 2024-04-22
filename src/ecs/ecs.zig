@@ -361,8 +361,28 @@ test "EntitiesManager: iterator" {
 /// The global manager of all resources of the game. It must be a singleton.
 /// Every operations over entities and components should be done with this
 /// object.
+///
+/// Components - a tagged union of used components.
+/// Events - an enum (or void) of events used in the game.
+/// Runtime - a type to communicate with runtime environment: reading pressed buttons, draw sprites,
+///         play sounds, etc.
 pub fn Game(comptime Components: anytype, comptime Events: anytype, comptime Runtime: type) type {
-    // TODO: add compile check of all anytypes with description of expectations
+    switch (@typeInfo(Components)) {
+        .Union => {},
+        else => @compileError(std.fmt.comptimePrint(
+            "The Components must be a tagged union, but it is {any}",
+            .{@typeInfo(Components)},
+        )),
+    }
+    const events_count = switch (@typeInfo(Events)) {
+        .Enum => |e| e.fields.len,
+        .Void => 0,
+        else => @compileError(std.fmt.comptimePrint(
+            "The Events must be an enum or void, but it is {any}",
+            .{@typeInfo(Events)},
+        )),
+    };
+
     return struct {
         const Self = @This();
 
@@ -374,7 +394,7 @@ pub fn Game(comptime Components: anytype, comptime Events: anytype, comptime Run
             components: ComponentsManager(Components),
             entities: EntitiesManager,
             systems: std.ArrayList(System),
-            events: std.StaticBitSet(Events.count) = std.StaticBitSet(Events.count).initEmpty(),
+            events: std.StaticBitSet(events_count) = std.StaticBitSet(events_count).initEmpty(),
 
             pub fn deinit(self: *@This()) void {
                 self.entities.deinit();
@@ -424,7 +444,7 @@ pub fn Game(comptime Components: anytype, comptime Events: anytype, comptime Run
         }
 
         fn cleanupEvents(self: *Self) anyerror!void {
-            self.st().events.setRangeValue(.{ .start = 0, .end = Events.count }, false);
+            self.st().events.setRangeValue(.{ .start = 0, .end = events_count }, false);
         }
 
         pub fn registerSystem(self: *Self, system: System) void {
@@ -464,6 +484,14 @@ pub fn Game(comptime Components: anytype, comptime Events: anytype, comptime Run
 
         pub fn getComponents(self: Self, comptime C: type) []const C {
             return self.st().components.getAll(C);
+        }
+
+        pub fn addComponent(self: Self, entity: Entity, comptime C: type, component: C) void {
+            self.st().components.addToEntity(entity, C, component);
+        }
+
+        pub fn removeComponentFromEntity(self: Self, entity: Entity, comptime C: type) void {
+            self.st().components.removeFromEntity(entity, C);
         }
     };
 }

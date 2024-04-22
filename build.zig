@@ -51,21 +51,51 @@ pub fn build(b: *std.Build) !void {
     //                   Desktop files:
     // ============================================================
 
-    // Executable file to run the game in the terminal
-    const desktop_exe = b.addExecutable(.{
+    // ------------------------------------------------------------
+    //                  Forgotten Catacomb Game
+    // ------------------------------------------------------------
+    const desktop_game_exe = b.addExecutable(.{
         .name = name,
         .root_source_file = .{ .path = "src/terminal/main.zig" },
         .target = desktop_target,
         .optimize = optimize,
     });
-    desktop_exe.root_module.addImport("ecs", ecs_module);
-    desktop_exe.root_module.addImport("game", game_module);
-    desktop_exe.root_module.addImport("utf8", utf8_module);
+    desktop_game_exe.root_module.addImport("ecs", ecs_module);
+    desktop_game_exe.root_module.addImport("game", game_module);
+    desktop_game_exe.root_module.addImport("utf8", utf8_module);
+    b.installArtifact(desktop_game_exe);
 
-    // This declares intent for the executable to be installed into the
-    // standard location when the user invokes the "install" step (the default
-    // step when running `zig build`).
-    b.installArtifact(desktop_exe);
+    // Step to build and run the game in terminal
+    const run_game_cmd = b.addRunArtifact(desktop_game_exe);
+    run_game_cmd.step.dependOn(b.getInstallStep());
+    if (b.args) |args| {
+        run_game_cmd.addArgs(args);
+    }
+    const run_game_step = b.step("run", "Run the Forgotten Catacomb in the terminal");
+    run_game_step.dependOn(&run_game_cmd.step);
+
+    // ------------------------------------------------------------
+    //                   Dungeons generator
+    // ------------------------------------------------------------
+    const dungeons_exe = b.addExecutable(.{
+        .name = "Dungeons generator",
+        .root_source_file = .{ .path = "src/terminal/dungeons_generator.zig" },
+        .target = desktop_target,
+        .optimize = optimize,
+    });
+    dungeons_exe.root_module.addImport("ecs", ecs_module);
+    dungeons_exe.root_module.addImport("game", game_module);
+    dungeons_exe.root_module.addImport("utf8", utf8_module);
+    b.installArtifact(dungeons_exe);
+
+    // Step to build and run the game in terminal
+    const run_generator_cmd = b.addRunArtifact(dungeons_exe);
+    run_generator_cmd.step.dependOn(b.getInstallStep());
+    if (b.args) |args| {
+        run_generator_cmd.addArgs(args);
+    }
+    const run_generator_step = b.step("generate", "Run the dungeons generator in the terminal");
+    run_generator_step.dependOn(&run_generator_cmd.step);
 
     // ============================================================
     //                   Playdate files:
@@ -106,36 +136,6 @@ pub fn build(b: *std.Build) !void {
 
     // copy resources:
     try addCopyDirectory(writer, "assets", ".");
-
-    // ============================================================
-    //                      Create build steps
-    // ============================================================
-
-    // ------------------------------------------------------------
-    //                Step to build and run in terminal
-    // ------------------------------------------------------------
-    // This *creates* a Run step in the build graph, to be executed when another
-    // step is evaluated that depends on it. The next line below will establish
-    // such a dependency.
-    const run_cmd = b.addRunArtifact(desktop_exe);
-
-    // By making the run step depend on the install step, it will be run from the
-    // installation directory rather than directly from within the cache directory.
-    // This is not necessary, however, if the application depends on other installed
-    // files, this ensures they will be present and in the expected location.
-    run_cmd.step.dependOn(b.getInstallStep());
-
-    // This allows the user to pass arguments to the application in the build
-    // command itself, like this: `zig build run -- arg1 arg2 etc`
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
-
-    // This creates a build step. It will be visible in the `zig build --help` menu,
-    // and can be selected like this: `zig build run`
-    // This will evaluate the `run` step rather than the default, which is "install".
-    const run_step = b.step("run", "Run the Forgotten Catacomb in the terminal");
-    run_step.dependOn(&run_cmd.step);
 
     // ------------------------------------------------------------
     //                Step to run in emulator
