@@ -38,10 +38,15 @@ pub fn build(b: *std.Build) !void {
         .root_source_file = .{ .path = "src/ecs/ecs.zig" },
     });
 
+    const math_module = b.createModule(.{
+        .root_source_file = .{ .path = "src/math/math.zig" },
+    });
+
     const game_module = b.createModule(.{
         .root_source_file = .{ .path = "src/game/game.zig" },
     });
     game_module.addImport("ecs", ecs_module);
+    game_module.addImport("math", math_module);
 
     const utf8_module = b.createModule(.{
         .root_source_file = .{ .path = "src/utf8/utf8.zig" },
@@ -61,6 +66,7 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
     desktop_game_exe.root_module.addImport("ecs", ecs_module);
+    desktop_game_exe.root_module.addImport("math", math_module);
     desktop_game_exe.root_module.addImport("game", game_module);
     desktop_game_exe.root_module.addImport("utf8", utf8_module);
     b.installArtifact(desktop_game_exe);
@@ -84,6 +90,7 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
     dungeons_exe.root_module.addImport("ecs", ecs_module);
+    dungeons_exe.root_module.addImport("math", math_module);
     dungeons_exe.root_module.addImport("game", game_module);
     dungeons_exe.root_module.addImport("utf8", utf8_module);
     b.installArtifact(dungeons_exe);

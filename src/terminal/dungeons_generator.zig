@@ -4,7 +4,6 @@ const gm = @import("game");
 const tty = @import("tty.zig");
 
 const Runtime = @import("Runtime.zig");
-const Walls = gm.Level.Walls;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -16,14 +15,14 @@ pub fn main() !void {
 
     var runtime = try Runtime.init(alloc, std.crypto.random, &arena);
     defer runtime.deinit();
-    var game = try DungeonsGenerator.init(alloc, std.crypto.random, runtime.any());
+    var game = try DungeonsGenerator.init(runtime.any());
     defer game.deinit();
 
     try runtime.run(&game);
 }
 
 const Components = union(enum) {
-    dungeon: Walls,
+    dungeon: gm.Dungeon,
 
     fn deinitAll(components: Components) void {
         switch (components) {
@@ -36,18 +35,19 @@ const DungeonsGenerator = struct {
     const Self = @This();
     pub const Game = ecs.Game(Components, gm.Events, gm.AnyRuntime);
 
-    pub fn init(
-        alloc: std.mem.Allocator,
-        rand: std.Random,
-        runtime: gm.AnyRuntime,
-    ) !Game {
-        var game: Game = Game.init(alloc, runtime, Components.deinitAll);
+    pub fn init(runtime: gm.AnyRuntime) !Game {
+        var game: Game = Game.init(runtime.alloc, runtime, Components.deinitAll);
 
         // Generate dungeon:
-        const dungeon = try gm.generateMap(alloc, rand, 40, 150, 10, 10);
+        const dungeon = try gm.Dungeon.bspGenerate(
+            game.runtime.alloc,
+            game.runtime.rand,
+            gm.Dungeon.ROWS,
+            gm.Dungeon.COLS,
+        );
 
         const entity = game.newEntity();
-        entity.addComponent(Walls, dungeon);
+        entity.addComponent(gm.Dungeon, dungeon);
 
         // Initialize systems:
         game.registerSystem(handleInput);
@@ -65,10 +65,15 @@ const DungeonsGenerator = struct {
         if (btn & gm.Button.A > 0) {
             var entities = game.entitiesIterator();
             while (entities.next()) |entity| {
-                if (game.getComponent(entity, Walls)) |_| {
-                    game.removeComponentFromEntity(entity, Walls);
-                    const dungeon = try gm.generateMap(game.runtime.alloc, game.runtime.rand, 40, 150, 10, 10);
-                    game.addComponent(entity, Walls, dungeon);
+                if (game.getComponent(entity, gm.Dungeon)) |_| {
+                    game.removeComponentFromEntity(entity, gm.Dungeon);
+                    const dungeon = try gm.Dungeon.bspGenerate(
+                        game.runtime.alloc,
+                        game.runtime.rand,
+                        gm.Dungeon.ROWS,
+                        gm.Dungeon.COLS,
+                    );
+                    game.addComponent(entity, gm.Dungeon, dungeon);
                 }
             }
         }
@@ -77,8 +82,8 @@ const DungeonsGenerator = struct {
     fn render(game: *Game) anyerror!void {
         if (!(game.isEventFired(gm.Events.gameHasBeenInitialized) or game.isEventFired(gm.Events.buttonWasPressed)))
             return;
-        const walls = game.getComponents(Walls)[0];
-        try game.runtime.drawWalls(&walls);
+        const dungeon = game.getComponents(gm.Dungeon)[0];
+        try game.runtime.drawDungeon(&dungeon);
     }
 };
 

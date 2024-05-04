@@ -80,7 +80,7 @@ pub fn any(self: *Self) gm.AnyRuntime {
         .rand = self.rand,
         .vtable = .{
             .readButton = readButton,
-            .drawWalls = drawWalls,
+            .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
         },
     };
@@ -107,9 +107,9 @@ fn readButton(ptr: *anyopaque) anyerror!?gm.Button.Type {
     return null;
 }
 
-fn drawWalls(ptr: *anyopaque, walls: *const gm.Level.Walls) anyerror!void {
+fn drawDungeon(ptr: *anyopaque, dungeon: *const gm.Dungeon) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
-    try Render.drawWalls(self.arena.allocator(), &self.buffer, walls);
+    try Render.drawDungeon(self.arena.allocator(), &self.buffer, dungeon, .{ .r = 1, .c = 1, .rows = dungeon.rows, .cols = dungeon.cols });
 }
 
 fn drawSprite(ptr: *anyopaque, sprite: *const gm.Sprite, row: u8, col: u8) anyerror!void {

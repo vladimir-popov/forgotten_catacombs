@@ -37,7 +37,7 @@ pub fn any(self: *Self) gm.AnyRuntime {
         .rand = rnd.random(),
         .vtable = .{
             .readButton = readButton,
-            .drawWalls = drawWalls,
+            .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
         },
     };
@@ -63,7 +63,7 @@ fn readButton(ptr: *anyopaque) anyerror!?gm.Button.Type {
         return @intCast(button);
 }
 
-fn drawWalls(_: *anyopaque, _: *const gm.Level.Walls) anyerror!void {}
+fn drawDungeon(_: *anyopaque, _: *const gm.Dungeon) anyerror!void {}
 
 fn drawSprite(ptr: *anyopaque, sprite: *const gm.Sprite, row: u8, col: u8) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));

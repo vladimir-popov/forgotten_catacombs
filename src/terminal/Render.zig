@@ -1,11 +1,17 @@
 const std = @import("std");
 const gm = @import("game");
 const utf8 = @import("utf8");
+const m = @import("math");
 
-pub fn drawWalls(alloc: std.mem.Allocator, buffer: *utf8.Buffer, walls: *const gm.Level.Walls) !void {
-    var line = try alloc.alloc(u8,walls.cols);
+pub fn drawDungeon(
+    alloc: std.mem.Allocator,
+    buffer: *utf8.Buffer,
+    dungeon: *const gm.Dungeon,
+    region: m.Region,
+) !void {
+    var line = try alloc.alloc(u8, region.cols);
     defer alloc.free(line);
-    for (walls.bitsets.items) |row| {
+    for (dungeon.walls.items) |row| {
         for (0..row.capacity()) |i| {
             line[i] = if (row.isSet(i)) '#' else ' ';
         }
@@ -14,12 +20,12 @@ pub fn drawWalls(alloc: std.mem.Allocator, buffer: *utf8.Buffer, walls: *const g
     }
 }
 
-test "Draw walls" {
+test drawDungeon {
     // given:
     const alloc = std.testing.allocator;
     var buffer = utf8.Buffer.init(alloc);
     defer buffer.deinit();
-    var walls = try gm.Level.Walls.initEmpty(alloc, 3, 5);
+    var walls = try gm.Dungeon.initEmpty(alloc, 3, 5);
     defer walls.deinit();
     walls.setWalls(1, 1, 5);
     walls.setWall(2, 1);
@@ -32,7 +38,7 @@ test "Draw walls" {
         \\#####
     ;
     // when:
-    try drawWalls(alloc, &buffer, &walls);
+    try drawDungeon(alloc, &buffer, walls, .{ .r = 1, .c = 1, .rows = 3, .cols = 5 });
 
     // then:
     const actual = try buffer.toCString(alloc);

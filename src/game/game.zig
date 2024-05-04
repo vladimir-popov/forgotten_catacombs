@@ -42,7 +42,7 @@ pub const AnyRuntime = struct {
 
     const VTable = struct {
         readButton: *const fn (context: *anyopaque) anyerror!?Button.Type,
-        drawWalls: *const fn (context: *anyopaque, walls: *const cmp.Level.Walls) anyerror!void,
+        drawDungeon: *const fn (context: *anyopaque, dungeon: *const cmp.Dungeon) anyerror!void,
         drawSprite: *const fn (context: *anyopaque, sprite: *const cmp.Sprite, row: u8, col: u8) anyerror!void,
     };
 
@@ -55,11 +55,11 @@ pub const AnyRuntime = struct {
         return try self.vtable.readButton(self.context);
     }
 
-    pub fn drawWalls(self: Self, walls: *const cmp.Level.Walls) !void {
-        try self.vtable.drawWalls(self.context, walls);
+    pub fn drawDungeon(self: Self, dungeon: *const cmp.Dungeon) !void {
+        try self.vtable.drawDungeon(self.context, dungeon);
     }
 
-    pub fn drawSprite(self: *Self, sprite: *const cmp.Sprite, row: u8, col: u8) !void {
+    pub fn drawSprite(self: Self, sprite: *const cmp.Sprite, row: u8, col: u8) !void {
         try self.vtable.drawSprite(self.context, sprite, row, col);
     }
 };
@@ -73,7 +73,7 @@ pub const ForgottenCatacomb = struct {
 
         // Create entities:
         const entity = game.newEntity();
-        try ent.Level(entity, runtime.alloc, runtime.rand, 40, 150);
+        try ent.Level(entity, runtime.alloc, runtime.rand);
         ent.Player(entity, 2, 2);
 
         // Initialize systems:
@@ -104,7 +104,7 @@ pub const ForgottenCatacomb = struct {
                 if (btn & Button.Right > 0)
                     new_position.col += 1;
 
-                if (!level.walls.hasWall(new_position))
+                if (!level.dungeon.hasWall(new_position.row, new_position.col))
                     position.* = new_position;
             }
         }
@@ -115,7 +115,7 @@ pub const ForgottenCatacomb = struct {
             return;
 
         const level = game.getComponents(cmp.Level)[0];
-        try game.runtime.drawWalls(&level.walls);
+        try game.runtime.drawDungeon(&level.dungeon);
 
         var itr = game.entitiesIterator();
         while (itr.next()) |entity| {
