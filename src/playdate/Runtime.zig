@@ -1,8 +1,8 @@
 const std = @import("std");
 const api = @import("api.zig");
-const gm = @import("game");
+const game = @import("game");
 const tools = @import("tools");
-const cmp = gm.components;
+const cmp = game.components;
 const Allocator = @import("Allocator.zig");
 
 const Self = @This();
@@ -27,7 +27,7 @@ pub fn deinit(self: Self) void {
     self.playdate.system.realloc(self.font, 0);
 }
 
-pub fn any(self: *Self) gm.AnyRuntime {
+pub fn any(self: *Self) game.AnyRuntime {
     var millis: c_uint = undefined;
     _ = self.playdate.system.getSecondsSinceEpoch(&millis);
     var rnd = std.Random.DefaultPrng.init(@intCast(millis));
@@ -53,7 +53,7 @@ pub fn log(self: Self, comptime fmt: []const u8, args: anytype) void {
 
 // ======== Private methods: ==============
 
-fn readButton(ptr: *anyopaque) anyerror!?gm.Button.Type {
+fn readButton(ptr: *anyopaque) anyerror!?game.Button.Type {
     var self: *Self = @ptrCast(@alignCast(ptr));
     var button: api.PDButtons = undefined;
     self.playdate.system.getButtonState(&button, null, null);
@@ -63,9 +63,9 @@ fn readButton(ptr: *anyopaque) anyerror!?gm.Button.Type {
         return @intCast(button);
 }
 
-fn drawDungeon(_: *anyopaque, _: *const gm.Dungeon) anyerror!void {}
+fn drawDungeon(_: *anyopaque, _: *const game.Dungeon) anyerror!void {}
 
-fn drawSprite(ptr: *anyopaque, sprite: *const gm.Sprite, row: u8, col: u8) anyerror!void {
+fn drawSprite(ptr: *anyopaque, sprite: *const game.Sprite, row: u8, col: u8) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     self.log("Draw {s}", .{sprite.letter});
     _ = self.playdate.graphics.drawText(sprite.letter.ptr, sprite.letter.len, .UTF8Encoding, col, row);

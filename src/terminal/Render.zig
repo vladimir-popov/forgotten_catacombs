@@ -1,12 +1,12 @@
 const std = @import("std");
-const gm = @import("game");
+const game = @import("game");
 const utf8 = @import("utf8");
 const m = @import("math");
 
 pub fn drawDungeon(
     alloc: std.mem.Allocator,
     buffer: *utf8.Buffer,
-    dungeon: *const gm.Dungeon,
+    dungeon: *const game.Dungeon,
     region: m.Region,
 ) !void {
     var line = try alloc.alloc(u8, region.cols);
@@ -25,7 +25,7 @@ test drawDungeon {
     const alloc = std.testing.allocator;
     var buffer = utf8.Buffer.init(alloc);
     defer buffer.deinit();
-    var walls = try gm.Dungeon.initEmpty(alloc, 3, 5);
+    var walls = try game.Dungeon.initEmpty(alloc, 3, 5);
     defer walls.deinit();
     walls.setWalls(1, 1, 5);
     walls.setWall(2, 1);

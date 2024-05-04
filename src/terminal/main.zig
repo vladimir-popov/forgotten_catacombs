@@ -1,5 +1,5 @@
 const std = @import("std");
-const gm = @import("game");
+const game = @import("game");
 const tty = @import("tty.zig");
 
 const Runtime = @import("Runtime.zig");
@@ -14,10 +14,10 @@ pub fn main() !void {
 
     var runtime = try Runtime.init(alloc, std.crypto.random, &arena);
     defer runtime.deinit();
-    var game = try gm.ForgottenCatacomb.init(runtime.any());
-    defer game.deinit();
+    var universe = try game.ForgottenCatacomb.init(runtime.any());
+    defer universe.deinit();
 
-    try runtime.run(&game);
+    try runtime.run(&universe);
 }
 
 test {

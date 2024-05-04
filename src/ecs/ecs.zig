@@ -366,7 +366,7 @@ test "EntitiesManager: iterator" {
 /// Events - an enum (or void) of events used in the game.
 /// Runtime - a type to communicate with runtime environment: reading pressed buttons, draw sprites,
 ///         play sounds, etc.
-pub fn Game(comptime Components: anytype, comptime Events: anytype, comptime Runtime: type) type {
+pub fn Universe(comptime Components: anytype, comptime Events: anytype, comptime Runtime: type) type {
     switch (@typeInfo(Components)) {
         .Union => {},
         else => @compileError(std.fmt.comptimePrint(

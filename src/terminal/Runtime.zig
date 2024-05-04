@@ -1,5 +1,5 @@
 const std = @import("std");
-const gm = @import("game");
+const game = @import("game");
 const tty = @import("tty.zig");
 const utf8 = @import("utf8");
 const Render = @import("Render.zig");
@@ -34,12 +34,12 @@ pub fn deinit(self: Self) void {
 }
 
 /// Run the main loop for game, which should be
-/// the *gm.ForgottenCatacomb.Game
-/// or *DungeonsGenerator.Game
-pub fn run(self: *Self, game: anytype) !void {
+/// the *gm.ForgottenCatacomb.Universe
+/// or *DungeonsGenerator.Universe
+pub fn run(self: *Self, universe: anytype) !void {
     tty.Display.clearScreen();
     while (!self.isExit()) {
-        try game.tick();
+        try universe.tick();
         try self.drawBuffer(1, 1);
         self.resetBuffer();
     }
@@ -73,7 +73,7 @@ fn resetBuffer(self: *Self) void {
     self.buffer = utf8.Buffer.init(self.arena.allocator());
 }
 
-pub fn any(self: *Self) gm.AnyRuntime {
+pub fn any(self: *Self) game.AnyRuntime {
     return .{
         .context = self,
         .alloc = self.alloc,
@@ -86,19 +86,19 @@ pub fn any(self: *Self) gm.AnyRuntime {
     };
 }
 
-fn readButton(ptr: *anyopaque) anyerror!?gm.Button.Type {
+fn readButton(ptr: *anyopaque) anyerror!?game.Button.Type {
     var self: *Self = @ptrCast(@alignCast(ptr));
     self.pressed_button = tty.Keyboard.readPressedButton();
     if (self.pressed_button) |key| {
         switch (key) {
             .char => switch (key.char.char) {
-                ' ' => return gm.Button.A,
-                'f' => return gm.Button.B,
-                'd' => return gm.Button.A,
-                'h' => return gm.Button.Left,
-                'j' => return gm.Button.Down,
-                'k' => return gm.Button.Up,
-                'l' => return gm.Button.Right,
+                ' ' => return game.Button.A,
+                'f' => return game.Button.B,
+                'd' => return game.Button.A,
+                'h' => return game.Button.Left,
+                'j' => return game.Button.Down,
+                'k' => return game.Button.Up,
+                'l' => return game.Button.Right,
                 else => return null,
             },
             else => return null,
@@ -107,12 +107,12 @@ fn readButton(ptr: *anyopaque) anyerror!?gm.Button.Type {
     return null;
 }
 
-fn drawDungeon(ptr: *anyopaque, dungeon: *const gm.Dungeon) anyerror!void {
+fn drawDungeon(ptr: *anyopaque, dungeon: *const game.Dungeon) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     try Render.drawDungeon(self.arena.allocator(), &self.buffer, dungeon, .{ .r = 1, .c = 1, .rows = dungeon.rows, .cols = dungeon.cols });
 }
 
-fn drawSprite(ptr: *anyopaque, sprite: *const gm.Sprite, row: u8, col: u8) anyerror!void {
+fn drawSprite(ptr: *anyopaque, sprite: *const game.Sprite, row: u8, col: u8) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     try self.buffer.mergeLine(sprite.letter, row - 1, col - 1);
 }

@@ -1,5 +1,5 @@
 const std = @import("std");
-const gm = @import("game");
+const game = @import("game");
 const api = @import("api.zig");
 const tools = @import("tools");
 
@@ -22,12 +22,12 @@ var playdate_error_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) v
 
 const GlobalState = struct {
     runtime: Runtime,
-    game: gm.ForgottenCatacomb.Game,
+    universe: game.ForgottenCatacomb.Universe,
 
     pub fn create(playdate: *api.PlaydateAPI) !*GlobalState {
         var state: *GlobalState = @ptrCast(@alignCast(playdate.system.realloc(null, @sizeOf(GlobalState))));
         state.runtime = Runtime.init(playdate);
-        state.game = try gm.ForgottenCatacomb.init(state.runtime.any());
+        state.universe = try game.ForgottenCatacomb.init(state.runtime.any());
         return state;
     }
 };
@@ -50,7 +50,7 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
 fn update_and_render(userdata: ?*anyopaque) callconv(.C) c_int {
     const gst: *GlobalState = @ptrCast(@alignCast(userdata.?));
     gst.runtime.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorWhite));
-    gst.game.tick() catch |err|
+    gst.universe.tick() catch |err|
         std.debug.panic("Error {any} on game tick", .{err});
 
     //returning 1 signals to the OS to draw the frame.

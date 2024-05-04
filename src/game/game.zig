@@ -66,34 +66,34 @@ pub const AnyRuntime = struct {
 
 pub const ForgottenCatacomb = struct {
     const Self = @This();
-    pub const Game = ecs.Game(cmp.Components, Events, AnyRuntime);
+    pub const Universe = ecs.Universe(cmp.Components, Events, AnyRuntime);
 
-    pub fn init(runtime: AnyRuntime) !Game {
-        var game: Game = Game.init(runtime.alloc, runtime, cmp.Components.deinit);
+    pub fn init(runtime: AnyRuntime) !Universe {
+        var universe: Universe = Universe.init(runtime.alloc, runtime, cmp.Components.deinit);
 
         // Create entities:
-        const entity = game.newEntity();
+        const entity = universe.newEntity();
         try ent.Level(entity, runtime.alloc, runtime.rand);
         ent.Player(entity, 2, 2);
 
         // Initialize systems:
-        game.registerSystem(handleInput);
-        game.registerSystem(render);
+        universe.registerSystem(handleInput);
+        universe.registerSystem(render);
 
-        game.fireEvent(Events.gameHasBeenInitialized);
-        return game;
+        universe.fireEvent(Events.gameHasBeenInitialized);
+        return universe;
     }
 
-    fn handleInput(game: *Game) anyerror!void {
-        const btn = try game.runtime.readButton() orelse return;
+    fn handleInput(universe: *Universe) anyerror!void {
+        const btn = try universe.runtime.readButton() orelse return;
         if (!Button.isMove(btn)) return;
 
-        game.fireEvent(Events.buttonWasPressed);
+        universe.fireEvent(Events.buttonWasPressed);
 
-        const level = game.getComponents(cmp.Level)[0];
-        var entities = game.entitiesIterator();
+        const level = universe.getComponents(cmp.Level)[0];
+        var entities = universe.entitiesIterator();
         while (entities.next()) |entity| {
-            if (game.getComponent(entity, cmp.Position)) |position| {
+            if (universe.getComponent(entity, cmp.Position)) |position| {
                 var new_position: cmp.Position = position.*;
                 if (btn & Button.Up > 0)
                     new_position.row -= 1;
@@ -110,18 +110,18 @@ pub const ForgottenCatacomb = struct {
         }
     }
 
-    fn render(game: *Game) anyerror!void {
-        if (!(game.isEventFired(Events.gameHasBeenInitialized) or game.isEventFired(Events.buttonWasPressed)))
+    fn render(universe: *Universe) anyerror!void {
+        if (!(universe.isEventFired(Events.gameHasBeenInitialized) or universe.isEventFired(Events.buttonWasPressed)))
             return;
 
-        const level = game.getComponents(cmp.Level)[0];
-        try game.runtime.drawDungeon(&level.dungeon);
+        const level = universe.getComponents(cmp.Level)[0];
+        try universe.runtime.drawDungeon(&level.dungeon);
 
-        var itr = game.entitiesIterator();
+        var itr = universe.entitiesIterator();
         while (itr.next()) |entity| {
-            if (game.getComponent(entity, cmp.Position)) |position| {
-                if (game.getComponent(entity, cmp.Sprite)) |sprite| {
-                    try game.runtime.drawSprite(sprite, position.row, position.col);
+            if (universe.getComponent(entity, cmp.Position)) |position| {
+                if (universe.getComponent(entity, cmp.Sprite)) |sprite| {
+                    try universe.runtime.drawSprite(sprite, position.row, position.col);
                 }
             }
         }
