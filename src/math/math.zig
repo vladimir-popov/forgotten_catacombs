@@ -1,3 +1,8 @@
-const geometry = @import("geometry.zig");
+const std = @import("std");
 
-pub usingnamespace geometry;
+pub const Tree = @import("Tree.zig");
+pub usingnamespace @import("geometry.zig");
+
+test {
+    std.testing.refAllDecls(@This());
+}

@@ -10,6 +10,10 @@ pub const Region = struct {
     /// The count of columns in this region.
     cols: u8,
 
+    pub inline fn isHorizontal(self: Region) bool {
+        return self.cols > self.rows;
+    }
+
     /// Returns true if this region has less rows or columns than passed minimal
     /// values.
     pub inline fn lessThan(self: Region, min_rows: u8, min_cols: u8) bool {

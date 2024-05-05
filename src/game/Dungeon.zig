@@ -6,15 +6,16 @@ const RoomGenerator = @import("RoomGenerator.zig");
 const Dungeon = @This();
 const Walls = std.ArrayList(std.DynamicBitSet);
 
+// Playdate resolution: w:400 × h:240 pixels
 pub const ROWS: u8 = 40;
-pub const COLS: u8 = 80;
+pub const COLS: u8 = 100;
 
 rows: u8,
 cols: u8,
 walls: Walls,
 
-pub fn initEmpty(alloc: std.mem.Allocator, rows: u8, cols: u8) Dungeon {
-    return .{ .walls = try initWalls(alloc, rows, cols), .rows = rows, .cols = cols };
+pub fn initEmpty(alloc: std.mem.Allocator, rows: u8, cols: u8) !Dungeon {
+    return .{ .rows = rows, .cols = cols, .walls = try initWalls(alloc, rows, cols) };
 }
 
 fn initWalls(alloc: std.mem.Allocator, rows: u8, cols: u8) !Walls {
@@ -67,7 +68,7 @@ pub fn bspGenerate(
     // rooms generator to fill regions
     const rooms = RoomGenerator.simpleRooms();
     // BSP helps to mark regions for rooms without intersections
-    const root = try bsp.buildTree(&arena, rand, rows, cols, 10, 10);
+    const root = try bsp.buildTree(&arena, rand, rows, cols, 8, 15);
     // visit every BSP node and generate rooms in the leafs
     var bspNodeHandler: BspTraverseAndGenerate = .{ .rooms = rooms, .dungeon = &dungeon };
     try root.traverse(0, bspNodeHandler.handler());
@@ -78,13 +79,13 @@ const BspTraverseAndGenerate = struct {
     rooms: RoomGenerator,
     dungeon: *Dungeon,
 
-    fn handler(self: *BspTraverseAndGenerate) bsp.TraverseHandler {
+    fn handler(self: *BspTraverseAndGenerate) bsp.Tree.TraverseHandler {
         return .{ .ptr = self, .handle = handleNode };
     }
 
-    fn handleNode(ptr: *anyopaque, node: *bsp.Node, _: u8) anyerror!void {
+    fn handleNode(ptr: *anyopaque, node: *bsp.Tree, _: u8) anyerror!void {
         if (!node.isLeaf()) return;
         const self: *BspTraverseAndGenerate = @ptrCast(@alignCast(ptr));
-        try self.rooms.generateRoom(self.dungeon, node.region.r, node.region.c, node.region.rows, node.region.cols);
+        try self.rooms.generateRoom(self.dungeon, node.value.r, node.value.c, node.value.rows, node.value.cols);
     }
 };

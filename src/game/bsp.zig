@@ -2,6 +2,7 @@ const std = @import("std");
 const math = @import("math");
 
 const Region = math.Region;
+pub const Tree = math.Tree.Node(Region);
 
 /// Builds graph of regions splitting the original region with `rows` and `cols`
 /// on smaller regions with minimum `min_rows` or `min_cols`. A region from any
@@ -15,82 +16,35 @@ pub fn buildTree(
     cols: u8,
     min_rows: u8,
     min_cols: u8,
-) !*Node {
+) !*Tree {
     const region = Region{ .r = 1, .c = 1, .rows = rows, .cols = cols };
     std.debug.assert(!region.lessThan(min_rows, min_cols));
 
     var alloc = arena.allocator();
-    var root: *Node = try alloc.create(Node);
-    root.* = .{ .region = region, .is_horizontal = true };
-    try root.split(alloc, rand, min_rows, min_cols);
+    var splitter = Splitter{ .rand = rand, .min_rows = min_rows, .min_cols = min_cols };
+    var root: *Tree = try alloc.create(Tree);
+    root.* = .{ .value = region };
+    try root.split(alloc, 0, splitter.handler());
 
     return root;
 }
 
-pub const Node = struct {
-    parent: ?*Node = null,
-    first: ?*Node = null,
-    second: ?*Node = null,
-    region: Region,
-    is_horizontal: bool,
+const Splitter = struct {
+    rand: std.Random,
+    min_rows: u8,
+    min_cols: u8,
 
-    pub inline fn isLeaf(self: *const Node) bool {
-        return self.first == null and self.second == null;
-    }
-
-    /// Splits recursively the node until it possible, or does nothing.
-    fn split(
-        self: *Node,
-        alloc: std.mem.Allocator,
-        rand: std.Random,
-        min_rows: u8,
-        min_cols: u8,
-    ) !void {
-        std.debug.assert(self.first == null);
-        std.debug.assert(self.second == null);
-
-        const maybe_regions = if (self.is_horizontal)
-            self.region.splitVerticaly(rand, min_cols)
+    fn split(ptr: *anyopaque, node: *Tree, _: u8) anyerror!?struct { Region, Region } {
+        const self: *Splitter = @ptrCast(@alignCast(ptr));
+        return if (node.value.isHorizontal())
+            node.value.splitVerticaly(self.rand, self.min_cols)
         else
-            self.region.splitHorizontaly(rand, min_rows);
-
-        if (maybe_regions) |regions| {
-            self.first = try alloc.create(Node);
-            self.first.?.* = Node{
-                .parent = self,
-                .region = regions[0],
-                .is_horizontal = !self.is_horizontal,
-            };
-            try self.first.?.split(alloc, rand, min_rows, min_cols);
-
-            self.second = try alloc.create(Node);
-            self.second.?.* = Node{
-                .parent = self,
-                .region = regions[1],
-                .is_horizontal = !self.is_horizontal,
-            };
-            try self.second.?.split(alloc, rand, min_rows, min_cols);
-        }
+            node.value.splitHorizontaly(self.rand, self.min_rows);
     }
 
-    /// Traverse all nodes of this tree and pass them to the callback.
-    pub fn traverse(self: *Node, init_depth: u8, handler: TraverseHandler) !void {
-        try handler.handle(handler.ptr, self, init_depth);
-        if (self.first) |first| {
-            try traverse(first, init_depth + 1, handler);
-        }
-        if (self.second) |second| {
-            try traverse(second, init_depth + 1, handler);
-        }
+    fn handler(self: *Splitter) Tree.SplitHandler {
+        return .{ .ptr = self, .split = split };
     }
-};
-
-pub const TraverseHandler = struct {
-    ptr: *anyopaque,
-    /// ptr - pointer to the context of the handler
-    /// node - the current node of the tree
-    /// depth - the current depth
-    handle: *const fn (ptr: *anyopaque, node: *Node, depth: u8) anyerror!void,
 };
 
 const expect = std.testing.expect;
@@ -115,15 +69,15 @@ const ValidateNodes = struct {
     min_rows: u8,
     min_cols: u8,
 
-    fn bspNodeHandler(self: *ValidateNodes) Node.TraverseHandler {
+    fn bspNodeHandler(self: *ValidateNodes) Tree.TraverseHandler {
         return .{ .ptr = self, .handle = validate };
     }
 
-    fn validate(ptr: *anyopaque, root: *Node, depth: u8) anyerror!void {
+    fn validate(ptr: *anyopaque, root: *Tree, depth: u8) anyerror!void {
         const self: *ValidateNodes = @ptrCast(@alignCast(ptr));
 
-        expect(!root.region.lessThan(self.min_rows, self.min_cols)) catch |err| {
-            std.debug.print("The root region {any} is less than {d}x{d}\n", .{ root.region, self.min_rows, self.min_cols });
+        expect(!root.value.lessThan(self.min_rows, self.min_cols)) catch |err| {
+            std.debug.print("The root region {any} is less than {d}x{d}\n", .{ root.value, self.min_rows, self.min_cols });
             return err;
         };
         if (root.first) |first| {
@@ -137,22 +91,22 @@ const ValidateNodes = struct {
     fn validateChild(
         self: *ValidateNodes,
         name: []const u8,
-        root: *Node,
-        node: *Node,
+        root: *Tree,
+        node: *Tree,
         depth: u8,
     ) !void {
-        expect(root.region.contains(node.region)) catch |err| {
+        expect(root.value.contains(node.value)) catch |err| {
             std.debug.print(
-                "The {s} region {any} doesn't contained in the root {any} on the depth {d}",
-                .{ name, node.region, root.region, depth },
+                "The {s} region {any} doesn't contained in the root {any} on the depth {d}\n",
+                .{ name, node.value, root.value, depth },
             );
             return err;
         };
-        expect(!root.region.lessThan(self.min_rows, self.min_cols)) catch |err| {
+        expect(!root.value.lessThan(self.min_rows, self.min_cols)) catch |err| {
             std.debug.print("The {s} region {any} of the root {any} is less than {d}x{d}\n", .{
                 name,
-                node.region,
-                root.region,
+                node.value,
+                root.value,
                 self.min_rows,
                 self.min_cols,
             });

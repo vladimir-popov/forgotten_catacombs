@@ -59,20 +59,20 @@ pub fn build(b: *std.Build) !void {
     // ------------------------------------------------------------
     //                  Forgotten Catacomb Game
     // ------------------------------------------------------------
-    const desktop_game_exe = b.addExecutable(.{
+    const terminal_game_exe = b.addExecutable(.{
         .name = name,
         .root_source_file = .{ .path = "src/terminal/main.zig" },
         .target = desktop_target,
         .optimize = optimize,
     });
-    desktop_game_exe.root_module.addImport("ecs", ecs_module);
-    desktop_game_exe.root_module.addImport("math", math_module);
-    desktop_game_exe.root_module.addImport("game", game_module);
-    desktop_game_exe.root_module.addImport("utf8", utf8_module);
-    b.installArtifact(desktop_game_exe);
+    terminal_game_exe.root_module.addImport("ecs", ecs_module);
+    terminal_game_exe.root_module.addImport("math", math_module);
+    terminal_game_exe.root_module.addImport("game", game_module);
+    terminal_game_exe.root_module.addImport("utf8", utf8_module);
+    b.installArtifact(terminal_game_exe);
 
     // Step to build and run the game in terminal
-    const run_game_cmd = b.addRunArtifact(desktop_game_exe);
+    const run_game_cmd = b.addRunArtifact(terminal_game_exe);
     run_game_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
         run_game_cmd.addArgs(args);
@@ -186,6 +186,14 @@ pub fn build(b: *std.Build) !void {
 
     const test_filters = b.option([]const []const u8, "test-filter", "Skip tests that do not match any filter") orelse &[0][]const u8{};
     
+    const ut_math = b.addTest(.{
+        .root_source_file = .{ .path = "src/math/math.zig" },
+        .target = desktop_target,
+        .optimize = optimize,
+        .filters = test_filters,
+    });
+    const run_ut_math = b.addRunArtifact(ut_math);
+    
     const ut_ecs = b.addTest(.{
         .root_source_file = .{ .path = "src/ecs/ecs.zig" },
         .target = desktop_target,
@@ -200,6 +208,8 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
         .filters = test_filters,
     });
+    ut_game.root_module.addImport("math", math_module);
+
     const run_ut_game = b.addRunArtifact(ut_game);
 
     const ut_utf8 = b.addTest(.{
@@ -216,6 +226,7 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
         .filters = test_filters,
     });
+    ut_terminal.root_module.addImport("math", math_module);
     ut_terminal.root_module.addImport("ecs", ecs_module);
     ut_terminal.root_module.addImport("game", game_module);
     ut_terminal.root_module.addImport("utf8", utf8_module);
@@ -227,6 +238,7 @@ pub fn build(b: *std.Build) !void {
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_ut_ecs.step);
+    test_step.dependOn(&run_ut_math.step);
     test_step.dependOn(&run_ut_game.step);
     test_step.dependOn(&run_ut_utf8.step);
     test_step.dependOn(&run_ut_terminal.step);

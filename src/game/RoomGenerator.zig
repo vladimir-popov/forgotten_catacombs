@@ -22,8 +22,8 @@ const SimpleRoomGenerator = struct {
     /// Create rectangle of walls inside the region.
     fn generate(_: *anyopaque, dungeon: *Dungeon, top_row: u8, left_col: u8, rows: u8, cols: u8) anyerror!void {
         const margin: u8 = 4;
-        const r: u8 = top_row + margin;
-        const c: u8 = left_col + margin;
+        const r = top_row;
+        const c = left_col;
         const rs: u8 = rows - margin;
         const cs: u8 = cols - margin;
         for (r..(r + rs)) |i| {

@@ -25,12 +25,12 @@ test drawDungeon {
     const alloc = std.testing.allocator;
     var buffer = utf8.Buffer.init(alloc);
     defer buffer.deinit();
-    var walls = try game.Dungeon.initEmpty(alloc, 3, 5);
-    defer walls.deinit();
-    walls.setWalls(1, 1, 5);
-    walls.setWall(2, 1);
-    walls.setWall(2, 5);
-    walls.setWalls(3, 1, 5);
+    var dungeon = try game.Dungeon.initEmpty(alloc, 3, 5);
+    defer dungeon.deinit();
+    dungeon.setWalls(1, 1, 5);
+    dungeon.setWall(2, 1);
+    dungeon.setWall(2, 5);
+    dungeon.setWalls(3, 1, 5);
 
     const expected =
         \\#####
@@ -38,7 +38,7 @@ test drawDungeon {
         \\#####
     ;
     // when:
-    try drawDungeon(alloc, &buffer, walls, .{ .r = 1, .c = 1, .rows = 3, .cols = 5 });
+    try drawDungeon(alloc, &buffer, &dungeon, .{ .r = 1, .c = 1, .rows = 3, .cols = 5 });
 
     // then:
     const actual = try buffer.toCString(alloc);
