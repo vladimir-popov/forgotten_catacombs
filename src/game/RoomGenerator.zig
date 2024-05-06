@@ -1,39 +1,74 @@
-/// The interface to generate dungeon inside a single region.
 const std = @import("std");
+const p = @import("primitives.zig");
 const Dungeon = @import("Dungeon.zig");
+const Walls = Dungeon.Walls;
+const Room = Dungeon.Room;
 
-const Self = @This();
+/// The interface of different algorithms to generate rooms with walls inside
+/// the region.
+const RoomGenerator = @This();
 
 ctx: *anyopaque,
-generateFn: *const fn (ctx: *anyopaque, dungeon: *Dungeon, top_row: u8, left_col: u8, rows: u8, cols: u8) anyerror!void,
+generateFn: *const fn (ctx: *anyopaque, walls: *Walls, region: p.Region) anyerror!Room,
 
-pub inline fn generateRoom(self: *Self, dungeon: *Dungeon, top_row: u8, left_col: u8, rows: u8, cols: u8) !void {
-    try self.generateFn(self.ctx, dungeon, top_row, left_col, rows, cols);
+/// Creates walls of the room inside the region.
+/// Returns the actual region in which the room is inscribed in.
+pub inline fn createRoom(self: RoomGenerator, walls: *Walls, region: p.Region) !Room {
+    try self.generateFn(self.ctx, walls, region);
 }
 
-pub fn simpleRooms() Self {
-    return .{
-        .ctx = undefined,
-        .generateFn = SimpleRoomGenerator.generate,
-    };
-}
+/// The simplest rooms generator, which create rooms as walls inside the region.
+pub const SimpleRoomGenerator = struct {
+    rand: std.Random,
 
-const SimpleRoomGenerator = struct {
+    pub fn generator(self: *SimpleRoomGenerator) RoomGenerator {
+        return .{
+            .ctx = self,
+            .generateFn = SimpleRoomGenerator.generate,
+        };
+    }
     /// Create rectangle of walls inside the region.
-    fn generate(_: *anyopaque, dungeon: *Dungeon, top_row: u8, left_col: u8, rows: u8, cols: u8) anyerror!void {
-        const margin: u8 = 4;
-        const r = top_row;
-        const c = left_col;
-        const rs: u8 = rows - margin;
-        const cs: u8 = cols - margin;
+    fn generate(ptr: *anyopaque, walls: *Walls, region: p.Region) anyerror!Room {
+        const self: *SimpleRoomGenerator = @ptrCast(@alignCast(ptr));
+        const margin: u8 = self.rand.intRangeAtMost(u8, 1, 4);
+        const r = region.top_left.row;
+        const c = region.top_left.col;
+        const rs: u8 = region.rows - margin;
+        const cs: u8 = region.cols - margin;
         for (r..(r + rs)) |i| {
             const u: u8 = @intCast(i);
             if (u == r or u == (r + rs - 1)) {
-                dungeon.setWalls(u, c, cs);
+                walls.setWalls(u, c, cs);
             } else {
-                dungeon.setWall(u, c);
-                dungeon.setWall(u, c + cs - 1);
+                walls.setWall(u, c);
+                walls.setWall(u, c + cs - 1);
             }
         }
+        return .{
+            .region = .{ .top_left = .{ .row = r, .col = c }, .rows = rs, .cols = cs },
+            .createDoorFn = SimpleRoomGenerator.createDoor,
+        };
+    }
+
+    fn createDoor(room: Room, side: p.Side, rand: std.Random) p.Point {
+        return switch (side) {
+            .top => .{
+                .row = room.region.r,
+                .col = rand.intRangeLessThan(u8, 0, room.region.cols) + room.region.top_left.col,
+            },
+            .bottom => .{
+                .row = room.region.top_left.row + room.region.rows - 1,
+                .col = rand.intRangeLessThan(u8, 0, room.region.cols) + room.region.top_left.col,
+            },
+            .left => .{
+                .row = rand.intRangeLessThan(u8, 0, room.region.rows) + room.region.top_left.row,
+                .col = room.region.top_left.col,
+            },
+            .right => .{
+                .row = rand.intRangeLessThan(u8, 0, room.region.rows) + room.region.top_left.row,
+                .col = room.region.top_left.col + room.region.cols - 1,
+            },
+        };
+
     }
 };

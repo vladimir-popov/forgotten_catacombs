@@ -10,6 +10,12 @@ const panic = std.debug.panic;
 pub usingnamespace cmp;
 pub usingnamespace bsp;
 
+pub const primitives = @import("primitives.zig");
+
+// Playdate resolution: w:400 × h:240 pixels
+pub const ROWS: u8 = 40;
+pub const COLS: u8 = 100;
+
 pub const Button = struct {
     pub const Type = u8;
 

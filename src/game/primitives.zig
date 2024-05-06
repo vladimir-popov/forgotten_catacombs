@@ -1,10 +1,18 @@
+/// This module contains primitive types, such as geometry primitives,
+/// enums, and other not domain value objects.
+
 const std = @import("std");
 
+pub const Side = enum { left, right, top, bottom };
+
+pub const Point = struct {
+    row: u8,
+    col: u8,
+};
+
 pub const Region = struct {
-    /// Top left corner row. Begins from 1.
-    r: u8,
-    /// Top left corner column. Begins from 1.
-    c: u8,
+    /// Top left corner. Index of rows and cols begins from 1.
+    top_left: Point,
     /// The count of rows in this region.
     rows: u8,
     /// The count of columns in this region.
@@ -27,11 +35,11 @@ pub const Region = struct {
 
     /// Returns true if the `other` region doesn't go beyond of this region.
     pub fn contains(self: Region, other: Region) bool {
-        if (self.r > other.r or self.c > other.c)
+        if (self.top_left.row > other.top_left.row or self.top_left.col > other.top_left.col)
             return false;
-        if (self.r + self.rows < other.r + other.rows)
+        if (self.top_left.row + self.rows < other.top_left.row + other.rows)
             return false;
-        if (self.c + self.cols < other.c + other.cols)
+        if (self.top_left.col + self.cols < other.top_left.col + other.cols)
             return false;
         return true;
     }
@@ -41,8 +49,16 @@ pub const Region = struct {
     pub fn splitVerticaly(self: Region, rand: std.Random, min: u8) ?struct { Region, Region } {
         if (split(rand, self.cols, min)) |middle| {
             return .{
-                Region{ .r = self.r, .c = self.c, .rows = self.rows, .cols = middle },
-                Region{ .r = self.r, .c = self.c + middle, .rows = self.rows, .cols = self.cols - middle },
+                Region{
+                    .top_left = .{ .row = self.top_left.row, .col = self.top_left.col },
+                    .rows = self.rows,
+                    .cols = middle,
+                },
+                Region{
+                    .top_left = .{ .row = self.top_left.row, .col = self.top_left.col + middle },
+                    .rows = self.rows,
+                    .cols = self.cols - middle,
+                },
             };
         } else {
             return null;
@@ -54,8 +70,16 @@ pub const Region = struct {
     pub fn splitHorizontaly(self: Region, rand: std.Random, min: u8) ?struct { Region, Region } {
         if (split(rand, self.rows, min)) |middle| {
             return .{
-                Region{ .r = self.r, .c = self.c, .rows = middle, .cols = self.cols },
-                Region{ .r = self.r + middle, .c = self.c, .rows = self.rows - middle, .cols = self.cols },
+                Region{
+                    .top_left = .{ .row = self.top_left.row, .col = self.top_left.col },
+                    .rows = middle,
+                    .cols = self.cols,
+                },
+                Region{
+                    .top_left = .{ .row = self.top_left.row + middle, .col = self.top_left.col },
+                    .rows = self.rows - middle,
+                    .cols = self.cols,
+                },
             };
         } else {
             return null;
@@ -71,5 +95,16 @@ pub const Region = struct {
             min
         else
             null;
+    }
+
+    pub fn intersect(self: Region, other: Region) Region {
+        return .{
+            .top_left = .{
+                .row = @min(self.top_left.row, other.top_left.row),
+                .col = @min(self.top_left.col, other.top_left.col),
+            },
+            .rows = @max(self.rows, other.rows),
+            .cols = @max(self.cols, other.cols),
+        };
     }
 };

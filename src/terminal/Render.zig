@@ -1,13 +1,13 @@
 const std = @import("std");
 const game = @import("game");
 const utf8 = @import("utf8");
-const m = @import("math");
+const p = game.primitives;
 
 pub fn drawDungeon(
     alloc: std.mem.Allocator,
     buffer: *utf8.Buffer,
     dungeon: *const game.Dungeon,
-    region: m.Region,
+    region: p.Region,
 ) !void {
     var line = try alloc.alloc(u8, region.cols);
     defer alloc.free(line);
@@ -38,7 +38,7 @@ test drawDungeon {
         \\#####
     ;
     // when:
-    try drawDungeon(alloc, &buffer, &dungeon, .{ .r = 1, .c = 1, .rows = 3, .cols = 5 });
+    try drawDungeon(alloc, &buffer, &dungeon, .{ .top_left = .{ .row = 1, .col = 1 }, .rows = 3, .cols = 5 });
 
     // then:
     const actual = try buffer.toCString(alloc);

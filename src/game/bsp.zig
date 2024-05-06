@@ -1,8 +1,8 @@
 const std = @import("std");
 const math = @import("math");
+const p = @import("primitives.zig");
 
-const Region = math.Region;
-pub const Tree = math.Tree.Node(Region);
+pub const Tree = math.BinaryTree.Node(p.Region);
 
 /// Builds graph of regions splitting the original region with `rows` and `cols`
 /// on smaller regions with minimum `min_rows` or `min_cols`. A region from any
@@ -17,7 +17,7 @@ pub fn buildTree(
     min_rows: u8,
     min_cols: u8,
 ) !*Tree {
-    const region = Region{ .r = 1, .c = 1, .rows = rows, .cols = cols };
+    const region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = rows, .cols = cols };
     std.debug.assert(!region.lessThan(min_rows, min_cols));
 
     var alloc = arena.allocator();
@@ -34,12 +34,12 @@ const Splitter = struct {
     min_rows: u8,
     min_cols: u8,
 
-    fn split(ptr: *anyopaque, node: *Tree, _: u8) anyerror!?struct { Region, Region } {
+    fn split(ptr: *anyopaque, node: *Tree, depth: u8) anyerror!?struct { p.Region, p.Region } {
         const self: *Splitter = @ptrCast(@alignCast(ptr));
-        return if (node.value.isHorizontal())
-            node.value.splitVerticaly(self.rand, self.min_cols)
+        return if (depth % 2 == 0)
+            node.value.splitHorizontaly(self.rand, self.min_rows)
         else
-            node.value.splitHorizontaly(self.rand, self.min_rows);
+            node.value.splitVerticaly(self.rand, self.min_cols);
     }
 
     fn handler(self: *Splitter) Tree.SplitHandler {
@@ -80,11 +80,11 @@ const ValidateNodes = struct {
             std.debug.print("The root region {any} is less than {d}x{d}\n", .{ root.value, self.min_rows, self.min_cols });
             return err;
         };
-        if (root.first) |first| {
-            try self.validateChild("first", root, first, depth);
+        if (root.left) |left| {
+            try self.validateChild("left", root, left, depth);
         }
-        if (root.second) |second| {
-            try self.validateChild("second", root, second, depth);
+        if (root.right) |right| {
+            try self.validateChild("right", root, right, depth);
         }
     }
 
