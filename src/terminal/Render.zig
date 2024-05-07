@@ -11,7 +11,7 @@ pub fn drawDungeon(
 ) !void {
     var line = try alloc.alloc(u8, region.cols);
     defer alloc.free(line);
-    for (dungeon.walls.items) |row| {
+    for (dungeon.walls.bitsets.items) |row| {
         for (0..row.capacity()) |i| {
             line[i] = if (row.isSet(i)) '#' else ' ';
         }
@@ -23,14 +23,15 @@ pub fn drawDungeon(
 test drawDungeon {
     // given:
     const alloc = std.testing.allocator;
+    const rand = std.crypto.random;
     var buffer = utf8.Buffer.init(alloc);
     defer buffer.deinit();
-    var dungeon = try game.Dungeon.initEmpty(alloc, 3, 5);
+    var dungeon = try game.Dungeon.initEmpty(alloc, rand, 3, 5);
     defer dungeon.deinit();
-    dungeon.setWalls(1, 1, 5);
-    dungeon.setWall(2, 1);
-    dungeon.setWall(2, 5);
-    dungeon.setWalls(3, 1, 5);
+    dungeon.walls.setRowOfWalls(1, 1, 5);
+    dungeon.walls.setWall(2, 1);
+    dungeon.walls.setWall(2, 5);
+    dungeon.walls.setRowOfWalls(3, 1, 5);
 
     const expected =
         \\#####

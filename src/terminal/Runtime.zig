@@ -109,7 +109,12 @@ fn readButton(ptr: *anyopaque) anyerror!?game.Button.Type {
 
 fn drawDungeon(ptr: *anyopaque, dungeon: *const game.Dungeon) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
-    try Render.drawDungeon(self.arena.allocator(), &self.buffer, dungeon, .{ .r = 1, .c = 1, .rows = dungeon.rows, .cols = dungeon.cols });
+    try Render.drawDungeon(
+        self.arena.allocator(),
+        &self.buffer,
+        dungeon,
+        .{ .top_left = .{ .row = 1, .col = 1 }, .rows = dungeon.rows, .cols = dungeon.cols },
+    );
 }
 
 fn drawSprite(ptr: *anyopaque, sprite: *const game.Sprite, row: u8, col: u8) anyerror!void {

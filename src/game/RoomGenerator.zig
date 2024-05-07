@@ -14,7 +14,7 @@ generateFn: *const fn (ctx: *anyopaque, walls: *Walls, region: p.Region) anyerro
 /// Creates walls of the room inside the region.
 /// Returns the actual region in which the room is inscribed in.
 pub inline fn createRoom(self: RoomGenerator, walls: *Walls, region: p.Region) !Room {
-    try self.generateFn(self.ctx, walls, region);
+    return try self.generateFn(self.ctx, walls, region);
 }
 
 /// The simplest rooms generator, which create rooms as walls inside the region.
@@ -38,7 +38,7 @@ pub const SimpleRoomGenerator = struct {
         for (r..(r + rs)) |i| {
             const u: u8 = @intCast(i);
             if (u == r or u == (r + rs - 1)) {
-                walls.setWalls(u, c, cs);
+                walls.setRowOfWalls(u, c, cs);
             } else {
                 walls.setWall(u, c);
                 walls.setWall(u, c + cs - 1);
@@ -53,7 +53,7 @@ pub const SimpleRoomGenerator = struct {
     fn createDoor(room: Room, side: p.Side, rand: std.Random) p.Point {
         return switch (side) {
             .top => .{
-                .row = room.region.r,
+                .row = room.region.top_left.row,
                 .col = rand.intRangeLessThan(u8, 0, room.region.cols) + room.region.top_left.col,
             },
             .bottom => .{

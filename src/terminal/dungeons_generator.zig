@@ -42,8 +42,8 @@ const DungeonsGenerator = struct {
         const dungeon = try game.Dungeon.bspGenerate(
             universe.runtime.alloc,
             universe.runtime.rand,
-            game.Dungeon.ROWS,
-            game.Dungeon.COLS,
+            game.ROWS,
+            game.COLS,
         );
 
         const entity = universe.newEntity();
@@ -70,8 +70,8 @@ const DungeonsGenerator = struct {
                     const dungeon = try game.Dungeon.bspGenerate(
                         universe.runtime.alloc,
                         universe.runtime.rand,
-                        game.Dungeon.ROWS,
-                        game.Dungeon.COLS,
+                        game.ROWS,
+                        game.COLS,
                     );
                     universe.addComponent(entity, game.Dungeon, dungeon);
                 }

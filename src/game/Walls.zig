@@ -10,7 +10,7 @@ pub fn initEmpty(alloc: std.mem.Allocator, rows: u8, cols: u8) !Walls {
         const row = bitsets.addOneAssumeCapacity();
         row.* = try std.DynamicBitSet.initEmpty(alloc, cols);
     }
-    return bitsets;
+    return .{ .bitsets = bitsets };
 }
 
 pub fn deinit(self: Walls) void {
@@ -21,7 +21,7 @@ pub fn deinit(self: Walls) void {
 }
 
 pub fn isWall(self: Walls, row: u8, col: u8) bool {
-    if (row < 1 or row >= self.walls.items.len)
+    if (row < 1 or row >= self.bitsets.items.len)
         return true;
     const walls_row = self.bitsets.items[row - 1];
     if (col < 1 or col >= walls_row.capacity())

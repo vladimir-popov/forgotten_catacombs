@@ -14,20 +14,22 @@ pub const Room = struct {
 
 kd_tree: std.ArrayList(std.DynamicBitSet),
 
-pub fn init(alloc: std.mem.Allocator) Rooms {
+pub fn init(alloc: std.mem.Allocator) !Rooms {
     _ = alloc;
+    return undefined;
 }
 
 pub fn deinit(self: Rooms) void {
     _ = self;
 }
 
-pub fn addRoom(self: *Rooms, room: Room) !void {
+pub fn add(self: *Rooms, room: Room) !void {
     _ = self;
     _ = room;
 }
 
-pub fn findInside(self: Rooms, region: p.Region) []const Room {
+pub fn findInside(self: Rooms, region: p.Region) []*Room {
     _ = self;
     _ = region;
+    return undefined;
 }

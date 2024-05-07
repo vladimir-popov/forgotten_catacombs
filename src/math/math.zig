@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub const Tree = @import("Tree.zig");
+pub const BinaryTree = @import("BinaryTree.zig");
 
 test {
     std.testing.refAllDecls(@This());

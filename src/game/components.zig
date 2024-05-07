@@ -14,12 +14,12 @@ pub const Level = struct {
     // items
     // enemies
 
-    pub fn init(alloc: std.mem.Allocator, rand: std.Random) !Level {
+    pub fn init(alloc: std.mem.Allocator, rand: std.Random, rows: u8, cols: u8) !Level {
         return .{ .dungeon = try Dungeon.bspGenerate(
             alloc,
             rand,
-            Dungeon.ROWS,
-            Dungeon.COLS,
+            rows,
+            cols,
         ) };
     }
 

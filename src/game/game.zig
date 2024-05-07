@@ -79,7 +79,7 @@ pub const ForgottenCatacomb = struct {
 
         // Create entities:
         const entity = universe.newEntity();
-        try ent.Level(entity, runtime.alloc, runtime.rand);
+        try ent.Level(entity, runtime.alloc, runtime.rand, ROWS, COLS);
         ent.Player(entity, 2, 2);
 
         // Initialize systems:
@@ -110,7 +110,7 @@ pub const ForgottenCatacomb = struct {
                 if (btn & Button.Right > 0)
                     new_position.col += 1;
 
-                if (!level.dungeon.hasWall(new_position.row, new_position.col))
+                if (!level.dungeon.walls.isWall(new_position.row, new_position.col))
                     position.* = new_position;
             }
         }

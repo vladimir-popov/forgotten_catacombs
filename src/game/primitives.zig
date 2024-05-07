@@ -97,7 +97,7 @@ pub const Region = struct {
             null;
     }
 
-    pub fn intersect(self: Region, other: Region) Region {
+    pub fn unionWith(self: Region, other: Region) Region {
         return .{
             .top_left = .{
                 .row = @min(self.top_left.row, other.top_left.row),
