@@ -133,3 +133,7 @@ pub const ForgottenCatacomb = struct {
         }
     }
 };
+
+test {
+    std.testing.refAllDecls(@This());
+}

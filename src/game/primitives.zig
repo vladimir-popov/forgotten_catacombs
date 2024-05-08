@@ -1,15 +1,52 @@
 /// This module contains primitive types, such as geometry primitives,
 /// enums, and other not domain value objects.
-
 const std = @import("std");
 
-pub const Side = enum { left, right, top, bottom };
+pub const Side = enum {
+    left,
+    right,
+    top,
+    bottom,
 
+    pub inline fn opposite(self: Side) Side {
+        return switch (self) {
+            .top => .bottom,
+            .bottom => .top,
+            .left => .right,
+            .right => .left,
+        };
+    }
+};
+
+/// The coordinates of a point. Index begins from 1.
 pub const Point = struct {
     row: u8,
     col: u8,
+
+    pub fn move(self: *Point, direction: Side) void {
+        switch (direction) {
+            .top => {
+                if (self.row > 1) self.row -= 1;
+            },
+            .bottom => self.row += 1,
+            .left => {
+                if (self.col > 1) self.col -= 1;
+            },
+            .right => self.col += 1,
+        }
+    }
 };
 
+/// The region described as its top left corner
+/// and count of rows and columns.
+///
+/// Example of the region 4x6:
+///   c:1
+/// r:1*----*
+///    |    |
+///    |    |
+///    *____* r:4
+///        c:6
 pub const Region = struct {
     /// Top left corner. Index of rows and cols begins from 1.
     top_left: Point,
@@ -20,6 +57,10 @@ pub const Region = struct {
 
     pub inline fn isHorizontal(self: Region) bool {
         return self.cols > self.rows;
+    }
+
+    pub inline fn bottomRight(self: Region) Point {
+        return .{ .row = self.top_left.row + self.rows - 1, .col = self.top_left.col + self.cols - 1 };
     }
 
     /// Returns true if this region has less rows or columns than passed minimal
@@ -33,8 +74,17 @@ pub const Region = struct {
         return self.rows * self.cols;
     }
 
+    pub inline fn containsPoint(self: Region, row: u8, col: u8) bool {
+        return betweenInclusive(row, self.top_left.row, self.bottomRight().row) and
+            betweenInclusive(col, self.top_left.col, self.bottomRight().col);
+    }
+
+    inline fn betweenInclusive(v: u8, l: u8, r: u8) bool {
+        return l <= v and v <= r;
+    }
+
     /// Returns true if the `other` region doesn't go beyond of this region.
-    pub fn contains(self: Region, other: Region) bool {
+    pub fn containsRegion(self: Region, other: Region) bool {
         if (self.top_left.row > other.top_left.row or self.top_left.col > other.top_left.col)
             return false;
         if (self.top_left.row + self.rows < other.top_left.row + other.rows)

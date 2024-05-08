@@ -97,7 +97,7 @@ const ValidateNodes = struct {
         root: *Tree,
         node: *Tree,
     ) !void {
-        expect(root.value.contains(node.value)) catch |err| {
+        expect(root.value.containsRegion(node.value)) catch |err| {
             std.debug.print(
                 "The {s} region {any} doesn't contained in the root {any}\n",
                 .{ name, node.value, root.value },
