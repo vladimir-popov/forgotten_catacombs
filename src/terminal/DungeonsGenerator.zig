@@ -5,6 +5,10 @@ const tty = @import("tty.zig");
 
 const Runtime = @import("Runtime.zig");
 
+pub const std_options = .{
+    .logFn = Runtime.writeLog,
+};
+
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const alloc = gpa.allocator();
@@ -32,7 +36,6 @@ const Components = union(enum) {
 };
 
 const DungeonsGenerator = struct {
-    const Self = @This();
     pub const Universe = ecs.Universe(Components, game.Events, game.AnyRuntime);
 
     pub fn init(runtime: game.AnyRuntime) !Universe {
@@ -87,6 +90,3 @@ const DungeonsGenerator = struct {
     }
 };
 
-test {
-    std.testing.refAllDecls(@This());
-}

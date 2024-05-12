@@ -31,7 +31,7 @@ test "draw walls" {
     const alloc = std.testing.allocator;
     var buffer = utf8.Buffer.init(alloc);
     defer buffer.deinit();
-    var dungeon = try game.Dungeon.init(alloc, 3, 5);
+    var dungeon = try game.Dungeon.initEmpty(alloc, 3, 5);
     defer dungeon.deinit();
     dungeon.walls.setRowOfWalls(1, 1, 5);
     dungeon.walls.setWall(2, 1);

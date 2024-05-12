@@ -2,6 +2,8 @@ const std = @import("std");
 const fmt = std.fmt;
 const c = std.c;
 
+pub var original_termios: c.termios = undefined;
+
 /// Functions and constants for format text and produce special sequences.
 pub const Text = struct {
     const ESC = '\x1b';
@@ -81,7 +83,6 @@ pub const Text = struct {
 
 pub const Display = struct {
     pub fn enterRawMode() c.termios {
-        var original_termios: c.termios = undefined;
         _ = c.tcgetattr(c.STDIN_FILENO, &original_termios);
         // copy struct:
         var raw = original_termios;
@@ -137,8 +138,9 @@ pub const Display = struct {
         return original_termios;
     }
 
-    pub fn exitFromRawMode(original_termios: c.termios) void {
+    pub fn exitFromRawMode() void {
         clearScreen();
+        showCursor();
         _ = c.tcsetattr(c.STDIN_FILENO, .FLUSH, &original_termios);
     }
 

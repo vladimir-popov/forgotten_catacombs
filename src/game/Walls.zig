@@ -1,7 +1,14 @@
 const std = @import("std");
 const p = @import("primitives.zig");
 
+const log = std.log.scoped(.walls);
+
 const Walls = @This();
+
+pub const Error = error{
+    WrongColumnsCountInString,
+    WrongRowsCountInString,
+};
 
 bitsets: std.ArrayList(std.DynamicBitSet),
 
@@ -38,21 +45,54 @@ pub inline fn colsCount(self: Walls) u8 {
     return @intCast(self.bitsets.items[0].capacity());
 }
 
-pub fn isWall(self: Walls, row: u8, col: u8) bool {
-    if (row < 1 or row > self.bitsets.items.len)
-        std.debug.panic("The row {d} is out of bound. Total rows count is {d}", .{ row, self.rowsCount() });
-    const walls_row = self.bitsets.items[row - 1];
-    if (col < 1 or col > walls_row.capacity())
-        std.debug.panic("The column {d} is out of bound. Total columns count is {d}", .{ col, self.colsCount() });
-    return walls_row.isSet(col - 1);
+pub fn parse(self: *Walls, str: []const u8) Error!void {
+    var r: u8 = 1;
+    var c: u8 = 1;
+    for (str) |char| {
+        switch (char) {
+            '\n' => {
+                if (c > self.colsCount() + 1) {
+                    log.err(
+                        "Total columns count is {d}, but found {d} char '{c}' in the parsed string\n{s}\n",
+                        .{ self.colsCount(), c, char, str },
+                    );
+                    return Error.WrongColumnsCountInString;
+                }
+                r += 1;
+                c = 0;
+            },
+            '#' => {
+                self.setWall(r, c);
+            },
+            else => {
+                self.removeWall(r, c);
+            },
+        }
+        c += 1;
+    }
+    if (r < self.rowsCount()) {
+        log.err(
+            "Total rows count is {d}, but found {d} lines in the parsed string\n{s}\n",
+            .{ self.rowsCount(), r, str },
+        );
+        return Error.WrongRowsCountInString;
+    }
 }
 
-pub fn setWall(self: *Walls, row: u8, col: u8) void {
+pub inline fn isWall(self: Walls, row: u8, col: u8) bool {
+    return self.bitsets.items[row - 1].isSet(col - 1);
+}
+
+pub inline fn setWall(self: *Walls, row: u8, col: u8) void {
     self.bitsets.items[row - 1].set(col - 1);
 }
 
-pub fn setRowOfWalls(self: *Walls, row: u8, from_col: u8, count: u8) void {
+pub inline fn setRowOfWalls(self: *Walls, row: u8, from_col: u8, count: u8) void {
     self.bitsets.items[row - 1].setRangeValue(.{ .start = from_col - 1, .end = from_col + count - 1 }, true);
+}
+
+pub inline fn removeWall(self: *Walls, row: u8, col: u8) void {
+    self.bitsets.items[row - 1].unset(col - 1);
 }
 
 pub fn removeWalls(self: *Walls, region: p.Region) void {
@@ -69,6 +109,28 @@ pub fn removeWalls(self: *Walls, region: p.Region) void {
             .{ .start = region.top_left.col - 1, .end = to_col },
             false,
         );
+    }
+}
+
+test "parse walls" {
+    // given:
+    const str =
+        \\###
+        \\# #
+        \\###
+    ;
+    var walls = try Walls.initEmpty(std.testing.allocator, 3, 3);
+    defer walls.deinit();
+
+    // when:
+    try walls.parse(str);
+
+    // then:
+    for (0..3) |r| {
+        for (0..3) |c| {
+            const expected = !(r == 1 and c == 1);
+            try std.testing.expectEqual(expected, walls.isWall(@intCast(r + 1), @intCast(c + 1)));
+        }
     }
 }
 

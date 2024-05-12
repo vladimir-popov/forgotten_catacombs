@@ -4,6 +4,10 @@ const tty = @import("tty.zig");
 
 const Runtime = @import("Runtime.zig");
 
+pub const std_options = .{
+    .logFn = Runtime.writeLog,
+};
+
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const alloc = gpa.allocator();

@@ -1,19 +1,17 @@
 const std = @import("std");
 const p = @import("primitives.zig");
-const Dungeon = @import("Dungeon.zig");
-const Walls = Dungeon.Walls;
-const Room = Dungeon.Room;
+const Walls = @import("Walls.zig");
 
 /// The interface of different algorithms to generate rooms with walls inside
 /// the region.
 const RoomGenerator = @This();
 
 ctx: *anyopaque,
-generateFn: *const fn (ctx: *anyopaque, walls: *Walls, region: p.Region) anyerror!Room,
+generateFn: *const fn (ctx: *anyopaque, walls: *Walls, region: p.Region) anyerror!p.Region,
 
 /// Creates walls of the room inside the region.
 /// Returns the actual region in which the room is inscribed in.
-pub inline fn createRoom(self: RoomGenerator, walls: *Walls, region: p.Region) !Room {
+pub inline fn createRoom(self: RoomGenerator, walls: *Walls, region: p.Region) !p.Region {
     return try self.generateFn(self.ctx, walls, region);
 }
 
@@ -43,7 +41,7 @@ pub const SimpleRoomGenerator = struct {
     /// |       |
     /// |       |
     /// ---------
-    fn generate(ptr: *anyopaque, walls: *Walls, region: p.Region) anyerror!Room {
+    fn generate(ptr: *anyopaque, walls: *Walls, region: p.Region) anyerror!p.Region {
         std.debug.assert(region.rows > 6);
         std.debug.assert(region.cols > 6);
 

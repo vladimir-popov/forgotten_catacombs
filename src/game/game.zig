@@ -6,6 +6,8 @@ const bsp = @import("bsp.zig");
 
 const panic = std.debug.panic;
 
+const Self = @This();
+
 // ========= Export: ======================
 pub usingnamespace cmp;
 pub usingnamespace bsp;
@@ -33,19 +35,15 @@ pub const Button = struct {
 
 /// Possible events which can be passed between systems.
 pub const Events = enum {
-    const Self = @This();
-
     gameHasBeenInitialized,
     buttonWasPressed,
 
-    pub fn index(self: Self) u8 {
+    pub fn index(self: Events) u8 {
         return @intFromEnum(self);
     }
 };
 
 pub const AnyRuntime = struct {
-    const Self = @This();
-
     const VTable = struct {
         readButton: *const fn (context: *anyopaque) anyerror!?Button.Type,
         drawDungeon: *const fn (context: *anyopaque, dungeon: *const cmp.Dungeon) anyerror!void,
@@ -57,21 +55,20 @@ pub const AnyRuntime = struct {
     rand: std.Random,
     vtable: VTable,
 
-    pub fn readButton(self: Self) !?Button.Type {
+    pub fn readButton(self: AnyRuntime) !?Button.Type {
         return try self.vtable.readButton(self.context);
     }
 
-    pub fn drawDungeon(self: Self, dungeon: *const cmp.Dungeon) !void {
+    pub fn drawDungeon(self: AnyRuntime, dungeon: *const cmp.Dungeon) !void {
         try self.vtable.drawDungeon(self.context, dungeon);
     }
 
-    pub fn drawSprite(self: Self, sprite: *const cmp.Sprite, row: u8, col: u8) !void {
+    pub fn drawSprite(self: AnyRuntime, sprite: *const cmp.Sprite, row: u8, col: u8) !void {
         try self.vtable.drawSprite(self.context, sprite, row, col);
     }
 };
 
 pub const ForgottenCatacomb = struct {
-    const Self = @This();
     pub const Universe = ecs.Universe(cmp.Components, Events, AnyRuntime);
 
     pub fn init(runtime: AnyRuntime) !Universe {
@@ -135,5 +132,5 @@ pub const ForgottenCatacomb = struct {
 };
 
 test {
-    std.testing.refAllDecls(@This());
+    std.testing.refAllDecls(Self);
 }

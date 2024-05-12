@@ -20,11 +20,6 @@ pub fn build(b: *std.Build) !void {
     // for restricting supported target set are available.
     const desktop_target = b.standardTargetOptions(.{});
 
-    const playdate_target = b.resolveTargetQuery(try std.zig.CrossTarget.parse(.{
-        .arch_os_abi = "thumb-freestanding-eabihf",
-        .cpu_features = "cortex_m7+vfp4d16sp",
-    }));
-
     // Standard optimization options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
     // set a preferred release mode, allowing the user to decide how to optimize.
@@ -73,7 +68,6 @@ pub fn build(b: *std.Build) !void {
 
     // Step to build and run the game in terminal
     const run_game_cmd = b.addRunArtifact(terminal_game_exe);
-    run_game_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
         run_game_cmd.addArgs(args);
     }
@@ -85,7 +79,7 @@ pub fn build(b: *std.Build) !void {
     // ------------------------------------------------------------
     const dungeons_exe = b.addExecutable(.{
         .name = "Dungeons generator",
-        .root_source_file = .{ .path = "src/terminal/dungeons_generator.zig" },
+        .root_source_file = .{ .path = "src/terminal/DungeonsGenerator.zig" },
         .target = desktop_target,
         .optimize = optimize,
     });
@@ -97,7 +91,6 @@ pub fn build(b: *std.Build) !void {
 
     // Step to build and run the game in terminal
     const run_generator_cmd = b.addRunArtifact(dungeons_exe);
-    run_generator_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
         run_generator_cmd.addArgs(args);
     }
@@ -126,7 +119,10 @@ pub fn build(b: *std.Build) !void {
     const elf = b.addExecutable(.{
         .name = "pdex.elf",
         .root_source_file = .{ .path = "src/playdate/main.zig" },
-        .target = playdate_target,
+        .target = b.resolveTargetQuery(try std.zig.CrossTarget.parse(.{
+            .arch_os_abi = "thumb-freestanding-eabihf",
+            .cpu_features = "cortex_m7+vfp4d16sp",
+        })),
         .optimize = optimize,
         .pic = true,
     });
@@ -185,25 +181,28 @@ pub fn build(b: *std.Build) !void {
     // ------------------------------------------------------------
 
     const test_filters = b.option([]const []const u8, "test-filter", "Skip tests that do not match any filter") orelse &[0][]const u8{};
-    
+
     const ut_math = b.addTest(.{
         .root_source_file = .{ .path = "src/math/math.zig" },
+        .test_runner = .{ .path = "src/test_runner.zig" },
         .target = desktop_target,
         .optimize = optimize,
         .filters = test_filters,
     });
     const run_ut_math = b.addRunArtifact(ut_math);
-    
+
     const ut_ecs = b.addTest(.{
         .root_source_file = .{ .path = "src/ecs/ecs.zig" },
+        .test_runner = .{ .path = "src/test_runner.zig" },
         .target = desktop_target,
         .optimize = optimize,
         .filters = test_filters,
     });
     const run_ut_ecs = b.addRunArtifact(ut_ecs);
-    
+
     const ut_game = b.addTest(.{
         .root_source_file = .{ .path = "src/game/game.zig" },
+        .test_runner = .{ .path = "src/test_runner.zig" },
         .target = desktop_target,
         .optimize = optimize,
         .filters = test_filters,
@@ -214,6 +213,7 @@ pub fn build(b: *std.Build) !void {
 
     const ut_utf8 = b.addTest(.{
         .root_source_file = .{ .path = "src/utf8/utf8.zig" },
+        .test_runner = .{ .path = "src/test_runner.zig" },
         .target = desktop_target,
         .optimize = optimize,
         .filters = test_filters,
@@ -222,6 +222,7 @@ pub fn build(b: *std.Build) !void {
 
     const ut_terminal = b.addTest(.{
         .root_source_file = .{ .path = "src/terminal/main.zig" },
+        .test_runner = .{ .path = "src/test_runner.zig" },
         .target = desktop_target,
         .optimize = optimize,
         .filters = test_filters,
@@ -231,6 +232,7 @@ pub fn build(b: *std.Build) !void {
     ut_terminal.root_module.addImport("game", game_module);
     ut_terminal.root_module.addImport("utf8", utf8_module);
 
+    b.installArtifact(ut_terminal);
     const run_ut_terminal = b.addRunArtifact(ut_terminal);
 
     // Similar to creating the run step earlier, this exposes a `test` step to

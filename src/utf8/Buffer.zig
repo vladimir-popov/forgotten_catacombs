@@ -126,7 +126,7 @@ test "parse string" {
     try std.testing.expectEqual(2, buffer.linesCount());
 }
 
-test "should crop \r and \n symbols" {
+test "should crop \\\\r and \\\\n symbols" {
     const data = "12345\n";
     const buffer = try Buffer.parseInit(std.testing.allocator, data);
     defer buffer.deinit();

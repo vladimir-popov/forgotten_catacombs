@@ -7,6 +7,21 @@ const Runtime = @import("Runtime.zig");
 
 const CurrentPlatform = tools.Platform.Playdate;
 
+// pub const std_options = .{
+//     .logFn = writeLog,
+// };
+//
+// fn writeLog(
+//     comptime message_level: std.log.Level,
+//     comptime _: @TypeOf(.enum_literal),
+//     comptime format: []const u8,
+//     args: anytype,
+// ) void {
+//     _ = format;
+//     _ = args;
+//     _ = message_level;
+// }
+
 pub fn panic(
     msg: []const u8,
     error_return_trace: ?*std.builtin.StackTrace,
