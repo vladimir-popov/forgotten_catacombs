@@ -180,14 +180,18 @@ pub fn build(b: *std.Build) !void {
     //                Step to run tests
     // ------------------------------------------------------------
 
-    const test_filters = b.option([]const []const u8, "test-filter", "Skip tests that do not match any filter") orelse &[0][]const u8{};
+    const test_filter = b.option(
+        []const []const u8,
+        "test-filter",
+        "Skip tests that do not match any filter",
+    ) orelse &[0][]const u8{};
 
     const ut_math = b.addTest(.{
         .root_source_file = .{ .path = "src/math/math.zig" },
         .test_runner = .{ .path = "src/test_runner.zig" },
         .target = desktop_target,
         .optimize = optimize,
-        .filters = test_filters,
+        .filters = test_filter,
     });
     const run_ut_math = b.addRunArtifact(ut_math);
 
@@ -196,7 +200,7 @@ pub fn build(b: *std.Build) !void {
         .test_runner = .{ .path = "src/test_runner.zig" },
         .target = desktop_target,
         .optimize = optimize,
-        .filters = test_filters,
+        .filters = test_filter,
     });
     const run_ut_ecs = b.addRunArtifact(ut_ecs);
 
@@ -205,7 +209,7 @@ pub fn build(b: *std.Build) !void {
         .test_runner = .{ .path = "src/test_runner.zig" },
         .target = desktop_target,
         .optimize = optimize,
-        .filters = test_filters,
+        .filters = test_filter,
     });
     ut_game.root_module.addImport("math", math_module);
 
@@ -216,7 +220,7 @@ pub fn build(b: *std.Build) !void {
         .test_runner = .{ .path = "src/test_runner.zig" },
         .target = desktop_target,
         .optimize = optimize,
-        .filters = test_filters,
+        .filters = test_filter,
     });
     const run_ut_utf8 = b.addRunArtifact(ut_utf8);
 
@@ -225,7 +229,7 @@ pub fn build(b: *std.Build) !void {
         .test_runner = .{ .path = "src/test_runner.zig" },
         .target = desktop_target,
         .optimize = optimize,
-        .filters = test_filters,
+        .filters = test_filter,
     });
     ut_terminal.root_module.addImport("math", math_module);
     ut_terminal.root_module.addImport("ecs", ecs_module);
@@ -239,6 +243,13 @@ pub fn build(b: *std.Build) !void {
     // the `zig build --help` menu, providing a way for the user to request
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
+    if (b.args) |args| {
+        run_ut_ecs.addArgs(args);
+        run_ut_math.addArgs(args);
+        run_ut_utf8.addArgs(args);
+        run_ut_game.addArgs(args);
+        run_ut_terminal.addArgs(args);
+    }
     test_step.dependOn(&run_ut_ecs.step);
     test_step.dependOn(&run_ut_math.step);
     test_step.dependOn(&run_ut_game.step);

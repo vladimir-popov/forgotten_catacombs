@@ -3,23 +3,50 @@ const builtin = @import("builtin");
 
 const TestFn = std.builtin.TestFn;
 
+// TODO: add doc about how to use it, and how to filter tests
 pub fn main() !void {
     var gpa: std.heap.GeneralPurposeAllocator(.{}) = .{};
     defer if (gpa.deinit() == .leak) unreachable;
 
+    var args = try std.process.argsWithAllocator(gpa.allocator());
+    defer args.deinit();
+
+    // skip the program name:
+    _ = args.next();
+    // Parse optional test filter:
+    const test_filter: ?[:0]const u8 = args.next();
+
     var arena = std.heap.ArenaAllocator.init(gpa.allocator());
     defer arena.deinit();
+    var arena_alloc = arena.allocator();
 
     var writer = std.io.getStdOut().writer();
     var any_writer = writer.any();
     const reporter = TxtReporter.reporter(&any_writer);
+    var tests: []const TestFn = builtin.test_functions;
+
+    // Filter tests:
+    if (test_filter) |filter| {
+        var arr = try arena_alloc.alloc(TestFn, builtin.test_functions.len);
+        arr.len = 0;
+        for (builtin.test_functions) |tst| {
+            if (std.mem.containsAtLeast(u8, tst.name, 1, filter)) {
+                arr.len += 1;
+                arr[arr.len - 1] = tst;
+            }
+        }
+        tests = arr;
+    }
 
     const print_report_on_run_tests = false;
     if (print_report_on_run_tests) {
-        _ = try Report.build(arena.allocator(), builtin.test_functions, reporter);
+        if (try Report.build(arena_alloc, tests, reporter)) |report| {
+            if (report.failed_count != 0 or report.is_mem_leak) std.process.exit(1);
+        }
     } else {
-        if (try Report.build(arena.allocator(), builtin.test_functions, null)) |report| {
+        if (try Report.build(arena_alloc, tests, null)) |report| {
             try reporter.write(report);
+            if (report.failed_count != 0 or report.is_mem_leak) std.process.exit(1);
         }
     }
 }
@@ -283,6 +310,8 @@ const TxtReporter = struct {
 
     const esc = "\x1b[0m";
 
+    const border = "=" ** 60;
+
     pub fn reporter(writer: *std.io.AnyWriter) AnyReporter {
         return .{
             .ptr = writer,
@@ -297,7 +326,7 @@ const TxtReporter = struct {
         const writer: *std.io.AnyWriter = @ptrCast(@alignCast(ptr));
         // move to the next line and cleanup output settings:
         std.debug.print("\r\n\x1b[0K", .{});
-        try colorizeLine(writer, Color.bold_cyan, "\n{s}:", .{module_name});
+        try colorizeLine(writer, Color.bold_cyan, "\n{s}\n\t\t{s}\n{s}", .{ border, module_name, border });
     }
 
     fn writeTestName(ptr: *anyopaque, test_name: []const u8) anyerror!void {
@@ -346,7 +375,7 @@ const TxtReporter = struct {
         try colorize(
             writer,
             Color.bold_cyan,
-            "Total {d} tests in {d} ms: ",
+            "Total {d} tests were run in {d} ms: ",
             .{ passed + failed + skipped, total_duration_ms },
         );
         if (passed > 0)
@@ -357,7 +386,7 @@ const TxtReporter = struct {
             try colorize(writer, Color.yellow, "{d} skipped;", .{skipped});
         if (is_mem_leak)
             try colorize(writer, Color.purple, "MEMORY LEAK", .{});
-        try colorizeLine(writer, Color.bold_cyan, "\n------------------------------------------------", .{});
+        try colorizeLine(writer, Color.bold_cyan, "\n{s}", .{border});
     }
 
     fn colorize(
