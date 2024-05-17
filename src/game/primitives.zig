@@ -26,11 +26,11 @@ pub const Point = struct {
     pub fn move(self: *Point, direction: Side) void {
         switch (direction) {
             .top => {
-                if (self.row > 1) self.row -= 1;
+                if (self.row > 0) self.row -= 1;
             },
             .bottom => self.row += 1,
             .left => {
-                if (self.col > 1) self.col -= 1;
+                if (self.col > 0) self.col -= 1;
             },
             .right => self.col += 1,
         }
