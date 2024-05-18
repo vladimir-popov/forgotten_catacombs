@@ -87,7 +87,7 @@ test "generate a simple room" {
         for (0..cols) |c_idx| {
             const c: u8 = @intCast(c_idx + 1);
             const cell = walls.isWall(r, c);
-            const expect = room.containsPoint(r, c) and
+            const expect = room.contains(r, c) and
                 (r == room.top_left.row or r == room.bottomRight().row or
                 c == room.top_left.col or c == room.bottomRight().col);
             try std.testing.expectEqual(expect, cell);

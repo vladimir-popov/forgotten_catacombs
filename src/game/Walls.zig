@@ -147,7 +147,7 @@ test "remove walls in the region" {
     for (walls.bitsets.items, 1..) |walls_row, r| {
         for (0..walls_row.capacity()) |c_idx| {
             const cell = walls_row.isSet(c_idx);
-            const expect = !region.containsPoint(@intCast(r), @intCast(c_idx + 1));
+            const expect = !region.contains(@intCast(r), @intCast(c_idx + 1));
             try std.testing.expectEqual(expect, cell);
         }
     }

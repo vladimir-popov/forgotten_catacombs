@@ -37,16 +37,34 @@ const Splitter = struct {
     min_rows: u8,
     min_cols: u8,
 
-    fn split(ptr: *anyopaque, node: *Tree) anyerror!?struct { p.Region, p.Region } {
-        const self: *Splitter = @ptrCast(@alignCast(ptr));
-        return if (node.depth % 2 == 0)
-            node.value.splitHorizontaly(self.rand, self.min_rows)
-        else
-            node.value.splitVerticaly(self.rand, self.min_cols);
-    }
-
     fn handler(self: *Splitter) Tree.SplitHandler {
         return .{ .ptr = self, .split = split };
+    }
+
+    fn split(ptr: *anyopaque, node: *Tree) anyerror!?struct { p.Region, p.Region } {
+        const self: *Splitter = @ptrCast(@alignCast(ptr));
+        const region: p.Region = node.value;
+        if (node.depth % 2 == 0) {
+            if (divideRnd(self.rand, region.rows, self.min_rows)) |rows| {
+                return region.splitHorizontally(rows);
+            }
+        } else {
+            if (divideRnd(self.rand, region.cols, self.min_rows)) |cols| {
+                return region.splitVertically(cols);
+            }
+        }
+        return null;
+    }
+
+    /// Randomly divides the `value` to two parts which are not less than `min`,
+    /// or return null if it is impossible.
+    inline fn divideRnd(rand: std.Random, value: u8, min: u8) ?u8 {
+        return if (value > min * 2)
+            min + rand.uintLessThan(u8, value - min * 2)
+        else if (value == 2 * min)
+            min
+        else
+            null;
     }
 };
 

@@ -38,7 +38,7 @@ pub fn main() !void {
         tests = arr;
     }
 
-    const print_report_on_run_tests = false;
+    const print_report_on_run_tests = true;
     if (print_report_on_run_tests) {
         if (try Report.build(arena_alloc, tests, reporter)) |report| {
             if (report.failed_count != 0 or report.is_mem_leak) std.process.exit(1);
@@ -325,8 +325,8 @@ const TxtReporter = struct {
     fn writeHeader(ptr: *anyopaque, module_name: []const u8) anyerror!void {
         const writer: *std.io.AnyWriter = @ptrCast(@alignCast(ptr));
         // move to the next line and cleanup output settings:
-        std.debug.print("\r\n\x1b[0K", .{});
-        try colorizeLine(writer, Color.bold_cyan, "\n{s}\n\t\t{s}\n{s}", .{ border, module_name, border });
+        const cleanup = "\r\n\x1b[0K";
+        try colorizeLine(writer, Color.bold_cyan, "{s}\n{s}\n\t\t{s}\n{s}", .{ cleanup, border, module_name, border });
     }
 
     fn writeTestName(ptr: *anyopaque, test_name: []const u8) anyerror!void {
@@ -386,7 +386,7 @@ const TxtReporter = struct {
             try colorize(writer, Color.yellow, "{d} skipped;", .{skipped});
         if (is_mem_leak)
             try colorize(writer, Color.purple, "MEMORY LEAK", .{});
-        try colorizeLine(writer, Color.bold_cyan, "\n{s}", .{border});
+        try colorizeLine(writer, Color.bold_cyan, "", .{});
     }
 
     fn colorize(

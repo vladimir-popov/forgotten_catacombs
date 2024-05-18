@@ -16,12 +16,22 @@ pub const Side = enum {
             .right => .left,
         };
     }
+
+    pub inline fn isHorizontal(self: Side) bool {
+        return self == .top or self == .bottom;
+    }
 };
 
 /// The coordinates of a point. Index begins from 1.
 pub const Point = struct {
     row: u8,
     col: u8,
+
+    pub fn movedTo(self: Point, direction: Side) Point {
+        var point = self;
+        point.move(direction);
+        return point;
+    }
 
     pub fn move(self: *Point, direction: Side) void {
         switch (direction) {
@@ -42,10 +52,10 @@ pub const Point = struct {
 ///
 /// Example of the region 4x6:
 ///   c:1
-/// r:1*----*
-///    |    |
-///    |    |
-///    *____* r:4
+/// r:1 *----*
+///     |    |
+///     |    |
+///     *____* r:4
 ///        c:6
 pub const Region = struct {
     /// Top left corner. Index of rows and cols begins from 1.
@@ -74,7 +84,11 @@ pub const Region = struct {
         return self.rows * self.cols;
     }
 
-    pub inline fn containsPoint(self: Region, row: u8, col: u8) bool {
+    pub inline fn containsPoint(self: Region, point: Point) bool {
+        return self.contains(point.row, point.col);
+    }
+
+    pub inline fn contains(self: Region, row: u8, col: u8) bool {
         return betweenInclusive(row, self.top_left.row, self.bottomRight().row) and
             betweenInclusive(col, self.top_left.col, self.bottomRight().col);
     }
@@ -94,20 +108,24 @@ pub const Region = struct {
         return true;
     }
 
-    /// Splits this region vertically to two parts with no less than `min` columns in each.
-    /// Returns null if splitting is impossible.
-    pub fn splitVerticaly(self: Region, rand: std.Random, min: u8) ?struct { Region, Region } {
-        if (split(rand, self.cols, min)) |middle| {
+    /// Splits vertically the region in two if it possible. The first one contains the top
+    /// left corner and `cols` columns. The second has the other part.
+    /// If splitting is impossible, returns null.
+    /// ┌───┬───┐
+    /// │ 1 │ 2 │
+    /// └───┴───┘
+    pub fn splitVertically(self: Region, cols: u8) ?struct { Region, Region } {
+        if (0 < cols and cols < self.cols) {
             return .{
                 Region{
                     .top_left = .{ .row = self.top_left.row, .col = self.top_left.col },
                     .rows = self.rows,
-                    .cols = middle,
+                    .cols = cols,
                 },
                 Region{
-                    .top_left = .{ .row = self.top_left.row, .col = self.top_left.col + middle },
+                    .top_left = .{ .row = self.top_left.row, .col = self.top_left.col + cols },
                     .rows = self.rows,
-                    .cols = self.cols - middle,
+                    .cols = self.cols - cols,
                 },
             };
         } else {
@@ -115,19 +133,25 @@ pub const Region = struct {
         }
     }
 
-    /// Splits this region horizontally to two parts with no less than `min` rows in each.
-    /// Returns null if splitting is impossible.
-    pub fn splitHorizontaly(self: Region, rand: std.Random, min: u8) ?struct { Region, Region } {
-        if (split(rand, self.rows, min)) |middle| {
+    /// Splits horizontally the region in two if it possible. The first one contains the top
+    /// left corner and `rows` rows. The second has the other part.
+    /// If splitting is impossible, returns null.
+    /// ┌───┐
+    /// │ 1 │
+    /// ├───┤
+    /// │ 2 │
+    /// └───┘
+    pub fn splitHorizontally(self: Region, rows: u8) ?struct { Region, Region } {
+        if (0 < rows and rows < self.rows) {
             return .{
                 Region{
                     .top_left = .{ .row = self.top_left.row, .col = self.top_left.col },
-                    .rows = middle,
+                    .rows = rows,
                     .cols = self.cols,
                 },
                 Region{
-                    .top_left = .{ .row = self.top_left.row + middle, .col = self.top_left.col },
-                    .rows = self.rows - middle,
+                    .top_left = .{ .row = self.top_left.row + rows, .col = self.top_left.col },
+                    .rows = self.rows - rows,
                     .cols = self.cols,
                 },
             };
@@ -136,15 +160,126 @@ pub const Region = struct {
         }
     }
 
-    /// Randomly splits the `value` to two parts which are not less than `min`,
-    /// or return null if it is impossible.
-    inline fn split(rand: std.Random, value: u8, min: u8) ?u8 {
-        return if (value > min * 2)
-            min + rand.uintLessThan(u8, value - min * 2)
-        else if (value == 2 * min)
-            min
-        else
-            null;
+    /// Cuts all rows before the `row` if it possible.
+    ///
+    /// ┌---┐
+    /// ¦   ¦
+    /// ├───┤ < row (exclusive)
+    /// │ r │
+    /// └───┘
+    pub fn cutHorizontallyAfter(self: Region, row: u8) ?Region {
+        if (self.top_left.row <= row and row < self.bottomRight().row) {
+            // copy original:
+            var region = self;
+            region.top_left.row = row + 1;
+            region.rows -= (row + 1);
+            return region;
+        } else {
+            return null;
+        }
+    }
+
+    test cutHorizontallyAfter {
+        // given:
+        const region = Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 5, .cols = 3 };
+        // when:
+        const result = region.cutHorizontallyAfter(2);
+        // then:
+        try std.testing.expectEqualDeep(
+            Region{ .top_left = .{ .row = 3, .col = 1 }, .rows = 2, .cols = 3 },
+            result,
+        );
+    }
+
+    /// Cuts all cols before the `col` if it possible.
+    ///
+    /// ┌---┬───┐
+    /// ¦   │ r │
+    /// └---┴───┘
+    ///     ^
+    ///     col (exclusive)
+    pub fn cutVerticallyAfter(self: Region, col: u8) ?Region {
+        if (self.top_left.col <= col and col < self.bottomRight().col) {
+            // copy original:
+            var region = self;
+            region.top_left.col = col + 1;
+            region.cols -= (col + 1);
+            return region;
+        } else {
+            return null;
+        }
+    }
+
+    test cutVerticallyAfter {
+        // given:
+        const region = Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 3, .cols = 5 };
+        // when:
+        const result = region.cutVerticallyAfter(2);
+        // then:
+        try std.testing.expectEqualDeep(
+            Region{ .top_left = .{ .row = 1, .col = 3 }, .rows = 3, .cols = 2 },
+            result,
+        );
+    }
+
+    /// Cuts all rows after the `row` (exclusive) if it possible.
+    ///
+    /// ┌───┐
+    /// │ r │
+    /// ├───┤ < row (exclusive)
+    /// ¦   ¦
+    /// └---┘
+    pub fn cutHorizontallyTo(self: Region, row: u8) ?Region {
+        if (self.top_left.row < row and row <= self.bottomRight().row) {
+            // copy original:
+            var region = self;
+            region.rows -= row;
+            return region;
+        } else {
+            return null;
+        }
+    }
+
+    test cutHorizontallyTo {
+        // given:
+        const region = Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 5, .cols = 3 };
+        // when:
+        const result = region.cutHorizontallyTo(3);
+        // then:
+        try std.testing.expectEqualDeep(
+            Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 2, .cols = 3 },
+            result,
+        );
+    }
+
+    /// Cuts all cols after the `col` (exclusive) if it possible.
+    ///
+    /// ┌───┬---┐
+    /// │ r │   ¦
+    /// └───┴---┘
+    ///     ^
+    ///     col (exclusive)
+    pub fn cutVerticallyTo(self: Region, col: u8) ?Region {
+        if (self.top_left.col < col and col <= self.bottomRight().col) {
+            // copy original:
+            var region = self;
+            region.cols -= col;
+            return region;
+        } else {
+            return null;
+        }
+    }
+
+    test cutVerticallyTo {
+        // given:
+        const region = Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 3, .cols = 5 };
+        // when:
+        const result = region.cutVerticallyTo(3);
+        // then:
+        try std.testing.expectEqualDeep(
+            Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 3, .cols = 2 },
+            result,
+        );
     }
 
     pub fn unionWith(self: Region, other: Region) Region {
