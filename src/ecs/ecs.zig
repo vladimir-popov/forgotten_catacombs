@@ -7,34 +7,31 @@ const std = @import("std");
 pub const Entity = u32;
 
 /// The container of the components of the type `C`.
+/// The type `C` should have a function `fn deinit(component: *C) void` for invalidation the component.
+///
 /// The components are stored in the array, and can be got
 /// for an entity for O(1) thanks for additional indexes inside.
-fn ComponentArray(comptime C: type) type {
+fn ComponentArray(comptime C: anytype) type {
     return struct {
         const Self = @This();
         // all components have to be stored in the array for perf. boost.
         components: std.ArrayList(C),
         entity_index: std.AutoHashMap(Entity, u8),
         index_entity: std.AutoHashMap(u8, Entity),
-        deinit_component: *const fn (component: C) void,
 
         /// Creates instances of the inner storages.
-        fn init(
-            alloc: std.mem.Allocator,
-            deinit_component: *const fn (component: C) void,
-        ) Self {
+        fn init(alloc: std.mem.Allocator) Self {
             return .{
                 .components = std.ArrayList(C).init(alloc),
                 .entity_index = std.AutoHashMap(Entity, u8).init(alloc),
                 .index_entity = std.AutoHashMap(u8, Entity).init(alloc),
-                .deinit_component = deinit_component,
             };
         }
 
         /// Deinits the inner storages and components.
         fn deinit(self: *Self) void {
-            for (self.components.items) |component| {
-                self.deinit_component(component);
+            for (self.components.items) |*component| {
+                component.deinit();
             }
             self.components.deinit();
             self.entity_index.deinit();
@@ -68,7 +65,7 @@ fn ComponentArray(comptime C: type) type {
                 _ = self.entity_index.remove(entity);
 
                 // deinit the component before removing
-                self.deinit_component(self.components.items[idx]);
+                self.components.items[idx].deinit();
 
                 const last_idx: u8 = @intCast(self.components.items.len - 1);
                 if (idx == last_idx) {
@@ -150,34 +147,18 @@ fn ComponentsManager(comptime ComponentsUnion: type) type {
 
         /// Initializes every field of the inner components map.
         /// The allocator is used for allocate inner storages.
-        pub fn init(
-            alloc: std.mem.Allocator,
-            comptime deinit_components: *const fn (component: ComponentsUnion) void,
-        ) Self {
+        pub fn init(alloc: std.mem.Allocator) Self {
             var components_map: ComponentsMap(ComponentsUnion) = undefined;
 
             const Arrays = @typeInfo(ComponentsMap(ComponentsUnion)).Struct.fields;
-            const Components = @typeInfo(ComponentsUnion).Union.fields;
-            inline for (Arrays, Components) |array, field| {
+            inline for (Arrays) |array| {
                 @field(components_map, array.name) =
-                    array.type.init(alloc, deinitComponent(field.name, field.type, deinit_components).deinit);
+                    array.type.init(alloc);
             }
 
             return .{ .inner_state = .{
                 .components_map = components_map,
             } };
-        }
-
-        fn deinitComponent(
-            comptime fieldName: []const u8,
-            comptime C: type,
-            deinit_components: *const fn (component: ComponentsUnion) void,
-        ) type {
-            return struct {
-                fn deinit(component: C) void {
-                    deinit_components(@unionInit(ComponentsUnion, fieldName, component));
-                }
-            };
         }
 
         /// Cleans up all inner storages.
@@ -221,7 +202,7 @@ fn ComponentsManager(comptime ComponentsUnion: type) type {
 }
 
 test "ComponentsManager: Add/Get/Remove component" {
-    var manager = ComponentsManager(TestComponents).init(std.testing.allocator, TestComponents.deinitAll);
+    var manager = ComponentsManager(TestComponents).init(std.testing.allocator);
     defer manager.deinit();
 
     // should return the component, which was added before
@@ -317,7 +298,7 @@ const EntitiesManager = struct {
 };
 
 test "EntitiesManager: Add/Remove" {
-    var cm = ComponentsManager(TestComponents).init(std.testing.allocator, TestComponents.deinitAll);
+    var cm = ComponentsManager(TestComponents).init(std.testing.allocator);
     defer cm.deinit();
 
     var em = EntitiesManager.init(
@@ -336,7 +317,7 @@ test "EntitiesManager: Add/Remove" {
 }
 
 test "EntitiesManager: iterator" {
-    var cm = ComponentsManager(TestComponents).init(std.testing.allocator, TestComponents.deinitAll);
+    var cm = ComponentsManager(TestComponents).init(std.testing.allocator);
     defer cm.deinit();
 
     var em = EntitiesManager.init(
@@ -362,7 +343,7 @@ test "EntitiesManager: iterator" {
 /// Every operations over entities and components should be done with this
 /// object.
 ///
-/// Components - a tagged union of used components.
+/// Components - a union of used components.
 /// Events - an enum (or void) of events used in the game.
 /// Runtime - a type to communicate with runtime environment: reading pressed buttons, draw sprites,
 ///         play sounds, etc.
@@ -370,7 +351,7 @@ pub fn Universe(comptime Components: anytype, comptime Events: anytype, comptime
     switch (@typeInfo(Components)) {
         .Union => {},
         else => @compileError(std.fmt.comptimePrint(
-            "The Components must be a tagged union, but it is {any}",
+            "The Components must be a union, but it is {any}",
             .{@typeInfo(Components)},
         )),
     }
@@ -416,11 +397,14 @@ pub fn Universe(comptime Components: anytype, comptime Events: anytype, comptime
             return @ptrCast(@alignCast(self.inner_state));
         }
 
-        pub fn init(alloc: std.mem.Allocator, runtime: Runtime, comptime components_deinit: *const fn (component: Components) void) Self {
+        pub fn init(
+            alloc: std.mem.Allocator,
+            runtime: Runtime,
+        ) Self {
             const state = alloc.create(InnerState) catch |err|
                 std.debug.panic("The memory error {any} happened on crating the inner state of the game.", .{err});
             state.alloc = alloc;
-            state.components = ComponentsManager(Components).init(alloc, components_deinit);
+            state.components = ComponentsManager(Components).init(alloc);
             state.entities = EntitiesManager.init(
                 alloc,
                 &state.components,
@@ -507,18 +491,11 @@ const TestComponent = struct {
         return instance;
     }
 
-    fn deinit(self: Self) void {
+    fn deinit(self: *Self) void {
         self.state.deinit();
     }
 };
-const TestComponents = union(enum) {
-    const Self = @This();
 
+const TestComponents = union {
     foo: TestComponent,
-
-    pub fn deinitAll(self: Self) void {
-        switch (self) {
-            .foo => self.foo.deinit(),
-        }
-    }
 };

@@ -33,15 +33,15 @@ pub fn build(b: *std.Build) !void {
         .root_source_file = .{ .path = "src/ecs/ecs.zig" },
     });
 
-    const math_module = b.createModule(.{
-        .root_source_file = .{ .path = "src/math/math.zig" },
+    const algs_and_types_module = b.createModule(.{
+        .root_source_file = .{ .path = "src/algs_and_types/algs_and_types.zig" },
     });
 
     const game_module = b.createModule(.{
         .root_source_file = .{ .path = "src/game/game.zig" },
     });
     game_module.addImport("ecs", ecs_module);
-    game_module.addImport("math", math_module);
+    game_module.addImport("algs_and_types", algs_and_types_module);
 
     const utf8_module = b.createModule(.{
         .root_source_file = .{ .path = "src/utf8/utf8.zig" },
@@ -61,7 +61,7 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
     terminal_game_exe.root_module.addImport("ecs", ecs_module);
-    terminal_game_exe.root_module.addImport("math", math_module);
+    terminal_game_exe.root_module.addImport("algs_and_types", algs_and_types_module);
     terminal_game_exe.root_module.addImport("game", game_module);
     terminal_game_exe.root_module.addImport("utf8", utf8_module);
     b.installArtifact(terminal_game_exe);
@@ -84,7 +84,7 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
     dungeons_exe.root_module.addImport("ecs", ecs_module);
-    dungeons_exe.root_module.addImport("math", math_module);
+    dungeons_exe.root_module.addImport("algs_and_types", algs_and_types_module);
     dungeons_exe.root_module.addImport("game", game_module);
     dungeons_exe.root_module.addImport("utf8", utf8_module);
     b.installArtifact(dungeons_exe);
@@ -186,14 +186,14 @@ pub fn build(b: *std.Build) !void {
         "Skip tests that do not match any filter",
     ) orelse &[0][]const u8{};
 
-    const ut_math = b.addTest(.{
-        .root_source_file = .{ .path = "src/math/math.zig" },
+    const ut_algs_and_types = b.addTest(.{
+        .root_source_file = .{ .path = "src/algs_and_types/algs_and_types.zig" },
         .test_runner = .{ .path = "src/test_runner.zig" },
         .target = desktop_target,
         .optimize = optimize,
         .filters = test_filter,
     });
-    const run_ut_math = b.addRunArtifact(ut_math);
+    const run_ut_algs_and_types = b.addRunArtifact(ut_algs_and_types);
 
     const ut_ecs = b.addTest(.{
         .root_source_file = .{ .path = "src/ecs/ecs.zig" },
@@ -211,7 +211,7 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
         .filters = test_filter,
     });
-    ut_game.root_module.addImport("math", math_module);
+    ut_game.root_module.addImport("algs_and_types", algs_and_types_module);
 
     const run_ut_game = b.addRunArtifact(ut_game);
 
@@ -231,7 +231,7 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
         .filters = test_filter,
     });
-    ut_terminal.root_module.addImport("math", math_module);
+    ut_terminal.root_module.addImport("algs_and_types", algs_and_types_module);
     ut_terminal.root_module.addImport("ecs", ecs_module);
     ut_terminal.root_module.addImport("game", game_module);
     ut_terminal.root_module.addImport("utf8", utf8_module);
@@ -245,13 +245,19 @@ pub fn build(b: *std.Build) !void {
     const test_step = b.step("test", "Run unit tests");
     if (b.args) |args| {
         run_ut_ecs.addArgs(args);
-        run_ut_math.addArgs(args);
+        run_ut_algs_and_types.addArgs(args);
         run_ut_utf8.addArgs(args);
         run_ut_game.addArgs(args);
         run_ut_terminal.addArgs(args);
     }
+    run_ut_ecs.has_side_effects = true;
+    run_ut_algs_and_types.has_side_effects = true;
+    run_ut_utf8.has_side_effects = true;
+    run_ut_game.has_side_effects = true;
+    run_ut_terminal.has_side_effects = true;
+
     test_step.dependOn(&run_ut_ecs.step);
-    test_step.dependOn(&run_ut_math.step);
+    test_step.dependOn(&run_ut_algs_and_types.step);
     test_step.dependOn(&run_ut_game.step);
     test_step.dependOn(&run_ut_utf8.step);
     test_step.dependOn(&run_ut_terminal.step);

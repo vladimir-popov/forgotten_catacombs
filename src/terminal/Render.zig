@@ -1,7 +1,8 @@
 const std = @import("std");
 const game = @import("game");
 const utf8 = @import("utf8");
-const p = game.primitives;
+const algs_and_types = @import("algs_and_types");
+const p = algs_and_types.primitives;
 
 pub fn drawDungeon(
     alloc: std.mem.Allocator,
@@ -9,17 +10,20 @@ pub fn drawDungeon(
     dungeon: *const game.Dungeon,
     region: p.Region,
 ) !void {
+    var itr = dungeon.cellsInRegion(region) orelse return;
     var line = try alloc.alloc(u8, region.cols);
     defer alloc.free(line);
-    var itr = dungeon.cells();
+
     while (itr.next()) |cell| {
-        line[itr.current_place.col - 1] = switch (cell) {
-            .floor => ' ',
+        const idx = itr.current_place.col - itr.start_place.col;
+        line[idx] = switch (cell) {
+            .nothing => ' ',
+            .floor => '.',
             .wall => '#',
             .opened_door => '\'',
             .closed_door => '+',
         };
-        if (itr.current_place.col == dungeon.cols) {
+        if (itr.current_place.col == itr.bottom_right_limit.col) {
             try buffer.addLine(line);
             @memset(line, 0);
         }
@@ -28,15 +32,17 @@ pub fn drawDungeon(
 
 test "draw walls" {
     // given:
-    const alloc = std.testing.allocator;
-    var buffer = utf8.Buffer.init(alloc);
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    var buffer = utf8.Buffer.init(std.testing.allocator);
     defer buffer.deinit();
-    var dungeon = try game.Dungeon.initEmpty(alloc, 3, 5);
-    defer dungeon.deinit();
-    dungeon.walls.setRowOfWalls(1, 1, 5);
-    dungeon.walls.setWall(2, 1);
-    dungeon.walls.setWall(2, 5);
-    dungeon.walls.setRowOfWalls(3, 1, 5);
+
+    var dungeon = try game.Dungeon.initEmpty(arena.allocator());
+    dungeon.walls.setRowValue(1, 1, 5, true);
+    dungeon.walls.set(2, 1);
+    dungeon.walls.set(2, 5);
+    dungeon.walls.setRowValue(3, 1, 5, true);
 
     const expected =
         \\#####
@@ -44,10 +50,17 @@ test "draw walls" {
         \\#####
     ;
     // when:
-    try drawDungeon(alloc, &buffer, &dungeon, .{ .top_left = .{ .row = 1, .col = 1 }, .rows = 3, .cols = 5 });
+    try drawDungeon(
+        std.testing.allocator,
+        &buffer,
+        &dungeon,
+        .{ .top_left = .{ .row = 1, .col = 1 }, .rows = 3, .cols = 5 },
+    );
 
     // then:
-    const actual = try buffer.toCString(alloc);
-    defer alloc.free(actual);
+    const actual = try buffer.toCString(std.testing.allocator);
+    defer std.testing.allocator.free(actual);
+
+    errdefer std.debug.print("Actual is:\n[{s}]\n", .{actual});
     try std.testing.expectEqualSlices(u8, expected, actual);
 }

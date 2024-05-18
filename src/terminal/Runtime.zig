@@ -6,29 +6,6 @@ const Render = @import("Render.zig");
 
 const Self = @This();
 
-pub var log_file: ?std.fs.File = null;
-
-pub fn writeLog(
-    comptime message_level: std.log.Level,
-    comptime scope: @TypeOf(.enum_literal),
-    comptime format: []const u8,
-    args: anytype,
-) void {
-    if (log_file) |file| {
-        const level_txt = comptime message_level.asText();
-        const prefix2 = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
-        var wr = file.writer();
-        wr.print(level_txt ++ prefix2 ++ format ++ "\n", args) catch {
-            @panic("Error on write log");
-        };
-    } else {
-        log_file = std.fs.cwd().createFile("error.log", .{ .read = false, .truncate = true }) catch {
-            @panic("Error on open log file.");
-        };
-        writeLog(message_level, scope, format, args);
-    }
-}
-
 alloc: std.mem.Allocator,
 arena: *std.heap.ArenaAllocator,
 rand: std.Random,
@@ -136,7 +113,7 @@ fn drawDungeon(ptr: *anyopaque, dungeon: *const game.Dungeon) anyerror!void {
         self.arena.allocator(),
         &self.buffer,
         dungeon,
-        .{ .top_left = .{ .row = 1, .col = 1 }, .rows = dungeon.rows, .cols = dungeon.cols },
+        .{ .top_left = .{ .row = 1, .col = 1 }, .rows = game.Dungeon.Rows, .cols = game.Dungeon.Cols },
     );
 }
 

@@ -1,8 +1,8 @@
 const std = @import("std");
 const ecs = @import("ecs");
+const algs_and_types = @import("algs_and_types");
 const cmp = @import("components.zig");
 const ent = @import("entities.zig");
-const bsp = @import("bsp.zig");
 
 const panic = std.debug.panic;
 
@@ -10,13 +10,6 @@ const Self = @This();
 
 // ========= Export: ======================
 pub usingnamespace cmp;
-pub usingnamespace bsp;
-
-pub const primitives = @import("primitives.zig");
-
-// Playdate resolution: w:400 × h:240 pixels
-pub const ROWS: u8 = 40;
-pub const COLS: u8 = 100;
 
 pub const Button = struct {
     pub const Type = u8;
@@ -72,11 +65,11 @@ pub const ForgottenCatacomb = struct {
     pub const Universe = ecs.Universe(cmp.Components, Events, AnyRuntime);
 
     pub fn init(runtime: AnyRuntime) !Universe {
-        var universe: Universe = Universe.init(runtime.alloc, runtime, cmp.Components.deinit);
+        var universe: Universe = Universe.init(runtime.alloc, runtime);
 
         // Create entities:
         const entity = universe.newEntity();
-        try ent.Level(entity, runtime.alloc, runtime.rand, ROWS, COLS);
+        try ent.Level(entity, runtime.alloc, runtime.rand);
         ent.Player(entity, 2, 2);
 
         // Initialize systems:
@@ -107,7 +100,7 @@ pub const ForgottenCatacomb = struct {
                 if (btn & Button.Right > 0)
                     new_position.col += 1;
 
-                if (!level.dungeon.walls.isWall(new_position.row, new_position.col))
+                if (!level.dungeon.walls.isSet(new_position.row, new_position.col))
                     position.* = new_position;
             }
         }

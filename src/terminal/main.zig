@@ -3,9 +3,10 @@ const game = @import("game");
 const tty = @import("tty.zig");
 
 const Runtime = @import("Runtime.zig");
+const Logger = @import("Logger.zig");
 
 pub const std_options = .{
-    .logFn = Runtime.writeLog,
+    .logFn = Logger.writeLog,
 };
 
 pub fn main() !void {

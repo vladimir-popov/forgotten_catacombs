@@ -1,8 +1,8 @@
 const std = @import("std");
-const math = @import("math");
 const p = @import("primitives.zig");
+const BinaryTree = @import("BinaryTree.zig");
 
-pub const Tree = math.BinaryTree.Node(p.Region);
+pub const Tree = BinaryTree.Node(p.Region);
 
 /// Builds graph of regions splitting the original region with `rows` and `cols`
 /// on smaller regions with minimum `min_rows` or `min_cols`. A region from any

@@ -1,5 +1,5 @@
-/// This module contains primitive types, such as geometry primitives,
-/// enums, and other not domain value objects.
+/// This module contains algorithms, data structures, and primitive types,
+/// such as geometry primitives, enums, and other not domain value objects.
 const std = @import("std");
 
 pub const Side = enum {
@@ -160,14 +160,14 @@ pub const Region = struct {
         }
     }
 
-    /// Cuts all rows before the `row` if it possible.
+    /// Crops all rows before the `row` if it possible.
     ///
     /// ┌---┐
     /// ¦   ¦
     /// ├───┤ < row (exclusive)
     /// │ r │
     /// └───┘
-    pub fn cutHorizontallyAfter(self: Region, row: u8) ?Region {
+    pub fn cropHorizontallyAfter(self: Region, row: u8) ?Region {
         if (self.top_left.row <= row and row < self.bottomRight().row) {
             // copy original:
             var region = self;
@@ -179,11 +179,11 @@ pub const Region = struct {
         }
     }
 
-    test cutHorizontallyAfter {
+    test cropHorizontallyAfter {
         // given:
         const region = Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 5, .cols = 3 };
         // when:
-        const result = region.cutHorizontallyAfter(2);
+        const result = region.cropHorizontallyAfter(2);
         // then:
         try std.testing.expectEqualDeep(
             Region{ .top_left = .{ .row = 3, .col = 1 }, .rows = 2, .cols = 3 },
@@ -191,14 +191,14 @@ pub const Region = struct {
         );
     }
 
-    /// Cuts all cols before the `col` if it possible.
+    /// Crops all cols before the `col` if it possible.
     ///
     /// ┌---┬───┐
     /// ¦   │ r │
     /// └---┴───┘
     ///     ^
     ///     col (exclusive)
-    pub fn cutVerticallyAfter(self: Region, col: u8) ?Region {
+    pub fn cropVerticallyAfter(self: Region, col: u8) ?Region {
         if (self.top_left.col <= col and col < self.bottomRight().col) {
             // copy original:
             var region = self;
@@ -210,11 +210,11 @@ pub const Region = struct {
         }
     }
 
-    test cutVerticallyAfter {
+    test cropVerticallyAfter {
         // given:
         const region = Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 3, .cols = 5 };
         // when:
-        const result = region.cutVerticallyAfter(2);
+        const result = region.cropVerticallyAfter(2);
         // then:
         try std.testing.expectEqualDeep(
             Region{ .top_left = .{ .row = 1, .col = 3 }, .rows = 3, .cols = 2 },
@@ -222,14 +222,14 @@ pub const Region = struct {
         );
     }
 
-    /// Cuts all rows after the `row` (exclusive) if it possible.
+    /// Crops all rows after the `row` (exclusive) if it possible.
     ///
     /// ┌───┐
     /// │ r │
     /// ├───┤ < row (exclusive)
     /// ¦   ¦
     /// └---┘
-    pub fn cutHorizontallyTo(self: Region, row: u8) ?Region {
+    pub fn cropHorizontallyTo(self: Region, row: u8) ?Region {
         if (self.top_left.row < row and row <= self.bottomRight().row) {
             // copy original:
             var region = self;
@@ -240,11 +240,11 @@ pub const Region = struct {
         }
     }
 
-    test cutHorizontallyTo {
+    test cropHorizontallyTo {
         // given:
         const region = Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 5, .cols = 3 };
         // when:
-        const result = region.cutHorizontallyTo(3);
+        const result = region.cropHorizontallyTo(3);
         // then:
         try std.testing.expectEqualDeep(
             Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 2, .cols = 3 },
@@ -252,14 +252,14 @@ pub const Region = struct {
         );
     }
 
-    /// Cuts all cols after the `col` (exclusive) if it possible.
+    /// Crops all cols after the `col` (exclusive) if it possible.
     ///
     /// ┌───┬---┐
     /// │ r │   ¦
     /// └───┴---┘
     ///     ^
     ///     col (exclusive)
-    pub fn cutVerticallyTo(self: Region, col: u8) ?Region {
+    pub fn cropVerticallyTo(self: Region, col: u8) ?Region {
         if (self.top_left.col < col and col <= self.bottomRight().col) {
             // copy original:
             var region = self;
@@ -270,11 +270,11 @@ pub const Region = struct {
         }
     }
 
-    test cutVerticallyTo {
+    test cropVerticallyTo {
         // given:
         const region = Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 3, .cols = 5 };
         // when:
-        const result = region.cutVerticallyTo(3);
+        const result = region.cropVerticallyTo(3);
         // then:
         try std.testing.expectEqualDeep(
             Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 3, .cols = 2 },
@@ -282,6 +282,10 @@ pub const Region = struct {
         );
     }
 
+    /// ┌───┐       ┌──────┐
+    /// │  ┌───┐ => │      │
+    /// └──│┘  │    │      │
+    ///    └───┘    └──────┘
     pub fn unionWith(self: Region, other: Region) Region {
         return .{
             .top_left = .{
@@ -291,5 +295,53 @@ pub const Region = struct {
             .rows = @max(self.rows, other.rows),
             .cols = @max(self.cols, other.cols),
         };
+    }
+
+    /// ┌───┐
+    /// │  ┌───┐ =>    ┌┐
+    /// └──│┘  │       └┘
+    ///    └───┘
+    pub fn intersect(self: Region, other: Region) ?Region {
+        const top_left: Point = .{
+            .row = @max(self.top_left.row, other.top_left.row),
+            .col = @max(self.top_left.col, other.top_left.col),
+        };
+        const bottom_right: Point = .{
+            .row = @min(self.bottomRight().row, other.bottomRight().row),
+            .col = @min(self.bottomRight().col, other.bottomRight().col),
+        };
+        if (top_left.row < bottom_right.row and top_left.col < bottom_right.col) {
+            return .{
+                .top_left = top_left,
+                .rows = bottom_right.row - top_left.row + 1,
+                .cols = bottom_right.col - top_left.col + 1,
+            };
+        } else {
+            return null;
+        }
+    }
+
+    test "partial intersect" {
+        // given:
+        const x = Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 5, .cols = 5 };
+        const y = Region{ .top_left = .{ .row = 3, .col = 3 }, .rows = 5, .cols = 5 };
+        const expected = Region{ .top_left = .{ .row = 3, .col = 3 }, .rows = 3, .cols = 3 };
+        // when:
+        const actual1 = x.intersect(y);
+        const actual2 = y.intersect(x);
+        // then:
+        try std.testing.expectEqualDeep(expected, actual1);
+        try std.testing.expectEqualDeep(expected, actual2);
+    }
+    test "intersect with inner" {
+        // given:
+        const out = Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 10, .cols = 10 };
+        const inner = Region{ .top_left = .{ .row = 3, .col = 3 }, .rows = 5, .cols = 5 };
+        // when:
+        const actual1 = out.intersect(inner);
+        const actual2 = inner.intersect(out);
+        // then:
+        try std.testing.expectEqualDeep(inner, actual1);
+        try std.testing.expectEqualDeep(inner, actual2);
     }
 };
