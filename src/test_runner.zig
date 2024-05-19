@@ -63,13 +63,10 @@ const Test = struct {
 
     pub fn wrap(test_fn: TestFn) Test {
         var instance: Test = .{ .test_fn = test_fn };
-        var itr = std.mem.splitScalar(u8, test_fn.name, '.');
-        instance.module_name = itr.next().?;
-        if (itr.next()) |test_0| {
-            instance.name = itr.next() orelse test_0;
-        } else {
-            instance.name = "unknown";
-        }
+        const names = get_names(test_fn);
+        instance.module_name = names[0];
+        instance.name = names[1];
+        // instance.name = test_fn.name;
         return instance;
     }
 
@@ -117,6 +114,18 @@ const Test = struct {
         return report;
     }
 };
+
+inline fn get_names(test_fn: TestFn) struct { []const u8, []const u8 } {
+    if (std.mem.indexOf(u8, test_fn.name, ".test.")) |idx| {
+        return .{ test_fn.name[0..idx], test_fn.name[idx + 6 ..] };
+    } else if (std.mem.indexOf(u8, test_fn.name, ".decltest.")) |idx| {
+        return .{ test_fn.name[0..idx], test_fn.name[idx + 10 ..] };
+    } else if (std.mem.indexOfScalar(u8, test_fn.name, '.')) |idx| {
+        return .{ test_fn.name[0..idx], test_fn.name[idx + 1 ..] };
+    } else {
+        return .{ "TESTS", test_fn.name };
+    }
+}
 
 /// Detailed information about a passed test
 const Passed = struct {
@@ -183,10 +192,11 @@ const Report = struct {
         if (tests.len == 0) {
             return null;
         }
-        const point_idx = std.mem.indexOfScalar(u8, tests[0].name, '.') orelse tests.len;
+
+        const names = get_names(tests[0]);
         var report = Report{
             .alloc = alloc,
-            .module_name = tests[0].name[0..point_idx],
+            .module_name = names[0],
             .test_results = try alloc.alloc(TestResult, tests.len),
         };
 
