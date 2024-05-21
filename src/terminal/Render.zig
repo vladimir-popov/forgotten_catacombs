@@ -14,8 +14,8 @@ pub fn drawDungeon(
     var line = try alloc.alloc(u8, region.cols);
     defer alloc.free(line);
 
+    var idx: u8 = 0;
     while (itr.next()) |cell| {
-        const idx = itr.current_place.col - itr.start_place.col;
         line[idx] = switch (cell) {
             .nothing => ' ',
             .floor => '.',
@@ -23,7 +23,9 @@ pub fn drawDungeon(
             .opened_door => '\'',
             .closed_door => '+',
         };
-        if (itr.current_place.col == itr.bottom_right_limit.col) {
+        idx += 1;
+        if (itr.cursor.col == itr.region.top_left.col) {
+            idx = 0;
             try buffer.addLine(line);
             @memset(line, 0);
         }

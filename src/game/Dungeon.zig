@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const algs_and_types = @import("algs_and_types");
 
 const bsp = algs_and_types.BSP;
@@ -56,15 +57,50 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
             self.passages.deinit();
         }
 
+        /// For tests only
+        fn parse(alloc: std.mem.Allocator, str: []const u8) !Self {
+            if (!builtin.is_test) {
+                @compileError("The function `parse` is for test purpose only");
+            }
+            return .{
+                .alloc = alloc,
+                .floor = try BitMap.parse('.', str),
+                .walls = try BitMap.parse('#', str),
+                .rooms = std.ArrayList(Room).init(alloc),
+                .passages = std.ArrayList(Passage).init(alloc),
+                .doors = std.AutoHashMap(p.Point, bool).init(alloc),
+            };
+        }
+
+        pub inline fn cellAt(self: Self, place: p.Point) ?Cell {
+            return self.cell(place.row, place.col);
+        }
+
+        pub fn cell(self: Self, row: u8, col: u8) ?Cell {
+            if (row < 1 or row > Rows) {
+                return null;
+            }
+            if (col < 1 or col > Cols) {
+                return null;
+            }
+            if (self.doors.getPtr(.{ .row = row, .col = col })) |door| {
+                return if (door.*) .closed_door else .opened_door;
+            }
+            if (self.walls.isSet(row, col)) {
+                return .wall;
+            }
+            if (self.floor.isSet(row, col)) {
+                return .floor;
+            }
+            return .nothing;
+        }
+
         pub fn cellsInRegion(self: *const Self, region: p.Region) ?CellsIterator {
             if (Self.Region.intersect(region)) |reg| {
-                const start_place: p.Point = .{ .row = reg.top_left.row, .col = reg.top_left.col };
                 return .{
                     .dungeon = self,
-                    .start_place = start_place,
-                    .bottom_right_limit = reg.bottomRight(),
-                    // -1 for col, coz we will begin iteration from the moving the current place
-                    .current_place = start_place.movedTo(.left),
+                    .region = reg,
+                    .cursor = reg.top_left,
                 };
             } else {
                 return null;
@@ -73,29 +109,22 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
 
         pub const CellsIterator = struct {
             dungeon: *const Self,
-            start_place: p.Point,
-            bottom_right_limit: p.Point,
-            current_place: p.Point,
+            region: p.Region,
+            cursor: p.Point,
 
             pub fn next(self: *CellsIterator) ?Cell {
-                self.current_place.move(.right);
-                if (self.current_place.col > self.bottom_right_limit.col) {
-                    self.current_place.col = self.start_place.col;
-                    self.current_place.row += 1;
-                }
-                if (self.current_place.row > self.bottom_right_limit.row) {
+                if (!self.region.containsPoint(self.cursor))
                     return null;
+
+                if (self.dungeon.cellAt(self.cursor)) |cl| {
+                    self.cursor.move(.right);
+                    if (self.cursor.col > self.region.bottomRight().col) {
+                        self.cursor.col = self.region.top_left.col;
+                        self.cursor.row += 1;
+                    }
+                    return cl;
                 }
-                if (self.dungeon.doors.getPtr(self.current_place)) |door| {
-                    return if (door.*) .closed_door else .opened_door;
-                }
-                if (self.dungeon.walls.isSet(self.current_place.row, self.current_place.col)) {
-                    return .wall;
-                }
-                if (self.dungeon.floor.isSet(self.current_place.row, self.current_place.col)) {
-                    return .floor;
-                }
-                return .nothing;
+                return null;
             }
         };
 
@@ -113,18 +142,18 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
             var dungeon: Self = try initEmpty(alloc);
 
             // BSP helps to mark regions for rooms without intersections
-            const root = try bsp.buildTree(&bsp_arena, rand, Rows, Cols, 8, 15);
+            const root = try bsp.buildTree(&bsp_arena, rand, Rows, Cols, 10, 15);
 
             // visit every BSP node and generate rooms in the leafs
             var createRooms: TraverseAndCreateRooms = .{ .dungeon = &dungeon, .rand = rand };
             try root.traverse(createRooms.handler());
 
             // fold the BSP tree and binds nodes with the same parent:
-            var bindRooms: FoldAndBind = .{
-                .dungeon = &dungeon,
-                .rand = rand,
-            };
-            _ = try root.fold(bindRooms.handler());
+            // var bindRooms: FoldAndBind = .{
+            //     .dungeon = &dungeon,
+            //     .rand = rand,
+            // };
+            // _ = try root.fold(bindRooms.handler());
 
             return dungeon;
         }
@@ -152,9 +181,9 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
                 return .{ .ptr = self, .combine = FoldAndBind.bindRegions };
             }
 
-            fn bindRegions(ptr: *anyopaque, x: p.Region, y: p.Region, depth: u8) anyerror!p.Region {
+            fn bindRegions(ptr: *anyopaque, p1: p.Region, p2: p.Region, depth: u8) anyerror!p.Region {
                 const self: *FoldAndBind = @ptrCast(@alignCast(ptr));
-                return try self.dungeon.createPassageBetweenRegions(self.rand, x, y, (depth % 2 == 0));
+                return try self.dungeon.createPassageBetweenRegions(self.rand, p1, p2, (depth % 2 == 0));
             }
         };
 
@@ -163,9 +192,8 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
             try self.rooms.append(room);
         }
 
-        /// Creates walls inside the region with random padding in the range [0:2].
-        /// Also, the count of rows and columns can be randomly reduced too in the same range.
-        /// The minimal size of the region is 7x7.
+        /// Creates floor and walls inside the region with random padding.
+        /// Also, the count of rows and columns can be randomly reduced too.
         ///
         /// Example of the room inside the 7x7 region with padding 1
         /// (the room's region includes the '#' cells):
@@ -179,19 +207,19 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
         /// |       |
         /// |       |
         /// ---------
-        fn generateSimpleRoom(self: *Self, rand: std.Random, region: p.Region) !Room {
+        fn generateSimpleRoom(self: *Self, _: std.Random, region: p.Region) !Room {
             std.debug.assert(region.rows > 6);
             std.debug.assert(region.cols > 6);
 
             // copy the initial region
-            var room = region;
+            const room = region;
             // generate inner region for the room:
-            const r_pad = rand.uintAtMost(u8, 2);
-            const c_pad = rand.uintAtMost(u8, 2);
-            room.top_left.row += r_pad;
-            room.top_left.col += c_pad;
-            room.rows -= (r_pad + rand.uintAtMost(u8, 2));
-            room.cols -= (c_pad + rand.uintAtMost(u8, 2));
+            // const r_pad = rand.uintAtMost(u8, 4);
+            // const c_pad = rand.uintAtMost(u8, 4);
+            // room.top_left.row += r_pad;
+            // room.top_left.col += c_pad;
+            // room.rows -= (r_pad + rand.uintAtMost(u8, 4));
+            // room.cols -= (c_pad + rand.uintAtMost(u8, 4));
             return self.createSimpleRoom(room);
         }
 
@@ -239,8 +267,11 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
             return x.unionWith(y);
         }
 
-        fn createPassage(self: *Self, _: std.Random, _: p.Point, _: p.Point) !Passage {
-            return Passage.init(self.alloc);
+        fn createPassage(self: *Self, _: std.Random, p1: p.Point, p2: p.Point) !Passage {
+            var result = Passage.init(self.alloc);
+            try result.append(p1);
+            try result.append(p2);
+            return result;
         }
 
         fn findPlaceForDoorInRegionRnd(self: Self, rand: std.Random, region: p.Region, side: p.Side) ?p.Point {
@@ -263,12 +294,14 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
                 },
             };
             log.debug(
-                "The point to start search of a place for the door r:{d} c:{d} in the {any} from the {s} side\n",
-                .{ place.row, place.col, region, @tagName(side) },
+                "The point to start search of a place for door from the _{s}_ side is {any}. The region for search is {any}\n",
+                .{ @tagName(side), place, region },
             );
-            if (self.findEmptyPlaceInDirection(side.opposite(), place, region)) |result| {
-                // move back to the wall:
-                return result.movedTo(side);
+            if (self.findFloorInDirection(side.opposite(), place, region)) |floor| {
+                // try to move back to the wall:
+                const candidate = floor.movedTo(side);
+                if (self.cellAt(candidate) == .wall)
+                    return candidate;
             }
             // try to find in the different parts of the region:
             var new_region: ?p.Region = null;
@@ -290,21 +323,12 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
             }
         }
 
-        /// Looks for an empty place **inside** a room or a passage in the `region`.
+        /// Looks for an empty place with florr.
         /// Starting from the `start`, moves to the `direction`.
         /// Returns the found place or null.
-        fn findEmptyPlaceInDirection(self: Self, direction: p.Side, start: p.Point, region: p.Region) ?p.Point {
+        fn findFloorInDirection(self: Self, direction: p.Side, start: p.Point, region: p.Region) ?p.Point {
             var place = start;
-            var cross_the_wall: bool = false;
-            blk: while (region.containsPoint(place)) {
-                const is_wall = self.walls.isSet(place.row, place.col);
-                if (is_wall) {
-                    cross_the_wall = true;
-                } else {
-                    if (cross_the_wall) {
-                        break :blk;
-                    }
-                }
+            while (region.containsPoint(place) and self.cellAt(place) != .floor) {
                 place.move(direction);
             }
             if (region.containsPoint(place)) {
@@ -319,118 +343,128 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
         }
     };
 }
-//
-// test "generate a simple room" {
-//     // given:
-//     const rows = 12;
-//     const cols = 12;
-//     var walls = try Walls.initEmpty(std.testing.allocator, rows, cols);
-//     defer walls.deinit();
-//     const region = p.Region{ .top_left = .{ .row = 2, .col = 2 }, .rows = 8, .cols = 8 };
-//
-//     var generator = SimpleRoomGenerator{ .rand = std.crypto.random };
-//
-//     // when:
-//     const room = try generator.generator().createRoom(&walls, region);
-//
-//     // then:
-//     try std.testing.expect(region.containsRegion(room));
-//     for (0..rows) |r_idx| {
-//         const r: u8 = @intCast(r_idx + 1);
-//         for (0..cols) |c_idx| {
-//             const c: u8 = @intCast(c_idx + 1);
-//             const cell = walls.isWall(r, c);
-//             const expect = room.contains(r, c) and
-//                 (r == room.top_left.row or r == room.bottomRight().row or
-//                 c == room.top_left.col or c == room.bottomRight().col);
-//             try std.testing.expectEqual(expect, cell);
-//         }
-//     }
-// }
-//
-// test "find an empty place inside the room in the region from right to left" {
-//     // given:
-//     const str =
-//         \\####.
-//         \\#..#.
-//         \\#..#.
-//         \\####.
-//     ;
-//     var dungeon = try Dungeon.initEmpty(std.testing.allocator, 4, 5);
-//     defer dungeon.deinit();
-//     try dungeon.walls.parse(str);
-//
-//     // when:
-//     const expected = dungeon.findEmptyPlaceInDirection(
-//         .left,
-//         p.Point{ .row = 2, .col = 5 },
-//         dungeon.getRegion(),
-//     );
-//     const unexpected = dungeon.findEmptyPlaceInDirection(
-//         .left,
-//         p.Point{ .row = 1, .col = 5 },
-//         dungeon.getRegion(),
-//     );
-//
-//     // then:
-//     try std.testing.expectEqualDeep(p.Point{ .row = 2, .col = 3 }, expected.?);
-//     try std.testing.expect(unexpected == null);
-// }
-//
-// test "find an empty place inside the room in the region from bottom to top" {
-//     // given:
-//     const str =
-//         \\####.
-//         \\#..#.
-//         \\#..#.
-//         \\####.
-//     ;
-//     var dungeon = try Dungeon.initEmpty(std.testing.allocator, 4, 5);
-//     defer dungeon.deinit();
-//     try dungeon.walls.parse(str);
-//
-//     // when:
-//     const expected = dungeon.findEmptyPlaceInDirection(
-//         .bottom,
-//         p.Point{ .row = 4, .col = 2 },
-//         dungeon.getRegion(),
-//     );
-//     const unexpected = dungeon.findEmptyPlaceInDirection(
-//         .bottom,
-//         p.Point{ .row = 4, .col = 1 },
-//         dungeon.getRegion(),
-//     );
-//
-//     // then:
-//     try std.testing.expectEqualDeep(p.Point{ .row = 3, .col = 2 }, expected.?);
-//     try std.testing.expect(unexpected == null);
-// }
-//
-// test "find a random place for door" {
-//     // given:
-//     const str =
-//         \\####.
-//         \\#..#.
-//         \\#..#.
-//         \\####.
-//     ;
-//     const rand = std.crypto.random;
-//     var dungeon = try Dungeon.initEmpty(std.testing.allocator, 4, 5);
-//     defer dungeon.deinit();
-//     try dungeon.walls.parse(str);
-//     const region: p.Region = .{ .top_left = .{ .row = 1, .col = 1 }, .rows = 4, .cols = 5 };
-//
-//     // when:
-//     const place_right = dungeon.findPlaceForDoorInRegionRnd(rand, region, .right).?;
-//     // const place_bottom = try dungeon.findPlaceForDoorRnd(rand, region, .bottom);
-//
-//     // then:
-//     try std.testing.expectEqual(4, place_right.col);
-//     try std.testing.expect(2 <= place_right.row and place_right.row <= 3);
-//     // and
-//     // try std.testing.expectEqual(4, place_bottom.row);
-//     // try std.testing.expect(2 <= place_bottom.col and place_bottom.col <= 3);
-// }
+
+test "generate a simple room" {
+    // given:
+    const rows = 12;
+    const cols = 12;
+    var dungeon = try Dungeon(rows, cols).initEmpty(std.testing.allocator);
+    defer dungeon.deinit();
+
+    const region = p.Region{ .top_left = .{ .row = 2, .col = 2 }, .rows = 8, .cols = 8 };
+
+    // when:
+    const room = try dungeon.generateSimpleRoom(std.crypto.random, region);
+
+    // then:
+    try std.testing.expect(region.containsRegion(room));
+    for (0..rows) |r_idx| {
+        const r: u8 = @intCast(r_idx + 1);
+        for (0..cols) |c_idx| {
+            const c: u8 = @intCast(c_idx + 1);
+            errdefer std.debug.print("r:{d} c:{d}\n", .{ r, c });
+
+            const cell = dungeon.cell(r, c);
+            if (room.contains(r, c)) {
+                const expect_wall =
+                    (r == room.top_left.row or r == room.bottomRight().row or
+                    c == room.top_left.col or c == room.bottomRight().col);
+                if (expect_wall) {
+                    try std.testing.expectEqual(.wall, cell);
+                } else {
+                    try std.testing.expectEqual(.floor, cell);
+                }
+            } else {
+                try std.testing.expectEqual(.nothing, cell);
+            }
+        }
+    }
+}
+
+test "find a cell with floor inside the room starting outside" {
+    // given:
+    const str =
+        \\ ####
+        \\ #..#
+        \\ #..#
+        \\ ####
+    ;
+    var dungeon = try Dungeon(4, 5).parse(std.testing.allocator, str);
+    defer dungeon.deinit();
+    const region = Dungeon(4, 5).Region;
+
+    // when:
+    const expected = dungeon.findFloorInDirection(
+        .right,
+        p.Point{ .row = 2, .col = 1 },
+        region,
+    );
+    const unexpected = dungeon.findFloorInDirection(
+        .right,
+        p.Point{ .row = 1, .col = 1 },
+        region,
+    );
+
+    // then:
+    try std.testing.expectEqualDeep(p.Point{ .row = 2, .col = 3 }, expected.?);
+    try std.testing.expect(unexpected == null);
+}
+
+test "find a cell with floor inside the room starting on the wall" {
+    // given:
+    const str =
+        \\ ####
+        \\ #..#
+        \\ #..#
+        \\ ####
+    ;
+    var dungeon = try Dungeon(4, 5).parse(std.testing.allocator, str);
+    defer dungeon.deinit();
+    const region = Dungeon(4, 5).Region;
+
+    // when:
+    const expected = dungeon.findFloorInDirection(
+        .bottom,
+        p.Point{ .row = 1, .col = 3 },
+        region,
+    );
+    const unexpected = dungeon.findFloorInDirection(
+        .bottom,
+        p.Point{ .row = 1, .col = 1 },
+        region,
+    );
+
+    // then:
+    try std.testing.expectEqualDeep(p.Point{ .row = 2, .col = 3 }, expected.?);
+    try std.testing.expect(unexpected == null);
+}
+
+test "find a random place for door" {
+    // given:
+    const str =
+        \\ ####
+        \\ #..#
+        \\ #..#
+        \\ ####
+    ;
+    var dungeon = try Dungeon(4, 5).parse(std.testing.allocator, str);
+    defer dungeon.deinit();
+    const region = Dungeon(4, 5).Region;
+    const rand = std.crypto.random;
+
+    // when:
+    const place_left = dungeon.findPlaceForDoorInRegionRnd(rand, region, .left);
+    const place_bottom = dungeon.findPlaceForDoorInRegionRnd(rand, region, .bottom);
+
+    // then:
+    errdefer std.debug.print("place left {any}\n", .{place_left});
+    try std.testing.expectEqual(2, place_left.?.col);
+    try std.testing.expect(2 <= place_left.?.row and place_left.?.row <= 3);
+    // and
+    errdefer std.debug.print("place bottom {any}\n", .{place_bottom});
+    try std.testing.expectEqual(4, place_bottom.?.row);
+    try std.testing.expect(3 <= place_bottom.?.col and place_bottom.?.col <= 4);
+}
 
 test {
     std.testing.refAllDecls(@This());

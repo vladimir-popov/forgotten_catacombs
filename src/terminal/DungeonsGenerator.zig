@@ -3,16 +3,17 @@ const ecs = @import("ecs");
 const game = @import("game");
 const tty = @import("tty.zig");
 
+const Logger = @import("Logger.zig");
 const Runtime = @import("Runtime.zig");
 
 pub const std_options = .{
-    .logFn = Runtime.writeLog,
+    .logFn = Logger.writeLog,
 };
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const alloc = gpa.allocator();
     defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK DETECTED!");
+    const alloc = gpa.allocator();
 
     var arena = std.heap.ArenaAllocator.init(alloc);
     defer arena.deinit();
@@ -27,19 +28,13 @@ pub fn main() !void {
 
 const Components = union(enum) {
     dungeon: game.Dungeon,
-
-    fn deinitAll(components: Components) void {
-        switch (components) {
-            .dungeon => components.dungeon.deinit(),
-        }
-    }
 };
 
 const DungeonsGenerator = struct {
     pub const Universe = ecs.Universe(Components, game.Events, game.AnyRuntime);
 
     pub fn init(runtime: game.AnyRuntime) !Universe {
-        var universe: Universe = Universe.init(runtime.alloc, runtime, Components.deinitAll);
+        var universe: Universe = Universe.init(runtime.alloc, runtime);
 
         // Generate dungeon:
         const dungeon = try game.Dungeon.bspGenerate(
@@ -71,8 +66,6 @@ const DungeonsGenerator = struct {
                     const dungeon = try game.Dungeon.bspGenerate(
                         universe.runtime.alloc,
                         universe.runtime.rand,
-                        game.ROWS,
-                        game.COLS,
                     );
                     universe.addComponent(entity, game.Dungeon, dungeon);
                 }
@@ -87,4 +80,3 @@ const DungeonsGenerator = struct {
         try universe.runtime.drawDungeon(&dungeon);
     }
 };
-

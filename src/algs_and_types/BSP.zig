@@ -44,7 +44,8 @@ const Splitter = struct {
     fn split(ptr: *anyopaque, node: *Tree) anyerror!?struct { p.Region, p.Region } {
         const self: *Splitter = @ptrCast(@alignCast(ptr));
         const region: p.Region = node.value;
-        if (node.depth % 2 == 0) {
+        const is_horizontal = self.rand.boolean();
+        if (is_horizontal) {
             if (divideRnd(self.rand, region.rows, self.min_rows)) |rows| {
                 return region.splitHorizontally(rows);
             }
