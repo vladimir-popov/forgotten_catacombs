@@ -153,11 +153,11 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
             try root.traverse(createRooms.handler());
 
             // fold the BSP tree and binds nodes with the same parent:
-            // var bindRooms: FoldAndBind = .{
-            //     .dungeon = &dungeon,
-            //     .rand = rand,
-            // };
-            // _ = try root.fold(bindRooms.handler());
+            var bindRooms: FoldAndBind = .{
+                .dungeon = &dungeon,
+                .rand = rand,
+            };
+            _ = try root.fold(bindRooms.handler());
 
             return dungeon;
         }
@@ -185,9 +185,10 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
                 return .{ .ptr = self, .combine = FoldAndBind.bindRegions };
             }
 
-            fn bindRegions(ptr: *anyopaque, p1: p.Region, p2: p.Region, depth: u8) anyerror!p.Region {
+            fn bindRegions(ptr: *anyopaque, r1: p.Region, r2: p.Region, _: u8) anyerror!p.Region {
                 const self: *FoldAndBind = @ptrCast(@alignCast(ptr));
-                return try self.dungeon.createPassageBetweenRegions(self.rand, p1, p2, (depth % 2 == 0));
+                const direction: p.Side = if (r1.top_left.row == r2.top_left.row) .right else .bottom;
+                return try self.dungeon.createPassageBetweenRegions(self.rand, r1, r2, direction);
             }
         };
 
@@ -275,30 +276,24 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
         fn createPassageBetweenRegions(
             self: *Self,
             rand: std.Random,
-            x: p.Region,
-            y: p.Region,
-            is_horizontal: bool,
+            r1: p.Region,
+            r2: p.Region,
+            direction: p.Side,
         ) !p.Region {
-            var passage: Passage = undefined;
-            if (is_horizontal) {
-                const left_region_door = self.findPlaceForDoorInRegionRnd(rand, x, .right) orelse return Error.NoSpaceForDoor;
-                const right_region_door = self.findPlaceForDoorInRegionRnd(rand, y, .left) orelse return Error.NoSpaceForDoor;
-                passage = try self.createPassage(rand, left_region_door, right_region_door);
-            } else {
-                const top_region_door = self.findPlaceForDoorInRegionRnd(rand, x, .bottom) orelse return Error.NoSpaceForDoor;
-                const bottom_region_door = self.findPlaceForDoorInRegionRnd(rand, y, .top) orelse return Error.NoSpaceForDoor;
-                passage = try self.createPassage(rand, top_region_door, bottom_region_door);
-            }
+            const door1 = self.findPlaceForDoorInRegionRnd(rand, r1, direction) orelse return Error.NoSpaceForDoor;
+            const door2 = self.findPlaceForDoorInRegionRnd(rand, r2, direction.opposite()) orelse return Error.NoSpaceForDoor;
+            const passage = try self.createPassage(rand, door1, door2, direction);
             try self.passages.append(passage);
             try self.doors.put(passage.items[0], rand.boolean());
             try self.doors.put(passage.items[passage.items.len - 1], rand.boolean());
-            return x.unionWith(y);
+            return r1.unionWith(r2);
         }
 
-        fn createPassage(self: *Self, _: std.Random, p1: p.Point, p2: p.Point) !Passage {
+        fn createPassage(self: *Self, _: std.Random, from: p.Point, to: p.Point, direction: p.Side) !Passage {
+            log.debug("Create passage from {any} {s} to {any}", .{ from, @tagName(direction), to });
             var result = Passage.init(self.alloc);
-            try result.append(p1);
-            try result.append(p2);
+            try result.append(from);
+            try result.append(to);
             return result;
         }
 
@@ -322,14 +317,16 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
                 },
             };
             log.debug(
-                "Start search of a place for door from {any} on the _{s}_ side of the {any}\n",
+                "Start search of a place for door from {any} on the _{s}_ side of the {any}",
                 .{ place, @tagName(side), region },
             );
             if (self.findFloorInDirection(side.opposite(), place, region)) |floor| {
                 // try to move back to the wall:
                 const candidate = floor.movedTo(side);
-                if (self.cellAt(candidate) == .wall)
+                if (self.cellAt(candidate) == .wall) {
+                    log.debug("{any} is the place for door in {any} on {s} side", .{ candidate, region, @tagName(side) });
                     return candidate;
+                }
             }
             // try to find in the different parts of the region:
             var new_regions: [2]?p.Region = .{ null, null };
@@ -338,21 +335,24 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
                     .{ region.cropVerticallyTo(place.col), region.cropVerticallyAfter(place.col) }
                 else
                     .{ region.cropVerticallyAfter(place.col), region.cropVerticallyTo(place.col) };
-                log.debug("Crop {any} vertically to {any} and {any}\n", .{ region, new_regions[0], new_regions[1] });
+                log.debug("Crop {any} vertically to {any} and {any}", .{ region, new_regions[0], new_regions[1] });
             } else {
                 new_regions = if (rand.boolean())
                     .{ region.cropHorizontallyTo(place.row), region.cropHorizontallyAfter(place.row) }
                 else
                     .{ region.cropHorizontallyAfter(place.row), region.cropHorizontallyTo(place.row) };
-                log.debug("Crop {any} horizontally to {any} and {any}\n", .{ region, new_regions[0], new_regions[1] });
+                log.debug("Crop {any} horizontally to {any} and {any}", .{ region, new_regions[0], new_regions[1] });
             }
             for (new_regions) |new_region| {
                 if (new_region) |reg| {
+                    reg.validate();
                     if (self.findPlaceForDoorInRegionRnd(rand, reg, side)) |result| {
+                        log.debug("{any} is the place for door in {any} on {s} side", .{ result, reg, @tagName(side) });
                         return result;
                     }
                 }
             }
+            log.debug("Not found any place for door in {any} on {s} side", .{ region, @tagName(side) });
             return null;
         }
 
@@ -515,6 +515,33 @@ test "find a random place for the door on the bottom side" {
     errdefer std.debug.print("place bottom {any}\n", .{place_bottom});
     try std.testing.expectEqual(4, place_bottom.?.row);
     try std.testing.expect(3 <= place_bottom.?.col and place_bottom.?.col <= 4);
+}
+
+test "create passage between two rooms" {
+    // given:
+    const Rows = 4;
+    const Cols = 12;
+    const str =
+        \\ ####   ####
+        \\ #..#   #..#
+        \\ #..#   #..#
+        \\ ####   ####
+    ;
+    errdefer std.debug.print("{s}\n", .{str});
+    var dungeon = try Dungeon(Rows, Cols).parse(std.testing.allocator, str);
+    defer dungeon.deinit();
+    const rand = std.crypto.random;
+    const r1 = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = Rows, .cols = 6 };
+    const r2 = p.Region{ .top_left = .{ .row = 1, .col = 7 }, .rows = Rows, .cols = Cols - 6 };
+
+    // when:
+    const region = try dungeon.createPassageBetweenRegions(rand, r1, r2, .right);
+
+    // then:
+    try std.testing.expectEqualDeep(Dungeon(Rows, Cols).Region, region);
+    const passage: Passage = dungeon.passages.items[0];
+    errdefer std.debug.print("Passage: {any}\n", .{passage.items});
+    try std.testing.expect(passage.items.len >= 2);
 }
 
 test {

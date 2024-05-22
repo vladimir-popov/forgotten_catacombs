@@ -1,6 +1,7 @@
 /// This module contains algorithms, data structures, and primitive types,
 /// such as geometry primitives, enums, and other not domain value objects.
 const std = @import("std");
+const builtin = @import("builtin");
 
 pub const Side = enum {
     left,
@@ -92,6 +93,20 @@ pub const Region = struct {
         );
     }
 
+    pub inline fn validate(self: Region) void {
+        if (builtin.mode == .Debug) {
+            const is_correct = self.top_left.row > 0 and
+                self.top_left.col > 0 and
+                self.rows > 0 and
+                self.cols > 0 and
+                256 > @as(u32, self.rows) + self.top_left.row and
+                256 > @as(u32, self.cols) + self.top_left.col;
+            if (!is_correct) {
+                std.debug.panic("Incorrect {any}", .{self});
+            }
+        }
+    }
+
     pub inline fn isHorizontal(self: Region) bool {
         return self.cols > self.rows;
     }
@@ -104,6 +119,7 @@ pub const Region = struct {
     }
 
     pub inline fn bottomRight(self: Region) Point {
+        self.validate();
         return .{ .row = self.top_left.row + self.rows - 1, .col = self.top_left.col + self.cols - 1 };
     }
 
@@ -208,6 +224,7 @@ pub const Region = struct {
             var region = self;
             region.top_left.row = row + 1;
             region.rows -= (row + 1 - self.top_left.row);
+            self.validate();
             return region;
         } else {
             return null;
@@ -239,6 +256,7 @@ pub const Region = struct {
             var region = self;
             region.top_left.col = col + 1;
             region.cols -= (col + 1 - self.top_left.col);
+            self.validate();
             return region;
         } else {
             return null;
@@ -268,7 +286,8 @@ pub const Region = struct {
         if (self.top_left.row < row and row <= self.bottomRight().row) {
             // copy original:
             var region = self;
-            region.rows = row - 1;
+            region.rows = row - self.top_left.row;
+            self.validate();
             return region;
         } else {
             return null;
@@ -298,7 +317,8 @@ pub const Region = struct {
         if (self.top_left.col < col and col <= self.bottomRight().col) {
             // copy original:
             var region = self;
-            region.cols = col - 1;
+            region.cols = col - self.top_left.col;
+            self.validate();
             return region;
         } else {
             return null;
@@ -322,14 +342,39 @@ pub const Region = struct {
     /// └──│┘  │    │      │
     ///    └───┘    └──────┘
     pub fn unionWith(self: Region, other: Region) Region {
-        return .{
-            .top_left = .{
-                .row = @min(self.top_left.row, other.top_left.row),
-                .col = @min(self.top_left.col, other.top_left.col),
-            },
-            .rows = @max(self.rows, other.rows),
-            .cols = @max(self.cols, other.cols),
+        const top_left = .{
+            .row = @min(self.top_left.row, other.top_left.row),
+            .col = @min(self.top_left.col, other.top_left.col),
         };
+        return .{
+            .top_left = top_left,
+            .rows = @max(self.bottomRight().row, other.bottomRight().row) - top_left.row + 1,
+            .cols = @max(self.bottomRight().col, other.bottomRight().col) - top_left.col + 1,
+        };
+    }
+
+    test "union with partial intersected" {
+        // given:
+        const x = Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 5, .cols = 5 };
+        const y = Region{ .top_left = .{ .row = 3, .col = 3 }, .rows = 5, .cols = 5 };
+        const expected = Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 7, .cols = 7 };
+        // when:
+        const actual1 = x.unionWith(y);
+        const actual2 = y.unionWith(x);
+        // then:
+        try std.testing.expectEqualDeep(expected, actual1);
+        try std.testing.expectEqualDeep(expected, actual2);
+    }
+    test "union with inner region" {
+        // given:
+        const outer = Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 10, .cols = 10 };
+        const inner = Region{ .top_left = .{ .row = 3, .col = 3 }, .rows = 5, .cols = 5 };
+        // when:
+        const actual1 = outer.unionWith(inner);
+        const actual2 = inner.unionWith(outer);
+        // then:
+        try std.testing.expectEqualDeep(outer, actual1);
+        try std.testing.expectEqualDeep(outer, actual2);
     }
 
     /// ┌───┐
