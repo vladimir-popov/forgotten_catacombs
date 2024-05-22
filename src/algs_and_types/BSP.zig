@@ -4,6 +4,27 @@ const BinaryTree = @import("BinaryTree.zig");
 
 pub const Tree = BinaryTree.Node(p.Region);
 
+pub const MinRegion = struct {
+    min_rows: u8 = 12,
+    min_cols: u8 = 30,
+    square_ration: f16 = 0.3,
+
+    fn validateRegion(self: MinRegion, region: p.Region) void {
+        if (region.rows < self.min_rows) {
+            std.debug.panic("The {any} has less than {d} min rows.\n", .{
+                region,
+                self.min_rows,
+            });
+        }
+        if (region.cols < self.min_cols) {
+            std.debug.panic("The {any} has less than {d} min cols.\n", .{
+                region,
+                self.min_cols,
+            });
+        }
+    }
+};
+
 /// Builds graph of regions splitting the original region with `rows` and `cols`
 /// on smaller regions with minimum `min_rows` or `min_cols`. A region from any
 /// node contains regions of its children.
@@ -14,14 +35,13 @@ pub fn buildTree(
     rand: std.Random,
     rows: u8,
     cols: u8,
-    min_rows: u8,
-    min_cols: u8,
+    opts: MinRegion,
 ) !*Tree {
     const region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = rows, .cols = cols };
-    std.debug.assert(!region.lessThan(min_rows, min_cols));
+    opts.validateRegion(region);
 
     const alloc = arena.allocator();
-    var splitter = Splitter{ .rand = rand, .min_rows = min_rows, .min_cols = min_cols };
+    var splitter = Splitter{ .rand = rand, .opts = opts };
     var root: *Tree = try Tree.root(alloc, region, compare);
     try root.split(alloc, splitter.handler());
 
@@ -34,8 +54,7 @@ fn compare(_: u8, _: p.Region, _: p.Region) i8 {
 
 const Splitter = struct {
     rand: std.Random,
-    min_rows: u8,
-    min_cols: u8,
+    opts: MinRegion,
 
     fn handler(self: *Splitter) Tree.SplitHandler {
         return .{ .ptr = self, .split = split };
@@ -44,14 +63,16 @@ const Splitter = struct {
     fn split(ptr: *anyopaque, node: *Tree) anyerror!?struct { p.Region, p.Region } {
         const self: *Splitter = @ptrCast(@alignCast(ptr));
         const region: p.Region = node.value;
-        const is_horizontal = self.rand.boolean();
-        if (is_horizontal) {
-            if (divideRnd(self.rand, region.rows, self.min_rows)) |rows| {
-                return region.splitHorizontally(rows);
+
+        const is_vertical = region.ratio() < self.opts.square_ration;
+
+        if (is_vertical) {
+            if (divideRnd(self.rand, region.cols, self.opts.min_rows)) |cols| {
+                return region.splitVertically(cols);
             }
         } else {
-            if (divideRnd(self.rand, region.cols, self.min_rows)) |cols| {
-                return region.splitVertically(cols);
+            if (divideRnd(self.rand, region.rows, self.opts.min_rows)) |rows| {
+                return region.splitHorizontally(rows);
             }
         }
         return null;
@@ -77,19 +98,20 @@ test "build tree" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer _ = arena.reset(.free_all);
     var rand = std.Random.DefaultPrng.init(0);
+    const opts: MinRegion = .{ .min_rows = 2, .min_cols = 2 };
 
     // when:
-    const root = try buildTree(&arena, rand.random(), 9, 7, 3, 2);
+    const root = try buildTree(&arena, rand.random(), 9, 7, opts);
 
     // then:
-    var validate = ValidateNodes{ .min_rows = 2, .min_cols = 2 };
+    var validate = ValidateNodes{ .opts = opts };
     try root.traverse(validate.bspNodeHandler());
 }
 
 /// Utility for test
 const ValidateNodes = struct {
-    min_rows: u8,
-    min_cols: u8,
+    opts: MinRegion,
+    min_ratio: f16 = 0.2,
 
     fn bspNodeHandler(self: *ValidateNodes) Tree.TraverseHandler {
         return .{ .ptr = self, .handle = validate };
@@ -98,40 +120,54 @@ const ValidateNodes = struct {
     fn validate(ptr: *anyopaque, node: *Tree) anyerror!void {
         const self: *ValidateNodes = @ptrCast(@alignCast(ptr));
 
-        expect(!node.value.lessThan(self.min_rows, self.min_cols)) catch |err| {
-            std.debug.print("The root region {any} is less than {d}x{d}\n", .{ node.value, self.min_rows, self.min_cols });
-            return err;
-        };
+        try self.validateNode("root", null, node);
         if (node.left) |left| {
-            try self.validateChild("left", node, left);
+            try self.validateNode("left", node, left);
         }
         if (node.right) |right| {
-            try self.validateChild("right", node, right);
+            try self.validateNode("right", node, right);
         }
     }
 
-    fn validateChild(
+    fn validateNode(
         self: *ValidateNodes,
         name: []const u8,
-        root: *Tree,
+        root: ?*Tree,
         node: *Tree,
     ) !void {
-        expect(root.value.containsRegion(node.value)) catch |err| {
-            std.debug.print(
-                "The {s} region {any} doesn't contained in the root {any}\n",
-                .{ name, node.value, root.value },
-            );
-            return err;
-        };
-        expect(!root.value.lessThan(self.min_rows, self.min_cols)) catch |err| {
-            std.debug.print("The {s} region {any} of the root {any} is less than {d}x{d}\n", .{
+        if (root) |rt| {
+            expect(rt.value.containsRegion(node.value)) catch |err| {
+                std.debug.print(
+                    "The {s} region {any} doesn't contained in the root {any}\n",
+                    .{ name, node.value, rt.value },
+                );
+                return err;
+            };
+        }
+        if (node.value.rows < self.opts.min_rows) {
+            std.debug.print("The {s} {any} has less than {d} min rows.\n", .{
                 name,
                 node.value,
-                root.value,
-                self.min_rows,
-                self.min_cols,
+                self.opts.min_rows,
             });
-            return err;
-        };
+            return error.TestUnexpectedResult;
+        }
+        if (node.value.cols < self.opts.min_cols) {
+            std.debug.print("The {s} {any} has less than {d} min cols.\n", .{
+                name,
+                node.value,
+                self.opts.min_cols,
+            });
+            return error.TestUnexpectedResult;
+        }
+        if (node.value.ratio() < self.min_ratio) {
+            std.debug.print("The {s} {any} has lower ratio {d} than {d}.\n", .{
+                name,
+                node.value,
+                node.value.ratio(),
+                self.min_ratio,
+            });
+            return error.TestUnexpectedResult;
+        }
     }
 };

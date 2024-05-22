@@ -27,6 +27,18 @@ pub const Point = struct {
     row: u8,
     col: u8,
 
+    pub fn format(
+        self: Point,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+
+        try writer.print("Point(r:{d}, c:{d})", .{ self.row, self.col });
+    }
+
     pub fn movedTo(self: Point, direction: Side) Point {
         var point = self;
         point.move(direction);
@@ -65,23 +77,46 @@ pub const Region = struct {
     /// The count of columns in this region.
     cols: u8,
 
+    pub fn format(
+        self: Region,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+
+        try writer.print(
+            "Region(r:{d}, c:{d}, rows:{d}, cols:{d}, ratio:{d})",
+            .{ self.top_left.row, self.top_left.col, self.rows, self.cols, self.ratio() },
+        );
+    }
+
     pub inline fn isHorizontal(self: Region) bool {
         return self.cols > self.rows;
+    }
+
+    /// rows / cols
+    pub inline fn ratio(self: Region) f16 {
+        const rows: f16 = @floatFromInt(self.rows);
+        const cols: f16 = @floatFromInt(self.cols);
+        return rows / cols;
     }
 
     pub inline fn bottomRight(self: Region) Point {
         return .{ .row = self.top_left.row + self.rows - 1, .col = self.top_left.col + self.cols - 1 };
     }
 
-    /// Returns true if this region has less rows or columns than passed minimal
-    /// values.
-    pub inline fn lessThan(self: Region, min_rows: u8, min_cols: u8) bool {
-        return self.rows < min_rows or self.cols < min_cols;
-    }
-
     /// Returns the area of this region.
     pub inline fn area(self: Region) u16 {
-        return self.rows * self.cols;
+        return std.math.mulWide(u8, self.rows, self.cols);
+    }
+
+    pub fn scale(self: *Region, k: f16) void {
+        const rows: f16 = @floatFromInt(self.rows);
+        const cols: f16 = @floatFromInt(self.cols);
+        self.rows = @intFromFloat(@round(rows * k));
+        self.cols = @intFromFloat(@round(cols * k));
     }
 
     pub inline fn containsPoint(self: Region, point: Point) bool {
@@ -172,7 +207,7 @@ pub const Region = struct {
             // copy original:
             var region = self;
             region.top_left.row = row + 1;
-            region.rows -= (row + 1);
+            region.rows -= (row + 1 - self.top_left.row);
             return region;
         } else {
             return null;
@@ -186,7 +221,7 @@ pub const Region = struct {
         const result = region.cropHorizontallyAfter(2);
         // then:
         try std.testing.expectEqualDeep(
-            Region{ .top_left = .{ .row = 3, .col = 1 }, .rows = 2, .cols = 3 },
+            Region{ .top_left = .{ .row = 3, .col = 1 }, .rows = 3, .cols = 3 },
             result,
         );
     }
@@ -203,7 +238,7 @@ pub const Region = struct {
             // copy original:
             var region = self;
             region.top_left.col = col + 1;
-            region.cols -= (col + 1);
+            region.cols -= (col + 1 - self.top_left.col);
             return region;
         } else {
             return null;
@@ -217,7 +252,7 @@ pub const Region = struct {
         const result = region.cropVerticallyAfter(2);
         // then:
         try std.testing.expectEqualDeep(
-            Region{ .top_left = .{ .row = 1, .col = 3 }, .rows = 3, .cols = 2 },
+            Region{ .top_left = .{ .row = 1, .col = 3 }, .rows = 3, .cols = 3 },
             result,
         );
     }
@@ -233,7 +268,7 @@ pub const Region = struct {
         if (self.top_left.row < row and row <= self.bottomRight().row) {
             // copy original:
             var region = self;
-            region.rows -= row;
+            region.rows = row - 1;
             return region;
         } else {
             return null;
@@ -263,7 +298,7 @@ pub const Region = struct {
         if (self.top_left.col < col and col <= self.bottomRight().col) {
             // copy original:
             var region = self;
-            region.cols -= col;
+            region.cols = col - 1;
             return region;
         } else {
             return null;

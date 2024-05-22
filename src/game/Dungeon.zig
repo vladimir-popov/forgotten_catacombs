@@ -25,6 +25,10 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
         pub const Cols: u8 = cols_count;
         pub const Region: p.Region = .{ .top_left = .{ .row = 1, .col = 1 }, .rows = Rows, .cols = Cols };
 
+        // rows / cols - for terminal it's less than 0.
+        // TODO make it as argument
+        const SquareRation: f16 = 0.4;
+
         const BitMap = algs_and_types.BitMap(Rows, Cols);
 
         alloc: std.mem.Allocator,
@@ -142,7 +146,7 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
             var dungeon: Self = try initEmpty(alloc);
 
             // BSP helps to mark regions for rooms without intersections
-            const root = try bsp.buildTree(&bsp_arena, rand, Rows, Cols, 10, 15);
+            const root = try bsp.buildTree(&bsp_arena, rand, Rows, Cols, .{});
 
             // visit every BSP node and generate rooms in the leafs
             var createRooms: TraverseAndCreateRooms = .{ .dungeon = &dungeon, .rand = rand };
@@ -188,9 +192,27 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
         };
 
         fn generateAndAddRoom(self: *Self, rand: std.Random, region: p.Region) !void {
-            const room = try self.generateSimpleRoom(rand, region);
+            const room = try self.generateSimpleRoom(rand, region, .{});
             try self.rooms.append(room);
         }
+
+        /// Configuration of the simple rooms.
+        const SimpleRoomOpts = struct {
+            /// Minimal rows count in the room
+            min_rows: u8 = 5,
+            /// Minimal columns count in the room
+            min_cols: u8 = 5,
+            /// Minimal scale rate to prevent too small rooms
+            min_scale: f16 = 0.6,
+            /// This is rows/cols ratio of the square.
+            /// In case of ascii graphics it's not 1.0
+            square_ratio: f16 = SquareRation,
+
+            /// Minimal area of the room
+            inline fn minArea(self: SimpleRoomOpts) u8 {
+                return self.min_rows * self.min_cols;
+            }
+        };
 
         /// Creates floor and walls inside the region with random padding.
         /// Also, the count of rows and columns can be randomly reduced too.
@@ -207,19 +229,25 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
         /// |       |
         /// |       |
         /// ---------
-        fn generateSimpleRoom(self: *Self, _: std.Random, region: p.Region) !Room {
-            std.debug.assert(region.rows > 6);
-            std.debug.assert(region.cols > 6);
-
-            // copy the initial region
-            const room = region;
-            // generate inner region for the room:
-            // const r_pad = rand.uintAtMost(u8, 4);
-            // const c_pad = rand.uintAtMost(u8, 4);
-            // room.top_left.row += r_pad;
-            // room.top_left.col += c_pad;
-            // room.rows -= (r_pad + rand.uintAtMost(u8, 4));
-            // room.cols -= (c_pad + rand.uintAtMost(u8, 4));
+        fn generateSimpleRoom(self: *Self, rand: std.Random, region: p.Region, opts: SimpleRoomOpts) !Room {
+            var room: p.Region = region;
+            if (!std.math.approxEqAbs(f16, opts.square_ratio, region.ratio(), 0.1)) {
+                // make the region 'more square'
+                if (region.ratio() > opts.square_ratio) {
+                    room.rows = @max(
+                        opts.min_rows,
+                        @as(u8, @intFromFloat(@round(@as(f16, @floatFromInt(region.cols)) * opts.square_ratio))),
+                    );
+                } else {
+                    room.cols = @max(
+                        opts.min_cols,
+                        @as(u8, @intFromFloat(@round(@as(f16, @floatFromInt(region.rows)) / opts.square_ratio))),
+                    );
+                }
+            }
+            var scale: f16 = @floatFromInt(1 + rand.uintLessThan(u16, room.area() - opts.minArea()));
+            scale = scale / @as(f16, @floatFromInt(room.area()));
+            room.scale(@max(opts.min_scale, scale));
             return self.createSimpleRoom(room);
         }
 
@@ -294,8 +322,8 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
                 },
             };
             log.debug(
-                "The point to start search of a place for door from the _{s}_ side is {any}. The region for search is {any}\n",
-                .{ @tagName(side), place, region },
+                "Start search of a place for door from {any} on the _{s}_ side of the {any}\n",
+                .{ place, @tagName(side), region },
             );
             if (self.findFloorInDirection(side.opposite(), place, region)) |floor| {
                 // try to move back to the wall:
@@ -304,23 +332,28 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
                     return candidate;
             }
             // try to find in the different parts of the region:
-            var new_region: ?p.Region = null;
+            var new_regions: [2]?p.Region = .{ null, null };
             if (side.isHorizontal()) {
-                new_region = if (rand.boolean())
-                    region.cropHorizontallyTo(place.row) orelse region.cropHorizontallyAfter(place.row)
+                new_regions = if (rand.boolean())
+                    .{ region.cropVerticallyTo(place.col), region.cropVerticallyAfter(place.col) }
                 else
-                    region.cropHorizontallyAfter(place.row) orelse region.cropHorizontallyTo(place.row);
+                    .{ region.cropVerticallyAfter(place.col), region.cropVerticallyTo(place.col) };
+                log.debug("Crop {any} vertically to {any} and {any}\n", .{ region, new_regions[0], new_regions[1] });
             } else {
-                new_region = if (rand.boolean())
-                    region.cropVerticallyTo(place.col) orelse region.cropVerticallyAfter(place.col)
+                new_regions = if (rand.boolean())
+                    .{ region.cropHorizontallyTo(place.row), region.cropHorizontallyAfter(place.row) }
                 else
-                    region.cropVerticallyAfter(place.col) orelse region.cropVerticallyTo(place.col);
+                    .{ region.cropHorizontallyAfter(place.row), region.cropHorizontallyTo(place.row) };
+                log.debug("Crop {any} horizontally to {any} and {any}\n", .{ region, new_regions[0], new_regions[1] });
             }
-            if (new_region) |reg| {
-                return self.findPlaceForDoorInRegionRnd(rand, reg, side);
-            } else {
-                return null;
+            for (new_regions) |new_region| {
+                if (new_region) |reg| {
+                    if (self.findPlaceForDoorInRegionRnd(rand, reg, side)) |result| {
+                        return result;
+                    }
+                }
             }
+            return null;
         }
 
         /// Looks for an empty place with florr.
@@ -346,21 +379,21 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
 
 test "generate a simple room" {
     // given:
-    const rows = 12;
-    const cols = 12;
-    var dungeon = try Dungeon(rows, cols).initEmpty(std.testing.allocator);
+    const Rows = 12;
+    const Cols = 12;
+    var dungeon = try Dungeon(Rows, Cols).initEmpty(std.testing.allocator);
     defer dungeon.deinit();
 
     const region = p.Region{ .top_left = .{ .row = 2, .col = 2 }, .rows = 8, .cols = 8 };
 
     // when:
-    const room = try dungeon.generateSimpleRoom(std.crypto.random, region);
+    const room = try dungeon.generateSimpleRoom(std.crypto.random, region, .{});
 
     // then:
     try std.testing.expect(region.containsRegion(room));
-    for (0..rows) |r_idx| {
+    for (0..Rows) |r_idx| {
         const r: u8 = @intCast(r_idx + 1);
-        for (0..cols) |c_idx| {
+        for (0..Cols) |c_idx| {
             const c: u8 = @intCast(c_idx + 1);
             errdefer std.debug.print("r:{d} c:{d}\n", .{ r, c });
 
@@ -438,8 +471,7 @@ test "find a cell with floor inside the room starting on the wall" {
     try std.testing.expectEqualDeep(p.Point{ .row = 2, .col = 3 }, expected.?);
     try std.testing.expect(unexpected == null);
 }
-
-test "find a random place for door" {
+test "find a random place for the door on the left side" {
     // given:
     const str =
         \\ ####
@@ -447,6 +479,7 @@ test "find a random place for door" {
         \\ #..#
         \\ ####
     ;
+    errdefer std.debug.print("{s}\n", .{str});
     var dungeon = try Dungeon(4, 5).parse(std.testing.allocator, str);
     defer dungeon.deinit();
     const region = Dungeon(4, 5).Region;
@@ -454,13 +487,31 @@ test "find a random place for door" {
 
     // when:
     const place_left = dungeon.findPlaceForDoorInRegionRnd(rand, region, .left);
-    const place_bottom = dungeon.findPlaceForDoorInRegionRnd(rand, region, .bottom);
 
     // then:
     errdefer std.debug.print("place left {any}\n", .{place_left});
     try std.testing.expectEqual(2, place_left.?.col);
     try std.testing.expect(2 <= place_left.?.row and place_left.?.row <= 3);
-    // and
+}
+
+test "find a random place for the door on the bottom side" {
+    // given:
+    const str =
+        \\ ####
+        \\ #..#
+        \\ #..#
+        \\ ####
+    ;
+    errdefer std.debug.print("{s}\n", .{str});
+    var dungeon = try Dungeon(4, 5).parse(std.testing.allocator, str);
+    defer dungeon.deinit();
+    const region = Dungeon(4, 5).Region;
+    const rand = std.crypto.random;
+
+    // when:
+    const place_bottom = dungeon.findPlaceForDoorInRegionRnd(rand, region, .bottom);
+
+    // then:
     errdefer std.debug.print("place bottom {any}\n", .{place_bottom});
     try std.testing.expectEqual(4, place_bottom.?.row);
     try std.testing.expect(3 <= place_bottom.?.col and place_bottom.?.col <= 4);
