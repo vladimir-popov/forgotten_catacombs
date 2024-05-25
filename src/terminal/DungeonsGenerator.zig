@@ -26,7 +26,7 @@ pub fn main() !void {
     try runtime.run(&universe);
 }
 
-const Components = union(enum) {
+const Components = union {
     dungeon: game.Dungeon,
 };
 

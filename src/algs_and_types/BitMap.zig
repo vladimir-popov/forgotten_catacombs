@@ -81,8 +81,16 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
             self.bitsets[row - 1].set(col - 1);
         }
 
+        pub inline fn setAt(self: *Self, point: p.Point) void {
+            self.set(point.row, point.col);
+        }
+
         pub inline fn unset(self: *Self, row: u8, col: u8) void {
             self.bitsets[row - 1].unset(col - 1);
+        }
+
+        pub inline fn unsetAt(self: *Self, point: p.Point) void {
+            self.unset(point.row, point.col);
         }
 
         pub inline fn setRowValue(

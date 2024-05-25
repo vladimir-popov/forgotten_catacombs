@@ -3,6 +3,49 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
+pub const Direction = enum {
+    left,
+    right,
+    up,
+    down,
+
+    pub inline fn asSide(self: Direction) Side {
+        return switch (self) {
+            .up => .top,
+            .down => .bottom,
+            .left => .left,
+            .right => .right,
+        };
+    }
+
+    pub inline fn opposite(self: Direction) Direction {
+        return switch (self) {
+            .up => .down,
+            .down => .up,
+            .left => .right,
+            .right => .left,
+        };
+    }
+
+    pub inline fn rotatedClockwise(self: Direction, is_clockwise: bool) Direction {
+        const clockwise: Direction = switch (self) {
+            .up => .right,
+            .down => .left,
+            .left => .up,
+            .right => .down,
+        };
+        return if (is_clockwise) clockwise else clockwise.opposite();
+    }
+
+    pub inline fn isHorizontal(self: Direction) bool {
+        return self == .left or self == .right;
+    }
+
+    pub inline fn isVertical(self: Direction) bool {
+        return self == .up or self == .down;
+    }
+};
+
 pub const Side = enum {
     left,
     right,
@@ -20,6 +63,19 @@ pub const Side = enum {
 
     pub inline fn isHorizontal(self: Side) bool {
         return self == .top or self == .bottom;
+    }
+
+    pub inline fn isVertical(self: Side) bool {
+        return self == .left or self == .right;
+    }
+
+    pub inline fn asDirection(self: Side) Direction {
+        return switch (self) {
+            .top => .up,
+            .bottom => .down,
+            .left => .left,
+            .right => .right,
+        };
     }
 };
 
@@ -40,18 +96,18 @@ pub const Point = struct {
         try writer.print("Point(r:{d}, c:{d})", .{ self.row, self.col });
     }
 
-    pub fn movedTo(self: Point, direction: Side) Point {
+    pub fn movedTo(self: Point, direction: Direction) Point {
         var point = self;
         point.move(direction);
         return point;
     }
 
-    pub fn move(self: *Point, direction: Side) void {
+    pub fn move(self: *Point, direction: Direction) void {
         switch (direction) {
-            .top => {
+            .up => {
                 if (self.row > 0) self.row -= 1;
             },
-            .bottom => self.row += 1,
+            .down => self.row += 1,
             .left => {
                 if (self.col > 0) self.col -= 1;
             },
