@@ -372,7 +372,9 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
             fn bindRegions(ptr: *anyopaque, r1: p.Region, r2: p.Region, _: u8) anyerror!p.Region {
                 const self: *FoldAndBind = @ptrCast(@alignCast(ptr));
                 const direction: p.Direction = if (r1.top_left.row == r2.top_left.row) .right else .down;
-                return try self.dungeon.createAndAddPassageBetweenRegions(self.rand, r1, r2, direction);
+                // return try self.dungeon.createAndAddPassageBetweenRegions(self.rand, r1, r2, direction);
+                _ = self.dungeon.createAndAddPassageBetweenRegions(self.rand, r1, r2, direction) catch {};
+                return r1.unionWith(r2);
             }
         };
 
@@ -489,9 +491,7 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
                 "Start search of a place for door from {any} on the _{s}_ side of the {any}",
                 .{ place, @tagName(side), region },
             );
-            if (self.findFloorInDirection(side.asDirection().opposite(), place, region)) |floor| {
-                // try to move back to the wall:
-                const candidate = floor.movedTo(side.asDirection());
+            if (self.findPlaceForDoor(side.asDirection().opposite(), place, region)) |candidate| {
                 if (self.cellAt(candidate) == .wall) {
                     log.debug("{any} is the place for door in {any} on {s} side", .{ candidate, region, @tagName(side) });
                     return candidate;
@@ -529,23 +529,55 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
         /// Starting from the `start`, moves in the `direction` till the first floor cell right after the
         /// single wall.
         /// Returns the found place or null.
-        fn findFloorInDirection(self: Self, direction: p.Direction, start: p.Point, region: p.Region) ?p.Point {
+        fn findPlaceForDoor(self: Self, direction: p.Direction, start: p.Point, region: p.Region) ?p.Point {
             var place = start;
-            while (region.containsPoint(place) and self.cellAt(place) != .floor) {
+            while (region.containsPoint(place)) {
+                if (self.cellAt(place)) |cl| {
+                    switch (cl) {
+                        .nothing => {},
+                        .opened_door, .closed_door => {
+                            log.debug("Door already exists at {any}", .{place});
+                            return null;
+                        },
+                        .wall => {
+                            log.debug("Meet the wall at {any}", .{place});
+                            if (self.cellAt(place.movedTo(direction)) != .floor) {
+                                log.debug(
+                                    "Expected floor after the wall at {any} in {s} direction, but found {any}",
+                                    .{ place, @tagName(direction), self.cellAt(place.movedTo(direction)) },
+                                );
+                                return null;
+                            }
+                            // check that no one door near
+                            if (self.doors.contains(place.movedTo(direction.rotatedClockwise(true)))) {
+                                log.debug(
+                                    "The door already exists nearby at {any}",
+                                    .{place.movedTo(direction.rotatedClockwise(true))},
+                                );
+                                return null;
+                            }
+                            if (self.doors.contains(place.movedTo(direction.rotatedClockwise(false)))) {
+                                log.debug(
+                                    "The door already exists nearby at {any}",
+                                    .{place.movedTo(direction.rotatedClockwise(false))},
+                                );
+                                return null;
+                            }
+                            log.debug("Found a place for door at {any}", .{place});
+                            return place;
+                        },
+                        .floor => {
+                            log.debug("Unexpected empty floor at {any}", .{place});
+                            return null;
+                        },
+                    }
+                } else {
+                    return null;
+                }
                 place.move(direction);
             }
-            if (self.doors.contains(place.movedTo(direction.rotatedClockwise(true))) or
-                self.doors.contains(place.movedTo(direction.rotatedClockwise(false))))
-            {
-                return null;
-            }
-            if (region.containsPoint(place)) {
-                return place;
-            } else {
-                return null;
-            }
+            return null;
         }
-
         inline fn contains(self: Dungeon, point: p.Point) bool {
             return point.row > 0 and point.row <= self.rows and point.col > 0 and point.col <= self.cols;
         }
@@ -602,12 +634,12 @@ test "find a cell with floor inside the room starting outside" {
     const region = Dungeon(4, 5).Region;
 
     // when:
-    const expected = dungeon.findFloorInDirection(
+    const expected = dungeon.findPlaceForDoor(
         .right,
         p.Point{ .row = 2, .col = 1 },
         region,
     );
-    const unexpected = dungeon.findFloorInDirection(
+    const unexpected = dungeon.findPlaceForDoor(
         .right,
         p.Point{ .row = 1, .col = 1 },
         region,
@@ -631,12 +663,12 @@ test "find a cell with floor inside the room starting on the wall" {
     const region = Dungeon(4, 5).Region;
 
     // when:
-    const expected = dungeon.findFloorInDirection(
+    const expected = dungeon.findPlaceForDoor(
         .down,
         p.Point{ .row = 1, .col = 3 },
         region,
     );
-    const unexpected = dungeon.findFloorInDirection(
+    const unexpected = dungeon.findPlaceForDoor(
         .down,
         p.Point{ .row = 1, .col = 1 },
         region,
