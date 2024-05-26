@@ -387,10 +387,8 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
         ) !p.Region {
             const door1 = self.findPlaceForDoorInRegionRnd(rand, r1, direction.asSide()) orelse
                 return Error.NoSpaceForDoor;
-            try self.forceCreateDoorAt(door1, rand.boolean());
             const door2 = self.findPlaceForDoorInRegionRnd(rand, r2, direction.asSide().opposite()) orelse
                 return Error.NoSpaceForDoor;
-            try self.forceCreateDoorAt(door2, rand.boolean());
 
             log.debug("Creating the passage from {any} {s} to {any}", .{ door1, @tagName(direction), door2 });
 
@@ -427,6 +425,8 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
             );
 
             try self.digPassage(passage);
+            try self.forceCreateDoorAt(door1, rand.boolean());
+            try self.forceCreateDoorAt(door2, rand.boolean());
 
             return r1.unionWith(r2);
         }
@@ -463,9 +463,9 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
                 self.createWallAt(cl);
             }
             // create the floor in the turn
-            self.createFloorAt(at);
-            self.createFloorAt(at.movedTo(from.opposite()));
-            self.createFloorAt(at.movedTo(to));
+            try self.forceCreateFloorAt(at);
+            try self.forceCreateFloorAt(at.movedTo(from.opposite()));
+            try self.forceCreateFloorAt(at.movedTo(to));
         }
 
         fn findPlaceForDoorInRegionRnd(self: Self, rand: std.Random, region: p.Region, side: p.Side) ?p.Point {
@@ -621,7 +621,7 @@ test "generate a simple room" {
     }
 }
 
-test "find a cell with floor inside the room starting outside" {
+test "find a place for door inside the room starting outside" {
     // given:
     const str =
         \\ ####
@@ -646,11 +646,11 @@ test "find a cell with floor inside the room starting outside" {
     );
 
     // then:
-    try std.testing.expectEqualDeep(p.Point{ .row = 2, .col = 3 }, expected.?);
+    try std.testing.expectEqualDeep(p.Point{ .row = 2, .col = 2 }, expected.?);
     try std.testing.expect(unexpected == null);
 }
 
-test "find a cell with floor inside the room starting on the wall" {
+test "find a place for door inside the room starting on the wall" {
     // given:
     const str =
         \\ ####
@@ -675,7 +675,7 @@ test "find a cell with floor inside the room starting on the wall" {
     );
 
     // then:
-    try std.testing.expectEqualDeep(p.Point{ .row = 2, .col = 3 }, expected.?);
+    try std.testing.expectEqualDeep(p.Point{ .row = 1, .col = 3 }, expected.?);
     try std.testing.expect(unexpected == null);
 }
 test "find a random place for the door on the left side" {
