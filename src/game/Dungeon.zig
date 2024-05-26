@@ -18,97 +18,48 @@ pub const Passage = struct {
     const Turn = struct {
         place: p.Point,
         to_direction: p.Direction,
+        pub fn format(
+            self: Turn,
+            comptime fmt: []const u8,
+            options: std.fmt.FormatOptions,
+            writer: anytype,
+        ) !void {
+            _ = fmt;
+            _ = options;
+
+            try writer.print("Turn(at {any} to {s})", .{ self.place, @tagName(self.to_direction) });
+        }
     };
 
     turns: std.ArrayList(Turn),
 
-    fn init(
-        rand: std.Random,
-        dungeon_ptr: anytype,
-        from: p.Point,
-        to: p.Point,
-        direction: p.Direction,
-    ) !Passage {
-        log.debug("Create passage from {any} {s} to {any}", .{ from, @tagName(direction), to });
-        var passage: Passage = .{ .turns = std.ArrayList(Turn).init(dungeon_ptr.*.alloc) };
-        errdefer passage.deinit();
-        try passage.turns.append(.{ .place = from, .to_direction = direction });
-        if (direction.isHorizontal() and from.row != to.row) {
-            try passage.addTurn("col", "row", rand, from, to, direction);
-        }
-        if (direction.isVertical() and from.col != to.col) {
-            try passage.addTurn("row", "col", rand, from, to, direction);
-        }
-        try passage.turns.append(.{ .place = to, .to_direction = direction });
-        return passage;
+    pub fn format(
+        self: Passage,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+
+        try writer.print("Passage({any})", .{self.turns.items});
     }
 
     fn deinit(self: Passage) void {
         self.turns.deinit();
     }
 
-    fn addTurn(
-        self: *Passage,
-        comptime in_direction_field: []const u8,
-        comptime orthogonal_field: []const u8,
-        rand: std.Random,
-        from: p.Point,
-        to: p.Point,
-        direction: p.Direction,
-    ) !void {
-        var min: u8 = @field(from, in_direction_field);
-        var max: u8 = @field(to, in_direction_field);
-        var is_clockwise: bool = if (direction.isHorizontal())
-            // example: moving to the right, but the destination is bottom
-            @field(from, orthogonal_field) < @field(to, orthogonal_field)
-        else
-            // example: moving down, but the destination is on right
-            @field(from, orthogonal_field) > @field(to, orthogonal_field);
-
-        if (min > max) {
-            is_clockwise = !is_clockwise;
-            const tmp = min;
-            min = max;
-            max = tmp;
-        }
-        const middle = rand.intRangeAtMost(u8, min + 1, max - 1);
-
-        var turn: Turn = undefined;
-        turn.to_direction = direction.rotatedClockwise(is_clockwise);
-        @field(turn.place, in_direction_field) = middle;
-        @field(turn.place, orthogonal_field) = @field(from, orthogonal_field);
-        log.debug("Turn on {any} to {s}", .{ turn.place, @tagName(turn.to_direction) });
+    fn turnAt(self: *Passage, place: p.Point, direction: p.Direction) !Turn {
+        const turn: Turn = .{ .place = place, .to_direction = direction };
         try self.turns.append(turn);
-
-        turn.to_direction = direction;
-        @field(turn.place, orthogonal_field) = @field(to, orthogonal_field);
-        log.debug("Turn on {any} to {s}", .{ turn.place, @tagName(turn.to_direction) });
-        try self.turns.append(turn);
+        return turn;
     }
 
-    test "create passage between two points" {
-        // given:
-        const Rows = 10;
-        const Cols = 10;
-        const seed = std.crypto.random.int(u64);
-        errdefer std.debug.print("Seed: {d}\n", .{seed});
-        var dungeon = try Dungeon(Rows, Cols).initEmpty(std.testing.allocator);
-        defer dungeon.deinit();
-        const from = p.Point{ .row = 1, .col = 1 };
-        const to = p.Point{ .row = Rows, .col = Cols };
-        var rand = std.rand.DefaultPrng.init(seed);
-
-        // when:
-        const result = try Passage.init(rand.random(), &dungeon, from, to, .down);
-        defer result.deinit();
-
-        // then:
-        try std.testing.expectEqual(4, result.turns.items.len);
-        try std.testing.expectEqualDeep(from, result.turns.items[0].place);
-        try std.testing.expectEqualDeep(to, result.turns.getLast().place);
-        try std.testing.expectEqual(.down, result.turns.items[0].to_direction);
-        try std.testing.expectEqual(.right, result.turns.items[1].to_direction);
-        try std.testing.expectEqual(.down, result.turns.items[2].to_direction);
+    fn turnToPoint(self: *Passage, at: p.Point, to: p.Point) !Turn {
+        const direction: p.Direction = if (at.row == to.row)
+            if (at.col < to.col) .right else .left
+        else if (at.row < to.row) .down else .up;
+        return try self.turnAt(at, direction);
     }
 };
 
@@ -239,7 +190,25 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
             _ = self.doors.remove(place);
         }
 
-        fn createDoorAt(self: *Self, place: p.Point, is_open: bool) !void {
+        fn forceCreateFloorAt(self: *Self, place: p.Point) !void {
+            if (!Region.containsPoint(place)) {
+                return;
+            }
+            self.walls.unsetAt(place);
+            _ = self.doors.remove(place);
+            self.floor.setAt(place);
+        }
+
+        fn forceCreateWallAt(self: *Self, place: p.Point) !void {
+            if (!Region.containsPoint(place)) {
+                return;
+            }
+            self.floor.unsetAt(place);
+            _ = self.doors.remove(place);
+            self.walls.setAt(place);
+        }
+
+        fn forceCreateDoorAt(self: *Self, place: p.Point, is_open: bool) !void {
             if (!Region.containsPoint(place)) {
                 return;
             }
@@ -248,13 +217,22 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
             try self.doors.put(place, is_open);
         }
 
-        fn createWallAt(self: *Self, place: p.Point) !void {
+        fn createWallAt(self: *Self, place: p.Point) void {
             if (!Region.containsPoint(place)) {
                 return;
             }
-            self.floor.unsetAt(place);
-            _ = self.doors.remove(place);
-            self.walls.setAt(place);
+            if (self.cellAt(place) == .nothing) {
+                self.walls.setAt(place);
+            }
+        }
+
+        fn createFloorAt(self: *Self, place: p.Point) void {
+            if (!Region.containsPoint(place)) {
+                return;
+            }
+            if (self.cellAt(place) == .nothing) {
+                self.floor.setAt(place);
+            }
         }
 
         /// Basic BSP Dungeon generation
@@ -407,32 +385,85 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
         ) !p.Region {
             const door1 = self.findPlaceForDoorInRegionRnd(rand, r1, direction.asSide()) orelse
                 return Error.NoSpaceForDoor;
+            try self.forceCreateDoorAt(door1, rand.boolean());
             const door2 = self.findPlaceForDoorInRegionRnd(rand, r2, direction.asSide().opposite()) orelse
                 return Error.NoSpaceForDoor;
+            try self.forceCreateDoorAt(door2, rand.boolean());
 
-            const passage = try Passage.init(rand, self, door1, door2, direction);
-            var prev_turn = passage.turns.items[0];
-            for (passage.turns.items[1..]) |turn| {
-                try self.dig(prev_turn.place, turn.place, prev_turn.to_direction);
-                prev_turn = turn;
+            log.debug("Creating the passage from {any} {s} to {any}", .{ door1, @tagName(direction), door2 });
+
+            const passage = try self.passages.addOne();
+            passage.turns = std.ArrayList(Passage.Turn).init(self.alloc);
+            _ = try passage.turnAt(door1, direction);
+            if (!door1.onSameAxis(door2)) {
+                // intersection of the passage from the door 1 and region 1
+                const middle1: p.Point = if (direction.isHorizontal())
+                    // left or right
+                    .{ .row = door1.row, .col = r1.bottomRight().col }
+                else
+                    // up or down
+                    .{ .row = r1.bottomRight().row, .col = door1.col };
+
+                // intersection of the passage from the region 1 and door 2
+                const middle2: p.Point = if (direction.isHorizontal())
+                    // left or right
+                    .{ .row = door2.row, .col = r1.bottomRight().col }
+                else
+                    // up or down
+                    .{ .row = r1.bottomRight().row, .col = door2.col };
+
+                var turn = try passage.turnToPoint(middle1, middle2);
+                log.debug("Add turn at {any} to {s}", .{ turn.place, @tagName(turn.to_direction) });
+
+                turn = try passage.turnToPoint(middle2, door2);
+                log.debug("Add turn at {any} to {s}", .{ turn.place, @tagName(turn.to_direction) });
             }
-            try self.createDoorAt(door1, rand.boolean());
-            try self.createDoorAt(door2, rand.boolean());
+            _ = try passage.turnAt(door2, direction);
+            log.debug(
+                "The passage from {any} {s} to {any} has been created:\n{any}",
+                .{ door1, @tagName(direction), door2, passage.* },
+            );
+
+            try self.digPassage(passage);
+
             return r1.unionWith(r2);
         }
 
+        fn digPassage(self: *Self, passage: *const Passage) !void {
+            var prev: Passage.Turn = passage.turns.items[0];
+            for (passage.turns.items[1 .. passage.turns.items.len - 1]) |turn| {
+                try self.dig(prev.place, turn.place, prev.to_direction);
+                try self.digTurn(turn.place, prev.to_direction, turn.to_direction);
+                prev = turn;
+            }
+            try self.dig(prev.place, passage.turns.getLast().place, prev.to_direction);
+        }
+
         fn dig(self: *Self, from: p.Point, to: p.Point, direction: p.Direction) !void {
+            log.debug("Dig from {any} to {any} in {s} direction", .{ from, to, @tagName(direction) });
             var point = from;
-            while (!std.meta.eql(point, to)) {
-                if (self.cellAt(point) == .wall) {
-                    try self.createDoorAt(point, true);
-                } else {
-                    try self.createWallAt(point.movedTo(direction.rotatedClockwise(false)));
-                    self.floor.setAt(point);
-                    try self.createWallAt(point.movedTo(direction.rotatedClockwise(true)));
-                }
+            while (true) {
+                log.debug("Dig at {any}", .{point});
+                self.createWallAt(point.movedTo(direction.rotatedClockwise(false)));
+                self.createWallAt(point.movedTo(direction.rotatedClockwise(true)));
+                self.createFloorAt(point);
+                if (std.meta.eql(point, to))
+                    break;
                 point.move(direction);
             }
+        }
+
+        fn digTurn(self: *Self, at: p.Point, from: p.Direction, to: p.Direction) !void {
+            // wrap the corner by walls
+            const reg: p.Region = .{ .top_left = at.movedTo(.up).movedTo(.left), .rows = 3, .cols = 3 };
+            var itr = reg.cells();
+            while (itr.next()) |cl| {
+                self.createWallAt(cl);
+            }
+            // create the floor in the turn
+            self.createFloorAt(at);
+            self.createFloorAt(at.movedTo(from.opposite()));
+            self.createFloorAt(at.movedTo(to));
         }
 
         fn findPlaceForDoorInRegionRnd(self: Self, rand: std.Random, region: p.Region, side: p.Side) ?p.Point {
@@ -495,7 +526,8 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
         }
 
         /// Looks for an empty place with the floor.
-        /// Starting from the `start`, moves to the `direction`.
+        /// Starting from the `start`, moves in the `direction` till the first floor cell right after the
+        /// single wall.
         /// Returns the found place or null.
         fn findFloorInDirection(self: Self, direction: p.Direction, start: p.Point, region: p.Region) ?p.Point {
             var place = start;

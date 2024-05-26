@@ -10,7 +10,18 @@ pub const std_options = .{
     .logFn = Logger.writeLog,
 };
 
+const log = std.log.scoped(.DungeonsGenerator);
+
 pub fn main() !void {
+    var args = std.process.args();
+    _ = args.next();
+    const seed = if (args.next()) |arg|
+        try std.fmt.parseInt(u64, arg, 10)
+    else
+        std.crypto.random.int(u64);
+    log.debug("The random seed is {d}", .{seed});
+    var rnd = std.Random.DefaultPrng.init(seed);
+
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK DETECTED!");
     const alloc = gpa.allocator();
@@ -18,7 +29,7 @@ pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(alloc);
     defer arena.deinit();
 
-    var runtime = try Runtime.init(alloc, std.crypto.random, &arena);
+    var runtime = try Runtime.init(alloc, rnd.random(), &arena);
     defer runtime.deinit();
     var universe = try DungeonsGenerator.init(runtime.any());
     defer universe.deinit();
@@ -63,9 +74,12 @@ const DungeonsGenerator = struct {
             while (entities.next()) |entity| {
                 if (universe.getComponent(entity, game.Dungeon)) |_| {
                     universe.removeComponentFromEntity(entity, game.Dungeon);
+                    const seed = universe.runtime.rand.int(u64);
+                    log.debug("The random seed is {d}", .{seed});
+                    var rnd = std.Random.DefaultPrng.init(seed);
                     const dungeon = try game.Dungeon.bspGenerate(
                         universe.runtime.alloc,
-                        universe.runtime.rand,
+                        rnd.random(),
                     );
                     universe.addComponent(entity, game.Dungeon, dungeon);
                 }

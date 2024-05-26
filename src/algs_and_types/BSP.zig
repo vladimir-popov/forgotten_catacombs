@@ -7,7 +7,7 @@ pub const Tree = BinaryTree.Node(p.Region);
 pub const MinRegion = struct {
     min_rows: u8 = 12,
     min_cols: u8 = 30,
-    square_ration: f16 = 0.3,
+    square_ratio: f16 = 0.3,
 
     fn validateRegion(self: MinRegion, region: p.Region) void {
         if (region.rows < self.min_rows) {
@@ -64,7 +64,7 @@ const Splitter = struct {
         const self: *Splitter = @ptrCast(@alignCast(ptr));
         const region: p.Region = node.value;
 
-        const is_vertical = region.ratio() < self.opts.square_ration;
+        const is_vertical = region.ratio() < self.opts.square_ratio;
 
         if (is_vertical) {
             if (divideRnd(self.rand, region.cols, self.opts.min_rows)) |cols| {

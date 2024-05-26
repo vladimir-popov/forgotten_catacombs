@@ -114,6 +114,10 @@ pub const Point = struct {
             .right => self.col += 1,
         }
     }
+
+    pub inline fn onSameAxis(self: Point, other: Point) bool {
+        return self.row == other.row or self.col == other.col;
+    }
 };
 
 /// The region described as its top left corner
@@ -407,6 +411,29 @@ pub const Region = struct {
             .rows = @max(self.bottomRight().row, other.bottomRight().row) - top_left.row + 1,
             .cols = @max(self.bottomRight().col, other.bottomRight().col) - top_left.col + 1,
         };
+    }
+
+    pub const CellsIterator = struct {
+        region: Region,
+        cursor: Point,
+
+        pub fn next(self: *CellsIterator) ?Point {
+            if (self.region.containsPoint(self.cursor)) {
+                const cell = self.cursor;
+                self.cursor.move(.right);
+                if (self.cursor.col > self.region.bottomRight().col) {
+                    self.cursor.row += 1;
+                    self.cursor.col = self.region.top_left.col;
+                }
+                return cell;
+            } else {
+                return null;
+            }
+        }
+    };
+
+    pub fn cells(self: Region) CellsIterator {
+        return .{ .region = self, .cursor = self.top_left };
     }
 
     test "union with partial intersected" {
