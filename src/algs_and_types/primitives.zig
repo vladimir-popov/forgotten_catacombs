@@ -188,6 +188,10 @@ pub const Region = struct {
         return std.math.mulWide(u8, self.rows, self.cols);
     }
 
+    pub inline fn middle(self: Region) Point {
+        return .{ .row = self.top_left.row + self.rows / 2, .col = self.top_left.col + self.cols / 2 };
+    }
+
     pub fn scale(self: *Region, k: f16) void {
         const rows: f16 = @floatFromInt(self.rows);
         const cols: f16 = @floatFromInt(self.cols);

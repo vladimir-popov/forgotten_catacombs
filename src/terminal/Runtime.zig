@@ -1,7 +1,11 @@
 const std = @import("std");
+const algs_and_types = @import("algs_and_types");
+const p = algs_and_types.primitives;
 const game = @import("game");
+const cmp = game.components;
 const tty = @import("tty.zig");
 const utf8 = @import("utf8");
+
 const Render = @import("Render.zig");
 
 const Self = @This();
@@ -107,17 +111,17 @@ fn readButton(ptr: *anyopaque) anyerror!?game.Button.Type {
     return null;
 }
 
-fn drawDungeon(ptr: *anyopaque, dungeon: *const game.Dungeon) anyerror!void {
+fn drawDungeon(ptr: *anyopaque, dungeon: *const cmp.Dungeon, region: p.Region) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     try Render.drawDungeon(
         self.arena.allocator(),
         &self.buffer,
         dungeon,
-        .{ .top_left = .{ .row = 1, .col = 1 }, .rows = game.Dungeon.Rows, .cols = game.Dungeon.Cols },
+        region,
     );
 }
 
-fn drawSprite(ptr: *anyopaque, sprite: *const game.Sprite, row: u8, col: u8) anyerror!void {
+fn drawSprite(ptr: *anyopaque, sprite: *const cmp.Sprite, row: u8, col: u8) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     try self.buffer.mergeLine(sprite.letter, row - 1, col - 1);
 }

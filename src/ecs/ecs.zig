@@ -449,8 +449,9 @@ pub fn Universe(comptime Components: anytype, comptime Events: anytype, comptime
             entity: Entity,
             cm_ptr: *ComponentsManager(Components),
 
-            pub fn addComponent(self: EB, comptime C: type, component: C) void {
+            pub fn withComponent(self: EB, comptime C: type, component: C) EB {
                 self.cm_ptr.addToEntity(self.entity, C, component);
+                return self;
             }
         };
 

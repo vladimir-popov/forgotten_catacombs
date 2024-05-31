@@ -1,9 +1,9 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const algs_and_types = @import("algs_and_types");
+const p = algs_and_types.primitives;
 
 const bsp = algs_and_types.BSP;
-const p = algs_and_types.primitives;
 
 const log = std.log.scoped(.dungeon);
 
@@ -101,6 +101,36 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
             };
         }
 
+        /// Basic BSP Dungeon generation
+        /// https://www.roguebasin.com/index.php?title=Basic_BSP_Dungeon_generation
+        pub fn bspGenerate(
+            alloc: std.mem.Allocator,
+            rand: std.Random,
+        ) !Self {
+            // this arena is used to build a BSP tree, which can be destroyed
+            // right after completing the dungeon.
+            var bsp_arena = std.heap.ArenaAllocator.init(alloc);
+            defer _ = bsp_arena.deinit();
+
+            var dungeon: Self = try initEmpty(alloc);
+
+            // BSP helps to mark regions for rooms without intersections
+            const root = try bsp.buildTree(&bsp_arena, rand, Rows, Cols, .{});
+
+            // visit every BSP node and generate rooms in the leafs
+            var createRooms: TraverseAndCreateRooms = .{ .dungeon = &dungeon, .rand = rand };
+            try root.traverse(createRooms.handler());
+
+            // fold the BSP tree and binds nodes with the same parent:
+            var bindRooms: FoldAndBind = .{
+                .dungeon = &dungeon,
+                .rand = rand,
+            };
+            _ = try root.fold(bindRooms.handler());
+
+            return dungeon;
+        }
+
         pub fn deinit(self: *Self) void {
             for (self.passages.items) |passage| {
                 passage.deinit();
@@ -108,6 +138,10 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
             self.passages.deinit();
             self.doors.deinit();
             self.rooms.deinit();
+        }
+
+        pub fn findRandomPlaceForPlayer(self: Self) p.Point {
+            return self.rooms.items[0].middle();
         }
 
         /// For tests only
@@ -233,36 +267,6 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
             if (self.cellAt(place) == .nothing) {
                 self.floor.setAt(place);
             }
-        }
-
-        /// Basic BSP Dungeon generation
-        /// https://www.roguebasin.com/index.php?title=Basic_BSP_Dungeon_generation
-        pub fn bspGenerate(
-            alloc: std.mem.Allocator,
-            rand: std.Random,
-        ) !Self {
-            // this arena is used to build a BSP tree, which can be destroyed
-            // right after completing the dungeon.
-            var bsp_arena = std.heap.ArenaAllocator.init(alloc);
-            defer _ = bsp_arena.deinit();
-
-            var dungeon: Self = try initEmpty(alloc);
-
-            // BSP helps to mark regions for rooms without intersections
-            const root = try bsp.buildTree(&bsp_arena, rand, Rows, Cols, .{});
-
-            // visit every BSP node and generate rooms in the leafs
-            var createRooms: TraverseAndCreateRooms = .{ .dungeon = &dungeon, .rand = rand };
-            try root.traverse(createRooms.handler());
-
-            // fold the BSP tree and binds nodes with the same parent:
-            var bindRooms: FoldAndBind = .{
-                .dungeon = &dungeon,
-                .rand = rand,
-            };
-            _ = try root.fold(bindRooms.handler());
-
-            return dungeon;
         }
 
         const TraverseAndCreateRooms = struct {

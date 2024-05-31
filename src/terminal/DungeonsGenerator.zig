@@ -38,7 +38,7 @@ pub fn main() !void {
 }
 
 const Components = union {
-    dungeon: game.Dungeon,
+    dungeon: game.components.Dungeon,
 };
 
 const DungeonsGenerator = struct {
@@ -48,13 +48,12 @@ const DungeonsGenerator = struct {
         var universe: Universe = Universe.init(runtime.alloc, runtime);
 
         // Generate dungeon:
-        const dungeon = try game.Dungeon.bspGenerate(
+        const dungeon = try game.components.Dungeon.bspGenerate(
             universe.runtime.alloc,
             universe.runtime.rand,
         );
 
-        const entity = universe.newEntity();
-        entity.addComponent(game.Dungeon, dungeon);
+        _ = universe.newEntity().withComponent(game.components.Dungeon, dungeon);
 
         // Initialize systems:
         universe.registerSystem(handleInput);
@@ -72,16 +71,16 @@ const DungeonsGenerator = struct {
         if (btn & game.Button.A > 0) {
             var entities = universe.entitiesIterator();
             while (entities.next()) |entity| {
-                if (universe.getComponent(entity, game.Dungeon)) |_| {
-                    universe.removeComponentFromEntity(entity, game.Dungeon);
+                if (universe.getComponent(entity, game.components.Dungeon)) |_| {
+                    universe.removeComponentFromEntity(entity, game.components.Dungeon);
                     const seed = universe.runtime.rand.int(u64);
                     log.debug("The random seed is {d}", .{seed});
                     var rnd = std.Random.DefaultPrng.init(seed);
-                    const dungeon = try game.Dungeon.bspGenerate(
+                    const dungeon = try game.components.Dungeon.bspGenerate(
                         universe.runtime.alloc,
                         rnd.random(),
                     );
-                    universe.addComponent(entity, game.Dungeon, dungeon);
+                    universe.addComponent(entity, game.components.Dungeon, dungeon);
                 }
             }
         }
@@ -90,7 +89,7 @@ const DungeonsGenerator = struct {
     fn render(universe: *Universe) anyerror!void {
         if (!(universe.isEventFired(game.Events.gameHasBeenInitialized) or universe.isEventFired(game.Events.buttonWasPressed)))
             return;
-        const dungeon = universe.getComponents(game.Dungeon)[0];
-        try universe.runtime.drawDungeon(&dungeon);
+        const dungeon = universe.getComponents(game.components.Dungeon)[0];
+        try universe.runtime.drawDungeon(&dungeon, game.components.Dungeon.Region);
     }
 };
