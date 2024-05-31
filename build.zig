@@ -212,6 +212,7 @@ pub fn build(b: *std.Build) !void {
         .filters = test_filter,
     });
     ut_game.root_module.addImport("algs_and_types", algs_and_types_module);
+    ut_game.root_module.addImport("ecs", ecs_module);
 
     const run_ut_game = b.addRunArtifact(ut_game);
 

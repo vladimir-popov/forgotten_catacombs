@@ -511,4 +511,12 @@ pub const Region = struct {
         try std.testing.expectEqualDeep(inner, actual1);
         try std.testing.expectEqualDeep(inner, actual2);
     }
+    test "intersect with the same region" {
+        // given:
+        const region = Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 10, .cols = 10 };
+        // when:
+        const actual = region.intersect(region);
+        // then:
+        try std.testing.expectEqualDeep(region, actual);
+    }
 };

@@ -13,8 +13,8 @@ pub fn centerAround(place: p.Point) Self {
     return .{
         .region = .{
             .top_left = .{
-                .row = if (place.row > game.DISPLAY_ROWS / 2) place.row - game.DISPLAY_ROWS / 2 else 0,
-                .col = if (place.col > game.DISPLAY_COLS / 2) place.col - game.DISPLAY_COLS / 2 else 0,
+                .row = if (place.row > game.DISPLAY_ROWS / 2) place.row - game.DISPLAY_ROWS / 2 else 1,
+                .col = if (place.col > game.DISPLAY_COLS / 2) place.col - game.DISPLAY_COLS / 2 else 1,
             },
             .rows = game.DISPLAY_ROWS,
             .cols = game.DISPLAY_COLS,
