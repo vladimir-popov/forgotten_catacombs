@@ -44,9 +44,12 @@ pub const Button = struct {
 
 pub const Components = union {
     screen: components.Screen,
-    health: components.Health,
-    sprite: components.Sprite,
+    level: components.Level,
     dungeon: components.Dungeon,
+    health: components.Health,
+    position: components.Position,
+    move: components.Move,
+    sprite: components.Sprite,
 };
 
 /// Possible events which can be passed between systems.
@@ -91,9 +94,11 @@ pub fn init(runtime: AnyRuntime) !Universe {
 
     const dungeon = try components.Dungeon.bspGenerate(runtime.alloc, runtime.rand);
     const player_position = dungeon.findRandomPlaceForPlayer();
-    entities.Player(universe, player_position);
+    const player = entities.Player(universe, player_position);
+    // init level
     _ = universe.newEntity()
         .withComponent(components.Screen, components.Screen.centerAround(player_position))
+        .withComponent(components.Level, .{ .player = player })
         .withComponent(components.Dungeon, dungeon);
 
     // Initialize systems:

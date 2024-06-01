@@ -1,30 +1,33 @@
 const game = @import("game.zig");
+const algs_and_types = @import("algs_and_types");
+const p = algs_and_types.primitives;
 
-const Universe = game.ForgottenCatacomb.Universe;
-
-fn handleInput(universe: *Universe) anyerror!void {
+fn handleInput(universe: *game.Universe) anyerror!void {
     const btn = try universe.runtime.readButton() orelse return;
     if (!game.Button.isMove(btn)) return;
 
     universe.fireEvent(game.Events.buttonWasPressed);
 
-    const level = universe.getComponents(game.Level)[0];
-    var entities = universe.entitiesIterator();
-    while (entities.next()) |entity| {
-        if (universe.getComponent(entity, game.Position)) |position| {
-            var new_position: game.Position = position.*;
-            if (btn & game.Button.Up > 0)
-                new_position.row -= 1;
-            if (btn & game.Button.Down > 0)
-                new_position.row += 1;
-            if (btn & game.Button.Left > 0)
-                new_position.col -= 1;
-            if (btn & game.Button.Right > 0)
-                new_position.col += 1;
+    const player_entity = universe.getComponents(game.components.Level)[0].player;
+    if (universe.getComponent(player_entity, game.components.Sprite)) |player| {
+        if (btn.isMove()) {
+            const direction = if (btn & game.Button.Up > 0)
+                p.Direction.up
+            else if (btn & game.Button.Down > 0)
+                p.Direction.down
+            else if (btn & game.Button.Left > 0)
+                p.Direction.left
+            else
+                p.Direction.right;
 
-            if (!level.dungeon.walls.isSet(new_position.row, new_position.col))
-                position.* = new_position;
+            universe.addComponent(
+                player,
+                game.components.Move{
+                    .entity = player_entity,
+                    .position = &player.position,
+                    .move = direction,
+                },
+            );
         }
     }
 }
-

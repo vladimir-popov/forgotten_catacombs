@@ -280,7 +280,7 @@ const EntitiesManager = struct {
 
     /// The iterator over entities. It should be used to get
     /// entities from this manager.
-    const Iterator = struct {
+    const EntitiesIterator = struct {
         key_terator: std.AutoHashMap(Entity, void).KeyIterator,
 
         pub fn next(self: *@This()) ?Entity {
@@ -292,7 +292,7 @@ const EntitiesManager = struct {
         }
     };
 
-    pub fn iterator(self: *Self) Iterator {
+    pub fn iterator(self: *Self) EntitiesIterator {
         return .{ .key_terator = self.inner_state.entities.keyIterator() };
     }
 };
@@ -459,7 +459,7 @@ pub fn Universe(comptime Components: anytype, comptime Events: anytype, comptime
             return .{ .entity = self.st().entities.newEntity(), .cm_ptr = &self.st().components };
         }
 
-        pub fn entitiesIterator(self: *Self) EntitiesManager.Iterator {
+        pub fn entitiesIterator(self: *Self) EntitiesManager.EntitiesIterator {
             return self.st().entities.iterator();
         }
 
@@ -477,6 +477,30 @@ pub fn Universe(comptime Components: anytype, comptime Events: anytype, comptime
 
         pub fn removeComponentFromEntity(self: Self, entity: Entity, comptime C: type) void {
             self.st().components.removeFromEntity(entity, C);
+        }
+
+        pub fn Query2(comptime Cmp1: type, Cmp2: type) type {
+            return struct {
+                const Q2 = @This();
+
+                universe: *Self,
+                entities: EntitiesManager.EntitiesIterator,
+
+                pub fn next(self: *Q2) ?struct { Entity, *Cmp1, *Cmp2 } {
+                    if (self.entities.next()) |entity| {
+                        if (self.universe.getComponent(entity, Cmp1)) |c1| {
+                            if (self.universe.getComponent(entity, Cmp2)) |c2| {
+                                return .{ entity, c1, c2 };
+                            }
+                        }
+                    }
+                    return null;
+                }
+            };
+        }
+
+        pub fn queryComponents2(self: *Self, comptime Cmp1: type, Cmp2: type) Query2(Cmp1, Cmp2) {
+            return .{ .universe = self, .entities = self.entitiesIterator() };
         }
     };
 }
