@@ -194,6 +194,10 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
             }
         }
 
+        pub fn openDoor(self: *Self, position: p.Point) !void {
+            try self.doors.put(position, true);
+        }
+
         pub const CellsIterator = struct {
             dungeon: *const Self,
             region: p.Region,

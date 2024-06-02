@@ -168,7 +168,7 @@ fn ComponentsManager(comptime ComponentsUnion: type) type {
             }
         }
 
-        pub fn getAll(self: Self, comptime C: type) []const C {
+        pub fn getAll(self: Self, comptime C: type) []C {
             return @field(self.inner_state.components_map, @typeName(C)).components.items;
         }
 
@@ -467,7 +467,7 @@ pub fn Universe(comptime Components: anytype, comptime Events: anytype, comptime
             return self.st().components.getForEntity(entity, C);
         }
 
-        pub fn getComponents(self: Self, comptime C: type) []const C {
+        pub fn getComponents(self: Self, comptime C: type) []C {
             return self.st().components.getAll(C);
         }
 

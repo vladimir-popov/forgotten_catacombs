@@ -14,7 +14,7 @@ pub const Level = struct {
 };
 
 pub const Position = struct {
-    position: p.Point,
+    point: p.Point,
     pub fn deinit(_: *@This()) void {}
 };
 
@@ -25,22 +25,19 @@ pub const Sprite = struct {
 
 pub const Move = struct {
     direction: ?p.Direction = null,
-    speed: u8 = 1,
 
-    pub fn doMove(self: Move, position: *p.Point) void {
-        position.move(self.direction);
+    pub fn applyTo(self: *Move, position: *Position) void {
+        if (self.direction) |direction| {
+            position.point.move(direction);
+        }
+        self.direction = null;
+    }
+
+    pub inline fn ignore(self: *Move) void {
+        self.direction = null;
     }
 
     pub fn deinit(_: *@This()) void {}
-};
-
-pub const CollisionWithCell = struct {
-    move: Move,
-    cell: dung.Cell,
-};
-
-pub const Collision = union {
-    with_cell: CollisionWithCell,
 };
 
 pub const Health = struct {

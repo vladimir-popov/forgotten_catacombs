@@ -16,11 +16,6 @@ pub const TOTAL_ROWS: u8 = 40;
 /// The maximum columns count in the dungeon
 pub const TOTAL_COLS: u8 = 100;
 
-/// The rows count to display
-pub const DISPLAY_ROWS: u8 = 15;
-/// The rows count to display
-pub const DISPLAY_COLS: u8 = 40;
-
 const panic = std.debug.panic;
 
 const Self = @This();
@@ -65,8 +60,17 @@ pub const Events = enum {
 pub const AnyRuntime = struct {
     const VTable = struct {
         readButton: *const fn (context: *anyopaque) anyerror!?Button.Type,
-        drawDungeon: *const fn (context: *anyopaque, dungeon: *const components.Dungeon, region: p.Region) anyerror!void,
-        drawSprite: *const fn (context: *anyopaque, sprite: *const components.Sprite, row: u8, col: u8) anyerror!void,
+        drawDungeon: *const fn (
+            context: *anyopaque,
+            screen: *const components.Screen,
+            dungeon: *const components.Dungeon,
+        ) anyerror!void,
+        drawSprite: *const fn (
+            context: *anyopaque,
+            screen: *const components.Screen,
+            sprite: *const components.Sprite,
+            position: *const components.Position,
+        ) anyerror!void,
     };
 
     context: *anyopaque,
@@ -78,12 +82,21 @@ pub const AnyRuntime = struct {
         return try self.vtable.readButton(self.context);
     }
 
-    pub fn drawDungeon(self: AnyRuntime, dungeon: *const components.Dungeon, region: p.Region) !void {
-        try self.vtable.drawDungeon(self.context, dungeon, region);
+    pub fn drawDungeon(
+        self: AnyRuntime,
+        screen: *const components.Screen,
+        dungeon: *const components.Dungeon,
+    ) !void {
+        try self.vtable.drawDungeon(self.context, screen, dungeon);
     }
 
-    pub fn drawSprite(self: AnyRuntime, sprite: *const components.Sprite, row: u8, col: u8) !void {
-        try self.vtable.drawSprite(self.context, sprite, row, col);
+    pub fn drawSprite(
+        self: AnyRuntime,
+        screen: *const components.Screen,
+        sprite: *const components.Sprite,
+        position: *const components.Position,
+    ) !void {
+        try self.vtable.drawSprite(self.context, screen, sprite, position);
     }
 };
 
@@ -97,11 +110,16 @@ pub fn init(runtime: AnyRuntime) !Universe {
     const player = entities.Player(universe, player_position);
     // init level
     _ = universe.newEntity()
-        .withComponent(components.Screen, components.Screen.centerAround(player_position))
         .withComponent(components.Level, .{ .player = player })
-        .withComponent(components.Dungeon, dungeon);
+        .withComponent(components.Dungeon, dungeon)
+        .withComponent(
+        components.Screen,
+        components.Screen.centeredAround(player_position, components.Dungeon.Region),
+    );
 
     // Initialize systems:
+    universe.registerSystem(systems.Input.handleInput);
+    universe.registerSystem(systems.Movement.handleMove);
     universe.registerSystem(systems.Render.render);
 
     universe.fireEvent(Events.gameHasBeenInitialized);

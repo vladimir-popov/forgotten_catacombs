@@ -1,17 +1,20 @@
+const std = @import("std");
 const game = @import("game.zig");
 const algs_and_types = @import("algs_and_types");
 const p = algs_and_types.primitives;
 
-fn handleInput(universe: *game.Universe) anyerror!void {
+const log = std.log.scoped(.input_system);
+
+pub fn handleInput(universe: *game.Universe) anyerror!void {
     const btn = try universe.runtime.readButton() orelse return;
-    if (!game.Button.isMove(btn)) return;
+    log.debug("Pressed button {d}", .{btn});
 
     universe.fireEvent(game.Events.buttonWasPressed);
 
     const player_entity = universe.getComponents(game.components.Level)[0].player;
-    if (universe.getComponent(player_entity, game.components.Sprite)) |player| {
-        if (btn.isMove()) {
-            const direction = if (btn & game.Button.Up > 0)
+    if (universe.getComponent(player_entity, game.components.Move)) |move| {
+        if (game.Button.isMove(btn)) {
+            move.direction = if (btn & game.Button.Up > 0)
                 p.Direction.up
             else if (btn & game.Button.Down > 0)
                 p.Direction.down
@@ -19,15 +22,7 @@ fn handleInput(universe: *game.Universe) anyerror!void {
                 p.Direction.left
             else
                 p.Direction.right;
-
-            universe.addComponent(
-                player,
-                game.components.Move{
-                    .entity = player_entity,
-                    .position = &player.position,
-                    .move = direction,
-                },
-            );
         }
+        log.debug("{any}", .{move});
     }
 }

@@ -7,7 +7,7 @@ const cmp = game.components;
 pub inline fn Player(universe: game.Universe, init_position: p.Point) game.Entity {
     return universe.newEntity()
         .withComponent(cmp.Sprite, .{ .letter = "@" })
-        .withComponent(cmp.Position, .{ .position = init_position })
+        .withComponent(cmp.Position, .{ .point = init_position })
         .withComponent(cmp.Move, .{})
         .entity;
 }

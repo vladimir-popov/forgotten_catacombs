@@ -111,17 +111,26 @@ fn readButton(ptr: *anyopaque) anyerror!?game.Button.Type {
     return null;
 }
 
-fn drawDungeon(ptr: *anyopaque, dungeon: *const cmp.Dungeon, region: p.Region) anyerror!void {
+fn drawDungeon(ptr: *anyopaque, screen: *const cmp.Screen, dungeon: *const cmp.Dungeon) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     try Render.drawDungeon(
         self.arena.allocator(),
         &self.buffer,
         dungeon,
-        region,
+        screen.region,
     );
 }
 
-fn drawSprite(ptr: *anyopaque, sprite: *const cmp.Sprite, row: u8, col: u8) anyerror!void {
-    var self: *Self = @ptrCast(@alignCast(ptr));
-    try self.buffer.mergeLine(sprite.letter, row - 1, col - 1);
+fn drawSprite(
+    ptr: *anyopaque,
+    screen: *const cmp.Screen,
+    sprite: *const cmp.Sprite,
+    position: *const cmp.Position,
+) anyerror!void {
+    if (screen.region.containsPoint(position.point)) {
+        var self: *Self = @ptrCast(@alignCast(ptr));
+        const r = position.point.row - screen.region.top_left.row;
+        const c = position.point.col - screen.region.top_left.col;
+        try self.buffer.mergeLine(sprite.letter, r, c);
+    }
 }
