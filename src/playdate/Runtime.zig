@@ -7,8 +7,10 @@ const Allocator = @import("Allocator.zig");
 
 const Self = @This();
 
-const FONT_HEIGHT = 16;
-const FONT_WIDHT = 8;
+const FONT_HEIGHT: u16 = 16;
+const FONT_WIDHT: u16 = 8;
+
+const log = std.log.scoped(.runtime);
 
 playdate: *api.PlaydateAPI,
 font: *api.LCDFont,
@@ -20,7 +22,7 @@ pub fn init(playdate: *api.PlaydateAPI) Self {
         std.debug.panic("Error on load font: {s}", .{err_msg});
     };
 
-    playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeFillBlack);
+    playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeFillWhite);
     playdate.graphics.setFont(font);
 
     return .{ .playdate = playdate, .font = font };
@@ -46,27 +48,19 @@ pub fn any(self: *Self) game.AnyRuntime {
     };
 }
 
-pub fn log(self: Self, comptime fmt: []const u8, args: anytype) void {
-    const full_fmt = "INFO: " ++ fmt ++ "\n";
-    var buffer: [128]u8 = undefined;
-    const str = std.fmt.bufPrintZ(&buffer, full_fmt, args) catch
-        return self.playdate.system.logToConsole("Message too long to show in log.");
-    self.playdate.system.logToConsole("%s", str.ptr);
-}
-
 // ======== Private methods: ==============
 
 fn readButton(ptr: *anyopaque) anyerror!?game.Button.Type {
     var self: *Self = @ptrCast(@alignCast(ptr));
     var button: api.PDButtons = undefined;
-    self.playdate.system.getButtonState(&button, null, null);
+    self.playdate.system.getButtonState(null, &button, null);
     if (button == 0)
         return null
     else
         return @intCast(button);
 }
 
-fn drawDungeon(_: *anyopaque, screen: *const cmp.Screen, dungeon: *const cmp.Dungeon) anyerror!void {
+fn drawDungeon(ptr: *anyopaque, screen: *const cmp.Screen, dungeon: *const cmp.Dungeon) anyerror!void {
     var itr = dungeon.cellsInRegion(screen.region) orelse return;
     var position = game.components.Position{ .point = screen.region.top_left };
     var sprite = game.components.Sprite{ .letter = undefined };
@@ -78,7 +72,7 @@ fn drawDungeon(_: *anyopaque, screen: *const cmp.Screen, dungeon: *const cmp.Dun
             .opened_door => "'",
             .closed_door => "+",
         };
-        // try drawSprite(ptr, screen, &sprite, &position);
+        try drawSprite(ptr, screen, &sprite, &position);
         position.point.move(.right);
         if (!screen.region.containsPoint(position.point)) {
             position.point.col = screen.region.top_left.col;
@@ -95,8 +89,8 @@ fn drawSprite(
 ) anyerror!void {
     if (screen.region.containsPoint(position.point)) {
         var self: *Self = @ptrCast(@alignCast(ptr));
-        const y: c_int = FONT_HEIGHT * (position.point.row - screen.region.top_left.row);
-        const x: c_int = FONT_WIDHT * (position.point.col - screen.region.top_left.col);
+        const y: c_int = FONT_HEIGHT * (position.point.row - screen.region.top_left.row + 1);
+        const x: c_int = FONT_WIDHT * (position.point.col - screen.region.top_left.col + 1);
         _ = self.playdate.graphics.drawText(sprite.letter.ptr, sprite.letter.len, .UTF8Encoding, x, y);
     }
 }

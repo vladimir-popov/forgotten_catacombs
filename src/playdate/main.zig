@@ -12,14 +12,17 @@ pub const std_options = .{
 };
 
 fn writeLog(
-    comptime message_level: std.log.Level,
-    comptime _: @TypeOf(.enum_literal),
+    comptime lvl: std.log.Level,
+    comptime scope: @TypeOf(.enum_literal),
     comptime format: []const u8,
     args: anytype,
 ) void {
-    _ = format;
-    _ = args;
-    _ = message_level;
+    if (lvl == .warn) {
+        var buffer = [_]u8{0} ** 128;
+        _ = std.fmt.bufPrint(&buffer, format, args) catch |err|
+            std.debug.panic("Error {any} on log {s}", .{ err, format });
+        playdate_log_to_console("%s (%s) %s", @tagName(lvl), @tagName(scope), (&buffer).ptr);
+    }
 }
 
 pub fn panic(
@@ -34,6 +37,7 @@ pub fn panic(
 }
 
 var playdate_error_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) void = undefined;
+var playdate_log_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) void = undefined;
 
 const GlobalState = struct {
     runtime: Runtime,
@@ -52,6 +56,7 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
     switch (event) {
         .EventInit => {
             playdate_error_to_console = playdate.system.@"error";
+            playdate_log_to_console = playdate.system.logToConsole;
 
             const global_state: *anyopaque = GlobalState.create(playdate) catch |err|
                 std.debug.panic("Error {any} on init global state", .{err});
@@ -64,7 +69,7 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
 
 fn update_and_render(userdata: ?*anyopaque) callconv(.C) c_int {
     const gst: *GlobalState = @ptrCast(@alignCast(userdata.?));
-    gst.runtime.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorWhite));
+    gst.runtime.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
     gst.universe.tick() catch |err|
         std.debug.panic("Error {any} on game tick", .{err});
 
