@@ -32,7 +32,7 @@ pub fn deinit(self: Self) void {
     self.playdate.system.realloc(self.font, 0);
 }
 
-pub fn any(self: *Self) game.AnyRuntime {
+pub fn any(self: *Self) !game.AnyRuntime {
     var millis: c_uint = undefined;
     _ = self.playdate.system.getSecondsSinceEpoch(&millis);
     var rnd = std.Random.DefaultPrng.init(@intCast(millis));
@@ -44,11 +44,17 @@ pub fn any(self: *Self) game.AnyRuntime {
             .readButton = readButton,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
+            .currentMillis = currentMillis,
         },
     };
 }
 
 // ======== Private methods: ==============
+
+fn currentMillis(ptr: *anyopaque) i64 {
+    var self: *Self = @ptrCast(@alignCast(ptr));
+    return self.playdate.system.getCurrentTimeMilliseconds();
+}
 
 fn readButton(ptr: *anyopaque) anyerror!?game.Button.Type {
     var self: *Self = @ptrCast(@alignCast(ptr));

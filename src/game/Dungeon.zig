@@ -194,8 +194,15 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
             }
         }
 
-        pub fn openDoor(self: *Self, position: p.Point) !void {
-            try self.doors.put(position, true);
+        pub fn cellsAround(self: *const Self, place: p.Point) ?CellsIterator {
+            return self.cellsInRegion(.{
+                .top_left = .{
+                    .row = @max(place.row - 1, 1),
+                    .col = @max(place.col - 1, 1),
+                },
+                .rows = 3,
+                .cols = 3,
+            });
         }
 
         pub const CellsIterator = struct {
@@ -218,6 +225,10 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
                 return null;
             }
         };
+
+        pub fn openDoor(self: *Self, position: p.Point) !void {
+            try self.doors.put(position, true);
+        }
 
         fn cleanAt(self: *Self, place: p.Point) void {
             if (!Region.containsPoint(place)) {

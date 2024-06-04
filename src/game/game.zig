@@ -47,6 +47,7 @@ pub const Button = struct {
 
 pub const Components = union {
     screen: components.Screen,
+    timers: components.Timers,
     level: components.Level,
     dungeon: components.Dungeon,
     health: components.Health,
@@ -69,12 +70,17 @@ pub const AnyRuntime = struct {
             sprite: *const components.Sprite,
             position: *const components.Position,
         ) anyerror!void,
+        currentMillis: *const fn (context: *anyopaque) i64,
     };
 
     context: *anyopaque,
     alloc: std.mem.Allocator,
     rand: std.Random,
     vtable: VTable,
+
+    pub fn currentMillis(self: AnyRuntime) i64 {
+        return self.vtable.currentMillis(self.context);
+    }
 
     pub fn readButton(self: AnyRuntime) !?Button.Type {
         return try self.vtable.readButton(self.context);
@@ -110,9 +116,10 @@ pub fn init(runtime: AnyRuntime) !Universe {
     screen.centeredAround(player_position);
     // init level
     _ = universe.newEntity()
+        .withComponent(components.Screen, screen)
+        .withComponent(components.Timers, try components.Timers.init(runtime.alloc))
         .withComponent(components.Level, .{ .player = player })
-        .withComponent(components.Dungeon, dungeon)
-        .withComponent(components.Screen, screen);
+        .withComponent(components.Dungeon, dungeon);
 
     // Initialize systems:
     universe.registerSystem(systems.Input.handleInput);

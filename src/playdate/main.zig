@@ -46,7 +46,7 @@ const GlobalState = struct {
     pub fn create(playdate: *api.PlaydateAPI) !*GlobalState {
         var state: *GlobalState = @ptrCast(@alignCast(playdate.system.realloc(null, @sizeOf(GlobalState))));
         state.runtime = Runtime.init(playdate);
-        state.universe = try game.init(state.runtime.any());
+        state.universe = try game.init(try state.runtime.any());
         return state;
     }
 };

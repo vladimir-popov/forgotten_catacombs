@@ -8,6 +8,20 @@ pub const Dungeon = dung.Dungeon(game.TOTAL_ROWS, game.TOTAL_COLS);
 
 pub const Screen = @import("Screen.zig");
 
+pub const Timers = struct {
+    pub const Handlers = enum { input_system };
+
+    alloc: std.mem.Allocator,
+    timers: []i64,
+
+    pub fn init(alloc: std.mem.Allocator) !Timers {
+        return .{ .alloc = alloc, .timers = try alloc.alloc(i64, std.meta.tags(Handlers).len) };
+    }
+    pub fn deinit(self: *@This()) void {
+        self.alloc.free(self.timers);
+    }
+};
+
 pub const Level = struct {
     player: game.Entity,
     pub fn deinit(_: *@This()) void {}
@@ -25,16 +39,19 @@ pub const Sprite = struct {
 
 pub const Move = struct {
     direction: ?p.Direction = null,
+    keep_moving: bool = false,
 
     pub fn applyTo(self: *Move, position: *Position) void {
         if (self.direction) |direction| {
             position.point.move(direction);
         }
-        self.direction = null;
+        if (!self.keep_moving)
+            self.direction = null;
     }
 
-    pub inline fn ignore(self: *Move) void {
+    pub inline fn cancel(self: *Move) void {
         self.direction = null;
+        self.keep_moving = false;
     }
 
     pub fn deinit(_: *@This()) void {}

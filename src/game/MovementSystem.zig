@@ -11,19 +11,22 @@ pub fn handleMove(universe: *game.Universe) anyerror!void {
     const dungeon = &universe.getComponents(cmp.Dungeon)[0];
     const screen = &universe.getComponents(cmp.Screen)[0];
     var itr = universe.queryComponents2(cmp.Move, cmp.Position);
-    while (itr.next()) |components| {
+    blk: while (itr.next()) |components| {
         const entity = components[0];
         const move = components[1];
-        var position = components[2];
+        const position = components[2];
         if (move.direction) |direction| {
+            // try to move:
+            const orig_point = position.point;
             const new_point = position.point.movedTo(direction);
             if (dungeon.cellAt(new_point)) |cell| {
                 switch (cell) {
                     .floor, .opened_door => {
                         move.applyTo(position);
                         if (entity != player_entity) {
-                            continue;
+                            continue :blk;
                         }
+                        // keep player on the screen:
                         if (direction == .up and new_point.row < screen.innerRegion().top_left.row)
                             screen.move(direction);
                         if (direction == .down and new_point.row > screen.innerRegion().bottomRight().row)
@@ -32,10 +35,25 @@ pub fn handleMove(universe: *game.Universe) anyerror!void {
                             screen.move(direction);
                         if (direction == .right and new_point.col > screen.innerRegion().bottomRight().col)
                             screen.move(direction);
+
+                        // maybe stop keep moving:
+                        var neighbors = dungeon.cellsAround(new_point) orelse continue :blk;
+                        while (neighbors.next()) |neighbor| {
+                            if (std.meta.eql(neighbors.cursor, orig_point))
+                                continue;
+                            if (std.meta.eql(neighbors.cursor, new_point))
+                                continue;
+                            switch (neighbor) {
+                                // keep moving
+                                .floor, .wall => {},
+                                // stop
+                                else => move.cancel(),
+                            }
+                        }
                     },
                     .closed_door => {
                         try dungeon.openDoor(new_point);
-                        move.ignore();
+                        move.cancel();
                     },
                     else => {},
                 }

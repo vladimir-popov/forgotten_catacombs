@@ -370,6 +370,7 @@ pub fn Universe(comptime Components: anytype, comptime Runtime: type) type {
             pub fn deinit(self: *@This()) void {
                 self.entities.deinit();
                 self.components.deinit();
+                self.systems.deinit();
                 self.alloc.destroy(self);
             }
         };

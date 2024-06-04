@@ -86,8 +86,13 @@ pub fn any(self: *Self) game.AnyRuntime {
             .readButton = readButton,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
+            .currentMillis = currentMillis,
         },
     };
+}
+
+fn currentMillis(_: *anyopaque) i64 {
+    return std.time.milliTimestamp();
 }
 
 fn readButton(ptr: *anyopaque) anyerror!?game.Button.Type {
