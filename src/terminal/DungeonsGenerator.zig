@@ -39,34 +39,37 @@ pub fn main() !void {
 
 const Components = union {
     dungeon: game.components.Dungeon,
+    screen: game.components.Screen,
 };
 
 const DungeonsGenerator = struct {
-    pub const Universe = ecs.Universe(Components, game.Events, game.AnyRuntime);
+    pub const Universe = ecs.Universe(Components, game.AnyRuntime);
+    const Dungeon = game.components.Dungeon;
 
     pub fn init(runtime: game.AnyRuntime) !Universe {
         var universe: Universe = Universe.init(runtime.alloc, runtime);
 
         // Generate dungeon:
-        const dungeon = try game.components.Dungeon.bspGenerate(
+        const dungeon = try Dungeon.bspGenerate(
             universe.runtime.alloc,
             universe.runtime.rand,
         );
+        // The screen to see whole dungeon:
+        const screen = game.components.Screen.init(Dungeon.Region.rows, Dungeon.Region.cols, Dungeon.Region);
 
-        _ = universe.newEntity().withComponent(game.components.Dungeon, dungeon);
+        _ = universe.newEntity()
+            .withComponent(game.components.Dungeon, dungeon)
+            .withComponent(game.components.Screen, screen);
 
         // Initialize systems:
         universe.registerSystem(handleInput);
         universe.registerSystem(render);
 
-        universe.fireEvent(game.Events.gameHasBeenInitialized);
         return universe;
     }
 
     fn handleInput(universe: *Universe) anyerror!void {
         const btn = try universe.runtime.readButton() orelse return;
-
-        universe.fireEvent(game.Events.buttonWasPressed);
 
         if (btn & game.Button.A > 0) {
             var entities = universe.entitiesIterator();
@@ -87,9 +90,8 @@ const DungeonsGenerator = struct {
     }
 
     fn render(universe: *Universe) anyerror!void {
-        if (!(universe.isEventFired(game.Events.gameHasBeenInitialized) or universe.isEventFired(game.Events.buttonWasPressed)))
-            return;
-        const dungeon = universe.getComponents(game.components.Dungeon)[0];
-        try universe.runtime.drawDungeon(&dungeon, game.components.Dungeon.Region);
+        const dungeon = &universe.getComponents(game.components.Dungeon)[0];
+        const screen = &universe.getComponents(game.components.Screen)[0];
+        try universe.runtime.drawDungeon(screen, dungeon);
     }
 };

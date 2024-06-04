@@ -344,10 +344,9 @@ test "EntitiesManager: iterator" {
 /// object.
 ///
 /// Components - a union of used components.
-/// Events - an enum (or void) of events used in the game.
-/// Runtime - a type to communicate with runtime environment: reading pressed buttons, draw sprites,
+/// Runtime - a type to communicate with a runtime environment: reading pressed buttons, draw sprites,
 ///         play sounds, etc.
-pub fn Universe(comptime Components: anytype, comptime Events: anytype, comptime Runtime: type) type {
+pub fn Universe(comptime Components: anytype, comptime Runtime: type) type {
     switch (@typeInfo(Components)) {
         .Union => {},
         else => @compileError(std.fmt.comptimePrint(
@@ -355,14 +354,6 @@ pub fn Universe(comptime Components: anytype, comptime Events: anytype, comptime
             .{@typeInfo(Components)},
         )),
     }
-    const events_count = switch (@typeInfo(Events)) {
-        .Enum => |e| e.fields.len,
-        .Void => 0,
-        else => @compileError(std.fmt.comptimePrint(
-            "The Events must be an enum or void, but it is {any}",
-            .{@typeInfo(Events)},
-        )),
-    };
 
     return struct {
         const Self = @This();
@@ -375,12 +366,10 @@ pub fn Universe(comptime Components: anytype, comptime Events: anytype, comptime
             components: ComponentsManager(Components),
             entities: EntitiesManager,
             systems: std.ArrayList(System),
-            events: std.StaticBitSet(events_count) = std.StaticBitSet(events_count).initEmpty(),
 
             pub fn deinit(self: *@This()) void {
                 self.entities.deinit();
                 self.components.deinit();
-                self.systems.deinit();
                 self.alloc.destroy(self);
             }
         };
@@ -419,18 +408,6 @@ pub fn Universe(comptime Components: anytype, comptime Events: anytype, comptime
             self.st().deinit();
         }
 
-        pub fn fireEvent(self: *Self, event: Events) void {
-            self.st().events.set(event.index());
-        }
-
-        pub fn isEventFired(self: Self, event: Events) bool {
-            return self.st().events.isSet(event.index());
-        }
-
-        fn cleanupEvents(self: *Self) anyerror!void {
-            self.st().events.setRangeValue(.{ .start = 0, .end = events_count }, false);
-        }
-
         pub fn registerSystem(self: *Self, system: System) void {
             self.st().systems.append(system) catch |err|
                 std.debug.panic("The memory error {any} happened on registration system.", .{err});
@@ -440,7 +417,6 @@ pub fn Universe(comptime Components: anytype, comptime Events: anytype, comptime
             for (self.st().systems.items) |system| {
                 try system(self);
             }
-            try self.cleanupEvents();
         }
 
         pub const EntityBuilder = struct {

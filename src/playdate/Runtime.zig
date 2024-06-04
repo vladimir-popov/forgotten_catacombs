@@ -7,6 +7,9 @@ const Allocator = @import("Allocator.zig");
 
 const Self = @This();
 
+const FONT_HEIGHT = 16;
+const FONT_WIDHT = 8;
+
 playdate: *api.PlaydateAPI,
 font: *api.LCDFont,
 
@@ -63,10 +66,37 @@ fn readButton(ptr: *anyopaque) anyerror!?game.Button.Type {
         return @intCast(button);
 }
 
-fn drawDungeon(_: *anyopaque, _: *const game.Dungeon) anyerror!void {}
+fn drawDungeon(_: *anyopaque, screen: *const cmp.Screen, dungeon: *const cmp.Dungeon) anyerror!void {
+    var itr = dungeon.cellsInRegion(screen.region) orelse return;
+    var position = game.components.Position{ .point = screen.region.top_left };
+    var sprite = game.components.Sprite{ .letter = undefined };
+    while (itr.next()) |cell| {
+        sprite.letter = switch (cell) {
+            .nothing => " ",
+            .floor => ".",
+            .wall => "#",
+            .opened_door => "'",
+            .closed_door => "+",
+        };
+        // try drawSprite(ptr, screen, &sprite, &position);
+        position.point.move(.right);
+        if (!screen.region.containsPoint(position.point)) {
+            position.point.col = screen.region.top_left.col;
+            position.point.move(.down);
+        }
+    }
+}
 
-fn drawSprite(ptr: *anyopaque, sprite: *const game.Sprite, row: u8, col: u8) anyerror!void {
-    var self: *Self = @ptrCast(@alignCast(ptr));
-    self.log("Draw {s}", .{sprite.letter});
-    _ = self.playdate.graphics.drawText(sprite.letter.ptr, sprite.letter.len, .UTF8Encoding, col, row);
+fn drawSprite(
+    ptr: *anyopaque,
+    screen: *const cmp.Screen,
+    sprite: *const cmp.Sprite,
+    position: *const cmp.Position,
+) anyerror!void {
+    if (screen.region.containsPoint(position.point)) {
+        var self: *Self = @ptrCast(@alignCast(ptr));
+        const y: c_int = FONT_HEIGHT * (position.point.row - screen.region.top_left.row);
+        const x: c_int = FONT_WIDHT * (position.point.col - screen.region.top_left.col);
+        _ = self.playdate.graphics.drawText(sprite.letter.ptr, sprite.letter.len, .UTF8Encoding, x, y);
+    }
 }

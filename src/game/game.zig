@@ -16,6 +16,14 @@ pub const TOTAL_ROWS: u8 = 40;
 /// The maximum columns count in the dungeon
 pub const TOTAL_COLS: u8 = 100;
 
+/// The rows count to display
+const DISPLAY_ROWS: u8 = 15;
+/// The rows count to display
+const DISPLAY_COLS: u8 = 40;
+
+const ROWS_PAD = 3;
+const COLS_PAD = 7;
+
 const panic = std.debug.panic;
 
 const Self = @This();
@@ -45,16 +53,6 @@ pub const Components = union {
     position: components.Position,
     move: components.Move,
     sprite: components.Sprite,
-};
-
-/// Possible events which can be passed between systems.
-pub const Events = enum {
-    gameHasBeenInitialized,
-    buttonWasPressed,
-
-    pub fn index(self: Events) u8 {
-        return @intFromEnum(self);
-    }
 };
 
 pub const AnyRuntime = struct {
@@ -100,7 +98,7 @@ pub const AnyRuntime = struct {
     }
 };
 
-pub const Universe = ecs.Universe(Components, Events, AnyRuntime);
+pub const Universe = ecs.Universe(Components, AnyRuntime);
 
 pub fn init(runtime: AnyRuntime) !Universe {
     var universe: Universe = Universe.init(runtime.alloc, runtime);
@@ -108,21 +106,19 @@ pub fn init(runtime: AnyRuntime) !Universe {
     const dungeon = try components.Dungeon.bspGenerate(runtime.alloc, runtime.rand);
     const player_position = dungeon.findRandomPlaceForPlayer();
     const player = entities.Player(universe, player_position);
+    var screen = components.Screen.init(DISPLAY_ROWS, DISPLAY_COLS, components.Dungeon.Region);
+    screen.centeredAround(player_position);
     // init level
     _ = universe.newEntity()
         .withComponent(components.Level, .{ .player = player })
         .withComponent(components.Dungeon, dungeon)
-        .withComponent(
-        components.Screen,
-        components.Screen.centeredAround(player_position, components.Dungeon.Region),
-    );
+        .withComponent(components.Screen, screen);
 
     // Initialize systems:
     universe.registerSystem(systems.Input.handleInput);
     universe.registerSystem(systems.Movement.handleMove);
     universe.registerSystem(systems.Render.render);
 
-    universe.fireEvent(Events.gameHasBeenInitialized);
     return universe;
 }
 

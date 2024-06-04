@@ -1,12 +1,10 @@
+const std = @import("std");
 const algs_and_types = @import("algs_and_types");
 const p = algs_and_types.primitives;
 const game = @import("game.zig");
 const cmp = game.components;
 
 pub fn render(universe: *game.Universe) anyerror!void {
-    if (!(universe.isEventFired(game.Events.gameHasBeenInitialized) or universe.isEventFired(game.Events.buttonWasPressed)))
-        return;
-
     const screen = &universe.getComponents(cmp.Screen)[0];
 
     const dungeon = &universe.getComponents(cmp.Dungeon)[0];

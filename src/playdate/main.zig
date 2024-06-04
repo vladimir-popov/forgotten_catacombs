@@ -7,20 +7,20 @@ const Runtime = @import("Runtime.zig");
 
 const CurrentPlatform = tools.Platform.Playdate;
 
-// pub const std_options = .{
-//     .logFn = writeLog,
-// };
-//
-// fn writeLog(
-//     comptime message_level: std.log.Level,
-//     comptime _: @TypeOf(.enum_literal),
-//     comptime format: []const u8,
-//     args: anytype,
-// ) void {
-//     _ = format;
-//     _ = args;
-//     _ = message_level;
-// }
+pub const std_options = .{
+    .logFn = writeLog,
+};
+
+fn writeLog(
+    comptime message_level: std.log.Level,
+    comptime _: @TypeOf(.enum_literal),
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    _ = format;
+    _ = args;
+    _ = message_level;
+}
 
 pub fn panic(
     msg: []const u8,
@@ -37,12 +37,12 @@ var playdate_error_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) v
 
 const GlobalState = struct {
     runtime: Runtime,
-    universe: game.ForgottenCatacomb.Universe,
+    universe: game.Universe,
 
     pub fn create(playdate: *api.PlaydateAPI) !*GlobalState {
         var state: *GlobalState = @ptrCast(@alignCast(playdate.system.realloc(null, @sizeOf(GlobalState))));
         state.runtime = Runtime.init(playdate);
-        state.universe = try game.ForgottenCatacomb.init(state.runtime.any());
+        state.universe = try game.init(state.runtime.any());
         return state;
     }
 };
