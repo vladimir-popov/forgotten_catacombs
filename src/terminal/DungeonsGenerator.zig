@@ -50,7 +50,7 @@ const DungeonsGenerator = struct {
         var universe: Universe = Universe.init(runtime.alloc, runtime);
 
         // Generate dungeon:
-        const dungeon = try Dungeon.bspGenerate(
+        const dungeon = try Dungeon.initRandom(
             universe.runtime.alloc,
             universe.runtime.rand,
         );
@@ -79,7 +79,7 @@ const DungeonsGenerator = struct {
                     const seed = universe.runtime.rand.int(u64);
                     log.debug("The random seed is {d}", .{seed});
                     var rnd = std.Random.DefaultPrng.init(seed);
-                    const dungeon = try game.components.Dungeon.bspGenerate(
+                    const dungeon = try game.components.Dungeon.initRandom(
                         universe.runtime.alloc,
                         rnd.random(),
                     );

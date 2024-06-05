@@ -109,8 +109,8 @@ pub const Universe = ecs.Universe(Components, AnyRuntime);
 pub fn init(runtime: AnyRuntime) !Universe {
     var universe: Universe = Universe.init(runtime.alloc, runtime);
 
-    const dungeon = try components.Dungeon.bspGenerate(runtime.alloc, runtime.rand);
-    const player_position = dungeon.findRandomPlaceForPlayer();
+    const dungeon = try components.Dungeon.initRandom(runtime.alloc, runtime.rand);
+    const player_position = dungeon.findRandomPlaceForPlayer(runtime.rand);
     const player = entities.Player(universe, player_position);
     var screen = components.Screen.init(DISPLAY_ROWS, DISPLAY_COLS, components.Dungeon.Region);
     screen.centeredAround(player_position);

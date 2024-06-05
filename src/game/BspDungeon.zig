@@ -103,7 +103,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
 
         /// Basic BSP Dungeon generation
         /// https://www.roguebasin.com/index.php?title=Basic_BSP_Dungeon_generation
-        pub fn bspGenerate(
+        pub fn initRandom(
             alloc: std.mem.Allocator,
             rand: std.Random,
         ) !Self {
@@ -140,8 +140,9 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             self.rooms.deinit();
         }
 
-        pub fn findRandomPlaceForPlayer(self: Self) p.Point {
-            return self.rooms.items[0].middle();
+        pub fn findRandomPlaceForPlayer(self: Self, rand: std.Random) p.Point {
+            const room = rand.uintLessThan(usize, self.rooms.items.len);
+            return self.rooms.items[room].middle();
         }
 
         /// For tests only
@@ -391,7 +392,6 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             fn bindRegions(ptr: *anyopaque, r1: p.Region, r2: p.Region, _: u8) anyerror!p.Region {
                 const self: *FoldAndBind = @ptrCast(@alignCast(ptr));
                 const direction: p.Direction = if (r1.top_left.row == r2.top_left.row) .right else .down;
-                // return try self.dungeon.createAndAddPassageBetweenRegions(self.rand, r1, r2, direction);
                 _ = self.dungeon.createAndAddPassageBetweenRegions(self.rand, r1, r2, direction) catch {};
                 return r1.unionWith(r2);
             }
@@ -416,7 +416,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             _ = try passage.turnAt(door1, direction);
             if (!door1.onSameAxis(door2)) {
                 // intersection of the passage from the door 1 and region 1
-                const middle1: p.Point = if (direction.isHorizontal())
+                var middle1: p.Point = if (direction.isHorizontal())
                     // left or right
                     .{ .row = door1.row, .col = r1.bottomRight().col }
                 else
@@ -424,12 +424,18 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                     .{ .row = r1.bottomRight().row, .col = door1.col };
 
                 // intersection of the passage from the region 1 and door 2
-                const middle2: p.Point = if (direction.isHorizontal())
+                var middle2: p.Point = if (direction.isHorizontal())
                     // left or right
                     .{ .row = door2.row, .col = r1.bottomRight().col }
                 else
                     // up or down
                     .{ .row = r1.bottomRight().row, .col = door2.col };
+
+                // try to find better places for turn:
+                if (self.findPlaceForPassageTurn(door1, door2, direction.isHorizontal(), 0)) |places| {
+                    middle1 = places[0];
+                    middle2 = places[1];
+                }
 
                 var turn = try passage.turnToPoint(middle1, middle2);
                 log.debug("Add turn at {any} to {s}", .{ turn.place, @tagName(turn.to_direction) });
@@ -448,6 +454,70 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             try self.forceCreateDoorAt(door2, rand.boolean());
 
             return r1.unionWith(r2);
+        }
+
+        /// Trying to find a line between `from` and `to` with `nothing` cells only.
+        /// Gives up after 5 attempt to prevent long search.
+        fn findPlaceForPassageTurn(
+            self: Self,
+            from: p.Point,
+            to: p.Point,
+            is_horizontal: bool,
+            attempt: u8,
+        ) ?struct { p.Point, p.Point } {
+            log.debug("Looking for passage between {any} to {any}", .{ from, to });
+            var middle1: p.Point = undefined;
+            var middle2: p.Point = undefined;
+            const distance: u8 = if (is_horizontal)
+                to.col - from.col
+            else
+                to.row - from.row;
+
+            if (distance > 4 and attempt < 5) {
+                if (is_horizontal) {
+                    middle1.row = from.row;
+                    middle1.col = distance / 2 + from.col;
+                    middle2.row = to.row;
+                    middle2.col = middle1.col;
+                } else {
+                    middle1.row = distance / 2 + from.row;
+                    middle1.col = from.col;
+                    middle2.row = middle1.row;
+                    middle2.col = to.col;
+                }
+                if (self.isFreeLine(middle1, middle2)) {
+                    return .{ middle1, middle2 };
+                } else if (self.findPlaceForPassageTurn(from, middle2, is_horizontal, attempt + 1)) |result| {
+                    return result;
+                } else if (self.findPlaceForPassageTurn(middle1, to, is_horizontal, attempt + 1)) |result| {
+                    return result;
+                }
+            }
+            return null;
+        }
+
+        fn isFreeLine(self: Self, from: p.Point, to: p.Point) bool {
+            const direction: p.Direction = if (from.col == to.col and from.row < to.row)
+                .down
+            else if (from.col == to.col and from.row > to.row)
+                .up
+            else if (from.row == to.row and from.col < to.col)
+                .right
+            else if (from.row == to.row and from.col > to.col)
+                .left
+            else
+                unreachable;
+            var cursor = from;
+            log.debug("Check line from {any} to {any} moving {s}", .{ from, to, @tagName(direction) });
+            while (!std.meta.eql(cursor, to)) {
+                const cl = self.cellAt(cursor);
+                log.debug("Checking the {any}. It's {any}", .{ cursor, cl });
+                if (cl == .nothing)
+                    cursor.move(direction)
+                else
+                    return false;
+            }
+            return true;
         }
 
         fn digPassage(self: *Self, passage: *const Passage) !void {
