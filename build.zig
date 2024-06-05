@@ -30,21 +30,21 @@ pub fn build(b: *std.Build) !void {
     // ============================================================
 
     const ecs_module = b.createModule(.{
-        .root_source_file = .{ .path = "src/ecs/ecs.zig" },
+        .root_source_file = b.path("src/ecs/ecs.zig"),
     });
 
     const algs_and_types_module = b.createModule(.{
-        .root_source_file = .{ .path = "src/algs_and_types/algs_and_types.zig" },
+        .root_source_file = b.path("src/algs_and_types/algs_and_types.zig"),
     });
 
     const game_module = b.createModule(.{
-        .root_source_file = .{ .path = "src/game/game.zig" },
+        .root_source_file = b.path("src/game/game.zig"),
     });
     game_module.addImport("ecs", ecs_module);
     game_module.addImport("algs_and_types", algs_and_types_module);
 
     const utf8_module = b.createModule(.{
-        .root_source_file = .{ .path = "src/utf8/utf8.zig" },
+        .root_source_file = b.path("src/utf8/utf8.zig"),
     });
 
     // ============================================================
@@ -56,7 +56,7 @@ pub fn build(b: *std.Build) !void {
     // ------------------------------------------------------------
     const terminal_game_exe = b.addExecutable(.{
         .name = name,
-        .root_source_file = .{ .path = "src/terminal/main.zig" },
+        .root_source_file = b.path("src/terminal/main.zig"),
         .target = desktop_target,
         .optimize = optimize,
     });
@@ -79,7 +79,7 @@ pub fn build(b: *std.Build) !void {
     // ------------------------------------------------------------
     const dungeons_exe = b.addExecutable(.{
         .name = "Dungeons generator",
-        .root_source_file = .{ .path = "src/terminal/DungeonsGenerator.zig" },
+        .root_source_file = b.path("src/terminal/DungeonsGenerator.zig"),
         .target = desktop_target,
         .optimize = optimize,
     });
@@ -103,7 +103,7 @@ pub fn build(b: *std.Build) !void {
 
     const lib = b.addSharedLibrary(.{
         .name = "pdex",
-        .root_source_file = .{ .path = "src/playdate/main.zig" },
+        .root_source_file = b.path("src/playdate/main.zig"),
         .optimize = optimize,
         .target = b.host,
     });
@@ -118,7 +118,7 @@ pub fn build(b: *std.Build) !void {
 
     const elf = b.addExecutable(.{
         .name = "pdex.elf",
-        .root_source_file = .{ .path = "src/playdate/main.zig" },
+        .root_source_file = b.path("src/playdate/main.zig"),
         .target = b.resolveTargetQuery(try std.zig.CrossTarget.parse(.{
             .arch_os_abi = "thumb-freestanding-eabihf",
             .cpu_features = "cortex_m7+vfp4d16sp",
@@ -131,7 +131,7 @@ pub fn build(b: *std.Build) !void {
     elf.link_emit_relocs = true;
     elf.entry = .{ .symbol_name = "eventHandler" };
 
-    elf.setLinkerScriptPath(.{ .path = "link_map.ld" });
+    elf.setLinkerScriptPath(b.path("link_map.ld"));
     if (optimize == .ReleaseFast) {
         elf.root_module.omit_frame_pointer = true;
     }
@@ -187,8 +187,8 @@ pub fn build(b: *std.Build) !void {
     ) orelse &[0][]const u8{};
 
     const ut_algs_and_types = b.addTest(.{
-        .root_source_file = .{ .path = "src/algs_and_types/algs_and_types.zig" },
-        .test_runner = .{ .path = "src/test_runner.zig" },
+        .root_source_file = b.path("src/algs_and_types/algs_and_types.zig"),
+        .test_runner = b.path("src/test_runner.zig"),
         .target = desktop_target,
         .optimize = optimize,
         .filters = test_filter,
@@ -196,8 +196,8 @@ pub fn build(b: *std.Build) !void {
     const run_ut_algs_and_types = b.addRunArtifact(ut_algs_and_types);
 
     const ut_ecs = b.addTest(.{
-        .root_source_file = .{ .path = "src/ecs/ecs.zig" },
-        .test_runner = .{ .path = "src/test_runner.zig" },
+        .root_source_file = b.path("src/ecs/ecs.zig"),
+        .test_runner = b.path("src/test_runner.zig"),
         .target = desktop_target,
         .optimize = optimize,
         .filters = test_filter,
@@ -205,8 +205,8 @@ pub fn build(b: *std.Build) !void {
     const run_ut_ecs = b.addRunArtifact(ut_ecs);
 
     const ut_game = b.addTest(.{
-        .root_source_file = .{ .path = "src/game/game.zig" },
-        .test_runner = .{ .path = "src/test_runner.zig" },
+        .root_source_file = b.path("src/game/game.zig"),
+        .test_runner = b.path("src/test_runner.zig"),
         .target = desktop_target,
         .optimize = optimize,
         .filters = test_filter,
@@ -217,8 +217,8 @@ pub fn build(b: *std.Build) !void {
     const run_ut_game = b.addRunArtifact(ut_game);
 
     const ut_utf8 = b.addTest(.{
-        .root_source_file = .{ .path = "src/utf8/utf8.zig" },
-        .test_runner = .{ .path = "src/test_runner.zig" },
+        .root_source_file = b.path("src/utf8/utf8.zig"),
+        .test_runner = b.path("src/test_runner.zig"),
         .target = desktop_target,
         .optimize = optimize,
         .filters = test_filter,
@@ -226,8 +226,8 @@ pub fn build(b: *std.Build) !void {
     const run_ut_utf8 = b.addRunArtifact(ut_utf8);
 
     const ut_terminal = b.addTest(.{
-        .root_source_file = .{ .path = "src/terminal/main.zig" },
-        .test_runner = .{ .path = "src/test_runner.zig" },
+        .root_source_file = b.path("src/terminal/main.zig"),
+        .test_runner = b.path("src/test_runner.zig"),
         .target = desktop_target,
         .optimize = optimize,
         .filters = test_filter,
@@ -279,7 +279,7 @@ pub fn addCopyDirectory(
     while (try it.next()) |entry| {
         const new_src_path = b.pathJoin(&.{ src_path, entry.name });
         const new_dest_path = b.pathJoin(&.{ dest_path, entry.name });
-        const new_src = .{ .path = new_src_path };
+        const new_src = b.path(new_src_path);
         switch (entry.kind) {
             .file => {
                 _ = wf.addCopyFile(new_src, new_dest_path);
