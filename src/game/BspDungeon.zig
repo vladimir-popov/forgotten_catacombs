@@ -65,7 +65,7 @@ pub const Passage = struct {
 
 pub const Cell = enum { nothing, floor, wall, opened_door, closed_door };
 
-pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
+pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
     return struct {
         /// The dungeon. Contains walls, doors, rooms and passages of the level.
         const Self = @This();
@@ -597,7 +597,7 @@ pub fn Dungeon(comptime rows_count: u8, cols_count: u8) type {
             }
             return null;
         }
-        inline fn contains(self: Dungeon, point: p.Point) bool {
+        inline fn contains(self: BspDungeon, point: p.Point) bool {
             return point.row > 0 and point.row <= self.rows and point.col > 0 and point.col <= self.cols;
         }
     };
@@ -607,7 +607,7 @@ test "generate a simple room" {
     // given:
     const Rows = 12;
     const Cols = 12;
-    var dungeon = try Dungeon(Rows, Cols).initEmpty(std.testing.allocator);
+    var dungeon = try BspDungeon(Rows, Cols).initEmpty(std.testing.allocator);
     defer dungeon.deinit();
 
     const region = p.Region{ .top_left = .{ .row = 2, .col = 2 }, .rows = 8, .cols = 8 };
@@ -648,9 +648,9 @@ test "find a place for door inside the room starting outside" {
         \\ #..#
         \\ ####
     ;
-    var dungeon = try Dungeon(4, 5).parse(std.testing.allocator, str);
+    var dungeon = try BspDungeon(4, 5).parse(std.testing.allocator, str);
     defer dungeon.deinit();
-    const region = Dungeon(4, 5).Region;
+    const region = BspDungeon(4, 5).Region;
 
     // when:
     const expected = dungeon.findPlaceForDoor(
@@ -677,9 +677,9 @@ test "find a place for door inside the room starting on the wall" {
         \\ #..#
         \\ ####
     ;
-    var dungeon = try Dungeon(4, 5).parse(std.testing.allocator, str);
+    var dungeon = try BspDungeon(4, 5).parse(std.testing.allocator, str);
     defer dungeon.deinit();
-    const region = Dungeon(4, 5).Region;
+    const region = BspDungeon(4, 5).Region;
 
     // when:
     const expected = dungeon.findPlaceForDoor(
@@ -706,9 +706,9 @@ test "find a random place for the door on the left side" {
         \\ ####
     ;
     errdefer std.debug.print("{s}\n", .{str});
-    var dungeon = try Dungeon(4, 5).parse(std.testing.allocator, str);
+    var dungeon = try BspDungeon(4, 5).parse(std.testing.allocator, str);
     defer dungeon.deinit();
-    const region = Dungeon(4, 5).Region;
+    const region = BspDungeon(4, 5).Region;
     const rand = std.crypto.random;
 
     // when:
@@ -729,9 +729,9 @@ test "find a random place for the door on the bottom side" {
         \\ ####
     ;
     errdefer std.debug.print("{s}\n", .{str});
-    var dungeon = try Dungeon(4, 5).parse(std.testing.allocator, str);
+    var dungeon = try BspDungeon(4, 5).parse(std.testing.allocator, str);
     defer dungeon.deinit();
-    const region = Dungeon(4, 5).Region;
+    const region = BspDungeon(4, 5).Region;
     const rand = std.crypto.random;
 
     // when:
@@ -754,7 +754,7 @@ test "create passage between two rooms" {
         \\ ####   ####
     ;
     errdefer std.debug.print("{s}\n", .{str});
-    var dungeon = try Dungeon(Rows, Cols).parse(std.testing.allocator, str);
+    var dungeon = try BspDungeon(Rows, Cols).parse(std.testing.allocator, str);
     defer dungeon.deinit();
     const rand = std.crypto.random;
     const r1 = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = Rows, .cols = 6 };
@@ -764,7 +764,7 @@ test "create passage between two rooms" {
     const region = try dungeon.createAndAddPassageBetweenRegions(rand, r1, r2, .right);
 
     // then:
-    try std.testing.expectEqualDeep(Dungeon(Rows, Cols).Region, region);
+    try std.testing.expectEqualDeep(BspDungeon(Rows, Cols).Region, region);
     const passage: Passage = dungeon.passages.items[0];
     errdefer std.debug.print("Passage: {any}\n", .{passage.turns.items});
     try std.testing.expect(passage.turns.items.len >= 2);

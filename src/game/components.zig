@@ -2,9 +2,9 @@ const std = @import("std");
 const algs_and_types = @import("algs_and_types");
 const p = algs_and_types.primitives;
 const game = @import("game.zig");
-const dung = @import("Dungeon.zig");
+const dung = @import("BspDungeon.zig");
 
-pub const Dungeon = dung.Dungeon(game.TOTAL_ROWS, game.TOTAL_COLS);
+pub const Dungeon = dung.BspDungeon(game.TOTAL_ROWS, game.TOTAL_COLS);
 
 pub const Screen = @import("Screen.zig");
 
