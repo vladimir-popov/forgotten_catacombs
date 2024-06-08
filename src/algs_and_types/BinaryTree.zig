@@ -51,32 +51,42 @@ pub fn Node(comptime V: type) type {
         pub fn split(
             self: *NodeV,
             alloc: std.mem.Allocator,
-            handler: SplitHandler,
+            splitter: SplitHandler,
         ) !void {
             std.debug.assert(self.left == null);
             std.debug.assert(self.right == null);
+            var node: *NodeV = self;
+            var another: ?*NodeV = null;
+            while (true) {
+                const maybe_values = try splitter.split(splitter.ptr, node);
+                if (maybe_values) |values| {
+                    std.debug.assert(node.compare(node.depth, values[0], values[1]) < 1);
 
-            const maybe_values = try handler.split(handler.ptr, self);
-            if (maybe_values) |values| {
-                std.debug.assert(self.compare(self.depth, values[0], values[1]) < 1);
+                    node.left = try alloc.create(NodeV);
+                    node.left.?.* = NodeV{
+                        .parent = node,
+                        .compare = node.compare,
+                        .depth = node.depth + 1,
+                        .value = values[0],
+                    };
+                    node.right = try alloc.create(NodeV);
+                    node.right.?.* = NodeV{
+                        .parent = node,
+                        .compare = node.compare,
+                        .depth = node.depth + 1,
+                        .value = values[1],
+                    };
 
-                self.left = try alloc.create(NodeV);
-                self.left.?.* = NodeV{
-                    .parent = self,
-                    .compare = self.compare,
-                    .depth = self.depth + 1,
-                    .value = values[0],
-                };
-                try self.left.?.split(alloc, handler);
+                    if (another == null)
+                        another = node.right;
 
-                self.right = try alloc.create(NodeV);
-                self.right.?.* = NodeV{
-                    .parent = self,
-                    .compare = self.compare,
-                    .depth = self.depth + 1,
-                    .value = values[1],
-                };
-                try self.right.?.split(alloc, handler);
+                    node = node.left.?;
+                } else if (another) |right| {
+                    node = right;
+                    another = null;
+                } else {
+                    break;
+                }
             }
         }
 
