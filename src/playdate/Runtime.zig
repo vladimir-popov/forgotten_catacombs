@@ -56,14 +56,11 @@ fn currentMillis(ptr: *anyopaque) i64 {
     return self.playdate.system.getCurrentTimeMilliseconds();
 }
 
-fn readButton(ptr: *anyopaque) anyerror!?game.Button.Type {
+fn readButton(ptr: *anyopaque) anyerror!game.Button.Type {
     var self: *Self = @ptrCast(@alignCast(ptr));
     var button: api.PDButtons = undefined;
     self.playdate.system.getButtonState(null, &button, null);
-    if (button == 0)
-        return null
-    else
-        return @intCast(button);
+    return @truncate(button);
 }
 
 fn drawDungeon(ptr: *anyopaque, screen: *const cmp.Screen, dungeon: *const cmp.Dungeon) anyerror!void {

@@ -31,8 +31,9 @@ const Self = @This();
 pub const Entity = ecs.Entity;
 
 pub const Button = struct {
-    pub const Type = u8;
+    pub const Type = c_int;
 
+    pub const None: Type = 0;
     pub const Left: Type = (1 << 0);
     pub const Right: Type = (1 << 1);
     pub const Up: Type = (1 << 2);
@@ -42,6 +43,19 @@ pub const Button = struct {
 
     pub inline fn isMove(btn: Type) bool {
         return (Up | Down | Left | Right) & btn > 0;
+    }
+
+    pub inline fn toDirection(btn: Button.Type) ?p.Direction {
+        return if (btn & Button.Up > 0)
+            p.Direction.up
+        else if (btn & Button.Down > 0)
+            p.Direction.down
+        else if (btn & Button.Left > 0)
+            p.Direction.left
+        else if (btn & Button.Right > 0)
+            p.Direction.right
+        else
+            null;
     }
 };
 
@@ -58,7 +72,7 @@ pub const Components = union {
 
 pub const AnyRuntime = struct {
     const VTable = struct {
-        readButton: *const fn (context: *anyopaque) anyerror!?Button.Type,
+        readButton: *const fn (context: *anyopaque) anyerror!Button.Type,
         drawDungeon: *const fn (
             context: *anyopaque,
             screen: *const components.Screen,
@@ -82,7 +96,7 @@ pub const AnyRuntime = struct {
         return self.vtable.currentMillis(self.context);
     }
 
-    pub fn readButton(self: AnyRuntime) !?Button.Type {
+    pub fn readButton(self: AnyRuntime) !Button.Type {
         return try self.vtable.readButton(self.context);
     }
 

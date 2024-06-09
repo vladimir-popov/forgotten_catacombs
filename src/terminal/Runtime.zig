@@ -95,7 +95,7 @@ fn currentMillis(_: *anyopaque) i64 {
     return std.time.milliTimestamp();
 }
 
-fn readButton(ptr: *anyopaque) anyerror!?game.Button.Type {
+fn readButton(ptr: *anyopaque) anyerror!game.Button.Type {
     var self: *Self = @ptrCast(@alignCast(ptr));
     self.pressed_button = tty.Keyboard.readPressedButton();
     if (self.pressed_button) |key| {
@@ -108,12 +108,12 @@ fn readButton(ptr: *anyopaque) anyerror!?game.Button.Type {
                 'j' => return game.Button.Down,
                 'k' => return game.Button.Up,
                 'l' => return game.Button.Right,
-                else => return null,
+                else => return game.Button.None,
             },
-            else => return null,
+            else => return game.Button.None,
         }
     }
-    return null;
+    return game.Button.None;
 }
 
 fn drawDungeon(ptr: *anyopaque, screen: *const cmp.Screen, dungeon: *const cmp.Dungeon) anyerror!void {

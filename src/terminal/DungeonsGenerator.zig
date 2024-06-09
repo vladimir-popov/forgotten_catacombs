@@ -69,8 +69,7 @@ const DungeonsGenerator = struct {
     }
 
     fn handleInput(universe: *Universe) anyerror!void {
-        const btn = try universe.runtime.readButton() orelse return;
-
+        const btn = try universe.runtime.readButton();
         if (btn & game.Button.A > 0) {
             var entities = universe.entitiesIterator();
             while (entities.next()) |entity| {
