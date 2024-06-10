@@ -119,7 +119,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
 
             // visit every BSP node and generate rooms in the leafs
             var createRooms: TraverseAndCreateRooms = .{ .dungeon = &dungeon, .rand = rand };
-            try root.traverse(createRooms.handler());
+            try root.traverse(bsp_arena.allocator(), createRooms.handler());
 
             // fold the BSP tree and binds nodes with the same parent:
             var bindRooms: FoldAndBind = .{

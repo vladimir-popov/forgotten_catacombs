@@ -48,8 +48,8 @@ pub fn buildTree(
     return root;
 }
 
-fn compare(_: u8, _: p.Region, _: p.Region) i8 {
-    return 0;
+fn compare(_: p.Region, _: p.Region) bool {
+    return false;
 }
 
 const Splitter = struct {
@@ -105,7 +105,7 @@ test "build tree" {
 
     // then:
     var validate = ValidateNodes{ .opts = opts };
-    try root.traverse(validate.bspNodeHandler());
+    try root.traverse(arena.allocator(), validate.bspNodeHandler());
 }
 
 /// Utility for test
