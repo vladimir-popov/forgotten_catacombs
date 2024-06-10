@@ -23,17 +23,18 @@ pub fn handleMove(universe: *game.Universe) anyerror!void {
                 switch (cell) {
                     .floor, .opened_door => {
                         move.applyTo(position);
+                        const inner_region = screen.innerRegion();
                         if (entity != player_entity) {
                             continue :blk;
                         }
                         // keep player on the screen:
-                        if (direction == .up and new_point.row < screen.innerRegion().top_left.row)
+                        if (direction == .up and new_point.row < inner_region.top_left.row)
                             screen.move(direction);
-                        if (direction == .down and new_point.row > screen.innerRegion().bottomRight().row)
+                        if (direction == .down and new_point.row > inner_region.bottomRightRow())
                             screen.move(direction);
-                        if (direction == .left and new_point.col < screen.innerRegion().top_left.col)
+                        if (direction == .left and new_point.col < inner_region.top_left.col)
                             screen.move(direction);
-                        if (direction == .right and new_point.col > screen.innerRegion().bottomRight().col)
+                        if (direction == .right and new_point.col > inner_region.bottomRightCol())
                             screen.move(direction);
 
                         // maybe stop keep moving:

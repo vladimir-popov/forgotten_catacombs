@@ -113,8 +113,8 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
             if (region.top_left.col > cols) {
                 return;
             }
-            const to_row = @min(rows, region.bottomRight().row) + 1;
-            const to_col = @min(cols, region.bottomRight().col);
+            const to_row = @min(rows, region.bottomRightRow()) + 1;
+            const to_col = @min(cols, region.bottomRightCol());
             for (region.top_left.row..to_row) |r| {
                 self.bitsets[r - 1].setRangeValue(
                     .{ .start = region.top_left.col - 1, .end = to_col },

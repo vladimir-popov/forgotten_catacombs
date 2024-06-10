@@ -178,9 +178,12 @@ pub const Region = struct {
         return rows / cols;
     }
 
-    pub inline fn bottomRight(self: Region) Point {
-        self.validate();
-        return .{ .row = self.top_left.row + self.rows - 1, .col = self.top_left.col + self.cols - 1 };
+    pub inline fn bottomRightRow(self: Region) u8 {
+        return self.top_left.row + self.rows - 1;
+    }
+
+    pub inline fn bottomRightCol(self: Region) u8 {
+        return self.top_left.col + self.cols - 1;
     }
 
     /// Returns the area of this region.
@@ -204,8 +207,8 @@ pub const Region = struct {
     }
 
     pub inline fn contains(self: Region, row: u8, col: u8) bool {
-        return betweenInclusive(row, self.top_left.row, self.bottomRight().row) and
-            betweenInclusive(col, self.top_left.col, self.bottomRight().col);
+        return betweenInclusive(row, self.top_left.row, self.bottomRightRow()) and
+            betweenInclusive(col, self.top_left.col, self.bottomRightCol());
     }
 
     inline fn betweenInclusive(v: u8, l: u8, r: u8) bool {
@@ -283,7 +286,7 @@ pub const Region = struct {
     /// │ r │
     /// └───┘
     pub fn cropHorizontallyAfter(self: Region, row: u8) ?Region {
-        if (self.top_left.row <= row and row < self.bottomRight().row) {
+        if (self.top_left.row <= row and row < self.bottomRightRow()) {
             // copy original:
             var region = self;
             region.top_left.row = row + 1;
@@ -315,7 +318,7 @@ pub const Region = struct {
     ///     ^
     ///     col (exclusive)
     pub fn cropVerticallyAfter(self: Region, col: u8) ?Region {
-        if (self.top_left.col <= col and col < self.bottomRight().col) {
+        if (self.top_left.col <= col and col < self.bottomRightCol()) {
             // copy original:
             var region = self;
             region.top_left.col = col + 1;
@@ -347,7 +350,7 @@ pub const Region = struct {
     /// ¦   ¦
     /// └---┘
     pub fn cropHorizontallyTo(self: Region, row: u8) ?Region {
-        if (self.top_left.row < row and row <= self.bottomRight().row) {
+        if (self.top_left.row < row and row <= self.bottomRightRow()) {
             // copy original:
             var region = self;
             region.rows = row - self.top_left.row;
@@ -378,7 +381,7 @@ pub const Region = struct {
     ///     ^
     ///     col (exclusive)
     pub fn cropVerticallyTo(self: Region, col: u8) ?Region {
-        if (self.top_left.col < col and col <= self.bottomRight().col) {
+        if (self.top_left.col < col and col <= self.bottomRightCol()) {
             // copy original:
             var region = self;
             region.cols = col - self.top_left.col;
@@ -412,8 +415,8 @@ pub const Region = struct {
         };
         return .{
             .top_left = top_left,
-            .rows = @max(self.bottomRight().row, other.bottomRight().row) - top_left.row + 1,
-            .cols = @max(self.bottomRight().col, other.bottomRight().col) - top_left.col + 1,
+            .rows = @max(self.bottomRightRow(), other.bottomRightRow()) - top_left.row + 1,
+            .cols = @max(self.bottomRightCol(), other.bottomRightCol()) - top_left.col + 1,
         };
     }
 
@@ -425,7 +428,7 @@ pub const Region = struct {
             if (self.region.containsPoint(self.cursor)) {
                 const cell = self.cursor;
                 self.cursor.move(.right);
-                if (self.cursor.col > self.region.bottomRight().col) {
+                if (self.cursor.col > self.region.bottomRightCol()) {
                     self.cursor.row += 1;
                     self.cursor.col = self.region.top_left.col;
                 }
@@ -474,8 +477,8 @@ pub const Region = struct {
             .col = @max(self.top_left.col, other.top_left.col),
         };
         const bottom_right: Point = .{
-            .row = @min(self.bottomRight().row, other.bottomRight().row),
-            .col = @min(self.bottomRight().col, other.bottomRight().col),
+            .row = @min(self.bottomRightRow(), other.bottomRightRow()),
+            .col = @min(self.bottomRightCol(), other.bottomRightCol()),
         };
         if (top_left.row < bottom_right.row and top_left.col < bottom_right.col) {
             return .{

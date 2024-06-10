@@ -46,7 +46,7 @@ pub fn move(self: *Self, direction: p.Direction) void {
                 self.region.top_left.row -= 1;
         },
         .down => {
-            if (self.region.bottomRight().row < self.dungeon_region.bottomRight().row)
+            if (self.region.bottomRightRow() < self.dungeon_region.bottomRightRow())
                 self.region.top_left.row += 1;
         },
         .left => {
@@ -54,7 +54,7 @@ pub fn move(self: *Self, direction: p.Direction) void {
                 self.region.top_left.col -= 1;
         },
         .right => {
-            if (self.region.bottomRight().col < self.dungeon_region.bottomRight().col)
+            if (self.region.bottomRightCol() < self.dungeon_region.bottomRightCol())
                 self.region.top_left.col += 1;
         },
     }

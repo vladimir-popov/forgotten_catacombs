@@ -217,7 +217,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
 
                 if (self.dungeon.cellAt(self.cursor)) |cl| {
                     self.cursor.move(.right);
-                    if (self.cursor.col > self.region.bottomRight().col) {
+                    if (self.cursor.col > self.region.bottomRightCol()) {
                         self.cursor.col = self.region.top_left.col;
                         self.cursor.row += 1;
                     }
@@ -363,11 +363,11 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
         fn createSimpleRoom(self: *Self, room: p.Region) Room {
             // generate walls:
             for (room.top_left.row..(room.top_left.row + room.rows)) |r| {
-                if (r == room.top_left.row or r == room.bottomRight().row) {
+                if (r == room.top_left.row or r == room.bottomRightRow()) {
                     self.walls.setRowValue(@intCast(r), room.top_left.col, room.cols, true);
                 } else {
                     self.walls.set(@intCast(r), @intCast(room.top_left.col));
-                    self.walls.set(@intCast(r), @intCast(room.bottomRight().col));
+                    self.walls.set(@intCast(r), @intCast(room.bottomRightCol()));
                 }
             }
             // generate floor:
@@ -418,18 +418,18 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                 // intersection of the passage from the door 1 and region 1
                 var middle1: p.Point = if (direction.isHorizontal())
                     // left or right
-                    .{ .row = door1.row, .col = r1.bottomRight().col }
+                    .{ .row = door1.row, .col = r1.bottomRightCol() }
                 else
                     // up or down
-                    .{ .row = r1.bottomRight().row, .col = door1.col };
+                    .{ .row = r1.bottomRightRow(), .col = door1.col };
 
                 // intersection of the passage from the region 1 and door 2
                 var middle2: p.Point = if (direction.isHorizontal())
                     // left or right
-                    .{ .row = door2.row, .col = r1.bottomRight().col }
+                    .{ .row = door2.row, .col = r1.bottomRightCol() }
                 else
                     // up or down
-                    .{ .row = r1.bottomRight().row, .col = door2.col };
+                    .{ .row = r1.bottomRightRow(), .col = door2.col };
 
                 // try to find better places for turn:
                 if (self.findPlaceForPassageTurn(door1, door2, direction.isHorizontal(), 0)) |places| {
@@ -561,19 +561,19 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             const place = switch (side) {
                 .top => p.Point{
                     .row = region.top_left.row,
-                    .col = rand.intRangeAtMost(u8, region.top_left.col, region.bottomRight().col),
+                    .col = rand.intRangeAtMost(u8, region.top_left.col, region.bottomRightCol()),
                 },
                 .bottom => p.Point{
-                    .row = region.bottomRight().row,
-                    .col = rand.intRangeAtMost(u8, region.top_left.col, region.bottomRight().col),
+                    .row = region.bottomRightRow(),
+                    .col = rand.intRangeAtMost(u8, region.top_left.col, region.bottomRightCol()),
                 },
                 .left => p.Point{
-                    .row = rand.intRangeAtMost(u8, region.top_left.row, region.bottomRight().row),
+                    .row = rand.intRangeAtMost(u8, region.top_left.row, region.bottomRightRow()),
                     .col = region.top_left.col,
                 },
                 .right => p.Point{
-                    .row = rand.intRangeAtMost(u8, region.top_left.row, region.bottomRight().row),
-                    .col = region.bottomRight().col,
+                    .row = rand.intRangeAtMost(u8, region.top_left.row, region.bottomRightRow()),
+                    .col = region.bottomRightCol(),
                 },
             };
             log.debug(
@@ -696,8 +696,8 @@ test "generate a simple room" {
             const cell = dungeon.cell(r, c);
             if (room.contains(r, c)) {
                 const expect_wall =
-                    (r == room.top_left.row or r == room.bottomRight().row or
-                    c == room.top_left.col or c == room.bottomRight().col);
+                    (r == room.top_left.row or r == room.bottomRightRow() or
+                    c == room.top_left.col or c == room.bottomRightCol());
                 if (expect_wall) {
                     try std.testing.expectEqual(.wall, cell);
                 } else {
