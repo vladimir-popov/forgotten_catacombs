@@ -124,6 +124,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             // fold the BSP tree and binds nodes with the same parent:
             var bindRooms: FoldAndBind = .{
                 .dungeon = &dungeon,
+                .alloc = bsp_arena.allocator(),
                 .rand = rand,
             };
             _ = try root.foldModify(bsp_arena.allocator(), bindRooms.handler());
@@ -383,6 +384,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
 
         const FoldAndBind = struct {
             dungeon: *Self,
+            alloc: std.mem.Allocator,
             rand: std.Random,
 
             fn handler(self: *FoldAndBind) bsp.Tree.FoldHandler {
@@ -392,21 +394,22 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             fn bindRegions(ptr: *anyopaque, r1: p.Region, r2: p.Region) anyerror!p.Region {
                 const self: *FoldAndBind = @ptrCast(@alignCast(ptr));
                 const direction: p.Direction = if (r1.top_left.row == r2.top_left.row) .right else .down;
-                _ = self.dungeon.createAndAddPassageBetweenRegions(self.rand, r1, r2, direction) catch {};
+                _ = self.dungeon.createAndAddPassageBetweenRegions(self.alloc, self.rand, r1, r2, direction) catch {};
                 return r1.unionWith(r2);
             }
         };
 
         fn createAndAddPassageBetweenRegions(
             self: *Self,
+            alloc: std.mem.Allocator,
             rand: std.Random,
             r1: p.Region,
             r2: p.Region,
             direction: p.Direction,
         ) !p.Region {
-            const door1 = self.findPlaceForDoorInRegionRnd(rand, r1, direction.asSide()) orelse
+            const door1 = try self.findPlaceForDoorInRegionRnd(alloc, rand, r1, direction.asSide()) orelse
                 return Error.NoSpaceForDoor;
-            const door2 = self.findPlaceForDoorInRegionRnd(rand, r2, direction.asSide().opposite()) orelse
+            const door2 = try self.findPlaceForDoorInRegionRnd(alloc, rand, r2, direction.asSide().opposite()) orelse
                 return Error.NoSpaceForDoor;
 
             log.debug("Creating the passage from {any} {s} to {any}", .{ door1, @tagName(direction), door2 });
@@ -557,60 +560,68 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             try self.forceCreateFloorAt(at.movedTo(to));
         }
 
-        fn findPlaceForDoorInRegionRnd(self: Self, rand: std.Random, region: p.Region, side: p.Side) ?p.Point {
-            const place = switch (side) {
-                .top => p.Point{
-                    .row = region.top_left.row,
-                    .col = rand.intRangeAtMost(u8, region.top_left.col, region.bottomRightCol()),
-                },
-                .bottom => p.Point{
-                    .row = region.bottomRightRow(),
-                    .col = rand.intRangeAtMost(u8, region.top_left.col, region.bottomRightCol()),
-                },
-                .left => p.Point{
-                    .row = rand.intRangeAtMost(u8, region.top_left.row, region.bottomRightRow()),
-                    .col = region.top_left.col,
-                },
-                .right => p.Point{
-                    .row = rand.intRangeAtMost(u8, region.top_left.row, region.bottomRightRow()),
-                    .col = region.bottomRightCol(),
-                },
-            };
-            log.debug(
-                "Start search of a place for door from {any} on the _{s}_ side of the {any}",
-                .{ place, @tagName(side), region },
-            );
-            if (self.findPlaceForDoor(side.asDirection().opposite(), place, region)) |candidate| {
-                if (self.cellAt(candidate) == .wall) {
-                    log.debug("{any} is the place for door in {any} on {s} side", .{ candidate, region, @tagName(side) });
-                    return candidate;
+        fn findPlaceForDoorInRegionRnd(
+            self: Self,
+            alloc: std.mem.Allocator,
+            rand: std.Random,
+            init_region: p.Region,
+            side: p.Side,
+        ) !?p.Point {
+            var stack = std.ArrayList(p.Region).init(alloc);
+            defer stack.deinit();
+            try stack.append(init_region);
+            while (stack.popOrNull()) |region| {
+                const place = switch (side) {
+                    .top => p.Point{
+                        .row = region.top_left.row,
+                        .col = rand.intRangeAtMost(u8, region.top_left.col, region.bottomRightCol()),
+                    },
+                    .bottom => p.Point{
+                        .row = region.bottomRightRow(),
+                        .col = rand.intRangeAtMost(u8, region.top_left.col, region.bottomRightCol()),
+                    },
+                    .left => p.Point{
+                        .row = rand.intRangeAtMost(u8, region.top_left.row, region.bottomRightRow()),
+                        .col = region.top_left.col,
+                    },
+                    .right => p.Point{
+                        .row = rand.intRangeAtMost(u8, region.top_left.row, region.bottomRightRow()),
+                        .col = region.bottomRightCol(),
+                    },
+                };
+                log.debug(
+                    "Start search of a place for door from {any} on the _{s}_ side of the {any}",
+                    .{ place, @tagName(side), region },
+                );
+                if (self.findPlaceForDoor(side.asDirection().opposite(), place, region)) |candidate| {
+                    if (self.cellAt(candidate) == .wall) {
+                        log.debug("{any} is the place for door in {any} on {s} side", .{ candidate, region, @tagName(side) });
+                        return candidate;
+                    }
                 }
-            }
-            // try to find in the different parts of the region:
-            var new_regions: [2]?p.Region = .{ null, null };
-            if (side.isHorizontal()) {
-                new_regions = if (rand.boolean())
-                    .{ region.cropVerticallyTo(place.col), region.cropVerticallyAfter(place.col) }
-                else
-                    .{ region.cropVerticallyAfter(place.col), region.cropVerticallyTo(place.col) };
-                log.debug("Crop {any} vertically to {any} and {any}", .{ region, new_regions[0], new_regions[1] });
-            } else {
-                new_regions = if (rand.boolean())
-                    .{ region.cropHorizontallyTo(place.row), region.cropHorizontallyAfter(place.row) }
-                else
-                    .{ region.cropHorizontallyAfter(place.row), region.cropHorizontallyTo(place.row) };
-                log.debug("Crop {any} horizontally to {any} and {any}", .{ region, new_regions[0], new_regions[1] });
-            }
-            for (new_regions) |new_region| {
-                if (new_region) |reg| {
-                    reg.validate();
-                    if (self.findPlaceForDoorInRegionRnd(rand, reg, side)) |result| {
-                        log.debug("{any} is the place for door in {any} on {s} side", .{ result, reg, @tagName(side) });
-                        return result;
+                // try to find in the different parts of the region:
+                var new_regions: [2]?p.Region = .{ null, null };
+                if (side.isHorizontal()) {
+                    new_regions = if (rand.boolean())
+                        .{ region.cropVerticallyTo(place.col), region.cropVerticallyAfter(place.col) }
+                    else
+                        .{ region.cropVerticallyAfter(place.col), region.cropVerticallyTo(place.col) };
+                    log.debug("Crop {any} vertically to {any} and {any}", .{ region, new_regions[0], new_regions[1] });
+                } else {
+                    new_regions = if (rand.boolean())
+                        .{ region.cropHorizontallyTo(place.row), region.cropHorizontallyAfter(place.row) }
+                    else
+                        .{ region.cropHorizontallyAfter(place.row), region.cropHorizontallyTo(place.row) };
+                    log.debug("Crop {any} horizontally to {any} and {any}", .{ region, new_regions[0], new_regions[1] });
+                }
+                for (new_regions) |new_region| {
+                    if (new_region) |reg| {
+                        reg.validate();
+                        try stack.append(reg);
                     }
                 }
             }
-            log.debug("Not found any place for door in {any} on {s} side", .{ region, @tagName(side) });
+            log.debug("Not found any place for door in {any} on {s} side", .{ init_region, @tagName(side) });
             return null;
         }
 
@@ -782,7 +793,7 @@ test "find a random place for the door on the left side" {
     const rand = std.crypto.random;
 
     // when:
-    const place_left = dungeon.findPlaceForDoorInRegionRnd(rand, region, .left);
+    const place_left = try dungeon.findPlaceForDoorInRegionRnd(std.testing.allocator, rand, region, .left);
 
     // then:
     errdefer std.debug.print("place left {any}\n", .{place_left});
@@ -805,7 +816,7 @@ test "find a random place for the door on the bottom side" {
     const rand = std.crypto.random;
 
     // when:
-    const place_bottom = dungeon.findPlaceForDoorInRegionRnd(rand, region, .bottom);
+    const place_bottom = try dungeon.findPlaceForDoorInRegionRnd(std.testing.allocator, rand, region, .bottom);
 
     // then:
     errdefer std.debug.print("place bottom {any}\n", .{place_bottom});
@@ -831,7 +842,7 @@ test "create passage between two rooms" {
     const r2 = p.Region{ .top_left = .{ .row = 1, .col = 7 }, .rows = Rows, .cols = Cols - 6 };
 
     // when:
-    const region = try dungeon.createAndAddPassageBetweenRegions(rand, r1, r2, .right);
+    const region = try dungeon.createAndAddPassageBetweenRegions(std.testing.allocator, rand, r1, r2, .right);
 
     // then:
     try std.testing.expectEqualDeep(BspDungeon(Rows, Cols).Region, region);

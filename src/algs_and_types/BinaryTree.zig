@@ -131,6 +131,9 @@ pub fn Node(comptime V: type) type {
             var stack = std.ArrayList(struct { *NodeV, *NodeV }).init(alloc);
             defer stack.deinit();
             var stack_prev_size: usize = 0;
+            if (self.left orelse self.right == null) {
+                return self.value;
+            }
             try stack.append(.{ self.left.?, self.right.? });
             while (stack.getLastOrNull()) |nodes| {
                 // if the pair is not leafs
