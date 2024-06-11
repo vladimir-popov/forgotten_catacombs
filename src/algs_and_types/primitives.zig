@@ -102,7 +102,7 @@ pub const Point = struct {
         return point;
     }
 
-    pub fn move(self: *Point, direction: Direction) void {
+    pub inline fn move(self: *Point, direction: Direction) void {
         switch (direction) {
             .up => {
                 if (self.row > 0) self.row -= 1;

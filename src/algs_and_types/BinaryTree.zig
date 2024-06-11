@@ -8,17 +8,16 @@ pub fn Node(comptime V: type) type {
         parent: ?*NodeV = null,
         left: ?*NodeV = null,
         right: ?*NodeV = null,
-        depth: u8 = 0,
         value: V,
         lessThan: *const fn (x: V, y: V) bool,
 
         /// Creates a single root node of the binary tree.
         pub fn root(
-            alloc: std.mem.Allocator,
+            arena: *std.heap.ArenaAllocator,
             value: V,
             lessThan: *const fn (x: V, y: V) bool,
         ) !*Node(V) {
-            const node = try alloc.create(NodeV);
+            const node = try arena.allocator().create(NodeV);
             node.* = .{ .value = value, .lessThan = lessThan };
             return node;
         }
@@ -46,7 +45,7 @@ pub fn Node(comptime V: type) type {
         /// Splits the node until the handler returns value.
         pub fn split(
             self: *NodeV,
-            alloc: std.mem.Allocator,
+            arena: *std.heap.ArenaAllocator,
             splitter: SplitHandler,
         ) !void {
             std.debug.assert(self.left == null);
@@ -56,18 +55,16 @@ pub fn Node(comptime V: type) type {
             while (true) {
                 const maybe_values = try splitter.split(splitter.ptr, node);
                 if (maybe_values) |values| {
-                    node.left = try alloc.create(NodeV);
+                    node.left = try arena.allocator().create(NodeV);
                     node.left.?.* = NodeV{
                         .parent = node,
                         .lessThan = node.lessThan,
-                        .depth = node.depth + 1,
                         .value = values[0],
                     };
-                    node.right = try alloc.create(NodeV);
+                    node.right = try arena.allocator().create(NodeV);
                     node.right.?.* = NodeV{
                         .parent = node,
                         .lessThan = node.lessThan,
-                        .depth = node.depth + 1,
                         .value = values[1],
                     };
 
@@ -84,28 +81,26 @@ pub fn Node(comptime V: type) type {
             }
         }
 
-        pub fn add(self: *NodeV, alloc: std.mem.Allocator, value: V) !void {
+        pub fn add(self: *NodeV, arena: *std.heap.ArenaAllocator, value: V) !void {
             if (self.lessThan(self.value, value)) {
                 if (self.right) |right| {
-                    try right.add(alloc, value);
+                    try right.add(arena, value);
                 } else {
-                    self.right = try alloc.create(NodeV);
+                    self.right = try arena.allocator().create(NodeV);
                     self.right.?.* = NodeV{
                         .parent = self,
                         .lessThan = self.lessThan,
-                        .depth = self.depth + 1,
                         .value = value,
                     };
                 }
             } else {
                 if (self.left) |left| {
-                    try left.add(alloc, value);
+                    try left.add(arena, value);
                 } else {
-                    self.left = try alloc.create(NodeV);
+                    self.left = try arena.allocator().create(NodeV);
                     self.left.?.* = NodeV{
                         .parent = self,
                         .lessThan = self.lessThan,
-                        .depth = self.depth + 1,
                         .value = value,
                     };
                 }
@@ -128,23 +123,41 @@ pub fn Node(comptime V: type) type {
             }
         }
 
-        pub fn fold(self: NodeV, handler: FoldHandler) !V {
-            if (self.left) |left| {
-                if (self.right) |right| {
-                    return try handler.combine(
-                        handler.ptr,
-                        try left.fold(handler),
-                        try right.fold(handler),
-                        self.depth + 1,
-                    );
+        /// Folds the tree by passing values from the paired leafs to the handler,
+        /// and modifies the parent of the leafs setting the value returned from the handler.
+        /// Note, that only values from paired leafs are used.  Values of all other nodes are ignored,
+        /// and replaces by the handler result.
+        pub fn foldModify(self: *NodeV, alloc: std.mem.Allocator, handler: FoldHandler) !V {
+            var stack = std.ArrayList(struct { *NodeV, *NodeV }).init(alloc);
+            defer stack.deinit();
+            var stack_prev_size: usize = 0;
+            try stack.append(.{ self.left.?, self.right.? });
+            while (stack.getLastOrNull()) |nodes| {
+                // if the pair is not leafs
+                if (stack.items.len > stack_prev_size) {
+                    stack_prev_size = stack.items.len;
+                    inline for (0..2) |i| {
+                        if (nodes[i].left) |left| {
+                            if (nodes[i].right) |right| {
+                                try stack.append(.{ left, right });
+                            } else {
+                                nodes[i].value = left.value;
+                            }
+                        } else {
+                            if (nodes[i].right) |right| {
+                                nodes[i].value = right.value;
+                            }
+                        }
+                    }
                 } else {
-                    return try left.fold(handler);
+                    _ = stack.pop();
+                    stack_prev_size = if (stack.items.len > 1) stack.items.len - 2 else 0;
+                    nodes[0].parent.?.value = try handler.combine(handler.ptr, nodes[0].value, nodes[1].value);
+                    nodes[0].parent.?.left = null;
+                    nodes[0].parent.?.right = null;
                 }
-            } else if (self.right) |right| {
-                return try right.fold(handler);
-            } else {
-                return self.value;
             }
+            return self.value;
         }
 
         pub const SplitHandler = struct {
@@ -166,8 +179,7 @@ pub fn Node(comptime V: type) type {
             /// ptr - pointer to the context of the handler
             /// left_value - the value of the left node
             /// right_value - the value of the right node
-            /// depth - the current depth of the tree
-            combine: *const fn (ptr: *anyopaque, left_value: V, right_value: V, depth: u8) anyerror!V,
+            combine: *const fn (ptr: *anyopaque, left_value: V, right_value: V) anyerror!V,
         };
     };
 }
@@ -180,11 +192,11 @@ test "split/fold" {
 
     const divider = Node(u8).SplitHandler{ .ptr = undefined, .split = divide };
     const summator = Node(u8).FoldHandler{ .ptr = undefined, .combine = sum };
-    var tree = try Node(u8).root(alloc, 8, compareU8);
+    var tree = try Node(u8).root(&arena, 8, compareU8);
 
     // when:
-    try tree.split(alloc, divider);
-    const result = try tree.fold(summator);
+    try tree.split(&arena, divider);
+    const result = try tree.foldModify(alloc, summator);
 
     // then:
     try std.testing.expectEqual(8, result);
@@ -196,7 +208,6 @@ test "add/traverse" {
         const Self = @This();
 
         actual_values: []u8,
-        actual_depths: []u8,
         idx: u8,
 
         fn handler(self: *Self) Node(u8).TraverseHandler {
@@ -205,47 +216,39 @@ test "add/traverse" {
 
         fn accumulate_actual(ptr: *anyopaque, node: *Node(u8)) !void {
             const self: *Self = @ptrCast(@alignCast(ptr));
-            std.debug.print("{d}\n", .{node.value});
             // then:
             self.actual_values[self.idx] = node.value;
-            self.actual_depths[self.idx] = node.depth;
             self.idx += 1;
         }
     };
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer _ = arena.reset(.free_all);
-    const alloc = arena.allocator();
     //          3
     //      1       5
     //        2   4   6
-    var tree = try Node(u8).root(alloc, 3, compareU8);
-    try tree.add(alloc, 1);
-    try tree.add(alloc, 2);
-    try tree.add(alloc, 5);
-    try tree.add(alloc, 4);
-    try tree.add(alloc, 6);
+    var tree = try Node(u8).root(&arena, 3, compareU8);
+    try tree.add(&arena, 1);
+    try tree.add(&arena, 2);
+    try tree.add(&arena, 5);
+    try tree.add(&arena, 4);
+    try tree.add(&arena, 6);
 
     const expected_values = [_]u8{ 1, 2, 3, 4, 5, 6 };
-    const epxected_depths = [_]u8{ 0, 1, 1, 2, 2, 2 };
 
     var actual_values = [_]u8{ 0, 0, 0, 0, 0, 0 };
-    var actual_depths = [_]u8{ 0, 0, 0, 0, 0, 0 };
 
     var validation = TraverseValidate{
         .actual_values = &actual_values,
-        .actual_depths = &actual_depths,
         .idx = 0,
     };
 
     // when:
-    try tree.traverse(alloc, validation.handler());
+    try tree.traverse(arena.allocator(), validation.handler());
 
     // then:
     std.mem.sort(u8, &actual_values, {}, lessThanU8);
     try std.testing.expectEqualSlices(u8, &expected_values, &actual_values);
-    std.mem.sort(u8, &actual_depths, {}, lessThanU8);
-    try std.testing.expectEqualSlices(u8, &epxected_depths, &actual_depths);
 }
 
 // Test utils //
@@ -263,6 +266,6 @@ fn divide(_: *anyopaque, node: *Node(u8)) anyerror!?struct { u8, u8 } {
     return if (half > 0) .{ half, half } else null;
 }
 
-fn sum(_: *anyopaque, x: u8, y: u8, _: u8) anyerror!u8 {
+fn sum(_: *anyopaque, x: u8, y: u8) anyerror!u8 {
     return x + y;
 }

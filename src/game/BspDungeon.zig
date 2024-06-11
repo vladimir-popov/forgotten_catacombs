@@ -126,7 +126,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                 .dungeon = &dungeon,
                 .rand = rand,
             };
-            _ = try root.fold(bindRooms.handler());
+            _ = try root.foldModify(bsp_arena.allocator(), bindRooms.handler());
 
             return dungeon;
         }
@@ -389,7 +389,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                 return .{ .ptr = self, .combine = FoldAndBind.bindRegions };
             }
 
-            fn bindRegions(ptr: *anyopaque, r1: p.Region, r2: p.Region, _: u8) anyerror!p.Region {
+            fn bindRegions(ptr: *anyopaque, r1: p.Region, r2: p.Region) anyerror!p.Region {
                 const self: *FoldAndBind = @ptrCast(@alignCast(ptr));
                 const direction: p.Direction = if (r1.top_left.row == r2.top_left.row) .right else .down;
                 _ = self.dungeon.createAndAddPassageBetweenRegions(self.rand, r1, r2, direction) catch {};

@@ -40,10 +40,9 @@ pub fn buildTree(
     const region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = rows, .cols = cols };
     opts.validateRegion(region);
 
-    const alloc = arena.allocator();
     var splitter = Splitter{ .rand = rand, .opts = opts };
-    var root: *Tree = try Tree.root(alloc, region, compare);
-    try root.split(alloc, splitter.handler());
+    var root: *Tree = try Tree.root(arena, region, compare);
+    try root.split(arena, splitter.handler());
 
     return root;
 }
