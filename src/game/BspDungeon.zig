@@ -435,7 +435,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                     .{ .row = r1.bottomRightRow(), .col = door2.col };
 
                 // try to find better places for turn:
-                if (self.findPlaceForPassageTurn(door1, door2, direction.isHorizontal(), 0)) |places| {
+                if (try self.findPlaceForPassageTurn(alloc, door1, door2, direction.isHorizontal(), 0)) |places| {
                     middle1 = places[0];
                     middle2 = places[1];
                 }
@@ -463,37 +463,45 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
         /// Gives up after 5 attempt to prevent long search.
         fn findPlaceForPassageTurn(
             self: Self,
-            from: p.Point,
-            to: p.Point,
+            alloc: std.mem.Allocator,
+            init_from: p.Point,
+            init_to: p.Point,
             is_horizontal: bool,
             attempt: u8,
-        ) ?struct { p.Point, p.Point } {
-            log.debug("Looking for passage between {any} to {any}", .{ from, to });
+        ) !?struct { p.Point, p.Point } {
+            log.debug("Looking for passage between {any} to {any}", .{ init_from, init_to });
+            var current_attempt = attempt;
+            var stack = std.ArrayList(struct { p.Point, p.Point }).init(alloc);
+            defer stack.deinit();
+            try stack.append(.{ init_from, init_to });
             var middle1: p.Point = undefined;
             var middle2: p.Point = undefined;
-            const distance: u8 = if (is_horizontal)
-                to.col - from.col
-            else
-                to.row - from.row;
+            while (stack.popOrNull()) |points| {
+                const from = points[0];
+                const to = points[0];
+                const distance: u8 = if (is_horizontal)
+                    to.col - from.col
+                else
+                    to.row - from.row;
 
-            if (distance > 4 and attempt < 5) {
-                if (is_horizontal) {
-                    middle1.row = from.row;
-                    middle1.col = distance / 2 + from.col;
-                    middle2.row = to.row;
-                    middle2.col = middle1.col;
-                } else {
-                    middle1.row = distance / 2 + from.row;
-                    middle1.col = from.col;
-                    middle2.row = middle1.row;
-                    middle2.col = to.col;
-                }
-                if (self.isFreeLine(middle1, middle2)) {
-                    return .{ middle1, middle2 };
-                } else if (self.findPlaceForPassageTurn(from, middle2, is_horizontal, attempt + 1)) |result| {
-                    return result;
-                } else if (self.findPlaceForPassageTurn(middle1, to, is_horizontal, attempt + 1)) |result| {
-                    return result;
+                if (distance > 4 and current_attempt < 5) {
+                    if (is_horizontal) {
+                        middle1.row = from.row;
+                        middle1.col = distance / 2 + from.col;
+                        middle2.row = to.row;
+                        middle2.col = middle1.col;
+                    } else {
+                        middle1.row = distance / 2 + from.row;
+                        middle1.col = from.col;
+                        middle2.row = middle1.row;
+                        middle2.col = to.col;
+                    }
+                    if (self.isFreeLine(middle1, middle2)) {
+                        return .{ middle1, middle2 };
+                    }
+                    current_attempt += 1;
+                    try stack.append(.{ from, middle2 });
+                    try stack.append(.{ middle1, to });
                 }
             }
             return null;
