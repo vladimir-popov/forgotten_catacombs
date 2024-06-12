@@ -28,7 +28,24 @@ const panic = std.debug.panic;
 
 const Self = @This();
 
+pub const Screen = @import("Screen.zig");
+
 pub const Entity = ecs.Entity;
+
+pub const Dungeon = @import("BspDungeon.zig").BspDungeon(TOTAL_ROWS, TOTAL_COLS);
+
+pub const GameSession = struct {
+    pub const Timers = enum { input_system };
+
+    screen: Screen,
+    timers: []i64,
+    player: Entity,
+    dungeon: Dungeon,
+
+    pub inline fn timer(self: GameSession, t: Timers) *i64 {
+        return &self.timers[@intFromEnum(t)];
+    }
+};
 
 pub const Button = struct {
     pub const Type = c_int;
@@ -60,10 +77,6 @@ pub const Button = struct {
 };
 
 pub const Components = union {
-    screen: components.Screen,
-    timers: components.Timers,
-    level: components.Level,
-    dungeon: components.Dungeon,
     health: components.Health,
     position: components.Position,
     move: components.Move,
@@ -75,12 +88,12 @@ pub const AnyRuntime = struct {
         readButton: *const fn (context: *anyopaque) anyerror!Button.Type,
         drawDungeon: *const fn (
             context: *anyopaque,
-            screen: *const components.Screen,
-            dungeon: *const components.Dungeon,
+            screen: *const Screen,
+            dungeon: *const Dungeon,
         ) anyerror!void,
         drawSprite: *const fn (
             context: *anyopaque,
-            screen: *const components.Screen,
+            screen: *const Screen,
             sprite: *const components.Sprite,
             position: *const components.Position,
         ) anyerror!void,
@@ -102,15 +115,15 @@ pub const AnyRuntime = struct {
 
     pub fn drawDungeon(
         self: AnyRuntime,
-        screen: *const components.Screen,
-        dungeon: *const components.Dungeon,
+        screen: *const Screen,
+        dungeon: *const Dungeon,
     ) !void {
         try self.vtable.drawDungeon(self.context, screen, dungeon);
     }
 
     pub fn drawSprite(
         self: AnyRuntime,
-        screen: *const components.Screen,
+        screen: *const Screen,
         sprite: *const components.Sprite,
         position: *const components.Position,
     ) !void {
@@ -118,22 +131,18 @@ pub const AnyRuntime = struct {
     }
 };
 
-pub const Universe = ecs.Universe(Components, AnyRuntime);
+pub const Universe = ecs.Universe(GameSession, Components, AnyRuntime);
 
 pub fn init(runtime: AnyRuntime) !Universe {
-    var universe: Universe = Universe.init(runtime.alloc, runtime);
+    var universe: Universe = Universe.init(runtime.alloc, runtime, try runtime.alloc.create(GameSession));
 
-    const dungeon = try components.Dungeon.initRandom(runtime.alloc, runtime.rand);
-    const player_position = dungeon.findRandomPlaceForPlayer(runtime.rand);
-    const player = entities.Player(universe, player_position);
-    var screen = components.Screen.init(DISPLAY_ROWS, DISPLAY_COLS, components.Dungeon.Region);
-    screen.centeredAround(player_position);
-    // init level
-    _ = universe.newEntity()
-        .withComponent(components.Screen, screen)
-        .withComponent(components.Timers, try components.Timers.init(runtime.alloc))
-        .withComponent(components.Level, .{ .player = player })
-        .withComponent(components.Dungeon, dungeon);
+    universe.root.screen = Screen.init(DISPLAY_ROWS, DISPLAY_COLS, Dungeon.Region);
+    universe.root.timers = try runtime.alloc.alloc(i64, std.meta.tags(GameSession.Timers).len);
+    universe.root.dungeon = try Dungeon.initRandom(runtime.alloc, runtime.rand);
+
+    const player_position = universe.root.dungeon.findRandomPlaceForPlayer(runtime.rand);
+    universe.root.player = entities.Player(universe, player_position);
+    universe.root.screen.centeredAround(player_position);
 
     // Initialize systems:
     universe.registerSystem(systems.Input.handleInput);

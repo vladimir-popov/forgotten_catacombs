@@ -116,7 +116,7 @@ fn readButton(ptr: *anyopaque) anyerror!game.Button.Type {
     return game.Button.None;
 }
 
-fn drawDungeon(ptr: *anyopaque, screen: *const cmp.Screen, dungeon: *const cmp.Dungeon) anyerror!void {
+fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     try Render.drawDungeon(
         self.arena.allocator(),
@@ -128,7 +128,7 @@ fn drawDungeon(ptr: *anyopaque, screen: *const cmp.Screen, dungeon: *const cmp.D
 
 fn drawSprite(
     ptr: *anyopaque,
-    screen: *const cmp.Screen,
+    screen: *const game.Screen,
     sprite: *const cmp.Sprite,
     position: *const cmp.Position,
 ) anyerror!void {

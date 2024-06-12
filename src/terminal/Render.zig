@@ -7,7 +7,7 @@ const p = algs_and_types.primitives;
 pub fn drawDungeon(
     alloc: std.mem.Allocator,
     buffer: *utf8.Buffer,
-    dungeon: *const game.components.Dungeon,
+    dungeon: *const game.Dungeon,
     region: p.Region,
 ) !void {
     var itr = dungeon.cellsInRegion(region) orelse return;
@@ -40,7 +40,7 @@ test "draw walls" {
     var buffer = utf8.Buffer.init(std.testing.allocator);
     defer buffer.deinit();
 
-    var dungeon = try game.components.Dungeon.initEmpty(arena.allocator());
+    var dungeon = try game.Dungeon.initEmpty(arena.allocator());
     dungeon.walls.setRowValue(1, 1, 5, true);
     dungeon.walls.set(2, 1);
     dungeon.walls.set(2, 5);

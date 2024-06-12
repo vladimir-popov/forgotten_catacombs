@@ -5,8 +5,6 @@ const tools = @import("tools");
 
 const Runtime = @import("Runtime.zig");
 
-const CurrentPlatform = tools.Platform.Playdate;
-
 pub const log_level: std.log.Level = .warn;
 
 pub const std_options = .{

@@ -31,66 +31,57 @@ pub fn main() !void {
 
     var runtime = try Runtime.init(alloc, rnd.random(), &arena);
     defer runtime.deinit();
-    var universe = try DungeonsGenerator.init(runtime.any());
-    defer universe.deinit();
 
-    try runtime.run(&universe);
+    var generator = try DungeonsGenerator.init(runtime.any());
+    defer generator.deinit();
+
+    try runtime.run(&generator);
 }
 
-const Components = union {
-    dungeon: game.components.Dungeon,
-    screen: game.components.Screen,
-};
-
 const DungeonsGenerator = struct {
-    pub const Universe = ecs.Universe(Components, game.AnyRuntime);
-    const Dungeon = game.components.Dungeon;
+    runtime: game.AnyRuntime,
+    screen: game.Screen,
+    dungeon: game.Dungeon,
 
-    pub fn init(runtime: game.AnyRuntime) !Universe {
-        var universe: Universe = Universe.init(runtime.alloc, runtime);
-
-        // Generate dungeon:
-        const dungeon = try Dungeon.initRandom(
-            universe.runtime.alloc,
-            universe.runtime.rand,
-        );
-        // The screen to see whole dungeon:
-        const screen = game.components.Screen.init(Dungeon.Region.rows, Dungeon.Region.cols, Dungeon.Region);
-
-        _ = universe.newEntity()
-            .withComponent(game.components.Dungeon, dungeon)
-            .withComponent(game.components.Screen, screen);
-
-        // Initialize systems:
-        universe.registerSystem(handleInput);
-        universe.registerSystem(render);
-
-        return universe;
+    pub fn init(runtime: game.AnyRuntime) !DungeonsGenerator {
+        return .{
+            .runtime = runtime,
+            // Generate dungeon:
+            .dungeon = try game.Dungeon.initRandom(runtime.alloc, runtime.rand),
+            // The screen to see whole dungeon:
+            .screen = game.Screen.init(
+                game.Dungeon.Region.rows,
+                game.Dungeon.Region.cols,
+                game.Dungeon.Region,
+            ),
+        };
     }
 
-    fn handleInput(universe: *Universe) anyerror!void {
-        const btn = try universe.runtime.readButton();
+    pub fn deinit(self: *DungeonsGenerator) void {
+        self.dungeon.deinit();
+        self.screen.deinit();
+    }
+
+    pub fn tick(self: *DungeonsGenerator) !void {
+        try self.handleInput();
+        try self.render();
+    }
+
+    fn handleInput(self: *DungeonsGenerator) anyerror!void {
+        const btn = try self.runtime.readButton();
         if (btn & game.Button.A > 0) {
-            var entities = universe.entitiesIterator();
-            while (entities.next()) |entity| {
-                if (universe.getComponent(entity, game.components.Dungeon)) |_| {
-                    universe.removeComponentFromEntity(entity, game.components.Dungeon);
-                    const seed = universe.runtime.rand.int(u64);
-                    log.debug("The random seed is {d}", .{seed});
-                    var rnd = std.Random.DefaultPrng.init(seed);
-                    const dungeon = try game.components.Dungeon.initRandom(
-                        universe.runtime.alloc,
-                        rnd.random(),
-                    );
-                    universe.addComponent(entity, game.components.Dungeon, dungeon);
-                }
-            }
+            const seed = self.runtime.rand.int(u64);
+            log.debug("The random seed is {d}", .{seed});
+            var rnd = std.Random.DefaultPrng.init(seed);
+            self.dungeon.deinit();
+            self.dungeon = try game.Dungeon.initRandom(
+                self.runtime.alloc,
+                rnd.random(),
+            );
         }
     }
 
-    fn render(universe: *Universe) anyerror!void {
-        const dungeon = &universe.getComponents(game.components.Dungeon)[0];
-        const screen = &universe.getComponents(game.components.Screen)[0];
-        try universe.runtime.drawDungeon(screen, dungeon);
+    fn render(self: *DungeonsGenerator) anyerror!void {
+        try self.runtime.drawDungeon(&self.screen, &self.dungeon);
     }
 };

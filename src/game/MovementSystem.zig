@@ -7,9 +7,9 @@ const p = algs_and_types.primitives;
 const log = std.log.scoped(.movement_system);
 
 pub fn handleMove(universe: *game.Universe) anyerror!void {
-    const player_entity = universe.getComponents(cmp.Level)[0].player;
-    const dungeon = &universe.getComponents(cmp.Dungeon)[0];
-    const screen = &universe.getComponents(cmp.Screen)[0];
+    const screen = &universe.root.screen;
+    const dungeon = &universe.root.dungeon;
+    const player_entity = universe.root.player;
     var itr = universe.queryComponents2(cmp.Move, cmp.Position);
     blk: while (itr.next()) |components| {
         const entity = components[0];

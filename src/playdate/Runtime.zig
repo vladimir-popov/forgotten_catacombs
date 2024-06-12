@@ -63,7 +63,7 @@ fn readButton(ptr: *anyopaque) anyerror!game.Button.Type {
     return @truncate(button);
 }
 
-fn drawDungeon(ptr: *anyopaque, screen: *const cmp.Screen, dungeon: *const cmp.Dungeon) anyerror!void {
+fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {
     var itr = dungeon.cellsInRegion(screen.region) orelse return;
     var position = game.components.Position{ .point = screen.region.top_left };
     var sprite = game.components.Sprite{ .letter = undefined };
@@ -86,7 +86,7 @@ fn drawDungeon(ptr: *anyopaque, screen: *const cmp.Screen, dungeon: *const cmp.D
 
 fn drawSprite(
     ptr: *anyopaque,
-    screen: *const cmp.Screen,
+    screen: *const game.Screen,
     sprite: *const cmp.Sprite,
     position: *const cmp.Position,
 ) anyerror!void {

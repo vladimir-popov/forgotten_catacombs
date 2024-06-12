@@ -10,14 +10,12 @@ pub fn handleInput(universe: *game.Universe) anyerror!void {
     if (btn == 0) return;
 
     const now = universe.runtime.currentMillis();
-    const timers = universe.getComponents(game.components.Timers)[0].timers;
-    const timer = @intFromEnum(game.components.Timers.Handlers.input_system);
-    const player_entity = universe.getComponents(game.components.Level)[0].player;
-    if (universe.getComponent(player_entity, game.components.Move)) |move| {
+    const timer = universe.root.timer(game.GameSession.Timers.input_system);
+    if (universe.getComponent(universe.root.player, game.components.Move)) |move| {
         if (game.Button.toDirection(btn)) |direction| {
             move.direction = direction;
-            move.keep_moving = now - timers[timer] < 200;
+            move.keep_moving = now - timer.* < 200;
         }
     }
-    timers[timer] = now;
+    timer.* = now;
 }

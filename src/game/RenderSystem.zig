@@ -5,10 +5,8 @@ const game = @import("game.zig");
 const cmp = game.components;
 
 pub fn render(universe: *game.Universe) anyerror!void {
-    const screen = &universe.getComponents(cmp.Screen)[0];
-
-    const dungeon = &universe.getComponents(cmp.Dungeon)[0];
-    try universe.runtime.drawDungeon(screen, dungeon);
+    const screen = &universe.root.screen;
+    try universe.runtime.drawDungeon(screen, &universe.root.dungeon);
 
     var itr = universe.queryComponents2(cmp.Sprite, cmp.Position);
     while (itr.next()) |components| {

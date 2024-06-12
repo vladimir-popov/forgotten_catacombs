@@ -343,10 +343,11 @@ test "EntitiesManager: iterator" {
 /// Every operations over entities and components should be done with this
 /// object.
 ///
+/// RootObject - a link to the singleton object, which is usually a game session.
 /// Components - a union of used components.
 /// Runtime - a type to communicate with a runtime environment: reading pressed buttons, draw sprites,
 ///         play sounds, etc.
-pub fn Universe(comptime Components: anytype, comptime Runtime: type) type {
+pub fn Universe(comptime RootObject: type, comptime Components: anytype, comptime Runtime: type) type {
     switch (@typeInfo(Components)) {
         .Union => {},
         else => @compileError(std.fmt.comptimePrint(
@@ -382,6 +383,8 @@ pub fn Universe(comptime Components: anytype, comptime Runtime: type) type {
         /// It can contains game settings and functions, which are used in the systems.
         runtime: Runtime,
 
+        root: *RootObject,
+
         /// private typed getter of the inner state
         inline fn st(self: Self) *InnerState {
             return @ptrCast(@alignCast(self.inner_state));
@@ -390,6 +393,7 @@ pub fn Universe(comptime Components: anytype, comptime Runtime: type) type {
         pub fn init(
             alloc: std.mem.Allocator,
             runtime: Runtime,
+            root: *RootObject,
         ) Self {
             const state = alloc.create(InnerState) catch |err|
                 std.debug.panic("The memory error {any} happened on crating the inner state of the game.", .{err});
@@ -402,7 +406,7 @@ pub fn Universe(comptime Components: anytype, comptime Runtime: type) type {
             );
             state.systems = std.ArrayList(System).init(alloc);
 
-            return .{ .runtime = runtime, .inner_state = state };
+            return .{ .root = root, .runtime = runtime, .inner_state = state };
         }
 
         pub fn deinit(self: *Self) void {
