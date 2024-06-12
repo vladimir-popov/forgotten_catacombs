@@ -20,8 +20,7 @@ pub fn drawDungeon(
             .nothing => ' ',
             .floor => '.',
             .wall => '#',
-            .opened_door => '\'',
-            .closed_door => '+',
+            .door => |door| if (door == .opened) '\'' else '+',
         };
         idx += 1;
         if (itr.cursor.col == itr.region.top_left.col) {

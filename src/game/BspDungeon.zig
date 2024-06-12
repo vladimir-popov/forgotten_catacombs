@@ -14,6 +14,8 @@ pub const Error = error{
 
 pub const Room = p.Region;
 
+pub const Door = enum { opened, closed };
+
 pub const Passage = struct {
     const Turn = struct {
         place: p.Point,
@@ -63,8 +65,6 @@ pub const Passage = struct {
     }
 };
 
-pub const Cell = enum { nothing, floor, wall, opened_door, closed_door };
-
 pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
     return struct {
         /// The dungeon. Contains walls, doors, rooms and passages of the level.
@@ -80,24 +80,51 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
 
         const BitMap = algs_and_types.BitMap(Rows, Cols);
 
+        /// Possible types of objects inside the dung
+        pub const CellEnum = enum {
+            nothing,
+            floor,
+            wall,
+            door,
+        };
+
+        /// Particular object in the cell of the dung
+        pub const Cell = union(CellEnum) {
+            nothing,
+            floor,
+            wall,
+            door: Door,
+        };
+
         alloc: std.mem.Allocator,
         floor: BitMap,
         walls: BitMap,
-        // true for opened doors
-        doors: std.AutoHashMap(p.Point, bool),
+        objects: BitMap,
+
+        objects_map: std.AutoHashMap(p.Point, Cell),
 
         // meta data about the dungeon:
         rooms: std.ArrayList(Room),
         passages: std.ArrayList(Passage),
+
+        pub fn deinit(self: *Self) void {
+            for (self.passages.items) |passage| {
+                passage.deinit();
+            }
+            self.passages.deinit();
+            self.rooms.deinit();
+            self.objects_map.deinit();
+        }
 
         pub fn initEmpty(alloc: std.mem.Allocator) !Self {
             return .{
                 .alloc = alloc,
                 .floor = BitMap.initEmpty(),
                 .walls = BitMap.initEmpty(),
+                .objects = BitMap.initEmpty(),
                 .rooms = std.ArrayList(Room).init(alloc),
                 .passages = std.ArrayList(Passage).init(alloc),
-                .doors = std.AutoHashMap(p.Point, bool).init(alloc),
+                .objects_map = std.AutoHashMap(p.Point, Cell).init(alloc),
             };
         }
 
@@ -132,15 +159,6 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             return dungeon;
         }
 
-        pub fn deinit(self: *Self) void {
-            for (self.passages.items) |passage| {
-                passage.deinit();
-            }
-            self.passages.deinit();
-            self.doors.deinit();
-            self.rooms.deinit();
-        }
-
         pub fn findRandomPlaceForPlayer(self: Self, rand: std.Random) p.Point {
             const room = rand.uintLessThan(usize, self.rooms.items.len);
             return self.rooms.items[room].middle();
@@ -151,18 +169,22 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             if (!builtin.is_test) {
                 @compileError("The function `parse` is for test purpose only");
             }
-            return .{
-                .alloc = alloc,
-                .floor = try BitMap.parse('.', str),
-                .walls = try BitMap.parse('#', str),
-                .rooms = std.ArrayList(Room).init(alloc),
-                .passages = std.ArrayList(Passage).init(alloc),
-                .doors = std.AutoHashMap(p.Point, bool).init(alloc),
-            };
+            var dungeon = try Self.initEmpty(alloc);
+            dungeon.floor = try BitMap.parse('.', str);
+            dungeon.walls = try BitMap.parse('#', str);
+            return dungeon;
         }
 
         pub inline fn cellAt(self: Self, place: p.Point) ?Cell {
             return self.cell(place.row, place.col);
+        }
+
+        pub inline fn isCellAt(self: Self, place: p.Point, assumption: CellEnum) bool {
+            if (self.cellAt(place)) |cl| {
+                return @intFromEnum(cl) == @intFromEnum(assumption);
+            } else {
+                return false;
+            }
         }
 
         pub fn cell(self: Self, row: u8, col: u8) ?Cell {
@@ -172,14 +194,14 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             if (col < 1 or col > Cols) {
                 return null;
             }
-            if (self.doors.getPtr(.{ .row = row, .col = col })) |door| {
-                return if (door.*) .opened_door else .closed_door;
-            }
             if (self.walls.isSet(row, col)) {
                 return .wall;
             }
             if (self.floor.isSet(row, col)) {
                 return .floor;
+            }
+            if (self.objects.isSet(row, col)) {
+                return self.objects_map.get(.{ .row = row, .col = col }) orelse unreachable;
             }
             return .nothing;
         }
@@ -228,8 +250,15 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             }
         };
 
-        pub fn openDoor(self: *Self, position: p.Point) !void {
-            try self.doors.put(position, true);
+        pub fn openDoor(self: *Self, position: p.Point) void {
+            if (self.objects_map.getPtr(position)) |cell_ptr| {
+                switch (cell_ptr.*) {
+                    .door => {
+                        cell_ptr.* = .{ .door = .opened };
+                    },
+                    else => {},
+                }
+            }
         }
 
         fn cleanAt(self: *Self, place: p.Point) void {
@@ -238,15 +267,17 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             }
             self.floor.unsetAt(place);
             self.walls.unsetAt(place);
-            _ = self.doors.remove(place);
+            if (self.objects.isSet(place.row, place.col)) {
+                _ = self.objects_map.remove(place);
+                self.objects.unsetAt(place);
+            }
         }
 
         fn forceCreateFloorAt(self: *Self, place: p.Point) !void {
             if (!Region.containsPoint(place)) {
                 return;
             }
-            self.walls.unsetAt(place);
-            _ = self.doors.remove(place);
+            self.cleanAt(place);
             self.floor.setAt(place);
         }
 
@@ -254,8 +285,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             if (!Region.containsPoint(place)) {
                 return;
             }
-            self.floor.unsetAt(place);
-            _ = self.doors.remove(place);
+            self.cleanAt(place);
             self.walls.setAt(place);
         }
 
@@ -263,16 +293,16 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             if (!Region.containsPoint(place)) {
                 return;
             }
-            self.floor.unsetAt(place);
-            self.walls.unsetAt(place);
-            try self.doors.put(place, is_open);
+            self.cleanAt(place);
+            self.objects.setAt(place);
+            try self.objects_map.put(place, .{ .door = if (is_open) .opened else .closed });
         }
 
         fn createWallAt(self: *Self, place: p.Point) void {
             if (!Region.containsPoint(place)) {
                 return;
             }
-            if (self.cellAt(place) == .nothing) {
+            if (self.isCellAt(place, .nothing)) {
                 self.walls.setAt(place);
             }
         }
@@ -281,7 +311,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             if (!Region.containsPoint(place)) {
                 return;
             }
-            if (self.cellAt(place) == .nothing) {
+            if (self.isCellAt(place, .nothing)) {
                 self.floor.setAt(place);
             }
         }
@@ -521,9 +551,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             var cursor = from;
             log.debug("Check line from {any} to {any} moving {s}", .{ from, to, @tagName(direction) });
             while (!std.meta.eql(cursor, to)) {
-                const cl = self.cellAt(cursor);
-                log.debug("Checking the {any}. It's {any}", .{ cursor, cl });
-                if (cl == .nothing)
+                if (self.isCellAt(cursor, .nothing))
                     cursor.move(direction)
                 else
                     return false;
@@ -602,9 +630,17 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                     .{ place, @tagName(side), region },
                 );
                 if (self.findPlaceForDoor(side.asDirection().opposite(), place, region)) |candidate| {
-                    if (self.cellAt(candidate) == .wall) {
-                        log.debug("{any} is the place for door in {any} on {s} side", .{ candidate, region, @tagName(side) });
-                        return candidate;
+                    if (self.cellAt(candidate)) |cl| {
+                        switch (cl) {
+                            .wall => {
+                                log.debug(
+                                    "{any} is the place for door in {any} on {s} side",
+                                    .{ candidate, region, @tagName(side) },
+                                );
+                                return candidate;
+                            },
+                            else => {},
+                        }
                     }
                 }
                 // try to find in the different parts of the region:
@@ -643,13 +679,13 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                 if (self.cellAt(place)) |cl| {
                     switch (cl) {
                         .nothing => {},
-                        .opened_door, .closed_door => {
+                        .door => {
                             log.debug("Door already exists at {any}", .{place});
                             return null;
                         },
                         .wall => {
                             log.debug("Meet the wall at {any}", .{place});
-                            if (self.cellAt(place.movedTo(direction)) != .floor) {
+                            if (!self.isCellAt(place.movedTo(direction), .floor)) {
                                 log.debug(
                                     "Expected floor after the wall at {any} in {s} direction, but found {any}",
                                     .{ place, @tagName(direction), self.cellAt(place.movedTo(direction)) },
@@ -657,14 +693,14 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                                 return null;
                             }
                             // check that no one door near
-                            if (self.doors.contains(place.movedTo(direction.rotatedClockwise(true)))) {
+                            if (self.isCellAt(place.movedTo(direction.rotatedClockwise(true)), .door)) {
                                 log.debug(
                                     "The door already exists nearby at {any}",
                                     .{place.movedTo(direction.rotatedClockwise(true))},
                                 );
                                 return null;
                             }
-                            if (self.doors.contains(place.movedTo(direction.rotatedClockwise(false)))) {
+                            if (self.isCellAt(place.movedTo(direction.rotatedClockwise(false)), .door)) {
                                 log.debug(
                                     "The door already exists nearby at {any}",
                                     .{place.movedTo(direction.rotatedClockwise(false))},
