@@ -115,10 +115,12 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             self.passages.deinit();
             self.rooms.deinit();
             self.objects_map.deinit();
+            self.alloc.destroy(self);
         }
 
-        pub fn initEmpty(alloc: std.mem.Allocator, rand: std.Random) !Self {
-            return .{
+        pub fn createEmpty(alloc: std.mem.Allocator, rand: std.Random) !*Self {
+            const instance = try alloc.create(Self);
+            instance.* = .{
                 .alloc = alloc,
                 .rand = rand,
                 .floor = BitMap.initEmpty(),
@@ -128,29 +130,30 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                 .passages = std.ArrayList(Passage).init(alloc),
                 .objects_map = std.AutoHashMap(p.Point, Cell).init(alloc),
             };
+            return instance;
         }
 
         /// Basic BSP Dungeon generation
         /// https://www.roguebasin.com/index.php?title=Basic_BSP_Dungeon_generation
-        pub fn initRandom(alloc: std.mem.Allocator, rand: std.Random) !Self {
+        pub fn createRandom(alloc: std.mem.Allocator, rand: std.Random) !*Self {
             // this arena is used to build a BSP tree, which can be destroyed
             // right after completing the dungeon.
             var bsp_arena = std.heap.ArenaAllocator.init(alloc);
             defer _ = bsp_arena.deinit();
 
-            var dungeon: Self = try initEmpty(alloc, rand);
+            const dungeon: *Self = try createEmpty(alloc, rand);
 
             // BSP helps to mark regions for rooms without intersections
             const root = try bsp.buildTree(&bsp_arena, rand, Rows, Cols, .{});
 
             // visit every BSP node and generate rooms in the leafs
-            var createRooms: TraverseAndCreateRooms = .{ .dungeon = &dungeon, .rand = rand };
+            var createRooms: TraverseAndCreateRooms = .{ .dungeon = dungeon, .rand = rand };
             try root.traverse(bsp_arena.allocator(), createRooms.handler());
 
             // fold the BSP tree and binds nodes with the same parent:
             _ = try root.foldModify(
                 bsp_arena.allocator(),
-                .{ .ptr = &dungeon, .combine = createAndAddPassageBetweenRegions },
+                .{ .ptr = dungeon, .combine = createAndAddPassageBetweenRegions },
             );
 
             return dungeon;
@@ -162,11 +165,11 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
         }
 
         /// For tests only
-        fn parse(alloc: std.mem.Allocator, rand: std.Random, str: []const u8) !Self {
+        fn parse(alloc: std.mem.Allocator, rand: std.Random, str: []const u8) !*Self {
             if (!builtin.is_test) {
                 @compileError("The function `parse` is for test purpose only");
             }
-            var dungeon = try Self.initEmpty(alloc, rand);
+            const dungeon = try Self.createEmpty(alloc, rand);
             dungeon.floor = try BitMap.parse('.', str);
             dungeon.walls = try BitMap.parse('#', str);
             return dungeon;
@@ -708,7 +711,7 @@ test "generate a simple room" {
     // given:
     const Rows = 12;
     const Cols = 12;
-    var dungeon = try BspDungeon(Rows, Cols).initEmpty(std.testing.allocator, std.crypto.random);
+    var dungeon = try BspDungeon(Rows, Cols).createEmpty(std.testing.allocator, std.crypto.random);
     defer dungeon.deinit();
 
     const region = p.Region{ .top_left = .{ .row = 2, .col = 2 }, .rows = 8, .cols = 8 };
@@ -855,13 +858,13 @@ test "create passage between two rooms" {
     ;
     errdefer std.debug.print("{s}\n", .{str});
     const rand = std.crypto.random;
-    var dungeon = try BspDungeon(Rows, Cols).parse(std.testing.allocator, rand, str);
+    const dungeon = try BspDungeon(Rows, Cols).parse(std.testing.allocator, rand, str);
     defer dungeon.deinit();
     const r1 = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = Rows, .cols = 6 };
     const r2 = p.Region{ .top_left = .{ .row = 1, .col = 7 }, .rows = Rows, .cols = Cols - 6 };
 
     // when:
-    const region = try BspDungeon(Rows, Cols).createAndAddPassageBetweenRegions(&dungeon, &r1, &r2);
+    const region = try BspDungeon(Rows, Cols).createAndAddPassageBetweenRegions(dungeon, &r1, &r2);
 
     // then:
     try std.testing.expectEqualDeep(BspDungeon(Rows, Cols).Region, region);

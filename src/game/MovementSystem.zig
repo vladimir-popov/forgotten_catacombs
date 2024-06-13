@@ -7,7 +7,7 @@ const p = algs_and_types.primitives;
 const log = std.log.scoped(.movement_system);
 
 pub fn handleMove(universe: *game.Universe) anyerror!void {
-    const dungeon = &universe.root.dungeon;
+    const dungeon = universe.root.dungeon;
     var itr = universe.queryComponents2(cmp.Move, cmp.Position);
     while (itr.next()) |components| {
         const entity = components[0];
@@ -45,7 +45,7 @@ fn doMove(universe: *game.Universe, move: *cmp.Move, position: *cmp.Position, en
     }
     const screen = &universe.root.screen;
     const inner_region = screen.innerRegion();
-    const dungeon = &universe.root.dungeon;
+    const dungeon = universe.root.dungeon;
     const new_point = position.point.movedTo(direction);
     // keep player on the screen:
     if (direction == .up and new_point.row < inner_region.top_left.row)

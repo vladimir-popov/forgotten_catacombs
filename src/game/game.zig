@@ -40,7 +40,7 @@ pub const GameSession = struct {
     screen: Screen,
     timers: []i64,
     player: Entity,
-    dungeon: Dungeon,
+    dungeon: *Dungeon,
 
     pub inline fn timer(self: GameSession, t: Timers) *i64 {
         return &self.timers[@intFromEnum(t)];
@@ -138,7 +138,7 @@ pub fn init(runtime: AnyRuntime) !Universe {
 
     universe.root.screen = Screen.init(DISPLAY_ROWS, DISPLAY_COLS, Dungeon.Region);
     universe.root.timers = try runtime.alloc.alloc(i64, std.meta.tags(GameSession.Timers).len);
-    universe.root.dungeon = try Dungeon.initRandom(runtime.alloc, runtime.rand);
+    universe.root.dungeon = try Dungeon.createRandom(runtime.alloc, runtime.rand);
 
     const player_position = universe.root.dungeon.findRandomPlaceForPlayer(runtime.rand);
     universe.root.player = entities.Player(universe, player_position);

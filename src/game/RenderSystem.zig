@@ -6,7 +6,7 @@ const cmp = game.components;
 
 pub fn render(universe: *game.Universe) anyerror!void {
     const screen = &universe.root.screen;
-    try universe.runtime.drawDungeon(screen, &universe.root.dungeon);
+    try universe.runtime.drawDungeon(screen, universe.root.dungeon);
 
     var itr = universe.queryComponents2(cmp.Sprite, cmp.Position);
     while (itr.next()) |components| {

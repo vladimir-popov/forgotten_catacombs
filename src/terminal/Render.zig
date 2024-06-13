@@ -39,7 +39,7 @@ test "draw walls" {
     var buffer = utf8.Buffer.init(std.testing.allocator);
     defer buffer.deinit();
 
-    var dungeon = try game.Dungeon.initEmpty(arena.allocator(), std.crypto.random);
+    const dungeon = try game.Dungeon.createEmpty(arena.allocator(), std.crypto.random);
     dungeon.walls.setRowValue(1, 1, 5, true);
     dungeon.walls.set(2, 1);
     dungeon.walls.set(2, 5);
@@ -54,7 +54,7 @@ test "draw walls" {
     try drawDungeon(
         std.testing.allocator,
         &buffer,
-        &dungeon,
+        dungeon,
         .{ .top_left = .{ .row = 1, .col = 1 }, .rows = 3, .cols = 5 },
     );
 

@@ -41,13 +41,13 @@ pub fn main() !void {
 const DungeonsGenerator = struct {
     runtime: game.AnyRuntime,
     screen: game.Screen,
-    dungeon: game.Dungeon,
+    dungeon: *game.Dungeon,
 
     pub fn init(runtime: game.AnyRuntime) !DungeonsGenerator {
         return .{
             .runtime = runtime,
             // Generate dungeon:
-            .dungeon = try game.Dungeon.initRandom(runtime.alloc, runtime.rand),
+            .dungeon = try game.Dungeon.createRandom(runtime.alloc, runtime.rand),
             // The screen to see whole dungeon:
             .screen = game.Screen.init(
                 game.Dungeon.Region.rows,
@@ -74,7 +74,7 @@ const DungeonsGenerator = struct {
             log.debug("The random seed is {d}", .{seed});
             var rnd = std.Random.DefaultPrng.init(seed);
             self.dungeon.deinit();
-            self.dungeon = try game.Dungeon.initRandom(
+            self.dungeon = try game.Dungeon.createRandom(
                 self.runtime.alloc,
                 rnd.random(),
             );
@@ -82,6 +82,6 @@ const DungeonsGenerator = struct {
     }
 
     fn render(self: *DungeonsGenerator) anyerror!void {
-        try self.runtime.drawDungeon(&self.screen, &self.dungeon);
+        try self.runtime.drawDungeon(&self.screen, self.dungeon);
     }
 };
