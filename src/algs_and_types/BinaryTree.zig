@@ -155,7 +155,7 @@ pub fn Node(comptime V: type) type {
                 } else {
                     _ = stack.pop();
                     stack_prev_size = if (stack.items.len > 1) stack.items.len - 2 else 0;
-                    nodes[0].parent.?.value = try handler.combine(handler.ptr, nodes[0].value, nodes[1].value);
+                    nodes[0].parent.?.value = try handler.combine(handler.ptr, &nodes[0].value, &nodes[1].value);
                     nodes[0].parent.?.left = null;
                     nodes[0].parent.?.right = null;
                 }
@@ -182,7 +182,7 @@ pub fn Node(comptime V: type) type {
             /// ptr - pointer to the context of the handler
             /// left_value - the value of the left node
             /// right_value - the value of the right node
-            combine: *const fn (ptr: *anyopaque, left_value: V, right_value: V) anyerror!V,
+            combine: *const fn (ptr: *anyopaque, left: *V, right: *V) anyerror!V,
         };
     };
 }
@@ -269,6 +269,6 @@ fn divide(_: *anyopaque, node: *Node(u8)) anyerror!?struct { u8, u8 } {
     return if (half > 0) .{ half, half } else null;
 }
 
-fn sum(_: *anyopaque, x: u8, y: u8) anyerror!u8 {
-    return x + y;
+fn sum(_: *anyopaque, x: *u8, y: *u8) anyerror!u8 {
+    return x.* + y.*;
 }

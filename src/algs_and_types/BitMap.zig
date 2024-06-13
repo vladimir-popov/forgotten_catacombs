@@ -157,7 +157,7 @@ test "unset a region" {
     for (bitmap.bitsets, 1..) |row, r| {
         for (0..10) |c_idx| {
             const cell = row.isSet(c_idx);
-            const expect = !region.contains(@intCast(r), @intCast(c_idx + 1));
+            const expect = !region.containsPoint(.{ .row = @intCast(r), .col = @intCast(c_idx + 1) });
             try std.testing.expectEqual(expect, cell);
         }
     }

@@ -64,10 +64,6 @@ pub const Point = struct {
             .right => self.col += 1,
         }
     }
-
-    pub inline fn onSameAxis(self: Point, other: Point) bool {
-        return self.row == other.row or self.col == other.col;
-    }
 };
 
 /// The region described as its top left corner
@@ -103,7 +99,7 @@ pub const Region = struct {
         );
     }
 
-    pub inline fn validate(self: Region) void {
+    pub fn validate(self: Region) void {
         if (builtin.mode == .Debug) {
             const is_correct = self.top_left.row > 0 and
                 self.top_left.col > 0 and
@@ -153,16 +149,8 @@ pub const Region = struct {
     }
 
     pub inline fn containsPoint(self: Region, point: Point) bool {
-        return self.contains(point.row, point.col);
-    }
-
-    pub inline fn contains(self: Region, row: u8, col: u8) bool {
-        return betweenInclusive(row, self.top_left.row, self.bottomRightRow()) and
-            betweenInclusive(col, self.top_left.col, self.bottomRightCol());
-    }
-
-    inline fn betweenInclusive(v: u8, l: u8, r: u8) bool {
-        return l <= v and v <= r;
+        return self.top_left.row <= point.row and point.row <= self.bottomRightRow() and
+            self.top_left.col <= point.col and point.col <= self.bottomRightCol();
     }
 
     /// Returns true if the `other` region doesn't go beyond of this region.
@@ -358,7 +346,7 @@ pub const Region = struct {
     /// │  ┌───┐ => │      │
     /// └──│┘  │    │      │
     ///    └───┘    └──────┘
-    pub fn unionWith(self: Region, other: Region) Region {
+    pub fn unionWith(self: *const Region, other: *const Region) Region {
         const top_left = .{
             .row = @min(self.top_left.row, other.top_left.row),
             .col = @min(self.top_left.col, other.top_left.col),
@@ -399,8 +387,8 @@ pub const Region = struct {
         const y = Region{ .top_left = .{ .row = 3, .col = 3 }, .rows = 5, .cols = 5 };
         const expected = Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 7, .cols = 7 };
         // when:
-        const actual1 = x.unionWith(y);
-        const actual2 = y.unionWith(x);
+        const actual1 = x.unionWith(&y);
+        const actual2 = y.unionWith(&x);
         // then:
         try std.testing.expectEqualDeep(expected, actual1);
         try std.testing.expectEqualDeep(expected, actual2);
@@ -410,8 +398,8 @@ pub const Region = struct {
         const outer = Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 10, .cols = 10 };
         const inner = Region{ .top_left = .{ .row = 3, .col = 3 }, .rows = 5, .cols = 5 };
         // when:
-        const actual1 = outer.unionWith(inner);
-        const actual2 = inner.unionWith(outer);
+        const actual1 = outer.unionWith(&inner);
+        const actual2 = inner.unionWith(&outer);
         // then:
         try std.testing.expectEqualDeep(outer, actual1);
         try std.testing.expectEqualDeep(outer, actual2);

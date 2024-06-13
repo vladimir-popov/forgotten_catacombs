@@ -97,6 +97,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
         };
 
         alloc: std.mem.Allocator,
+        rand: std.Random,
         floor: BitMap,
         walls: BitMap,
         objects: BitMap,
@@ -116,9 +117,10 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             self.objects_map.deinit();
         }
 
-        pub fn initEmpty(alloc: std.mem.Allocator) !Self {
+        pub fn initEmpty(alloc: std.mem.Allocator, rand: std.Random) !Self {
             return .{
                 .alloc = alloc,
+                .rand = rand,
                 .floor = BitMap.initEmpty(),
                 .walls = BitMap.initEmpty(),
                 .objects = BitMap.initEmpty(),
@@ -130,16 +132,13 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
 
         /// Basic BSP Dungeon generation
         /// https://www.roguebasin.com/index.php?title=Basic_BSP_Dungeon_generation
-        pub fn initRandom(
-            alloc: std.mem.Allocator,
-            rand: std.Random,
-        ) !Self {
+        pub fn initRandom(alloc: std.mem.Allocator, rand: std.Random) !Self {
             // this arena is used to build a BSP tree, which can be destroyed
             // right after completing the dungeon.
             var bsp_arena = std.heap.ArenaAllocator.init(alloc);
             defer _ = bsp_arena.deinit();
 
-            var dungeon: Self = try initEmpty(alloc);
+            var dungeon: Self = try initEmpty(alloc, rand);
 
             // BSP helps to mark regions for rooms without intersections
             const root = try bsp.buildTree(&bsp_arena, rand, Rows, Cols, .{});
@@ -149,12 +148,10 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             try root.traverse(bsp_arena.allocator(), createRooms.handler());
 
             // fold the BSP tree and binds nodes with the same parent:
-            var bindRooms: FoldAndBind = .{
-                .dungeon = &dungeon,
-                .alloc = bsp_arena.allocator(),
-                .rand = rand,
-            };
-            _ = try root.foldModify(bsp_arena.allocator(), bindRooms.handler());
+            _ = try root.foldModify(
+                bsp_arena.allocator(),
+                .{ .ptr = &dungeon, .combine = createAndAddPassageBetweenRegions },
+            );
 
             return dungeon;
         }
@@ -165,11 +162,11 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
         }
 
         /// For tests only
-        fn parse(alloc: std.mem.Allocator, str: []const u8) !Self {
+        fn parse(alloc: std.mem.Allocator, rand: std.Random, str: []const u8) !Self {
             if (!builtin.is_test) {
                 @compileError("The function `parse` is for test purpose only");
             }
-            var dungeon = try Self.initEmpty(alloc);
+            var dungeon = try Self.initEmpty(alloc, rand);
             dungeon.floor = try BitMap.parse('.', str);
             dungeon.walls = try BitMap.parse('#', str);
             return dungeon;
@@ -412,34 +409,16 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             return room;
         }
 
-        const FoldAndBind = struct {
-            dungeon: *Self,
-            alloc: std.mem.Allocator,
-            rand: std.Random,
-
-            fn handler(self: *FoldAndBind) bsp.Tree.FoldHandler {
-                return .{ .ptr = self, .combine = FoldAndBind.bindRegions };
-            }
-
-            fn bindRegions(ptr: *anyopaque, r1: p.Region, r2: p.Region) anyerror!p.Region {
-                const self: *FoldAndBind = @ptrCast(@alignCast(ptr));
-                const direction: p.Direction = if (r1.top_left.row == r2.top_left.row) .right else .down;
-                _ = self.dungeon.createAndAddPassageBetweenRegions(self.alloc, self.rand, r1, r2, direction) catch {};
-                return r1.unionWith(r2);
-            }
-        };
-
         fn createAndAddPassageBetweenRegions(
-            self: *Self,
-            alloc: std.mem.Allocator,
-            rand: std.Random,
-            r1: p.Region,
-            r2: p.Region,
-            direction: p.Direction,
+            ptr: *anyopaque,
+            r1: *const p.Region,
+            r2: *const p.Region,
         ) !p.Region {
-            const door1 = try self.findPlaceForDoorInRegionRnd(alloc, rand, r1, direction) orelse
+            const self: *Self = @ptrCast(@alignCast(ptr));
+            const direction: p.Direction = if (r1.top_left.row == r2.top_left.row) .right else .down;
+            const door1 = try self.findPlaceForDoorInRegionRnd(r1, direction) orelse
                 return Error.NoSpaceForDoor;
-            const door2 = try self.findPlaceForDoorInRegionRnd(alloc, rand, r2, direction.opposite()) orelse
+            const door2 = try self.findPlaceForDoorInRegionRnd(r2, direction.opposite()) orelse
                 return Error.NoSpaceForDoor;
 
             log.debug("Creating the passage from {any} {s} to {any}", .{ door1, @tagName(direction), door2 });
@@ -447,7 +426,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             const passage = try self.passages.addOne();
             passage.turns = std.ArrayList(Passage.Turn).init(self.alloc);
             _ = try passage.turnAt(door1, direction);
-            if (!door1.onSameAxis(door2)) {
+            if (door1.row != door2.row and door1.col != door2.col) {
                 // intersection of the passage from the door 1 and region 1
                 var middle1: p.Point = if (direction == .left or direction == .right)
                     // left or right
@@ -465,7 +444,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                     .{ .row = r1.bottomRightRow(), .col = door2.col };
 
                 // try to find better places for turn:
-                if (try self.findPlaceForPassageTurn(alloc, door1, door2, direction == .left or direction == .right, 0)) |places| {
+                if (try self.findPlaceForPassageTurn(door1, door2, direction == .left or direction == .right, 0)) |places| {
                     middle1 = places[0];
                     middle2 = places[1];
                 }
@@ -483,8 +462,8 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             );
 
             try self.digPassage(passage);
-            try self.forceCreateDoorAt(door1, rand.boolean());
-            try self.forceCreateDoorAt(door2, rand.boolean());
+            try self.forceCreateDoorAt(door1, self.rand.boolean());
+            try self.forceCreateDoorAt(door2, self.rand.boolean());
 
             return r1.unionWith(r2);
         }
@@ -493,7 +472,6 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
         /// Gives up after 5 attempt to prevent long search.
         fn findPlaceForPassageTurn(
             self: Self,
-            alloc: std.mem.Allocator,
             init_from: p.Point,
             init_to: p.Point,
             is_horizontal: bool,
@@ -501,7 +479,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
         ) !?struct { p.Point, p.Point } {
             log.debug("Looking for passage between {any} to {any}", .{ init_from, init_to });
             var current_attempt = attempt;
-            var stack = std.ArrayList(struct { p.Point, p.Point }).init(alloc);
+            var stack = std.ArrayList(struct { p.Point, p.Point }).init(self.alloc);
             defer stack.deinit();
             try stack.append(.{ init_from, init_to });
             var middle1: p.Point = undefined;
@@ -598,30 +576,28 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
 
         fn findPlaceForDoorInRegionRnd(
             self: Self,
-            alloc: std.mem.Allocator,
-            rand: std.Random,
-            init_region: p.Region,
+            init_region: *const p.Region,
             side: p.Direction,
         ) !?p.Point {
-            var stack = std.ArrayList(p.Region).init(alloc);
+            var stack = std.ArrayList(p.Region).init(self.alloc);
             defer stack.deinit();
-            try stack.append(init_region);
+            try stack.append(init_region.*);
             while (stack.popOrNull()) |region| {
                 const place = switch (side) {
                     .up => p.Point{
                         .row = region.top_left.row,
-                        .col = rand.intRangeAtMost(u8, region.top_left.col, region.bottomRightCol()),
+                        .col = self.rand.intRangeAtMost(u8, region.top_left.col, region.bottomRightCol()),
                     },
                     .down => p.Point{
                         .row = region.bottomRightRow(),
-                        .col = rand.intRangeAtMost(u8, region.top_left.col, region.bottomRightCol()),
+                        .col = self.rand.intRangeAtMost(u8, region.top_left.col, region.bottomRightCol()),
                     },
                     .left => p.Point{
-                        .row = rand.intRangeAtMost(u8, region.top_left.row, region.bottomRightRow()),
+                        .row = self.rand.intRangeAtMost(u8, region.top_left.row, region.bottomRightRow()),
                         .col = region.top_left.col,
                     },
                     .right => p.Point{
-                        .row = rand.intRangeAtMost(u8, region.top_left.row, region.bottomRightRow()),
+                        .row = self.rand.intRangeAtMost(u8, region.top_left.row, region.bottomRightRow()),
                         .col = region.bottomRightCol(),
                     },
                 };
@@ -646,13 +622,13 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                 // try to find in the different parts of the region:
                 var new_regions: [2]?p.Region = .{ null, null };
                 if (side == .up or side == .down) {
-                    new_regions = if (rand.boolean())
+                    new_regions = if (self.rand.boolean())
                         .{ region.cropVerticallyTo(place.col), region.cropVerticallyAfter(place.col) }
                     else
                         .{ region.cropVerticallyAfter(place.col), region.cropVerticallyTo(place.col) };
                     log.debug("Crop {any} vertically to {any} and {any}", .{ region, new_regions[0], new_regions[1] });
                 } else {
-                    new_regions = if (rand.boolean())
+                    new_regions = if (self.rand.boolean())
                         .{ region.cropHorizontallyTo(place.row), region.cropHorizontallyAfter(place.row) }
                     else
                         .{ region.cropHorizontallyAfter(place.row), region.cropHorizontallyTo(place.row) };
@@ -732,7 +708,7 @@ test "generate a simple room" {
     // given:
     const Rows = 12;
     const Cols = 12;
-    var dungeon = try BspDungeon(Rows, Cols).initEmpty(std.testing.allocator);
+    var dungeon = try BspDungeon(Rows, Cols).initEmpty(std.testing.allocator, std.crypto.random);
     defer dungeon.deinit();
 
     const region = p.Region{ .top_left = .{ .row = 2, .col = 2 }, .rows = 8, .cols = 8 };
@@ -749,7 +725,7 @@ test "generate a simple room" {
             errdefer std.debug.print("r:{d} c:{d}\n", .{ r, c });
 
             const cell = dungeon.cell(r, c);
-            if (room.contains(r, c)) {
+            if (room.containsPoint(.{ .row = r, .col = c })) {
                 const expect_wall =
                     (r == room.top_left.row or r == room.bottomRightRow() or
                     c == room.top_left.col or c == room.bottomRightCol());
@@ -773,7 +749,7 @@ test "find a place for door inside the room starting outside" {
         \\ #..#
         \\ ####
     ;
-    var dungeon = try BspDungeon(4, 5).parse(std.testing.allocator, str);
+    var dungeon = try BspDungeon(4, 5).parse(std.testing.allocator, std.crypto.random, str);
     defer dungeon.deinit();
     const region = BspDungeon(4, 5).Region;
 
@@ -802,7 +778,7 @@ test "find a place for door inside the room starting on the wall" {
         \\ #..#
         \\ ####
     ;
-    var dungeon = try BspDungeon(4, 5).parse(std.testing.allocator, str);
+    var dungeon = try BspDungeon(4, 5).parse(std.testing.allocator, std.crypto.random, str);
     defer dungeon.deinit();
     const region = BspDungeon(4, 5).Region;
 
@@ -831,13 +807,13 @@ test "find a random place for the door on the left side" {
         \\ ####
     ;
     errdefer std.debug.print("{s}\n", .{str});
-    var dungeon = try BspDungeon(4, 5).parse(std.testing.allocator, str);
+    const rand = std.crypto.random;
+    var dungeon = try BspDungeon(4, 5).parse(std.testing.allocator, rand, str);
     defer dungeon.deinit();
     const region = BspDungeon(4, 5).Region;
-    const rand = std.crypto.random;
 
     // when:
-    const place_left = try dungeon.findPlaceForDoorInRegionRnd(std.testing.allocator, rand, region, .left);
+    const place_left = try dungeon.findPlaceForDoorInRegionRnd(&region, .left);
 
     // then:
     errdefer std.debug.print("place left {any}\n", .{place_left});
@@ -854,13 +830,12 @@ test "find a random place for the door on the bottom side" {
         \\ ####
     ;
     errdefer std.debug.print("{s}\n", .{str});
-    var dungeon = try BspDungeon(4, 5).parse(std.testing.allocator, str);
+    var dungeon = try BspDungeon(4, 5).parse(std.testing.allocator, std.crypto.random, str);
     defer dungeon.deinit();
     const region = BspDungeon(4, 5).Region;
-    const rand = std.crypto.random;
 
     // when:
-    const place_bottom = try dungeon.findPlaceForDoorInRegionRnd(std.testing.allocator, rand, region, .down);
+    const place_bottom = try dungeon.findPlaceForDoorInRegionRnd(&region, .down);
 
     // then:
     errdefer std.debug.print("place bottom {any}\n", .{place_bottom});
@@ -879,14 +854,14 @@ test "create passage between two rooms" {
         \\ ####   ####
     ;
     errdefer std.debug.print("{s}\n", .{str});
-    var dungeon = try BspDungeon(Rows, Cols).parse(std.testing.allocator, str);
-    defer dungeon.deinit();
     const rand = std.crypto.random;
+    var dungeon = try BspDungeon(Rows, Cols).parse(std.testing.allocator, rand, str);
+    defer dungeon.deinit();
     const r1 = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = Rows, .cols = 6 };
     const r2 = p.Region{ .top_left = .{ .row = 1, .col = 7 }, .rows = Rows, .cols = Cols - 6 };
 
     // when:
-    const region = try dungeon.createAndAddPassageBetweenRegions(std.testing.allocator, rand, r1, r2, .right);
+    const region = try BspDungeon(Rows, Cols).createAndAddPassageBetweenRegions(&dungeon, &r1, &r2);
 
     // then:
     try std.testing.expectEqualDeep(BspDungeon(Rows, Cols).Region, region);
