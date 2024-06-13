@@ -437,9 +437,9 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             r2: p.Region,
             direction: p.Direction,
         ) !p.Region {
-            const door1 = try self.findPlaceForDoorInRegionRnd(alloc, rand, r1, direction.asSide()) orelse
+            const door1 = try self.findPlaceForDoorInRegionRnd(alloc, rand, r1, direction) orelse
                 return Error.NoSpaceForDoor;
-            const door2 = try self.findPlaceForDoorInRegionRnd(alloc, rand, r2, direction.asSide().opposite()) orelse
+            const door2 = try self.findPlaceForDoorInRegionRnd(alloc, rand, r2, direction.opposite()) orelse
                 return Error.NoSpaceForDoor;
 
             log.debug("Creating the passage from {any} {s} to {any}", .{ door1, @tagName(direction), door2 });
@@ -449,7 +449,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             _ = try passage.turnAt(door1, direction);
             if (!door1.onSameAxis(door2)) {
                 // intersection of the passage from the door 1 and region 1
-                var middle1: p.Point = if (direction.isHorizontal())
+                var middle1: p.Point = if (direction == .left or direction == .right)
                     // left or right
                     .{ .row = door1.row, .col = r1.bottomRightCol() }
                 else
@@ -457,7 +457,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                     .{ .row = r1.bottomRightRow(), .col = door1.col };
 
                 // intersection of the passage from the region 1 and door 2
-                var middle2: p.Point = if (direction.isHorizontal())
+                var middle2: p.Point = if (direction == .left or direction == .right)
                     // left or right
                     .{ .row = door2.row, .col = r1.bottomRightCol() }
                 else
@@ -465,7 +465,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                     .{ .row = r1.bottomRightRow(), .col = door2.col };
 
                 // try to find better places for turn:
-                if (try self.findPlaceForPassageTurn(alloc, door1, door2, direction.isHorizontal(), 0)) |places| {
+                if (try self.findPlaceForPassageTurn(alloc, door1, door2, direction == .left or direction == .right, 0)) |places| {
                     middle1 = places[0];
                     middle2 = places[1];
                 }
@@ -601,18 +601,18 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             alloc: std.mem.Allocator,
             rand: std.Random,
             init_region: p.Region,
-            side: p.Side,
+            side: p.Direction,
         ) !?p.Point {
             var stack = std.ArrayList(p.Region).init(alloc);
             defer stack.deinit();
             try stack.append(init_region);
             while (stack.popOrNull()) |region| {
                 const place = switch (side) {
-                    .top => p.Point{
+                    .up => p.Point{
                         .row = region.top_left.row,
                         .col = rand.intRangeAtMost(u8, region.top_left.col, region.bottomRightCol()),
                     },
-                    .bottom => p.Point{
+                    .down => p.Point{
                         .row = region.bottomRightRow(),
                         .col = rand.intRangeAtMost(u8, region.top_left.col, region.bottomRightCol()),
                     },
@@ -629,7 +629,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                     "Start search of a place for door from {any} on the _{s}_ side of the {any}",
                     .{ place, @tagName(side), region },
                 );
-                if (self.findPlaceForDoor(side.asDirection().opposite(), place, region)) |candidate| {
+                if (self.findPlaceForDoor(side.opposite(), place, region)) |candidate| {
                     if (self.cellAt(candidate)) |cl| {
                         switch (cl) {
                             .wall => {
@@ -645,7 +645,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                 }
                 // try to find in the different parts of the region:
                 var new_regions: [2]?p.Region = .{ null, null };
-                if (side.isHorizontal()) {
+                if (side == .up or side == .down) {
                     new_regions = if (rand.boolean())
                         .{ region.cropVerticallyTo(place.col), region.cropVerticallyAfter(place.col) }
                     else
@@ -860,7 +860,7 @@ test "find a random place for the door on the bottom side" {
     const rand = std.crypto.random;
 
     // when:
-    const place_bottom = try dungeon.findPlaceForDoorInRegionRnd(std.testing.allocator, rand, region, .bottom);
+    const place_bottom = try dungeon.findPlaceForDoorInRegionRnd(std.testing.allocator, rand, region, .down);
 
     // then:
     errdefer std.debug.print("place bottom {any}\n", .{place_bottom});

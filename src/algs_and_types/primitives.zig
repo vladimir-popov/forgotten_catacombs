@@ -9,15 +9,6 @@ pub const Direction = enum {
     up,
     down,
 
-    pub inline fn asSide(self: Direction) Side {
-        return switch (self) {
-            .up => .top,
-            .down => .bottom,
-            .left => .left,
-            .right => .right,
-        };
-    }
-
     pub inline fn opposite(self: Direction) Direction {
         return switch (self) {
             .up => .down,
@@ -35,47 +26,6 @@ pub const Direction = enum {
             .right => .down,
         };
         return if (is_clockwise) clockwise else clockwise.opposite();
-    }
-
-    pub inline fn isHorizontal(self: Direction) bool {
-        return self == .left or self == .right;
-    }
-
-    pub inline fn isVertical(self: Direction) bool {
-        return self == .up or self == .down;
-    }
-};
-
-pub const Side = enum {
-    left,
-    right,
-    top,
-    bottom,
-
-    pub inline fn opposite(self: Side) Side {
-        return switch (self) {
-            .top => .bottom,
-            .bottom => .top,
-            .left => .right,
-            .right => .left,
-        };
-    }
-
-    pub inline fn isHorizontal(self: Side) bool {
-        return self == .top or self == .bottom;
-    }
-
-    pub inline fn isVertical(self: Side) bool {
-        return self == .left or self == .right;
-    }
-
-    pub inline fn asDirection(self: Side) Direction {
-        return switch (self) {
-            .top => .up,
-            .bottom => .down,
-            .left => .left,
-            .right => .right,
-        };
     }
 };
 
