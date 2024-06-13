@@ -129,7 +129,7 @@ pub const GameSession = struct {
     player: Entity,
     dungeon: *Dungeon,
 
-    pub fn init(alloc: std.mem.Allocator, rand: std.Random, universe: *const Universe) !void {
+    pub fn init(alloc: std.mem.Allocator, rand: std.Random, universe: *Universe) !void {
         const dungeon = try Dungeon.createRandom(alloc, rand);
         const player_position = dungeon.findRandomPlaceForPlayer();
         universe.root.* = .{
@@ -144,7 +144,7 @@ pub const GameSession = struct {
 
     pub fn deinit(self: *GameSession) void {
         self.alloc.free(self.timers);
-        self.dungeon.deinit();
+        self.dungeon.destroy();
     }
 
     pub inline fn timer(self: GameSession, t: Timers) *i64 {

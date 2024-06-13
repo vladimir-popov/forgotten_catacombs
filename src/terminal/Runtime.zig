@@ -40,10 +40,10 @@ pub fn deinit(self: Self) void {
 /// Run the main loop for game, which should be
 /// the *gm.ForgottenCatacomb.Universe
 /// or *DungeonsGenerator.Universe
-pub fn run(self: *Self, universe: anytype) !void {
+pub fn run(self: *Self, universe_ptr: anytype) !void {
     tty.Display.clearScreen();
     while (!self.isExit()) {
-        try universe.tick();
+        try universe_ptr.*.tick();
         try self.drawBuffer(1, 1);
         self.resetBuffer();
     }

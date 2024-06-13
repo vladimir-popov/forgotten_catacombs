@@ -140,25 +140,25 @@ fn ComponentsManager(comptime ComponentsUnion: type) type {
         const Self = @This();
 
         const InnerState = struct {
+            alloc: std.mem.Allocator,
             components_map: ComponentsMap(ComponentsUnion),
         };
 
-        inner_state: InnerState,
+        inner_state: *InnerState,
 
         /// Initializes every field of the inner components map.
         /// The allocator is used for allocate inner storages.
-        pub fn init(alloc: std.mem.Allocator) Self {
-            var components_map: ComponentsMap(ComponentsUnion) = undefined;
+        pub fn init(alloc: std.mem.Allocator) !Self {
+            const inner_state = try alloc.create(InnerState);
+            inner_state.alloc = alloc;
 
             const Arrays = @typeInfo(ComponentsMap(ComponentsUnion)).Struct.fields;
             inline for (Arrays) |array| {
-                @field(components_map, array.name) =
+                @field(inner_state.components_map, array.name) =
                     array.type.init(alloc);
             }
 
-            return .{ .inner_state = .{
-                .components_map = components_map,
-            } };
+            return .{ .inner_state = inner_state };
         }
 
         /// Cleans up all inner storages.
@@ -166,6 +166,7 @@ fn ComponentsManager(comptime ComponentsUnion: type) type {
             inline for (@typeInfo(ComponentsMap(ComponentsUnion)).Struct.fields) |field| {
                 @field(self.inner_state.components_map, field.name).deinit();
             }
+            self.inner_state.alloc.destroy(self.inner_state);
         }
 
         pub fn getAll(self: Self, comptime C: type) []C {
@@ -202,7 +203,7 @@ fn ComponentsManager(comptime ComponentsUnion: type) type {
 }
 
 test "ComponentsManager: Add/Get/Remove component" {
-    var manager = ComponentsManager(TestComponents).init(std.testing.allocator);
+    var manager = try ComponentsManager(TestComponents).init(std.testing.allocator);
     defer manager.deinit();
 
     // should return the component, which was added before
@@ -298,7 +299,7 @@ const EntitiesManager = struct {
 };
 
 test "EntitiesManager: Add/Remove" {
-    var cm = ComponentsManager(TestComponents).init(std.testing.allocator);
+    var cm = try ComponentsManager(TestComponents).init(std.testing.allocator);
     defer cm.deinit();
 
     var em = EntitiesManager.init(
@@ -317,7 +318,7 @@ test "EntitiesManager: Add/Remove" {
 }
 
 test "EntitiesManager: iterator" {
-    var cm = ComponentsManager(TestComponents).init(std.testing.allocator);
+    var cm = try ComponentsManager(TestComponents).init(std.testing.allocator);
     defer cm.deinit();
 
     var em = EntitiesManager.init(
@@ -347,7 +348,7 @@ test "EntitiesManager: iterator" {
 ///              function.
 /// Components - a union of used components. Every component must have `fn deinit(self: *Self) void` function.
 /// Runtime - a type to communicate with a runtime environment: reading pressed buttons, draw sprites,
-///         play sounds, etc. 
+///         play sounds, etc.
 pub fn Universe(comptime RootObject: type, comptime Components: anytype, comptime Runtime: type) type {
     switch (@typeInfo(Components)) {
         .Union => {},
@@ -391,14 +392,11 @@ pub fn Universe(comptime RootObject: type, comptime Components: anytype, comptim
             return @ptrCast(@alignCast(self.inner_state));
         }
 
-        pub fn init(
-            alloc: std.mem.Allocator,
-            runtime: Runtime,
-        ) !Self {
+        pub fn init(alloc: std.mem.Allocator, runtime: Runtime) !Self {
             const root = try alloc.create(RootObject);
             const state = try alloc.create(InnerState);
             state.alloc = alloc;
-            state.components = ComponentsManager(Components).init(alloc);
+            state.components = try ComponentsManager(Components).init(alloc);
             state.entities = EntitiesManager.init(
                 alloc,
                 &state.components,

@@ -108,7 +108,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
         rooms: std.ArrayList(Room),
         passages: std.ArrayList(Passage),
 
-        pub fn deinit(self: *Self) void {
+        pub fn destroy(self: *Self) void {
             for (self.passages.items) |passage| {
                 passage.deinit();
             }
@@ -449,16 +449,10 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                 }
 
                 var turn = try passage.turnToPoint(middle1, middle2);
-                log.debug("Add turn at {any} to {s}", .{ turn.place, @tagName(turn.to_direction) });
 
                 turn = try passage.turnToPoint(middle2, door2);
-                log.debug("Add turn at {any} to {s}", .{ turn.place, @tagName(turn.to_direction) });
             }
             _ = try passage.turnAt(door2, direction);
-            log.debug(
-                "The passage from {any} {s} to {any} has been created:\n{any}",
-                .{ door1, @tagName(direction), door2, passage.* },
-            );
 
             try self.digPassage(passage);
             try self.forceCreateDoorAt(door1, self.rand.boolean());
@@ -476,7 +470,6 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             is_horizontal: bool,
             attempt: u8,
         ) !?struct { p.Point, p.Point } {
-            log.debug("Looking for passage between {any} to {any}", .{ init_from, init_to });
             var current_attempt = attempt;
             var stack = std.ArrayList(struct { p.Point, p.Point }).init(self.alloc);
             defer stack.deinit();
@@ -526,7 +519,6 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             else
                 unreachable;
             var cursor = from;
-            log.debug("Check line from {any} to {any} moving {s}", .{ from, to, @tagName(direction) });
             while (!std.meta.eql(cursor, to)) {
                 if (self.isCellAt(cursor, .nothing))
                     cursor.move(direction)
@@ -547,10 +539,8 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
         }
 
         fn dig(self: *Self, from: p.Point, to: p.Point, direction: p.Direction) !void {
-            log.debug("Dig from {any} to {any} in {s} direction", .{ from, to, @tagName(direction) });
             var point = from;
             while (true) {
-                log.debug("Dig at {any}", .{point});
                 self.createWallAt(point.movedTo(direction.rotatedClockwise(false)));
                 self.createWallAt(point.movedTo(direction.rotatedClockwise(true)));
                 self.createFloorAt(point);
@@ -600,18 +590,10 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                         .col = region.bottomRightCol(),
                     },
                 };
-                log.debug(
-                    "Start search of a place for door from {any} on the _{s}_ side of the {any}",
-                    .{ place, @tagName(side), region },
-                );
                 if (self.findPlaceForDoor(side.opposite(), place, region)) |candidate| {
                     if (self.cellAt(candidate)) |cl| {
                         switch (cl) {
                             .wall => {
-                                log.debug(
-                                    "{any} is the place for door in {any} on {s} side",
-                                    .{ candidate, region, @tagName(side) },
-                                );
                                 return candidate;
                             },
                             else => {},
@@ -625,13 +607,11 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                         .{ region.cropVerticallyTo(place.col), region.cropVerticallyAfter(place.col) }
                     else
                         .{ region.cropVerticallyAfter(place.col), region.cropVerticallyTo(place.col) };
-                    log.debug("Crop {any} vertically to {any} and {any}", .{ region, new_regions[0], new_regions[1] });
                 } else {
                     new_regions = if (self.rand.boolean())
                         .{ region.cropHorizontallyTo(place.row), region.cropHorizontallyAfter(place.row) }
                     else
                         .{ region.cropHorizontallyAfter(place.row), region.cropHorizontallyTo(place.row) };
-                    log.debug("Crop {any} horizontally to {any} and {any}", .{ region, new_regions[0], new_regions[1] });
                 }
                 for (new_regions) |new_region| {
                     if (new_region) |reg| {
@@ -640,7 +620,6 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                     }
                 }
             }
-            log.debug("Not found any place for door in {any} on {s} side", .{ init_region, @tagName(side) });
             return null;
         }
 
@@ -655,38 +634,22 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                     switch (cl) {
                         .nothing => {},
                         .door => {
-                            log.debug("Door already exists at {any}", .{place});
                             return null;
                         },
                         .wall => {
-                            log.debug("Meet the wall at {any}", .{place});
                             if (!self.isCellAt(place.movedTo(direction), .floor)) {
-                                log.debug(
-                                    "Expected floor after the wall at {any} in {s} direction, but found {any}",
-                                    .{ place, @tagName(direction), self.cellAt(place.movedTo(direction)) },
-                                );
                                 return null;
                             }
                             // check that no one door near
                             if (self.isCellAt(place.movedTo(direction.rotatedClockwise(true)), .door)) {
-                                log.debug(
-                                    "The door already exists nearby at {any}",
-                                    .{place.movedTo(direction.rotatedClockwise(true))},
-                                );
                                 return null;
                             }
                             if (self.isCellAt(place.movedTo(direction.rotatedClockwise(false)), .door)) {
-                                log.debug(
-                                    "The door already exists nearby at {any}",
-                                    .{place.movedTo(direction.rotatedClockwise(false))},
-                                );
                                 return null;
                             }
-                            log.debug("Found a place for door at {any}", .{place});
                             return place;
                         },
                         .floor => {
-                            log.debug("Unexpected empty floor at {any}", .{place});
                             return null;
                         },
                     }
@@ -708,7 +671,7 @@ test "generate a simple room" {
     const Rows = 12;
     const Cols = 12;
     var dungeon = try BspDungeon(Rows, Cols).createEmpty(std.testing.allocator, std.crypto.random);
-    defer dungeon.deinit();
+    defer dungeon.destroy();
 
     const region = p.Region{ .top_left = .{ .row = 2, .col = 2 }, .rows = 8, .cols = 8 };
 
@@ -749,7 +712,7 @@ test "find a place for door inside the room starting outside" {
         \\ ####
     ;
     var dungeon = try BspDungeon(4, 5).parse(std.testing.allocator, std.crypto.random, str);
-    defer dungeon.deinit();
+    defer dungeon.destroy();
     const region = BspDungeon(4, 5).Region;
 
     // when:
@@ -778,7 +741,7 @@ test "find a place for door inside the room starting on the wall" {
         \\ ####
     ;
     var dungeon = try BspDungeon(4, 5).parse(std.testing.allocator, std.crypto.random, str);
-    defer dungeon.deinit();
+    defer dungeon.destroy();
     const region = BspDungeon(4, 5).Region;
 
     // when:
@@ -808,7 +771,7 @@ test "find a random place for the door on the left side" {
     errdefer std.debug.print("{s}\n", .{str});
     const rand = std.crypto.random;
     var dungeon = try BspDungeon(4, 5).parse(std.testing.allocator, rand, str);
-    defer dungeon.deinit();
+    defer dungeon.destroy();
     const region = BspDungeon(4, 5).Region;
 
     // when:
@@ -830,7 +793,7 @@ test "find a random place for the door on the bottom side" {
     ;
     errdefer std.debug.print("{s}\n", .{str});
     var dungeon = try BspDungeon(4, 5).parse(std.testing.allocator, std.crypto.random, str);
-    defer dungeon.deinit();
+    defer dungeon.destroy();
     const region = BspDungeon(4, 5).Region;
 
     // when:
@@ -855,7 +818,7 @@ test "create passage between two rooms" {
     errdefer std.debug.print("{s}\n", .{str});
     const rand = std.crypto.random;
     const dungeon = try BspDungeon(Rows, Cols).parse(std.testing.allocator, rand, str);
-    defer dungeon.deinit();
+    defer dungeon.destroy();
     const r1 = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = Rows, .cols = 6 };
     const r2 = p.Region{ .top_left = .{ .row = 1, .col = 7 }, .rows = Rows, .cols = Cols - 6 };
 

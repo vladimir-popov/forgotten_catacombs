@@ -58,7 +58,7 @@ const DungeonsGenerator = struct {
     }
 
     pub fn deinit(self: *DungeonsGenerator) void {
-        self.dungeon.deinit();
+        self.dungeon.destroy();
         self.screen.deinit();
     }
 
@@ -73,7 +73,7 @@ const DungeonsGenerator = struct {
             const seed = self.runtime.rand.int(u64);
             log.debug("The random seed is {d}", .{seed});
             var rnd = std.Random.DefaultPrng.init(seed);
-            self.dungeon.deinit();
+            self.dungeon.destroy();
             self.dungeon = try game.Dungeon.createRandom(
                 self.runtime.alloc,
                 rnd.random(),
