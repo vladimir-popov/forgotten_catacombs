@@ -72,8 +72,7 @@ fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game
             .nothing => " ",
             .floor => ".",
             .wall => "#",
-            .opened_door => "'",
-            .closed_door => "+",
+            .door => |door| if (door == .opened) "\'" else "+",
         };
         try drawSprite(ptr, screen, &sprite, &position);
         position.point.move(.right);

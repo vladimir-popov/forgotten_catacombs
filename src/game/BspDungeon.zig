@@ -152,7 +152,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
 
             // fold the BSP tree and binds nodes with the same parent:
             _ = try root.foldModify(
-                bsp_arena.allocator(),
+                alloc,
                 .{ .ptr = dungeon, .combine = createAndAddPassageBetweenRegions },
             );
 
@@ -176,7 +176,22 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
         }
 
         pub inline fn cellAt(self: Self, place: p.Point) ?Cell {
-            return self.cell(place.row, place.col);
+            if (place.row < 1 or place.row > Rows) {
+                return null;
+            }
+            if (place.col < 1 or place.col > Cols) {
+                return null;
+            }
+            if (self.walls.isSet(place.row, place.col)) {
+                return .wall;
+            }
+            if (self.floor.isSet(place.row, place.col)) {
+                return .floor;
+            }
+            if (self.objects.isSet(place.row, place.col)) {
+                return self.objects_map.get(place) orelse unreachable;
+            }
+            return .nothing;
         }
 
         pub inline fn isCellAt(self: Self, place: p.Point, assumption: CellEnum) bool {
@@ -185,25 +200,6 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             } else {
                 return false;
             }
-        }
-
-        pub fn cell(self: Self, row: u8, col: u8) ?Cell {
-            if (row < 1 or row > Rows) {
-                return null;
-            }
-            if (col < 1 or col > Cols) {
-                return null;
-            }
-            if (self.walls.isSet(row, col)) {
-                return .wall;
-            }
-            if (self.floor.isSet(row, col)) {
-                return .floor;
-            }
-            if (self.objects.isSet(row, col)) {
-                return self.objects_map.get(.{ .row = row, .col = col }) orelse unreachable;
-            }
-            return .nothing;
         }
 
         pub fn cellsInRegion(self: *const Self, region: p.Region) ?CellsIterator {
@@ -727,7 +723,7 @@ test "generate a simple room" {
             const c: u8 = @intCast(c_idx + 1);
             errdefer std.debug.print("r:{d} c:{d}\n", .{ r, c });
 
-            const cell = dungeon.cell(r, c);
+            const cell = dungeon.cellAt(.{ .row = r, .col = c });
             if (room.containsPoint(.{ .row = r, .col = c })) {
                 const expect_wall =
                     (r == room.top_left.row or r == room.bottomRightRow() or

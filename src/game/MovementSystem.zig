@@ -40,14 +40,16 @@ fn doMove(universe: *game.Universe, move: *cmp.Move, position: *cmp.Position, en
     const orig_point = position.point;
     const direction = move.direction.?;
     move.applyTo(position);
+
     if (entity != universe.root.player) {
         return;
     }
+
+    // keep player on the screen:
     const screen = &universe.root.screen;
     const inner_region = screen.innerRegion();
     const dungeon = universe.root.dungeon;
-    const new_point = position.point.movedTo(direction);
-    // keep player on the screen:
+    const new_point = position.point;
     if (direction == .up and new_point.row < inner_region.top_left.row)
         screen.move(direction);
     if (direction == .down and new_point.row > inner_region.bottomRightRow())
