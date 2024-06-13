@@ -159,8 +159,8 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             return dungeon;
         }
 
-        pub fn findRandomPlaceForPlayer(self: Self, rand: std.Random) p.Point {
-            const room = rand.uintLessThan(usize, self.rooms.items.len);
+        pub fn findRandomPlaceForPlayer(self: Self) p.Point {
+            const room = self.rand.uintLessThan(usize, self.rooms.items.len);
             return self.rooms.items[room].middle();
         }
 

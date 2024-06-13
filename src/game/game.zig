@@ -34,19 +34,6 @@ pub const Entity = ecs.Entity;
 
 pub const Dungeon = @import("BspDungeon.zig").BspDungeon(TOTAL_ROWS, TOTAL_COLS);
 
-pub const GameSession = struct {
-    pub const Timers = enum { input_system };
-
-    screen: Screen,
-    timers: []i64,
-    player: Entity,
-    dungeon: *Dungeon,
-
-    pub inline fn timer(self: GameSession, t: Timers) *i64 {
-        return &self.timers[@intFromEnum(t)];
-    }
-};
-
 pub const Button = struct {
     pub const Type = c_int;
 
@@ -133,16 +120,42 @@ pub const AnyRuntime = struct {
 
 pub const Universe = ecs.Universe(GameSession, Components, AnyRuntime);
 
+pub const GameSession = struct {
+    pub const Timers = enum { input_system };
+
+    alloc: std.mem.Allocator,
+    screen: Screen,
+    timers: []i64,
+    player: Entity,
+    dungeon: *Dungeon,
+
+    pub fn init(alloc: std.mem.Allocator, rand: std.Random, universe: *const Universe) !void {
+        const dungeon = try Dungeon.createRandom(alloc, rand);
+        const player_position = dungeon.findRandomPlaceForPlayer();
+        universe.root.* = .{
+            .alloc = alloc,
+            .screen = Screen.init(DISPLAY_ROWS, DISPLAY_COLS, Dungeon.Region),
+            .timers = try alloc.alloc(i64, std.meta.tags(GameSession.Timers).len),
+            .dungeon = dungeon,
+            .player = entities.Player(universe, player_position),
+        };
+        universe.root.screen.centeredAround(player_position);
+    }
+
+    pub fn deinit(self: *GameSession) void {
+        self.alloc.free(self.timers);
+        self.dungeon.deinit();
+    }
+
+    pub inline fn timer(self: GameSession, t: Timers) *i64 {
+        return &self.timers[@intFromEnum(t)];
+    }
+};
+
 pub fn init(runtime: AnyRuntime) !Universe {
-    var universe: Universe = Universe.init(runtime.alloc, runtime, try runtime.alloc.create(GameSession));
+    var universe: Universe = try Universe.init(runtime.alloc, runtime);
 
-    universe.root.screen = Screen.init(DISPLAY_ROWS, DISPLAY_COLS, Dungeon.Region);
-    universe.root.timers = try runtime.alloc.alloc(i64, std.meta.tags(GameSession.Timers).len);
-    universe.root.dungeon = try Dungeon.createRandom(runtime.alloc, runtime.rand);
-
-    const player_position = universe.root.dungeon.findRandomPlaceForPlayer(runtime.rand);
-    universe.root.player = entities.Player(universe, player_position);
-    universe.root.screen.centeredAround(player_position);
+    try GameSession.init(runtime.alloc, runtime.rand, &universe);
 
     // Initialize systems:
     universe.registerSystem(systems.Input.handleInput);
