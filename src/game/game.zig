@@ -153,8 +153,7 @@ pub const GameSession = struct {
 };
 
 pub fn createUniverse(runtime: AnyRuntime) !*Universe {
-    const universe: *Universe = try runtime.alloc.create(Universe);
-    universe.* = try Universe.init(runtime.alloc, runtime);
+    const universe: *Universe = try Universe.create(runtime.alloc, runtime);
 
     try GameSession.init(runtime.alloc, runtime.rand, universe);
 

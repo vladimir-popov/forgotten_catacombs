@@ -11,7 +11,7 @@ pub fn handleInput(universe: *game.Universe) anyerror!void {
 
     const now = universe.runtime.currentMillis();
     const timer = universe.root.timer(game.GameSession.Timers.input_system);
-    if (universe.getComponent(universe.root.player, game.components.Move)) |move| {
+    if (universe.components.getForEntity(universe.root.player, game.components.Move)) |move| {
         if (game.Button.toDirection(btn)) |direction| {
             move.direction = direction;
             move.keep_moving = now - timer.* < 200;

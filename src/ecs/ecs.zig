@@ -89,7 +89,9 @@ fn ComponentsMap(comptime ComponentsUnion: anytype) type {
     const type_info = @typeInfo(ComponentsUnion);
     switch (type_info) {
         .Union => {},
-        else => @compileError(std.fmt.comptimePrint("Components have to be grouped to the tagged union, but found {any}", .{type_info})),
+        else => @compileError(
+            std.fmt.comptimePrint("Components have to be grouped to the tagged union, but found {any}", .{type_info}),
+        ),
     }
     const union_fields = type_info.Union.fields;
     if (union_fields.len == 0) {
@@ -364,23 +366,11 @@ pub fn Universe(comptime RootObject: type, comptime Components: anytype, comptim
 
         const System = *const fn (game: *Self) anyerror!void;
 
-        const InnerState = struct {
-            /// The allocator which is used for creating this inner state.
-            alloc: std.mem.Allocator,
-            components: ComponentsManager(Components),
-            entities: EntitiesManager,
-            systems: std.ArrayList(System),
-
-            pub fn deinit(self: *@This()) void {
-                self.entities.deinit();
-                self.components.deinit();
-                self.systems.deinit();
-                self.alloc.destroy(self);
-            }
-        };
-        /// To protect access to the inner state, everything is wrapped to the
-        /// structure, and can be accessed only inside this type.
-        inner_state: *anyopaque,
+        /// The allocator which is used for creating this inner state.
+        alloc: std.mem.Allocator,
+        components: ComponentsManager(Components),
+        entities: EntitiesManager,
+        systems: std.ArrayList(System),
 
         /// A runtime in which the game is run.
         /// It can contains game settings and functions, which are used in the systems.
@@ -388,77 +378,40 @@ pub fn Universe(comptime RootObject: type, comptime Components: anytype, comptim
 
         root: *RootObject,
 
-        /// private typed getter of the inner state
-        inline fn st(self: Self) *InnerState {
-            return @ptrCast(@alignCast(self.inner_state));
-        }
-
-        pub fn init(alloc: std.mem.Allocator, runtime: Runtime) !Self {
-            const root = try alloc.create(RootObject);
-            const state = try alloc.create(InnerState);
-            state.alloc = alloc;
-            state.components = try ComponentsManager(Components).init(alloc);
-            state.entities = EntitiesManager.init(
+        pub fn create(alloc: std.mem.Allocator, runtime: Runtime) !*Self {
+            const instance = try alloc.create(Self);
+            instance.alloc = alloc;
+            instance.root = try alloc.create(RootObject);
+            instance.components = try ComponentsManager(Components).init(alloc);
+            instance.entities = EntitiesManager.init(
                 alloc,
-                &state.components,
+                &instance.components,
                 ComponentsManager(Components).removeAllForEntityOpaque,
             );
-            state.systems = std.ArrayList(System).init(alloc);
+            instance.systems = std.ArrayList(System).init(alloc);
+            instance.runtime = runtime;
 
-            return .{ .root = root, .runtime = runtime, .inner_state = state };
+            return instance;
         }
 
-        pub fn deinit(self: *Self) void {
+        pub fn destroy(self: *Self) void {
             self.root.deinit();
-            self.st().alloc.destroy(self.root);
-            self.st().deinit();
+            self.alloc.destroy(self.root);
+            self.entities.deinit();
+            self.components.deinit();
+            self.systems.deinit();
+            self.alloc.destroy(self);
         }
 
         pub fn registerSystem(self: *Self, system: System) void {
-            self.st().systems.append(system) catch |err|
+            self.systems.append(system) catch |err|
                 std.debug.panic("The memory error {any} happened on registration system.", .{err});
         }
 
         pub fn tick(self: *Self) anyerror!void {
-            for (self.st().systems.items) |system| {
+            for (self.systems.items) |system| {
                 try system(self);
             }
-        }
-
-        pub const EntityBuilder = struct {
-            const EB = @This();
-
-            entity: Entity,
-            cm_ptr: *ComponentsManager(Components),
-
-            pub fn withComponent(self: EB, comptime C: type, component: C) EB {
-                self.cm_ptr.addToEntity(self.entity, C, component);
-                return self;
-            }
-        };
-
-        pub fn newEntity(self: Self) EntityBuilder {
-            return .{ .entity = self.st().entities.newEntity(), .cm_ptr = &self.st().components };
-        }
-
-        pub fn entitiesIterator(self: *Self) EntitiesManager.EntitiesIterator {
-            return self.st().entities.iterator();
-        }
-
-        pub fn getComponent(self: Self, entity: Entity, comptime C: type) ?*C {
-            return self.st().components.getForEntity(entity, C);
-        }
-
-        pub fn getComponents(self: Self, comptime C: type) []C {
-            return self.st().components.getAll(C);
-        }
-
-        pub fn addComponent(self: Self, entity: Entity, comptime C: type, component: C) void {
-            self.st().components.addToEntity(entity, C, component);
-        }
-
-        pub fn removeComponentFromEntity(self: Self, entity: Entity, comptime C: type) void {
-            self.st().components.removeFromEntity(entity, C);
         }
 
         pub fn Query2(comptime Cmp1: type, Cmp2: type) type {
@@ -470,8 +423,8 @@ pub fn Universe(comptime RootObject: type, comptime Components: anytype, comptim
 
                 pub fn next(self: *Q2) ?struct { Entity, *Cmp1, *Cmp2 } {
                     if (self.entities.next()) |entity| {
-                        if (self.universe.getComponent(entity, Cmp1)) |c1| {
-                            if (self.universe.getComponent(entity, Cmp2)) |c2| {
+                        if (self.universe.components.getForEntity(entity, Cmp1)) |c1| {
+                            if (self.universe.components.getForEntity(entity, Cmp2)) |c2| {
                                 return .{ entity, c1, c2 };
                             }
                         }
@@ -482,7 +435,7 @@ pub fn Universe(comptime RootObject: type, comptime Components: anytype, comptim
         }
 
         pub fn queryComponents2(self: *Self, comptime Cmp1: type, Cmp2: type) Query2(Cmp1, Cmp2) {
-            return .{ .universe = self, .entities = self.entitiesIterator() };
+            return .{ .universe = self, .entities = self.entities.iterator() };
         }
     };
 }
