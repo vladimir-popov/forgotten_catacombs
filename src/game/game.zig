@@ -90,7 +90,7 @@ pub const AnyRuntime = struct {
     context: *anyopaque,
     alloc: std.mem.Allocator,
     rand: std.Random,
-    vtable: VTable,
+    vtable: *const VTable,
 
     pub fn currentMillis(self: AnyRuntime) i64 {
         return self.vtable.currentMillis(self.context);
@@ -152,10 +152,11 @@ pub const GameSession = struct {
     }
 };
 
-pub fn init(runtime: AnyRuntime) !Universe {
-    var universe: Universe = try Universe.init(runtime.alloc, runtime);
+pub fn createUniverse(runtime: AnyRuntime) !*Universe {
+    const universe: *Universe = try runtime.alloc.create(Universe);
+    universe.* = try Universe.init(runtime.alloc, runtime);
 
-    try GameSession.init(runtime.alloc, runtime.rand, &universe);
+    try GameSession.init(runtime.alloc, runtime.rand, universe);
 
     // Initialize systems:
     universe.registerSystem(systems.Input.handleInput);

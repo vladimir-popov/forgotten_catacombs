@@ -39,18 +39,6 @@ pub fn panic(
 var playdate_error_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) void = undefined;
 var playdate_log_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) void = undefined;
 
-const GlobalState = struct {
-    runtime: Runtime,
-    universe: game.Universe,
-
-    pub fn create(playdate: *api.PlaydateAPI) !*GlobalState {
-        var state: *GlobalState = @ptrCast(@alignCast(playdate.system.realloc(null, @sizeOf(GlobalState))));
-        state.runtime = Runtime.init(playdate);
-        state.universe = try game.init(try state.runtime.any());
-        return state;
-    }
-};
-
 pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent, arg: u32) callconv(.C) c_int {
     _ = arg;
     switch (event) {
@@ -58,9 +46,19 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
             playdate_error_to_console = playdate.system.@"error";
             playdate_log_to_console = playdate.system.logToConsole;
 
-            const global_state: *anyopaque = GlobalState.create(playdate) catch |err|
-                std.debug.panic("Error {any} on init global state", .{err});
-            playdate.system.setUpdateCallback(update_and_render, global_state);
+            const err: ?*[*c]const u8 = null;
+            const font = playdate.graphics.loadFont("Roobert-11-Mono-Condensed.pft", err) orelse {
+                const err_msg = err orelse "Unknown error.";
+                std.debug.panic("Error on load font: {s}", .{err_msg});
+            };
+
+            playdate.graphics.setFont(font);
+            playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeFillWhite);
+
+            const universe: *game.Universe = game.createUniverse(Runtime.any(playdate)) catch
+                @panic("Error on creating universe");
+
+            playdate.system.setUpdateCallback(update_and_render, universe);
         },
         else => {},
     }
@@ -68,9 +66,12 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
 }
 
 fn update_and_render(userdata: ?*anyopaque) callconv(.C) c_int {
-    const gst: *GlobalState = @ptrCast(@alignCast(userdata.?));
-    gst.runtime.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
-    gst.universe.tick() catch |err|
+    const universe: *game.Universe = @ptrCast(@alignCast(userdata.?));
+    const playdate: *api.PlaydateAPI = @ptrCast(@alignCast(universe.runtime.context));
+
+    playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
+
+    universe.tick() catch |err|
         std.debug.panic("Error {any} on game tick", .{err});
 
     //returning 1 signals to the OS to draw the frame.

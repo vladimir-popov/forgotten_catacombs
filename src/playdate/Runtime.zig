@@ -12,35 +12,17 @@ const FONT_WIDHT: u16 = 8;
 
 const log = std.log.scoped(.runtime);
 
-playdate: *api.PlaydateAPI,
-font: *api.LCDFont,
+var rnd: std.rand.Xoshiro256 = std.rand.DefaultPrng.init(0);
 
-pub fn init(playdate: *api.PlaydateAPI) Self {
-    const err: ?*[*c]const u8 = null;
-    const font = playdate.graphics.loadFont("Roobert-11-Mono-Condensed.pft", err) orelse {
-        const err_msg = err orelse "Unknown error.";
-        std.debug.panic("Error on load font: {s}", .{err_msg});
-    };
-
-    playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeFillWhite);
-    playdate.graphics.setFont(font);
-
-    return .{ .playdate = playdate, .font = font };
-}
-
-pub fn deinit(self: Self) void {
-    self.playdate.system.realloc(self.font, 0);
-}
-
-pub fn any(self: *Self) !game.AnyRuntime {
-    var millis: c_uint = undefined;
-    _ = self.playdate.system.getSecondsSinceEpoch(&millis);
-    var rnd = std.Random.DefaultPrng.init(@intCast(millis));
+pub fn any(playdate: *api.PlaydateAPI) game.AnyRuntime {
+    // var millis: c_uint = undefined;
+    // _ = self.playdate.system.getSecondsSinceEpoch(&millis);
+    // var rnd = std.Random.DefaultPrng.init(@intCast(millis));
     return .{
-        .context = self,
-        .alloc = Allocator.allocator(self.playdate),
+        .context = playdate,
+        .alloc = Allocator.allocator(playdate),
         .rand = rnd.random(),
-        .vtable = .{
+        .vtable = &.{
             .readButton = readButton,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
@@ -52,14 +34,14 @@ pub fn any(self: *Self) !game.AnyRuntime {
 // ======== Private methods: ==============
 
 fn currentMillis(ptr: *anyopaque) i64 {
-    var self: *Self = @ptrCast(@alignCast(ptr));
-    return self.playdate.system.getCurrentTimeMilliseconds();
+    const playdate: *api.PlaydateAPI = @ptrCast(@alignCast(ptr));
+    return playdate.system.getCurrentTimeMilliseconds();
 }
 
 fn readButton(ptr: *anyopaque) anyerror!game.Button.Type {
-    var self: *Self = @ptrCast(@alignCast(ptr));
+    const playdate: *api.PlaydateAPI = @ptrCast(@alignCast(ptr));
     var button: api.PDButtons = undefined;
-    self.playdate.system.getButtonState(null, &button, null);
+    playdate.system.getButtonState(null, &button, null);
     return @truncate(button);
 }
 
@@ -90,9 +72,9 @@ fn drawSprite(
     position: *const cmp.Position,
 ) anyerror!void {
     if (screen.region.containsPoint(position.point)) {
-        var self: *Self = @ptrCast(@alignCast(ptr));
+        const playdate: *api.PlaydateAPI = @ptrCast(@alignCast(ptr));
         const y: c_int = FONT_HEIGHT * (position.point.row - screen.region.top_left.row + 1);
         const x: c_int = FONT_WIDHT * (position.point.col - screen.region.top_left.col + 1);
-        _ = self.playdate.graphics.drawText(sprite.letter.ptr, sprite.letter.len, .UTF8Encoding, x, y);
+        _ = playdate.graphics.drawText(sprite.letter.ptr, sprite.letter.len, .UTF8Encoding, x, y);
     }
 }

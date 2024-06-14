@@ -82,7 +82,7 @@ pub fn any(self: *Self) game.AnyRuntime {
         .context = self,
         .alloc = self.alloc,
         .rand = self.rand,
-        .vtable = .{
+        .vtable = &.{
             .readButton = readButton,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,

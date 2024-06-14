@@ -151,6 +151,7 @@ fn ComponentsManager(comptime ComponentsUnion: type) type {
         pub fn init(alloc: std.mem.Allocator) !Self {
             const inner_state = try alloc.create(InnerState);
             inner_state.alloc = alloc;
+            inner_state.components_map = undefined;
 
             const Arrays = @typeInfo(ComponentsMap(ComponentsUnion)).Struct.fields;
             inline for (Arrays) |array| {
