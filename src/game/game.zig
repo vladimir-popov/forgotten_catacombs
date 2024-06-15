@@ -2,16 +2,13 @@ const std = @import("std");
 const ecs = @import("ecs");
 
 pub usingnamespace @import("components.zig");
+pub usingnamespace @import("systems.zig");
 
 pub const AnyRuntime = @import("AnyRuntime.zig");
 
 pub const Entity = ecs.Entity;
 pub const Screen = @import("Screen.zig");
 pub const Dungeon = @import("BspDungeon.zig").BspDungeon(TOTAL_ROWS, TOTAL_COLS);
-
-pub const InputSystem = @import("InputSystem.zig");
-pub const RenderSystem = @import("RenderSystem.zig");
-pub const MovementSystem = @import("MovementSystem.zig");
 
 pub const GameSession = @import("GameSession.zig");
 

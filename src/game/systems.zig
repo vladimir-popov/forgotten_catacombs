@@ -1,9 +1,37 @@
 const std = @import("std");
-const game = @import("game.zig");
 const algs_and_types = @import("algs_and_types");
 const p = algs_and_types.primitives;
+const game = @import("game.zig");
 
-const log = std.log.scoped(.movement_system);
+const log = std.log.scoped(.systems);
+
+pub fn render(session: *game.GameSession) anyerror!void {
+    const screen = &session.screen;
+    try session.runtime.drawDungeon(screen, session.dungeon);
+
+    for (session.components.getAll(game.Position)) |*position| {
+        if (screen.region.containsPoint(position.point)) {
+            for (session.components.getAll(game.Sprite)) |*sprite| {
+                try session.runtime.drawSprite(screen, sprite, position);
+            }
+        }
+    }
+}
+
+pub fn handleInput(session: *game.GameSession) anyerror!void {
+    const btn = try session.runtime.readButton();
+    if (btn == 0) return;
+
+    const now = session.runtime.currentMillis();
+    const timer = session.timer(game.GameSession.Timers.key_pressed);
+    if (session.components.getForEntity(session.player, game.Move)) |move| {
+        if (game.AnyRuntime.Button.toDirection(btn)) |direction| {
+            move.direction = direction;
+            move.keep_moving = now - timer.* < 200;
+        }
+    }
+    timer.* = now;
+}
 
 pub fn handleMove(session: *game.GameSession) anyerror!void {
     var itr = session.queryComponents2(game.Move, game.Position);

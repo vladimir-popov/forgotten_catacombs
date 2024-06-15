@@ -197,6 +197,24 @@ pub fn ComponentsManager(comptime ComponentsUnion: type) type {
 }
 
 test "ComponentsManager: Add/Get/Remove component" {
+    const TestComponent = struct {
+        const Self = @This();
+        state: std.ArrayList(u8),
+        fn init(value: u8) !Self {
+            var instance: Self = .{ .state = try std.ArrayList(u8).initCapacity(std.testing.allocator, 1) };
+            try instance.state.append(value);
+            return instance;
+        }
+
+        fn deinit(self: *Self) void {
+            self.state.deinit();
+        }
+    };
+
+    const TestComponents = union {
+        foo: TestComponent,
+    };
+
     var manager = try ComponentsManager(TestComponents).init(std.testing.allocator);
     defer manager.deinit();
 
@@ -218,21 +236,45 @@ test "ComponentsManager: Add/Get/Remove component" {
     // and finally, no memory leak should happened
 }
 
-// Just for tests:
-const TestComponent = struct {
+/// The manager of the entities and their components.
+pub const EntitiesManager = struct {
     const Self = @This();
-    state: std.ArrayList(u8),
-    fn init(value: u8) !Self {
-        var instance: Self = .{ .state = try std.ArrayList(u8).initCapacity(std.testing.allocator, 1) };
-        try instance.state.append(value);
-        return instance;
+
+    /// The iterator over entities. It should be used to get
+    /// entities from this manager.
+    pub const EntitiesIterator = std.AutoHashMap(Entity, void).KeyIterator;
+
+    next_entity: Entity,
+    entities: std.AutoHashMap(Entity, void),
+
+    pub fn init(alloc: std.mem.Allocator) !Self {
+        return .{
+            .next_entity = 0,
+            .entities = std.AutoHashMap(Entity, void).init(alloc),
+        };
     }
 
-    fn deinit(self: *Self) void {
-        self.state.deinit();
+    /// Removes cleans up the inner entities storage.
+    pub fn deinit(self: *Self) void {
+        self.entities.deinit();
     }
-};
 
-const TestComponents = union {
-    foo: TestComponent,
+    /// Generates an unique id for the new entity, puts it to the inner storage,
+    /// and then returns as the result. The id is unique for whole life circle of
+    /// this manager.
+    pub fn newEntity(self: *Self) !Entity {
+        const entity = self.next_entity;
+        self.next_entity += 1;
+        try self.entities.put(entity, {});
+        return entity;
+    }
+
+    /// Removes all components of the entity and it self from the inner storage.
+    pub fn removeEntity(self: *Self, entity: Entity) void {
+        _ = self.entities.remove(entity);
+    }
+
+    pub inline fn iterator(self: *Self) EntitiesIterator {
+        return self.entities.keyIterator();
+    }
 };
