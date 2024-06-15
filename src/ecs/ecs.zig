@@ -11,7 +11,7 @@ pub const Entity = u32;
 ///
 /// The components are stored in the array, and can be got
 /// for an entity for O(1) thanks for additional indexes inside.
-fn ComponentArray(comptime C: anytype) type {
+pub fn ComponentArray(comptime C: anytype) type {
     return struct {
         const Self = @This();
         // all components have to be stored in the array for perf. boost.
@@ -20,7 +20,7 @@ fn ComponentArray(comptime C: anytype) type {
         index_entity: std.AutoHashMap(u8, Entity),
 
         /// Creates instances of the inner storages.
-        fn init(alloc: std.mem.Allocator) Self {
+        pub fn init(alloc: std.mem.Allocator) Self {
             return .{
                 .components = std.ArrayList(C).init(alloc),
                 .entity_index = std.AutoHashMap(Entity, u8).init(alloc),
@@ -29,7 +29,7 @@ fn ComponentArray(comptime C: anytype) type {
         }
 
         /// Deinits the inner storages and components.
-        fn deinit(self: *Self) void {
+        pub fn deinit(self: *Self) void {
             for (self.components.items) |*component| {
                 component.deinit();
             }
@@ -39,7 +39,7 @@ fn ComponentArray(comptime C: anytype) type {
         }
 
         /// Returns the pointer to the component for the entity, if it was added before, or null.
-        fn getForEntity(self: Self, entity: Entity) ?*C {
+        pub fn getForEntity(self: Self, entity: Entity) ?*C {
             if (self.entity_index.get(entity)) |idx| {
                 return &self.components.items[idx];
             } else {
@@ -48,7 +48,7 @@ fn ComponentArray(comptime C: anytype) type {
         }
 
         /// Adds the component of the type `C` for the entity.
-        fn addToEntity(self: *Self, entity: Entity, component: C) void {
+        pub fn addToEntity(self: *Self, entity: Entity, component: C) void {
             self.entity_index.put(entity, @intCast(self.components.items.len)) catch |err|
                 std.debug.panic("The memory error {any} happened on putting entity {d}", .{ err, entity });
             self.index_entity.put(@intCast(self.components.items.len), entity) catch |err|
@@ -59,7 +59,7 @@ fn ComponentArray(comptime C: anytype) type {
 
         /// Deletes the components of the entity from the all inner stores,
         /// if they was added before, or does nothing.
-        fn removeFromEntity(self: *Self, entity: Entity) void {
+        pub fn removeFromEntity(self: *Self, entity: Entity) void {
             if (self.entity_index.get(entity)) |idx| {
                 _ = self.index_entity.remove(idx);
                 _ = self.entity_index.remove(entity);

@@ -4,16 +4,15 @@ const p = algs_and_types.primitives;
 const game = @import("game.zig");
 const cmp = game.components;
 
-pub fn render(universe: *game.Universe) anyerror!void {
-    const screen = &universe.root.screen;
-    try universe.runtime.drawDungeon(screen, universe.root.dungeon);
+pub fn render(session: *game.GameSession) anyerror!void {
+    const screen = &session.screen;
+    try session.runtime.drawDungeon(screen, session.dungeon);
 
-    var itr = universe.queryComponents2(cmp.Sprite, cmp.Position);
-    while (itr.next()) |components| {
-        const sprite = components[1];
-        const position = components[2];
+    for (session.positions.components.items) |*position| {
         if (screen.region.containsPoint(position.point)) {
-            try universe.runtime.drawSprite(screen, sprite, position);
+            for (session.sprites.components.items) |*sprite| {
+                try session.runtime.drawSprite(screen, sprite, position);
+            }
         }
     }
 }

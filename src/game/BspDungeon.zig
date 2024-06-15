@@ -123,9 +123,9 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             instance.* = .{
                 .alloc = alloc,
                 .rand = rand,
-                .floor = BitMap.initEmpty(),
-                .walls = BitMap.initEmpty(),
-                .objects = BitMap.initEmpty(),
+                .floor = try BitMap.initEmpty(alloc),
+                .walls = try BitMap.initEmpty(alloc),
+                .objects = try BitMap.initEmpty(alloc),
                 .rooms = std.ArrayList(Room).init(alloc),
                 .passages = std.ArrayList(Passage).init(alloc),
                 .objects_map = std.AutoHashMap(p.Point, Cell).init(alloc),

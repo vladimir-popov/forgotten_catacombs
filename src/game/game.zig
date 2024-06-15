@@ -26,8 +26,6 @@ const COLS_PAD = 7;
 
 const panic = std.debug.panic;
 
-const Self = @This();
-
 pub const Screen = @import("Screen.zig");
 
 pub const Entity = ecs.Entity;
@@ -61,13 +59,6 @@ pub const Button = struct {
         else
             null;
     }
-};
-
-pub const Components = union {
-    health: components.Health,
-    position: components.Position,
-    move: components.Move,
-    sprite: components.Sprite,
 };
 
 pub const AnyRuntime = struct {
@@ -118,53 +109,72 @@ pub const AnyRuntime = struct {
     }
 };
 
-pub const Universe = ecs.Universe(GameSession, Components, AnyRuntime);
-
 pub const GameSession = struct {
+    const Self = @This();
+
+    const System = *const fn (game: *Self) anyerror!void;
+
     pub const Timers = enum { input_system };
 
-    alloc: std.mem.Allocator,
+    runtime: AnyRuntime,
     screen: Screen,
     timers: []i64,
     player: Entity,
     dungeon: *Dungeon,
+    entities: std.ArrayList(Entity),
+    systems: std.ArrayList(System),
+    positions: ecs.ComponentArray(components.Position),
+    moves: ecs.ComponentArray(components.Move),
+    sprites: ecs.ComponentArray(components.Sprite),
 
-    pub fn init(alloc: std.mem.Allocator, rand: std.Random, universe: *Universe) !void {
-        const dungeon = try Dungeon.createRandom(alloc, rand);
+    pub fn create(runtime: AnyRuntime) !*Self {
+        const dungeon = try Dungeon.createRandom(runtime.alloc, runtime.rand);
         const player_position = dungeon.findRandomPlaceForPlayer();
-        universe.root.* = .{
-            .alloc = alloc,
+        const session = try runtime.alloc.create(Self);
+        session.* = .{
+            .runtime = runtime,
             .screen = Screen.init(DISPLAY_ROWS, DISPLAY_COLS, Dungeon.Region),
-            .timers = try alloc.alloc(i64, std.meta.tags(GameSession.Timers).len),
+            .timers = try runtime.alloc.alloc(i64, std.meta.tags(GameSession.Timers).len),
+            .player = 0,
             .dungeon = dungeon,
-            .player = entities.Player(universe, player_position),
+            .entities = std.ArrayList(Entity).init(runtime.alloc),
+            .systems = std.ArrayList(System).init(runtime.alloc),
+            .positions = ecs.ComponentArray(components.Position).init(runtime.alloc),
+            .moves = ecs.ComponentArray(components.Move).init(runtime.alloc),
+            .sprites = ecs.ComponentArray(components.Sprite).init(runtime.alloc),
         };
-        universe.root.screen.centeredAround(player_position);
+        try session.entities.append(session.player);
+        session.screen.centeredAround(player_position);
+        session.positions.addToEntity(session.player, .{ .point = player_position });
+        session.moves.addToEntity(session.player, .{});
+        session.sprites.addToEntity(session.player, .{ .letter = "@" });
+
+        // Initialize systems:
+        // session.systems.append(systems.Input.handleInput);
+        // session.systems.append(systems.Movement.handleMove);
+        try session.systems.append(systems.Render.render);
+
+        return session;
     }
 
-    pub fn deinit(self: *GameSession) void {
-        self.alloc.free(self.timers);
+    pub fn destroy(self: *GameSession) void {
+        self.runtime.alloc.free(self.timers);
         self.dungeon.destroy();
+        self.entities.deinit();
+        self.systems.deinit();
+        self.positions.deinit();
+        self.moves.deinit();
+        self.sprites.deinit();
+        self.runtime.alloc.destroy(self);
     }
 
     pub inline fn timer(self: GameSession, t: Timers) *i64 {
         return &self.timers[@intFromEnum(t)];
     }
+
+    pub fn tick(self: *Self) anyerror!void {
+        for (self.systems.items) |system| {
+            try system(self);
+        }
+    }
 };
-
-pub fn createUniverse(runtime: AnyRuntime) !*Universe {
-    const universe: *Universe = try Universe.create(runtime.alloc, runtime);
-
-    try GameSession.init(runtime.alloc, runtime.rand, universe);
-
-    // Initialize systems:
-    universe.registerSystem(systems.Input.handleInput);
-    universe.registerSystem(systems.Movement.handleMove);
-    universe.registerSystem(systems.Render.render);
-
-    return universe;
-}
-
-test {
-    std.testing.refAllDecls(Self);
-}

@@ -17,7 +17,7 @@ fn writeLog(
     comptime format: []const u8,
     args: anytype,
 ) void {
-    if (lvl == .warn) {
+    if (lvl == log_level) {
         var buffer = [_]u8{0} ** 128;
         _ = std.fmt.bufPrint(&buffer, format, args) catch |err|
             std.debug.panic("Error {any} on log {s}", .{ err, format });
@@ -55,10 +55,10 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
             playdate.graphics.setFont(font);
             playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeFillWhite);
 
-            const universe: *game.Universe = game.createUniverse(Runtime.any(playdate)) catch
+            const session: *game.GameSession = game.GameSession.create(Runtime.any(playdate)) catch
                 @panic("Error on creating universe");
 
-            playdate.system.setUpdateCallback(update_and_render, universe);
+            playdate.system.setUpdateCallback(update_and_render, session);
         },
         else => {},
     }
@@ -66,12 +66,12 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
 }
 
 fn update_and_render(userdata: ?*anyopaque) callconv(.C) c_int {
-    const universe: *game.Universe = @ptrCast(@alignCast(userdata.?));
-    const playdate: *api.PlaydateAPI = @ptrCast(@alignCast(universe.runtime.context));
+    const session: *game.GameSession = @ptrCast(@alignCast(userdata.?));
+    const playdate: *api.PlaydateAPI = @ptrCast(@alignCast(session.runtime.context));
 
     playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
 
-    universe.tick() catch |err|
+    session.tick() catch |err|
         std.debug.panic("Error {any} on game tick", .{err});
 
     //returning 1 signals to the OS to draw the frame.
