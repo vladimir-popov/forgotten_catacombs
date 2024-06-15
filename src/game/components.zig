@@ -4,7 +4,6 @@ const p = algs_and_types.primitives;
 const game = @import("game.zig");
 const dung = @import("BspDungeon.zig");
 
-
 pub const Position = struct {
     point: p.Point,
     pub fn deinit(_: *@This()) void {}
@@ -38,4 +37,10 @@ pub const Move = struct {
 pub const Health = struct {
     health: u8,
     pub fn deinit(_: *@This()) void {}
+};
+
+pub const Components = union {
+    position: Position,
+    move: Move,
+    sprite: Sprite,
 };

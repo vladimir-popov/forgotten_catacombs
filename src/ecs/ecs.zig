@@ -48,18 +48,15 @@ pub fn ComponentArray(comptime C: anytype) type {
         }
 
         /// Adds the component of the type `C` for the entity.
-        pub fn addToEntity(self: *Self, entity: Entity, component: C) void {
-            self.entity_index.put(entity, @intCast(self.components.items.len)) catch |err|
-                std.debug.panic("The memory error {any} happened on putting entity {d}", .{ err, entity });
-            self.index_entity.put(@intCast(self.components.items.len), entity) catch |err|
-                std.debug.panic("The memory error {any} happened on putting index to entity {d}", .{ err, entity });
-            self.components.append(component) catch |err|
-                std.debug.panic("The memory error {any} happened on appending a component", .{err});
+        pub fn addToEntity(self: *Self, entity: Entity, component: C) !void {
+            try self.entity_index.put(entity, @intCast(self.components.items.len));
+            try self.index_entity.put(@intCast(self.components.items.len), entity);
+            try self.components.append(component);
         }
 
         /// Deletes the components of the entity from the all inner stores,
         /// if they was added before, or does nothing.
-        pub fn removeFromEntity(self: *Self, entity: Entity) void {
+        pub fn removeFromEntity(self: *Self, entity: Entity) !void {
             if (self.entity_index.get(entity)) |idx| {
                 _ = self.index_entity.remove(idx);
                 _ = self.entity_index.remove(entity);
@@ -73,10 +70,8 @@ pub fn ComponentArray(comptime C: anytype) type {
                 } else {
                     const last_entity = self.index_entity.get(last_idx).?;
                     self.components.items[idx] = self.components.pop();
-                    self.entity_index.put(last_entity, idx) catch |err|
-                        std.debug.panic("The memory error {any}", .{err});
-                    self.index_entity.put(idx, last_entity) catch |err|
-                        std.debug.panic("The memory error {any}", .{err});
+                    try self.entity_index.put(last_entity, idx);
+                    try self.index_entity.put(idx, last_entity);
                 }
             }
         }
@@ -90,7 +85,7 @@ fn ComponentsMap(comptime ComponentsUnion: anytype) type {
     switch (type_info) {
         .Union => {},
         else => @compileError(
-            std.fmt.comptimePrint("Components have to be grouped to the tagged union, but found {any}", .{type_info}),
+            std.fmt.comptimePrint("Components have to be grouped to an union, but found {any}", .{type_info}),
         ),
     }
     const union_fields = type_info.Union.fields;
@@ -137,7 +132,7 @@ fn compareUnionFields(_: void, a: std.builtin.Type.UnionField, b: std.builtin.Ty
 }
 
 /// The manager of the components.
-fn ComponentsManager(comptime ComponentsUnion: type) type {
+pub fn ComponentsManager(comptime ComponentsUnion: type) type {
     return struct {
         const Self = @This();
 
@@ -182,13 +177,14 @@ fn ComponentsManager(comptime ComponentsUnion: type) type {
         }
 
         /// Adds the component of the type `C` to the entity.
-        pub fn addToEntity(self: *Self, entity: Entity, comptime C: anytype, component: C) void {
-            @field(self.inner_state.components_map, @typeName(C)).addToEntity(entity, component);
+        pub fn addToEntity(self: *Self, entity: Entity, component: anytype) !void {
+            const C = @TypeOf(component);
+            try @field(self.inner_state.components_map, @typeName(C)).addToEntity(entity, component);
         }
 
         /// Removes the component of the type `C` from the entity if it was added before, or does nothing.
-        pub fn removeFromEntity(self: *Self, entity: Entity, comptime C: type) void {
-            @field(self.inner_state.components_map, @typeName(C)).removeFromEntity(entity);
+        pub fn removeFromEntity(self: *Self, entity: Entity, comptime C: type) !void {
+            try @field(self.inner_state.components_map, @typeName(C)).removeFromEntity(entity);
         }
 
         /// Removes all components from all stores which belong to the entity.
@@ -196,11 +192,6 @@ fn ComponentsManager(comptime ComponentsUnion: type) type {
             inline for (@typeInfo(ComponentsMap(ComponentsUnion)).Struct.fields) |field| {
                 @field(self.inner_state.components_map, field.name).removeFromEntity(entity);
             }
-        }
-
-        fn removeAllForEntityOpaque(ptr: *anyopaque, entity: Entity) void {
-            var cm: *Self = @ptrCast(@alignCast(ptr));
-            cm.removeAllForEntity(entity);
         }
     };
 }
@@ -211,7 +202,7 @@ test "ComponentsManager: Add/Get/Remove component" {
 
     // should return the component, which was added before
     const entity = 1;
-    manager.addToEntity(entity, TestComponent, try TestComponent.init(123));
+    try manager.addToEntity(entity, try TestComponent.init(123));
     var component = manager.getForEntity(entity, TestComponent);
     try std.testing.expectEqual(123, component.?.state.items[0]);
 
@@ -220,228 +211,14 @@ test "ComponentsManager: Add/Get/Remove component" {
     try std.testing.expectEqual(null, component);
 
     // should return null for removed component
-    manager.removeFromEntity(entity, TestComponent);
+    try manager.removeFromEntity(entity, TestComponent);
     component = manager.getForEntity(entity, TestComponent);
     try std.testing.expectEqual(null, component);
 
     // and finally, no memory leak should happened
 }
 
-/// The manager of the entities.
-const EntitiesManager = struct {
-    const Self = @This();
-
-    const InnerState = struct {
-        entities: std.AutoHashMap(Entity, void),
-        components_ptr: *anyopaque,
-        last_entity: Entity,
-    };
-
-    inner_state: InnerState,
-    removeAllComponentsForEntity: *const fn (components_manager: *anyopaque, entity: Entity) void,
-
-    pub fn init(
-        alloc: std.mem.Allocator,
-        components_manager: *anyopaque,
-        removeAllComponentsForEntity: *const fn (components_manager: *anyopaque, entity: Entity) void,
-    ) Self {
-        return .{
-            .removeAllComponentsForEntity = removeAllComponentsForEntity,
-            .inner_state = InnerState{
-                .entities = std.AutoHashMap(Entity, void).init(alloc),
-                .components_ptr = components_manager,
-                .last_entity = 1,
-            },
-        };
-    }
-
-    /// Removes components from the components manager for every entity,
-    /// and clean up the inner entities storage.
-    pub fn deinit(self: *Self) void {
-        var itr = self.inner_state.entities.iterator();
-        while (itr.next()) |entity| {
-            self.removeAllComponentsForEntity(self.inner_state.components_ptr, entity.key_ptr.*);
-        }
-        self.inner_state.entities.deinit();
-    }
-
-    /// Generates an unique id for the new entity, puts it to the inner storage,
-    /// and then returns as the result. The id is unique for whole life circle of
-    /// this manager.
-    pub fn newEntity(self: *Self) Entity {
-        self.inner_state.last_entity += 1;
-        const entity = self.inner_state.last_entity;
-        _ = self.inner_state.entities.getOrPut(entity) catch |err|
-            std.debug.panic("The memory error {any} happened on creating a new entity", .{err});
-        return entity;
-    }
-
-    /// Removes all components of the entity and it self from the inner storage.
-    pub fn removeEntity(self: *Self, entity: Entity) void {
-        self.removeAllComponentsForEntity(self.inner_state.components_ptr, entity);
-        _ = self.inner_state.entities.remove(entity);
-    }
-
-    /// The iterator over entities. It should be used to get
-    /// entities from this manager.
-    const EntitiesIterator = struct {
-        key_terator: std.AutoHashMap(Entity, void).KeyIterator,
-
-        pub fn next(self: *@This()) ?Entity {
-            if (self.key_terator.next()) |entity_ptr| {
-                return entity_ptr.*;
-            } else {
-                return null;
-            }
-        }
-    };
-
-    pub fn iterator(self: *Self) EntitiesIterator {
-        return .{ .key_terator = self.inner_state.entities.keyIterator() };
-    }
-};
-
-test "EntitiesManager: Add/Remove" {
-    var cm = try ComponentsManager(TestComponents).init(std.testing.allocator);
-    defer cm.deinit();
-
-    var em = EntitiesManager.init(
-        std.testing.allocator,
-        &cm,
-        ComponentsManager(TestComponents).removeAllForEntityOpaque,
-    );
-    defer em.deinit();
-
-    const entity = em.newEntity();
-    cm.addToEntity(entity, TestComponent, try TestComponent.init(123));
-    try std.testing.expectEqual(123, cm.getForEntity(entity, TestComponent).?.state.items[0]);
-
-    em.removeEntity(entity);
-    try std.testing.expectEqual(null, cm.getForEntity(entity, TestComponent));
-}
-
-test "EntitiesManager: iterator" {
-    var cm = try ComponentsManager(TestComponents).init(std.testing.allocator);
-    defer cm.deinit();
-
-    var em = EntitiesManager.init(
-        std.testing.allocator,
-        &cm,
-        ComponentsManager(TestComponents).removeAllForEntityOpaque,
-    );
-    defer em.deinit();
-
-    const e1 = em.newEntity();
-    const e2 = em.newEntity();
-
-    var itr = em.iterator();
-    var entitiesSum: u32 = 0;
-    while (itr.next()) |entity| {
-        std.debug.assert(entity == e1 or entity == e2);
-        entitiesSum += entity;
-    }
-    try std.testing.expectEqual(e1 + e2, entitiesSum);
-}
-
-/// The global manager of all resources of the game. It must be a singleton.
-/// Every operations over entities and components should be done with this
-/// object.
-///
-/// RootObject - a singleton object, which is usually a game session. Must have `fn deinit(self: *RootObject) void`
-///              function.
-/// Components - a union of used components. Every component must have `fn deinit(self: *Self) void` function.
-/// Runtime - a type to communicate with a runtime environment: reading pressed buttons, draw sprites,
-///         play sounds, etc.
-pub fn Universe(comptime RootObject: type, comptime Components: anytype, comptime Runtime: type) type {
-    switch (@typeInfo(Components)) {
-        .Union => {},
-        else => @compileError(std.fmt.comptimePrint(
-            "The Components must be a union, but it is {any}",
-            .{@typeInfo(Components)},
-        )),
-    }
-
-    return struct {
-        const Self = @This();
-
-        const System = *const fn (game: *Self) anyerror!void;
-
-        /// The allocator which is used for creating this inner state.
-        alloc: std.mem.Allocator,
-        components: ComponentsManager(Components),
-        entities: EntitiesManager,
-        systems: std.ArrayList(System),
-
-        /// A runtime in which the game is run.
-        /// It can contains game settings and functions, which are used in the systems.
-        runtime: Runtime,
-
-        root: *RootObject,
-
-        pub fn create(alloc: std.mem.Allocator, runtime: Runtime) !*Self {
-            const instance = try alloc.create(Self);
-            instance.alloc = alloc;
-            instance.root = try alloc.create(RootObject);
-            instance.components = try ComponentsManager(Components).init(alloc);
-            instance.entities = EntitiesManager.init(
-                alloc,
-                &instance.components,
-                ComponentsManager(Components).removeAllForEntityOpaque,
-            );
-            instance.systems = std.ArrayList(System).init(alloc);
-            instance.runtime = runtime;
-
-            return instance;
-        }
-
-        pub fn destroy(self: *Self) void {
-            self.root.deinit();
-            self.alloc.destroy(self.root);
-            self.entities.deinit();
-            self.components.deinit();
-            self.systems.deinit();
-            self.alloc.destroy(self);
-        }
-
-        pub fn registerSystem(self: *Self, system: System) void {
-            self.systems.append(system) catch |err|
-                std.debug.panic("The memory error {any} happened on registration system.", .{err});
-        }
-
-        pub fn tick(self: *Self) anyerror!void {
-            for (self.systems.items) |system| {
-                try system(self);
-            }
-        }
-
-        pub fn Query2(comptime Cmp1: type, Cmp2: type) type {
-            return struct {
-                const Q2 = @This();
-
-                universe: *Self,
-                entities: EntitiesManager.EntitiesIterator,
-
-                pub fn next(self: *Q2) ?struct { Entity, *Cmp1, *Cmp2 } {
-                    if (self.entities.next()) |entity| {
-                        if (self.universe.components.getForEntity(entity, Cmp1)) |c1| {
-                            if (self.universe.components.getForEntity(entity, Cmp2)) |c2| {
-                                return .{ entity, c1, c2 };
-                            }
-                        }
-                    }
-                    return null;
-                }
-            };
-        }
-
-        pub fn queryComponents2(self: *Self, comptime Cmp1: type, Cmp2: type) Query2(Cmp1, Cmp2) {
-            return .{ .universe = self, .entities = self.entities.iterator() };
-        }
-    };
-}
-
 // Just for tests:
-
 const TestComponent = struct {
     const Self = @This();
     state: std.ArrayList(u8),

@@ -19,10 +19,9 @@ pub fn main() !void {
 
     var runtime = try Runtime.init(alloc, std.crypto.random, &arena);
     defer runtime.deinit();
-    // var universe = try game.createUniverse(runtime.any());
-    // defer universe.destroy();
-    //
-    // try runtime.run(&universe);
+    const session = try game.GameSession.create(runtime.any());
+    defer session.destroy();
+    try runtime.run(session);
 }
 
 test {

@@ -69,7 +69,7 @@ const DungeonsGenerator = struct {
 
     fn handleInput(self: *DungeonsGenerator) anyerror!void {
         const btn = try self.runtime.readButton();
-        if (btn & game.Button.A > 0) {
+        if (btn & game.AnyRuntime.Button.A > 0) {
             const seed = self.runtime.rand.int(u64);
             log.debug("The random seed is {d}", .{seed});
             var rnd = std.Random.DefaultPrng.init(seed);

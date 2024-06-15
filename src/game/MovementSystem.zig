@@ -1,14 +1,12 @@
 const std = @import("std");
 const game = @import("game.zig");
-const cmp = game.components;
 const algs_and_types = @import("algs_and_types");
 const p = algs_and_types.primitives;
 
 const log = std.log.scoped(.movement_system);
 
-pub fn handleMove(universe: *game.Universe) anyerror!void {
-    const dungeon = universe.root.dungeon;
-    var itr = universe.queryComponents2(cmp.Move, cmp.Position);
+pub fn handleMove(session: *game.GameSession) anyerror!void {
+    var itr = session.queryComponents2(game.Move, game.Position);
     while (itr.next()) |components| {
         const entity = components[0];
         const move = components[1];
@@ -16,16 +14,16 @@ pub fn handleMove(universe: *game.Universe) anyerror!void {
         if (move.direction) |direction| {
             // try to move:
             const new_point = position.point.movedTo(direction);
-            if (dungeon.cellAt(new_point)) |cell| {
+            if (session.dungeon.cellAt(new_point)) |cell| {
                 switch (cell) {
                     .floor => {
-                        doMove(universe, move, position, entity);
+                        doMove(session, move, position, entity.*);
                     },
                     .door => |door| {
                         if (door == .opened) {
-                            doMove(universe, move, position, entity);
+                            doMove(session, move, position, entity.*);
                         } else {
-                            dungeon.openDoor(new_point);
+                            session.dungeon.openDoor(new_point);
                             move.cancel();
                         }
                     },
@@ -36,19 +34,19 @@ pub fn handleMove(universe: *game.Universe) anyerror!void {
     }
 }
 
-fn doMove(universe: *game.Universe, move: *cmp.Move, position: *cmp.Position, entity: game.Entity) void {
+fn doMove(session: *game.GameSession, move: *game.Move, position: *game.Position, entity: game.Entity) void {
     const orig_point = position.point;
     const direction = move.direction.?;
     move.applyTo(position);
 
-    if (entity != universe.root.player) {
+    if (entity != session.player) {
         return;
     }
 
     // keep player on the screen:
-    const screen = &universe.root.screen;
+    const screen = &session.screen;
     const inner_region = screen.innerRegion();
-    const dungeon = universe.root.dungeon;
+    const dungeon = session.dungeon;
     const new_point = position.point;
     if (direction == .up and new_point.row < inner_region.top_left.row)
         screen.move(direction);

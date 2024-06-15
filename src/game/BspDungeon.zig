@@ -109,6 +109,9 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
         passages: std.ArrayList(Passage),
 
         pub fn destroy(self: *Self) void {
+            self.floor.deinit();
+            self.walls.deinit();
+            self.objects.deinit();
             for (self.passages.items) |passage| {
                 passage.deinit();
             }

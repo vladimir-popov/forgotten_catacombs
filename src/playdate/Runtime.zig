@@ -1,8 +1,6 @@
 const std = @import("std");
 const api = @import("api.zig");
 const game = @import("game");
-const tools = @import("tools");
-const cmp = game.components;
 const Allocator = @import("Allocator.zig");
 
 const Self = @This();
@@ -38,7 +36,7 @@ fn currentMillis(ptr: *anyopaque) i64 {
     return playdate.system.getCurrentTimeMilliseconds();
 }
 
-fn readButton(ptr: *anyopaque) anyerror!game.Button.Type {
+fn readButton(ptr: *anyopaque) anyerror!game.AnyRuntime.Button.Type {
     const playdate: *api.PlaydateAPI = @ptrCast(@alignCast(ptr));
     var button: api.PDButtons = undefined;
     playdate.system.getButtonState(null, &button, null);
@@ -47,8 +45,8 @@ fn readButton(ptr: *anyopaque) anyerror!game.Button.Type {
 
 fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {
     var itr = dungeon.cellsInRegion(screen.region) orelse return;
-    var position = game.components.Position{ .point = screen.region.top_left };
-    var sprite = game.components.Sprite{ .letter = undefined };
+    var position = game.Position{ .point = screen.region.top_left };
+    var sprite = game.Sprite{ .letter = undefined };
     while (itr.next()) |cell| {
         sprite.letter = switch (cell) {
             .nothing => " ",
@@ -68,8 +66,8 @@ fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game
 fn drawSprite(
     ptr: *anyopaque,
     screen: *const game.Screen,
-    sprite: *const cmp.Sprite,
-    position: *const cmp.Position,
+    sprite: *const game.Sprite,
+    position: *const game.Position,
 ) anyerror!void {
     if (screen.region.containsPoint(position.point)) {
         const playdate: *api.PlaydateAPI = @ptrCast(@alignCast(ptr));

@@ -8,9 +8,9 @@ pub fn render(session: *game.GameSession) anyerror!void {
     const screen = &session.screen;
     try session.runtime.drawDungeon(screen, session.dungeon);
 
-    for (session.positions.components.items) |*position| {
+    for (session.components.getAll(game.Position)) |*position| {
         if (screen.region.containsPoint(position.point)) {
-            for (session.sprites.components.items) |*sprite| {
+            for (session.components.getAll(game.Sprite)) |*sprite| {
                 try session.runtime.drawSprite(screen, sprite, position);
             }
         }

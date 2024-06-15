@@ -37,8 +37,8 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
             return self;
         }
 
-        pub fn deinit(self: Self) void {
-            for (self.bitsets) |bs| {
+        pub fn deinit(self: *Self) void {
+            for (self.bitsets.items) |*bs| {
                 bs.deinit();
             }
             self.bitsets.deinit();
@@ -144,6 +144,7 @@ test "parse BitMap" {
 
     // when:
     var bitmap = try BitMap(3, 3).parse('#', std.testing.allocator, str);
+    defer bitmap.deinit();
 
     // then:
     for (0..3) |r| {
@@ -157,6 +158,7 @@ test "parse BitMap" {
 test "unset a region" {
     // given:
     var bitmap = try BitMap(10, 10).initFull(std.testing.allocator);
+    defer bitmap.deinit();
     const region = p.Region{ .top_left = .{ .row = 2, .col = 2 }, .rows = 5, .cols = 5 };
 
     // when:

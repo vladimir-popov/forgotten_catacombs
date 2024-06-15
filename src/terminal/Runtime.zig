@@ -2,7 +2,6 @@ const std = @import("std");
 const algs_and_types = @import("algs_and_types");
 const p = algs_and_types.primitives;
 const game = @import("game");
-const cmp = game.components;
 const tty = @import("tty.zig");
 const utf8 = @import("utf8");
 
@@ -37,13 +36,11 @@ pub fn deinit(self: Self) void {
     _ = self.arena.reset(.free_all);
 }
 
-/// Run the main loop for game, which should be
-/// the *gm.ForgottenCatacomb.Universe
-/// or *DungeonsGenerator.Universe
-pub fn run(self: *Self, universe_ptr: anytype) !void {
+/// Run the main loop of the game
+pub fn run(self: *Self, game_session: anytype) !void {
     tty.Display.clearScreen();
     while (!self.isExit()) {
-        try universe_ptr.*.tick();
+        try game_session.*.tick();
         try self.drawBuffer(1, 1);
         self.resetBuffer();
     }
@@ -95,25 +92,25 @@ fn currentMillis(_: *anyopaque) i64 {
     return std.time.milliTimestamp();
 }
 
-fn readButton(ptr: *anyopaque) anyerror!game.Button.Type {
+fn readButton(ptr: *anyopaque) anyerror!game.AnyRuntime.Button.Type {
     var self: *Self = @ptrCast(@alignCast(ptr));
     self.pressed_button = tty.Keyboard.readPressedButton();
     if (self.pressed_button) |key| {
         switch (key) {
             .char => switch (key.char.char) {
-                ' ' => return game.Button.A,
-                'f' => return game.Button.B,
-                'd' => return game.Button.A,
-                'h' => return game.Button.Left,
-                'j' => return game.Button.Down,
-                'k' => return game.Button.Up,
-                'l' => return game.Button.Right,
-                else => return game.Button.None,
+                ' ' => return game.AnyRuntime.Button.A,
+                'f' => return game.AnyRuntime.Button.B,
+                'd' => return game.AnyRuntime.Button.A,
+                'h' => return game.AnyRuntime.Button.Left,
+                'j' => return game.AnyRuntime.Button.Down,
+                'k' => return game.AnyRuntime.Button.Up,
+                'l' => return game.AnyRuntime.Button.Right,
+                else => return game.AnyRuntime.Button.None,
             },
-            else => return game.Button.None,
+            else => return game.AnyRuntime.Button.None,
         }
     }
-    return game.Button.None;
+    return game.AnyRuntime.Button.None;
 }
 
 fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {
@@ -129,8 +126,8 @@ fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game
 fn drawSprite(
     ptr: *anyopaque,
     screen: *const game.Screen,
-    sprite: *const cmp.Sprite,
-    position: *const cmp.Position,
+    sprite: *const game.Sprite,
+    position: *const game.Position,
 ) anyerror!void {
     if (screen.region.containsPoint(position.point)) {
         var self: *Self = @ptrCast(@alignCast(ptr));
