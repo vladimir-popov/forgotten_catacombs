@@ -465,7 +465,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
         }
 
         /// Trying to find a line between `from` and `to` with `nothing` cells only.
-        /// Gives up after 5 attempt to prevent long search.
+        /// Gives up after N attempts to prevent long search.
         fn findPlaceForPassageTurn(
             self: Self,
             init_from: p.Point,
@@ -481,7 +481,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             var middle2: p.Point = undefined;
             while (stack.popOrNull()) |points| {
                 const from = points[0];
-                const to = points[0];
+                const to = points[1];
                 const distance: u8 = if (is_horizontal)
                     to.col - from.col
                 else
