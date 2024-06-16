@@ -6,6 +6,8 @@ const Allocator = @import("Allocator.zig");
 const FONT_HEIGHT: u16 = 16;
 const FONT_WIDHT: u16 = 8;
 
+const PRESS_BUTTON_DELAY_MS = 100;
+
 const log = std.log.scoped(.runtime);
 
 const Self = @This();
@@ -14,7 +16,7 @@ playdate: *api.PlaydateAPI,
 alloc: std.mem.Allocator,
 prng: std.rand.Xoshiro256,
 font: ?*api.LCDFont,
-pressed_button: api.PDButtons = 0,
+button: api.PDButtons = 0,
 
 pub fn create(playdate: *api.PlaydateAPI) Self {
     const err: ?*[*c]const u8 = null;
@@ -64,8 +66,11 @@ fn currentMillis(ptr: *anyopaque) i64 {
 
 fn readButton(ptr: *anyopaque) anyerror!game.AnyRuntime.Button.Type {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    self.playdate.system.getButtonState(null, &self.pressed_button, null);
-    return self.pressed_button;
+    if (self.button == 0)
+        self.playdate.system.getButtonState(null, &self.button, null)
+    else
+        self.playdate.system.getButtonState(null, null, &self.button);
+    return self.button;
 }
 
 fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {
