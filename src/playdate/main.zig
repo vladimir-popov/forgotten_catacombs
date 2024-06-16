@@ -39,6 +39,11 @@ pub fn panic(
 var playdate_error_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) void = undefined;
 var playdate_log_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) void = undefined;
 
+const GlobalState = struct {
+    runtime: Runtime,
+    session: *game.GameSession,
+};
+
 pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent, arg: u32) callconv(.C) c_int {
     _ = arg;
     switch (event) {
@@ -46,19 +51,12 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
             playdate_error_to_console = playdate.system.@"error";
             playdate_log_to_console = playdate.system.logToConsole;
 
-            const err: ?*[*c]const u8 = null;
-            const font = playdate.graphics.loadFont("Roobert-11-Mono-Condensed.pft", err) orelse {
-                const err_msg = err orelse "Unknown error.";
-                std.debug.panic("Error on load font: {s}", .{err_msg});
-            };
-
-            playdate.graphics.setFont(font);
-            playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeFillWhite);
-
-            const session: *game.GameSession = game.GameSession.create(Runtime.any(playdate)) catch
+            var state: *GlobalState = @ptrCast(@alignCast(playdate.system.realloc(null, @sizeOf(GlobalState))));
+            state.runtime = Runtime.create(playdate);
+            state.session = game.GameSession.create(state.runtime.any()) catch
                 @panic("Error on creating universe");
 
-            playdate.system.setUpdateCallback(update_and_render, session);
+            playdate.system.setUpdateCallback(update_and_render, state);
         },
         else => {},
     }
@@ -66,12 +64,10 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
 }
 
 fn update_and_render(userdata: ?*anyopaque) callconv(.C) c_int {
-    const session: *game.GameSession = @ptrCast(@alignCast(userdata.?));
-    const playdate: *api.PlaydateAPI = @ptrCast(@alignCast(session.runtime.context));
+    const state: *GlobalState = @ptrCast(@alignCast(userdata.?));
+    state.runtime.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
 
-    playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
-
-    session.tick() catch |err|
+    state.session.tick() catch |err|
         std.debug.panic("Error {any} on game tick", .{err});
 
     //returning 1 signals to the OS to draw the frame.
