@@ -5,7 +5,7 @@ const tools = @import("tools");
 
 const Runtime = @import("Runtime.zig");
 
-pub const log_level: std.log.Level = .warn;
+pub const log_level: std.log.Level = .info;
 
 pub const std_options = .{
     .logFn = writeLog,
@@ -39,8 +39,8 @@ pub fn panic(
 var playdate_error_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) void = undefined;
 var playdate_log_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) void = undefined;
 
-const GlobalState = struct {
-    runtime: Runtime,
+pub const GlobalState = struct {
+    runtime: *Runtime,
     session: *game.GameSession,
 };
 
@@ -52,9 +52,10 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
             playdate_log_to_console = playdate.system.logToConsole;
 
             var state: *GlobalState = @ptrCast(@alignCast(playdate.system.realloc(null, @sizeOf(GlobalState))));
-            state.runtime = Runtime.create(playdate);
+            state.runtime = Runtime.create(playdate) catch
+                @panic("Error on creating Runtime");
             state.session = game.GameSession.create(state.runtime.any()) catch
-                @panic("Error on creating universe");
+                @panic("Error on creating game session");
 
             playdate.system.setUpdateCallback(update_and_render, state);
         },

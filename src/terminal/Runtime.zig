@@ -7,6 +7,8 @@ const utf8 = @import("utf8");
 
 const Render = @import("Render.zig");
 
+const log = std.log.scoped(.runtime);
+
 const Self = @This();
 
 alloc: std.mem.Allocator,
@@ -16,7 +18,8 @@ buffer: utf8.Buffer,
 termios: std.c.termios,
 // the last read button through readButton function.
 // it is used as a buffer to check ESC outside the readButton function
-pressed_button: ?tty.Keyboard.Button = null,
+prev_key: ?tty.Keyboard.Button = null,
+pressed_at: i64 = 0,
 
 pub fn init(alloc: std.mem.Allocator, rand: std.Random, arena: *std.heap.ArenaAllocator) !Self {
     const instance = Self{
@@ -47,7 +50,7 @@ pub fn run(self: *Self, game_session: anytype) !void {
 }
 
 fn isExit(self: Self) bool {
-    if (self.pressed_button) |btn| {
+    if (self.prev_key) |btn| {
         switch (btn) {
             .control => return btn.control == tty.Keyboard.ControlButton.ESC,
             else => return false,
@@ -80,7 +83,7 @@ pub fn any(self: *Self) game.AnyRuntime {
         .alloc = self.alloc,
         .rand = self.rand,
         .vtable = &.{
-            .readButton = readButton,
+            .readButtons = readButtons,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
             .currentMillis = currentMillis,
@@ -92,25 +95,42 @@ fn currentMillis(_: *anyopaque) i64 {
     return std.time.milliTimestamp();
 }
 
-fn readButton(ptr: *anyopaque) anyerror!game.AnyRuntime.Button.Type {
+fn readButtons(ptr: *anyopaque) anyerror!?game.AnyRuntime.Buttons {
     var self: *Self = @ptrCast(@alignCast(ptr));
-    self.pressed_button = tty.Keyboard.readPressedButton();
-    if (self.pressed_button) |key| {
-        switch (key) {
+    const prev_key = self.prev_key;
+    if (tty.Keyboard.readPressedButton()) |key| {
+        self.prev_key = key;
+        const known_key_code: ?game.AnyRuntime.Buttons.Code = switch (key) {
             .char => switch (key.char.char) {
-                ' ' => return game.AnyRuntime.Button.A,
-                'f' => return game.AnyRuntime.Button.B,
-                'd' => return game.AnyRuntime.Button.A,
-                'h' => return game.AnyRuntime.Button.Left,
-                'j' => return game.AnyRuntime.Button.Down,
-                'k' => return game.AnyRuntime.Button.Up,
-                'l' => return game.AnyRuntime.Button.Right,
-                else => return game.AnyRuntime.Button.None,
+                ' ' => game.AnyRuntime.Buttons.A,
+                'f' => game.AnyRuntime.Buttons.B,
+                'd' => game.AnyRuntime.Buttons.A,
+                'h' => game.AnyRuntime.Buttons.Left,
+                'j' => game.AnyRuntime.Buttons.Down,
+                'k' => game.AnyRuntime.Buttons.Up,
+                'l' => game.AnyRuntime.Buttons.Right,
+                else => null,
             },
-            else => return game.AnyRuntime.Button.None,
+            else => null,
+        };
+        if (known_key_code) |code| {
+            const now = std.time.milliTimestamp();
+            const delay = now - self.pressed_at;
+            self.pressed_at = now;
+            var state: game.AnyRuntime.Buttons.State = .pressed;
+            if (key.eql(prev_key)) {
+                if (delay < game.AnyRuntime.DOUBLE_PRESS_DELAY_MS)
+                    state = .double_pressed
+                else if (delay > game.AnyRuntime.HOLD_DELAY_MS)
+                    state = .hold;
+            }
+            return .{ .code = code, .state = state };
+        } else {
+            self.pressed_at = 0;
+            return null;
         }
     }
-    return game.AnyRuntime.Button.None;
+    return null;
 }
 
 fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {

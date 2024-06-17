@@ -184,7 +184,7 @@ pub const Keyboard = struct {
         LEFT = 'D',
         RIGHT = 'C',
 
-        pub inline fn code(comptime self: ControlButton) u8 {
+        pub inline fn code(self: ControlButton) u8 {
             return @intFromEnum(self);
         }
     };
@@ -227,6 +227,20 @@ pub const Keyboard = struct {
         control: ControlButton,
         char: CharButton,
         unknown: PressedButton,
+
+        pub fn eql(self: Button, maybe_other: ?Button) bool {
+            if (maybe_other) |other| {
+                if (@intFromEnum(self) != @intFromEnum(other))
+                    return false;
+
+                return switch (self) {
+                    .control => self.control.code() == other.control.code(),
+                    .char => self.char.char == other.char.char,
+                    .unknown => std.mem.eql(u8, &self.unknown.bytes, &other.unknown.bytes),
+                };
+            }
+            return false;
+        }
     };
 
     pub fn readPressedButton() ?Button {

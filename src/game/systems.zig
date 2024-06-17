@@ -19,18 +19,13 @@ pub fn render(session: *game.GameSession) anyerror!void {
 }
 
 pub fn handleInput(session: *game.GameSession) anyerror!void {
-    const btn = try session.runtime.readButton();
-    if (btn == 0) return;
-
-    const now = session.runtime.currentMillis();
-    const timer = session.timer(game.GameSession.Timers.key_pressed);
+    const btn = try session.runtime.readButtons() orelse return;
     if (session.components.getForEntity(session.player, game.Move)) |move| {
-        if (game.AnyRuntime.Button.toDirection(btn)) |direction| {
+        if (btn.toDirection()) |direction| {
             move.direction = direction;
-            move.keep_moving = now - timer.* < 200;
+            move.keep_moving = btn.state == .double_pressed;
         }
     }
-    timer.* = now;
 }
 
 pub fn handleMove(session: *game.GameSession) anyerror!void {
