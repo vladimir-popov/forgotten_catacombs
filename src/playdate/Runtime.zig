@@ -60,10 +60,11 @@ pub fn any(self: *Self) game.AnyRuntime {
         .alloc = self.alloc,
         .rand = self.prng.random(),
         .vtable = &.{
+            .currentMillis = currentMillis,
             .readButtons = readButtons,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
-            .currentMillis = currentMillis,
+            .drawHealth = drawHealth,
         },
     };
 }
@@ -137,4 +138,10 @@ fn drawSprite(
         const x: c_int = FONT_WIDHT * (position.point.col - screen.region.top_left.col + 1);
         _ = self.playdate.graphics.drawText(sprite.letter.ptr, sprite.letter.len, .UTF8Encoding, x, y);
     }
+}
+
+fn drawHealth(ptr: *anyopaque, health: *const game.Health) !void {
+    // var self: *Self = @ptrCast(@alignCast(ptr));
+    _ = ptr;
+    _ = health;
 }

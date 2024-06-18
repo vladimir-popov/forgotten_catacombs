@@ -26,10 +26,7 @@ pub fn main() !void {
     defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK DETECTED!");
     const alloc = gpa.allocator();
 
-    var arena = std.heap.ArenaAllocator.init(alloc);
-    defer arena.deinit();
-
-    var runtime = try Runtime.init(alloc, rnd.random(), &arena);
+    var runtime = try Runtime.init(alloc, rnd.random());
     defer runtime.deinit();
 
     var generator = try DungeonsGenerator.init(runtime.any());

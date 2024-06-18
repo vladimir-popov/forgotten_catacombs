@@ -5,14 +5,13 @@ const game = @import("game");
 const tty = @import("tty.zig");
 const utf8 = @import("utf8");
 
-const Render = @import("Render.zig");
-
 const log = std.log.scoped(.runtime);
 
 const Self = @This();
 
 alloc: std.mem.Allocator,
-arena: *std.heap.ArenaAllocator,
+// used to accumulate the buffer every run-loop circle
+arena: std.heap.ArenaAllocator,
 rand: std.Random,
 buffer: utf8.Buffer,
 termios: std.c.termios,
@@ -21,19 +20,19 @@ termios: std.c.termios,
 prev_key: ?tty.Keyboard.Button = null,
 pressed_at: i64 = 0,
 
-pub fn init(alloc: std.mem.Allocator, rand: std.Random, arena: *std.heap.ArenaAllocator) !Self {
+pub fn init(alloc: std.mem.Allocator, rand: std.Random) !Self {
     const instance = Self{
         .alloc = alloc,
-        .arena = arena,
+        .arena = std.heap.ArenaAllocator.init(alloc),
         .rand = rand,
-        .buffer = utf8.Buffer.init(arena.allocator()),
+        .buffer = undefined,
         .termios = tty.Display.enterRawMode(),
     };
     tty.Display.hideCursor();
     return instance;
 }
 
-pub fn deinit(self: Self) void {
+pub fn deinit(self: *Self) void {
     tty.Display.exitFromRawMode();
     tty.Display.showCursor();
     _ = self.arena.reset(.free_all);
@@ -42,10 +41,12 @@ pub fn deinit(self: Self) void {
 /// Run the main loop of the game
 pub fn run(self: *Self, game_session: anytype) !void {
     tty.Display.clearScreen();
+    self.buffer = utf8.Buffer.init(self.arena.allocator());
     while (!self.isExit()) {
         try game_session.*.tick();
-        try self.drawBuffer(1, 1);
-        self.resetBuffer();
+        try self.writeBuffer(tty.Display.writer, 1, 1);
+        _ = self.arena.reset(.retain_capacity);
+        self.buffer = utf8.Buffer.init(self.arena.allocator());
     }
 }
 
@@ -60,21 +61,11 @@ fn isExit(self: Self) bool {
     }
 }
 
-// row & col begin from 1
-fn drawBuffer(self: Self, rows_pad: u8, cols_pad: u8) !void {
-    try self.writeBuffer(tty.Display.writer, rows_pad, cols_pad);
-}
-
 fn writeBuffer(self: Self, writer: std.io.AnyWriter, rows_pad: u8, cols_pad: u8) !void {
     for (self.buffer.lines.items, rows_pad..) |line, i| {
         try tty.Text.writeSetCursorPosition(writer, @intCast(i), cols_pad);
         _ = try writer.write(line.bytes.items);
     }
-}
-
-fn resetBuffer(self: *Self) void {
-    _ = self.arena.reset(.retain_capacity);
-    self.buffer = utf8.Buffer.init(self.arena.allocator());
 }
 
 pub fn any(self: *Self) game.AnyRuntime {
@@ -83,10 +74,11 @@ pub fn any(self: *Self) game.AnyRuntime {
         .alloc = self.alloc,
         .rand = self.rand,
         .vtable = &.{
+            .currentMillis = currentMillis,
             .readButtons = readButtons,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
-            .currentMillis = currentMillis,
+            .drawHealth = drawHealth,
         },
     };
 }
@@ -135,12 +127,26 @@ fn readButtons(ptr: *anyopaque) anyerror!?game.AnyRuntime.Buttons {
 
 fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
-    try Render.drawDungeon(
-        self.arena.allocator(),
-        &self.buffer,
-        dungeon,
-        screen.region,
-    );
+    const buffer = &self.buffer;
+    var itr = dungeon.cellsInRegion(screen.region) orelse return;
+    var line = try self.alloc.alloc(u8, screen.region.cols);
+    defer self.alloc.free(line);
+
+    var idx: u8 = 0;
+    while (itr.next()) |cell| {
+        line[idx] = switch (cell) {
+            .nothing => ' ',
+            .floor => '.',
+            .wall => '#',
+            .door => |door| if (door == .opened) '\'' else '+',
+        };
+        idx += 1;
+        if (itr.cursor.col == itr.region.top_left.col) {
+            idx = 0;
+            try buffer.addLine(line);
+            @memset(line, 0);
+        }
+    }
 }
 
 fn drawSprite(
@@ -155,4 +161,10 @@ fn drawSprite(
         const c = position.point.col - screen.region.top_left.col;
         try self.buffer.mergeLine(sprite.letter, r, c);
     }
+}
+
+fn drawHealth(ptr: *anyopaque, health: *const game.Health) !void {
+    // var self: *Self = @ptrCast(@alignCast(ptr));
+    _ = ptr;
+    _ = health;
 }

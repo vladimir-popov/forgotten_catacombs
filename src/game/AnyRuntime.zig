@@ -54,6 +54,10 @@ const VTable = struct {
         sprite: *const game.Sprite,
         position: *const game.Position,
     ) anyerror!void,
+    drawHealth: *const fn (
+        context: *anyopaque,
+        health: *const game.Health,
+    ) anyerror!void,
     currentMillis: *const fn (context: *anyopaque) i64,
 };
 
@@ -62,27 +66,27 @@ alloc: std.mem.Allocator,
 rand: std.Random,
 vtable: *const VTable,
 
-pub fn currentMillis(self: Self) i64 {
+pub inline fn currentMillis(self: Self) i64 {
     return self.vtable.currentMillis(self.context);
 }
 
-pub fn readButtons(self: Self) !?Buttons {
+pub inline fn readButtons(self: Self) !?Buttons {
     return try self.vtable.readButtons(self.context);
 }
 
-pub fn drawDungeon(
-    self: Self,
-    screen: *const game.Screen,
-    dungeon: *const game.Dungeon,
-) !void {
+pub inline fn drawDungeon(self: Self, screen: *const game.Screen, dungeon: *const game.Dungeon) !void {
     try self.vtable.drawDungeon(self.context, screen, dungeon);
 }
 
-pub fn drawSprite(
+pub inline fn drawSprite(
     self: Self,
     screen: *const game.Screen,
     sprite: *const game.Sprite,
     position: *const game.Position,
 ) !void {
     try self.vtable.drawSprite(self.context, screen, sprite, position);
+}
+
+pub inline fn drawHealth(self: Self, health: *const game.Health) !void {
+    try self.vtable.drawHealth(self.context, health);
 }
