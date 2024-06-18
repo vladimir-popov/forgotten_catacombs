@@ -21,7 +21,7 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     const session = try runtime.alloc.create(Self);
     session.* = .{
         .runtime = runtime,
-        .screen = game.Screen.init(game.DISPLAY_ROWS, game.DISPLAY_COLS, game.Dungeon.Region),
+        .screen = game.Screen.init(game.DISPLAY_DUNG_ROWS, game.DISPLAY_DUNG_COLS, game.Dungeon.Region),
         .timers = try runtime.alloc.alloc(i64, std.meta.tags(Timers).len),
         .entities = try ecs.EntitiesManager.init(runtime.alloc),
         .components = try ecs.ComponentsManager(game.Components).init(runtime.alloc),

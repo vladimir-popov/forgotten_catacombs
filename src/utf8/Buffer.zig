@@ -6,7 +6,7 @@ const String = @import("String.zig");
 
 const Buffer = @This();
 
-const Error = std.mem.Allocator.Error;
+const Error = String.Error;
 
 lines: std.ArrayList(String),
 
@@ -28,10 +28,6 @@ pub fn parseInit(alloc: std.mem.Allocator, str: []const u8) Error!Buffer {
         try self.addLine(line);
     }
     return self;
-}
-
-pub inline fn linesCount(self: Buffer) usize {
-    return self.lines.items.len;
 }
 
 pub inline fn get(self: Buffer, idx: usize) ?*String {
@@ -123,7 +119,7 @@ test "parse string" {
     const buffer = try Buffer.parseInit(std.testing.allocator, data);
     defer buffer.deinit();
 
-    try std.testing.expectEqual(2, buffer.linesCount());
+    try std.testing.expectEqual(2, buffer.lines.items.len);
 }
 
 test "should crop \\\\r and \\\\n symbols" {
@@ -131,7 +127,7 @@ test "should crop \\\\r and \\\\n symbols" {
     const buffer = try Buffer.parseInit(std.testing.allocator, data);
     defer buffer.deinit();
 
-    try std.testing.expectEqual(1, buffer.linesCount());
+    try std.testing.expectEqual(1, buffer.lines.items.len);
 }
 
 test "should recover to the same string" {

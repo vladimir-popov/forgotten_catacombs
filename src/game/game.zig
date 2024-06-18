@@ -8,23 +8,28 @@ pub const AnyRuntime = @import("AnyRuntime.zig");
 
 pub const Entity = ecs.Entity;
 pub const Screen = @import("Screen.zig");
-pub const Dungeon = @import("BspDungeon.zig").BspDungeon(TOTAL_ROWS, TOTAL_COLS);
+pub const Dungeon = @import("BspDungeon.zig").BspDungeon(TOTAL_DUNG_ROWS, TOTAL_DUNG_COLS);
 
 pub const GameSession = @import("GameSession.zig");
 
-// Playdate resolution: h:240 × w:400 pixels
-// we expect at least 4x4 sprite to render the whole level map
-// and 16x8 to render the game in play mode
+// Playdate display resolution px:
+pub const DISPLPAY_HEGHT = 240;
+pub const DISPLPAY_WIGHT = 400;
+
+// Font size px:
+pub const FONT_HEIGHT = 16;
+pub const FONT_WIDTH = 8;
+
+// The size of the zone with stats:
+pub const STATS_ROWS = 15;
+pub const STATS_COLS = 10;
 
 /// The maximum rows count in the dungeon
-pub const TOTAL_ROWS: u8 = 40;
+pub const TOTAL_DUNG_ROWS: u8 = 40;
 /// The maximum columns count in the dungeon
-pub const TOTAL_COLS: u8 = 100;
+pub const TOTAL_DUNG_COLS: u8 = 100;
 
 /// The rows count to display
-pub const DISPLAY_ROWS: u8 = 15;
+pub const DISPLAY_DUNG_ROWS = STATS_ROWS;
 /// The rows count to display
-pub const DISPLAY_COLS: u8 = 40;
-
-const ROWS_PAD = 3;
-const COLS_PAD = 7;
+pub const DISPLAY_DUNG_COLS = (DISPLPAY_WIGHT - STATS_COLS * FONT_WIDTH) / FONT_WIDTH;

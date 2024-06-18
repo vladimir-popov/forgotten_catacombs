@@ -133,6 +133,7 @@ fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game
     defer self.alloc.free(line);
 
     var idx: u8 = 0;
+    var row: u8 = 0;
     while (itr.next()) |cell| {
         line[idx] = switch (cell) {
             .nothing => ' ',
@@ -142,11 +143,14 @@ fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game
         };
         idx += 1;
         if (itr.cursor.col == itr.region.top_left.col) {
-            idx = 0;
             try buffer.addLine(line);
+            // try buffer.mergeLine(line, row, game.STATS_COLS);
             @memset(line, 0);
+            idx = 0;
+            row += 1;
         }
     }
+    try drawHealth(ptr, undefined);
 }
 
 fn drawSprite(
@@ -164,7 +168,14 @@ fn drawSprite(
 }
 
 fn drawHealth(ptr: *anyopaque, health: *const game.Health) !void {
-    // var self: *Self = @ptrCast(@alignCast(ptr));
-    _ = ptr;
+    const self: *Self = @ptrCast(@alignCast(ptr));
     _ = health;
+    const footer = try utf8.String.initFill(self.alloc, '-', game.STATS_COLS + game.DISPLAY_DUNG_COLS);
+    defer footer.deinit();
+    for (self.buffer.lines.items) |*line| {
+       try line.setChar(0, '|');
+       // try line.setChar(game.DISPLAY_DUNG_COLS - 1, '|');
+       try line.setChar(game.DISPLAY_DUNG_COLS + game.STATS_COLS - 1, '|');
+    }
+    try self.buffer.addLine(footer.bytes.items);
 }

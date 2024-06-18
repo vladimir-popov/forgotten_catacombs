@@ -9,7 +9,7 @@ pub const Symbol = struct {
     len: u8,
 };
 
-pub const Error = std.mem.Allocator.Error;
+pub const Error = std.mem.Allocator.Error || error{ Utf8CannotEncodeSurrogateHalf, CodepointTooLarge };
 
 const String = @This();
 
@@ -40,6 +40,14 @@ pub fn initFill(alloc: std.mem.Allocator, char: u8, count: usize) Error!String {
     return res;
 }
 
+pub fn fromOneSymbol(alloc: std.mem.Allocator, symbol: u21) Error!String {
+    var bytes: [4]u8 = undefined;
+    const len = try std.unicode.utf8Encode(symbol, &bytes);
+    var str = String{ .bytes = try std.ArrayList(u8).initCapacity(alloc, len) };
+    try str.bytes.insertSlice(0, bytes[0..len]);
+    return str;
+}
+
 /// Frees memory allocated for this sting.
 pub fn deinit(self: String) void {
     self.bytes.deinit();
@@ -50,26 +58,30 @@ pub fn deinit(self: String) void {
 ///
 /// @b_idx the index of the byte near which the symbol will be looking for.
 pub fn symbolAfter(self: String, b_idx: usize) ?Symbol {
+    return findStartOfSymbol(self.bytes.items, b_idx);
+}
+
+fn findStartOfSymbol(bytes: []u8, b_idx: usize) ?Symbol {
     var idx: usize = b_idx;
 
     // move to the nearest symbol beginning
     // 0xC0 == 1100 0000; 0x80 == 1000 0000
-    while (idx < self.bytes.items.len and (self.bytes.items[idx] & 0xC0) == 0x80) {
+    while (idx < bytes.len and (bytes[idx] & 0xC0) == 0x80) {
         idx += 1;
     }
 
     // looks like no one full symbol till the end
-    if (idx >= self.bytes.items.len)
+    if (idx >= bytes.len)
         return null;
 
     // skip control sequence
-    if (self.bytes.items[idx] == '\x1b') {
+    if (bytes[idx] == '\x1b') {
         idx += 1;
 
-        if (self.bytes.items[idx] == '[') {
+        if (bytes[idx] == '[') {
             idx += 1;
-            while (idx < self.bytes.items.len) {
-                const c = self.bytes.items[idx];
+            while (idx < bytes.len) {
+                const c = bytes[idx];
                 idx += 1;
                 // TODO skip CS more generally
                 if (c == 'B' or c == 'C' or c == 'J' or c == 'H' or c == 'h' or c == 'm' or c == 'l' or c == 'n')
@@ -80,7 +92,7 @@ pub fn symbolAfter(self: String, b_idx: usize) ?Symbol {
 
     // count symbol's bytes
     var n: u8 = 1;
-    while (idx + n < self.bytes.items.len and (self.bytes.items[idx + n] & 0xC0) == 0x80)
+    while (idx + n < bytes.len and (bytes[idx + n] & 0xC0) == 0x80)
         n += 1;
 
     return .{ .index = idx, .len = n };
@@ -173,17 +185,32 @@ pub fn merge(self: *String, source: String, left_pad_symbols: usize) Error!void 
     }
 }
 
+/// Replaces s_idx (0 based) symbol by the passed symbol.
+/// If the s_idx more than length of the string, appropriate count of spaces
+/// will be added.
+pub fn set(self: *String, s_idx: usize, symbol: u21) Error!void {
+    const str = try fromOneSymbol(self.bytes.allocator, symbol);
+    defer str.deinit();
+    try self.merge(str, s_idx);
+}
+
 // 0xE2 == 1110 0010
 // 0x92 == 1001 0010
 // 0xB6 == 1011 0110
 //
-// Ⓐ    0xE2 0x92 0xB6
+// Ⓐ    0xE2 0x92 0xB6   1110 0010 1001 0010 1011 0110    226 146 182
 // Ⓑ    0xE2 0x92 0xB7
 // Ⓒ    0xE2 0x92 0xB8
 // Ⓓ    0xE2 0x92 0xB9
 // ☺    0xE2 0x98 0xBA
 // █	0xE2 0x96 0x88
 // ░	0xE2 0x96 0x91
+
+test "should treat uint as a utf8 symbol" {
+    const str = try String.fromOneSymbol(std.testing.allocator, 'Ⓐ');
+    defer str.deinit();
+    try std.testing.expectEqualStrings("Ⓐ", str.bytes.items);
+}
 
 test "should return expected symbol at specified index" {
     const alloc = std.testing.allocator;
@@ -246,4 +273,37 @@ test "merge to short string" {
 
     // then:
     try std.testing.expectEqualStrings("  ***", str1.bytes.items);
+}
+
+test "set symbol at existed char" {
+    // given:
+    const alloc = std.testing.allocator;
+    var u8str = try String.initParse(alloc, "123");
+    defer u8str.deinit();
+    // when:
+    try u8str.set(1, 'Ⓐ');
+    // then:
+    try std.testing.expectEqualStrings("1Ⓐ3", u8str.bytes.items);
+}
+
+test "set symbol at existed utf8 symbol" {
+    // given:
+    const alloc = std.testing.allocator;
+    var u8str = try String.initParse(alloc, "1Ⓑ3");
+    defer u8str.deinit();
+    // when:
+    try u8str.set(1, 'Ⓐ');
+    // then:
+    try std.testing.expectEqualStrings("1Ⓐ3", u8str.bytes.items);
+}
+
+test "set symbol at the end of the string" {
+    // given:
+    const alloc = std.testing.allocator;
+    var u8str = try String.initParse(alloc, "123");
+    defer u8str.deinit();
+    // when:
+    try u8str.set(5, 'Ⓐ');
+    // then:
+    try std.testing.expectEqualStrings("123  Ⓐ", u8str.bytes.items);
 }
