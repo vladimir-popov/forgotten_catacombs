@@ -9,6 +9,11 @@ const log = std.log.scoped(.runtime);
 
 const Self = @This();
 
+var window_size: tty.Display.RowsCols = undefined;
+var act: std.posix.Sigaction = undefined;
+var rows_pad: u16 = 0;
+var cols_pad: u16 = 0;
+
 alloc: std.mem.Allocator,
 // used to accumulate the buffer every run-loop circle
 arena: std.heap.ArenaAllocator,
@@ -28,25 +33,33 @@ pub fn init(alloc: std.mem.Allocator, rand: std.Random) !Self {
         .buffer = undefined,
         .termios = tty.Display.enterRawMode(),
     };
-    tty.Display.hideCursor();
+    try tty.Display.hideCursor();
+    try tty.Display.handleWindowResize(&act, handleWindowResize);
     return instance;
 }
 
 pub fn deinit(self: *Self) void {
-    tty.Display.exitFromRawMode();
-    tty.Display.showCursor();
+    tty.Display.exitFromRawMode() catch unreachable;
+    tty.Display.showCursor() catch unreachable;
     _ = self.arena.reset(.free_all);
 }
 
 /// Run the main loop of the game
 pub fn run(self: *Self, game_session: anytype) !void {
-    tty.Display.clearScreen();
+    handleWindowResize(0);
     while (!self.isExit()) {
         try self.drawBorders();
         try game_session.*.tick();
-        try self.writeBuffer(tty.Display.writer, 1, 1);
+        try self.writeBuffer(tty.Display.writer);
         _ = self.arena.reset(.retain_capacity);
     }
+}
+
+fn handleWindowResize(_: i32) callconv(.C) void {
+    window_size = tty.Display.getWindowSize() catch unreachable;
+    tty.Display.clearScreen() catch unreachable;
+    rows_pad = (window_size.rows - game.DISPLPAY_ROWS) / 2;
+    cols_pad = (window_size.cols - game.DISPLPAY_COLS) / 2;
 }
 
 fn drawBorders(self: *Self) !void {
@@ -71,7 +84,7 @@ fn isExit(self: Self) bool {
     }
 }
 
-fn writeBuffer(self: Self, writer: std.io.AnyWriter, rows_pad: u8, cols_pad: u8) !void {
+fn writeBuffer(self: Self, writer: std.io.AnyWriter) !void {
     for (self.buffer.lines.items, rows_pad..) |line, i| {
         try tty.Text.writeSetCursorPosition(writer, @intCast(i), cols_pad);
         _ = try writer.write(line.bytes.items);
