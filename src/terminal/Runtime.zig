@@ -101,7 +101,7 @@ pub fn any(self: *Self) game.AnyRuntime {
             .readButtons = readButtons,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
-            .drawHealth = drawHealth,
+            .drawLabel = drawLabel,
         },
     };
 }
@@ -173,7 +173,6 @@ fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game
             row += 1;
         }
     }
-    try drawHealth(ptr, undefined);
 }
 
 fn drawSprite(
@@ -190,8 +189,7 @@ fn drawSprite(
     }
 }
 
-fn drawHealth(ptr: *anyopaque, health: *const game.Health) !void {
-    // const self: *Self = @ptrCast(@alignCast(ptr));
-    _ = health;
-    _ = ptr;
+fn drawLabel(ptr: *anyopaque, label: []const u8, row: u8, col: u8) !void {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    try self.buffer.mergeLine(label, row, col);
 }

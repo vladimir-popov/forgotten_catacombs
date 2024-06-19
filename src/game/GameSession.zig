@@ -35,6 +35,7 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     try session.components.addToEntity(session.player, game.Position{ .point = player_position });
     try session.components.addToEntity(session.player, game.Move{});
     try session.components.addToEntity(session.player, game.Sprite{ .letter = "@" });
+    try session.components.addToEntity(session.player, game.Health{ .health = 100 });
 
     // Initialize systems:
     try session.systems.append(game.handleInput);

@@ -9,6 +9,15 @@ pub fn render(session: *game.GameSession) anyerror!void {
     const screen = &session.screen;
     try session.runtime.drawDungeon(screen, session.dungeon);
 
+    if (session.components.getForEntity(session.player, game.Health)) |health| {
+        var buf: [8]u8 = [_]u8{0} ** 8;
+        try session.runtime.drawLabel(
+            try std.fmt.bufPrint(&buf, "HP: {d}", .{health.health}),
+            2,
+            game.DISPLAY_DUNG_COLS + 3,
+        );
+    }
+
     for (session.components.getAll(game.Position)) |*position| {
         if (screen.region.containsPoint(position.point)) {
             for (session.components.getAll(game.Sprite)) |*sprite| {

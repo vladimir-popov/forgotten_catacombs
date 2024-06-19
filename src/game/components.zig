@@ -43,4 +43,5 @@ pub const Components = union {
     position: Position,
     move: Move,
     sprite: Sprite,
+    health: Health,
 };

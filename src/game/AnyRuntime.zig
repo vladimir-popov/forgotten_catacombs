@@ -54,9 +54,11 @@ const VTable = struct {
         sprite: *const game.Sprite,
         position: *const game.Position,
     ) anyerror!void,
-    drawHealth: *const fn (
+    drawLabel: *const fn (
         context: *anyopaque,
-        health: *const game.Health,
+        label: []const u8,
+        row: u8,
+        col: u8,
     ) anyerror!void,
     currentMillis: *const fn (context: *anyopaque) i64,
 };
@@ -87,6 +89,6 @@ pub inline fn drawSprite(
     try self.vtable.drawSprite(self.context, screen, sprite, position);
 }
 
-pub inline fn drawHealth(self: Self, health: *const game.Health) !void {
-    try self.vtable.drawHealth(self.context, health);
+pub inline fn drawLabel(self: Self, label: []const u8, row: u8, col: u8) !void {
+    try self.vtable.drawLabel(self.context, label, row, col);
 }
