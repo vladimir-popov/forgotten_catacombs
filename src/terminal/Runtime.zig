@@ -126,6 +126,13 @@ fn readButtons(ptr: *anyopaque) anyerror!?game.AnyRuntime.Buttons {
                 'l' => game.AnyRuntime.Buttons.Right,
                 else => null,
             },
+            .control => switch (key.control) {
+                .LEFT => game.AnyRuntime.Buttons.Left,
+                .DOWN => game.AnyRuntime.Buttons.Down,
+                .UP => game.AnyRuntime.Buttons.Up,
+                .RIGHT => game.AnyRuntime.Buttons.Right,
+                else => null,
+            },
             else => null,
         };
         if (known_key_code) |code| {
