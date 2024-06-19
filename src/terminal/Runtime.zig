@@ -41,13 +41,23 @@ pub fn deinit(self: *Self) void {
 /// Run the main loop of the game
 pub fn run(self: *Self, game_session: anytype) !void {
     tty.Display.clearScreen();
-    self.buffer = utf8.Buffer.init(self.arena.allocator());
     while (!self.isExit()) {
+        try self.drawBorders();
         try game_session.*.tick();
         try self.writeBuffer(tty.Display.writer, 1, 1);
         _ = self.arena.reset(.retain_capacity);
-        self.buffer = utf8.Buffer.init(self.arena.allocator());
     }
+}
+
+fn drawBorders(self: *Self) !void {
+    self.buffer = utf8.Buffer.init(self.arena.allocator());
+    try self.buffer.addLine("╔" ++ "═" ** game.DISPLPAY_COLS ++ "╗");
+    for (0..game.DISPLPAY_ROWS) |_| {
+        try self.buffer.addLine("║" ++ " " ** game.DISPLAY_DUNG_COLS ++ "║" ++ " " ** (game.STATS_COLS - 1) ++ "║");
+    }
+    try self.buffer.addLine("╚" ++ "═" ** game.DISPLPAY_COLS ++ "╝");
+    try self.buffer.lines.items[0].set(game.DISPLAY_DUNG_COLS + 1, '╦');
+    try self.buffer.lines.items[game.DISPLPAY_ROWS + 1].set(game.DISPLAY_DUNG_COLS + 1, '╩');
 }
 
 fn isExit(self: Self) bool {
@@ -133,7 +143,7 @@ fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game
     defer self.alloc.free(line);
 
     var idx: u8 = 0;
-    var row: u8 = 0;
+    var row: u8 = 1;
     while (itr.next()) |cell| {
         line[idx] = switch (cell) {
             .nothing => ' ',
@@ -143,8 +153,8 @@ fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game
         };
         idx += 1;
         if (itr.cursor.col == itr.region.top_left.col) {
-            try buffer.addLine(line);
-            // try buffer.mergeLine(line, row, game.STATS_COLS);
+            // try buffer.addLine(line);
+            try buffer.mergeLine(line, row, 1);
             @memset(line, 0);
             idx = 0;
             row += 1;
@@ -161,21 +171,14 @@ fn drawSprite(
 ) anyerror!void {
     if (screen.region.containsPoint(position.point)) {
         var self: *Self = @ptrCast(@alignCast(ptr));
-        const r = position.point.row - screen.region.top_left.row;
-        const c = position.point.col - screen.region.top_left.col;
+        const r = position.point.row - screen.region.top_left.row + 1;
+        const c = position.point.col - screen.region.top_left.col + 1;
         try self.buffer.mergeLine(sprite.letter, r, c);
     }
 }
 
 fn drawHealth(ptr: *anyopaque, health: *const game.Health) !void {
-    const self: *Self = @ptrCast(@alignCast(ptr));
+    // const self: *Self = @ptrCast(@alignCast(ptr));
     _ = health;
-    const footer = try utf8.String.initFill(self.alloc, '-', game.STATS_COLS + game.DISPLAY_DUNG_COLS);
-    defer footer.deinit();
-    for (self.buffer.lines.items) |*line| {
-       try line.setChar(0, '|');
-       // try line.setChar(game.DISPLAY_DUNG_COLS - 1, '|');
-       try line.setChar(game.DISPLAY_DUNG_COLS + game.STATS_COLS - 1, '|');
-    }
-    try self.buffer.addLine(footer.bytes.items);
+    _ = ptr;
 }
