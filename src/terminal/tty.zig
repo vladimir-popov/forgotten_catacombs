@@ -76,13 +76,18 @@ pub const Text = struct {
         }
     }
 
-    pub fn writeSetCursorPosition(writer: std.io.AnyWriter, row: u8, col: u8) !void {
+    pub fn writeSetCursorPosition(writer: std.io.AnyWriter, row: u16, col: u16) !void {
         try std.fmt.format(writer, "\x1b[{d};{d}H", .{ row, col });
     }
 };
 
 pub const Display = struct {
     pub const Error = error{ GettingCursoreError, WritenNotAllBytes };
+
+    pub const RowsCols = struct {
+        rows: u16,
+        cols: u16,
+    };
 
     pub fn enterRawMode() c.termios {
         _ = c.tcgetattr(c.STDIN_FILENO, &original_termios);
@@ -174,9 +179,9 @@ pub const Display = struct {
     pub fn showCursor() !void {
         try write(Text.SM_SHOW_CU);
     }
-    
-    /// Returns position of the cursor in form of .{ ROWS, COLS }.
-    pub fn getCursorPosition() !struct { u16, u16 } {
+
+    /// Returns position of the cursor
+    pub fn getCursorPosition() !RowsCols {
         try write(Text.DSR_GET_POSISION);
         var buf: [32]u8 = undefined;
         var i: u8 = 0;
@@ -192,23 +197,30 @@ pub const Display = struct {
             return error.GettingCursoreError;
         if (std.mem.indexOfScalar(u8, buf[2..], ';')) |idx| {
             return .{
-                try std.fmt.parseInt(u8, buf[2..idx], 10),
-                try std.fmt.parseInt(u8, buf[idx + 1 ..], 10),
+                .rows = try std.fmt.parseInt(u8, buf[2..idx], 10),
+                .cols = try std.fmt.parseInt(u8, buf[idx + 1 ..], 10),
             };
         } else {
             return error.GettingCursoreError;
         }
     }
-    
-    /// Returns count of rows and cols of the current window in form of .{ ROWS, COLS }.
-    pub fn getWindowSize() !struct { u16, u16 } {
+
+    /// Returns count of rows and cols of the current window
+    pub fn getWindowSize() !RowsCols {
         var ws: c.winsize = std.mem.zeroes(c.winsize);
         if (c.ioctl(c.STDOUT_FILENO, std.posix.system.T.IOCGWINSZ, &ws) == 1 or ws.ws_col == 0) {
             try write(Text.cursorDown(999) ++ Text.cursorRight(999));
             return try getCursorPosition();
         } else {
-            return .{ ws.ws_row, ws.ws_col };
+            return .{ .rows = ws.ws_row, .cols = ws.ws_col };
         }
+    }
+
+    pub fn handleWindowResize(act: *std.posix.Sigaction, handler: *align(1) const fn (i32) callconv(.C) void) !void {
+        act.flags = std.posix.SA.RESTART;
+        act.handler = .{ .handler = handler };
+        act.mask = std.posix.empty_sigset;
+        try std.posix.sigaction(std.posix.SIG.WINCH, act, null);
     }
 };
 
