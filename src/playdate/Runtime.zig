@@ -3,9 +3,6 @@ const api = @import("api.zig");
 const game = @import("game");
 const Allocator = @import("Allocator.zig");
 
-const FONT_HEIGHT: u16 = 16;
-const FONT_WIDHT: u16 = 8;
-
 const log = std.log.scoped(.runtime);
 
 const Self = @This();
@@ -64,7 +61,7 @@ pub fn any(self: *Self) game.AnyRuntime {
             .readButtons = readButtons,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
-            .drawHealth = drawHealth,
+            .drawLabel = drawLabel,
         },
     };
 }
@@ -107,6 +104,13 @@ fn readButtons(ptr: *anyopaque) anyerror!?game.AnyRuntime.Buttons {
 }
 
 fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {
+    // separate dung and stats:
+    var self: *Self = @ptrCast(@alignCast(ptr));
+    const x = (game.DISPLAY_DUNG_COLS + 1) * game.FONT_WIDTH;
+    self.playdate.graphics.drawLine(x, 0, x, game.DISPLPAY_HEGHT, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
+    self.playdate.graphics.drawLine(x + 2, 0, x + 2, game.DISPLPAY_HEGHT, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
+
+    // draw dung:
     var itr = dungeon.cellsInRegion(screen.region) orelse return;
     var position = game.Position{ .point = screen.region.top_left };
     var sprite = game.Sprite{ .letter = undefined };
@@ -134,14 +138,19 @@ fn drawSprite(
 ) anyerror!void {
     if (screen.region.containsPoint(position.point)) {
         const self: *Self = @ptrCast(@alignCast(ptr));
-        const y: c_int = FONT_HEIGHT * (position.point.row - screen.region.top_left.row + 1);
-        const x: c_int = FONT_WIDHT * (position.point.col - screen.region.top_left.col + 1);
+        const y: c_int = game.FONT_HEIGHT * @as(c_int, position.point.row - screen.region.top_left.row + 1);
+        const x: c_int = game.FONT_WIDTH * @as(c_int, position.point.col - screen.region.top_left.col + 1);
         _ = self.playdate.graphics.drawText(sprite.letter.ptr, sprite.letter.len, .UTF8Encoding, x, y);
     }
 }
 
-fn drawHealth(ptr: *anyopaque, health: *const game.Health) !void {
-    // var self: *Self = @ptrCast(@alignCast(ptr));
-    _ = ptr;
-    _ = health;
+fn drawLabel(ptr: *anyopaque, label: []const u8, row: u8, col: u8) !void {
+    var self: *Self = @ptrCast(@alignCast(ptr));
+    _ = self.playdate.graphics.drawText(
+        label.ptr,
+        label.len,
+        .UTF8Encoding,
+        @as(c_int, col) * game.FONT_WIDTH,
+        @as(c_int, row) * game.FONT_HEIGHT,
+    );
 }

@@ -25,7 +25,7 @@ pub const DISPLPAY_COLS = DISPLPAY_WIGHT / FONT_WIDTH;
 
 // The size of the zone with stats:
 pub const STATS_ROWS = DISPLPAY_ROWS;
-pub const STATS_COLS = 10;
+pub const STATS_COLS = 12;
 
 /// The maximum rows count in the dungeon
 pub const TOTAL_DUNG_ROWS: u8 = 40;
