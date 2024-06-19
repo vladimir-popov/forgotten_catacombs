@@ -33,13 +33,13 @@ pub const Text = struct {
     const SGR_UNDERLINE = csi("4m");
     const SGR_INVERT_COLORS = csi("7m");
 
-    pub inline fn cursorRight(comptime count: u8) *const [fmt.count("\x1b[{d}", .{count}):0]u8 {
+    pub inline fn cursorRight(comptime count: u16) *const [fmt.count("\x1b[{d}C", .{count}):0]u8 {
         comptime {
             return fmt.comptimePrint("\x1b[{d}C", .{count});
         }
     }
 
-    pub inline fn cursorDown(comptime count: u8) *const [fmt.count("\x1b[{d}", .{count}):0]u8 {
+    pub inline fn cursorDown(comptime count: u16) *const [fmt.count("\x1b[{d}B", .{count}):0]u8 {
         comptime {
             return fmt.comptimePrint("\x1b[{d}B", .{count});
         }
@@ -82,6 +82,8 @@ pub const Text = struct {
 };
 
 pub const Display = struct {
+    pub const Error = error{ GettingCursoreError, WritenNotAllBytes };
+
     pub fn enterRawMode() c.termios {
         _ = c.tcgetattr(c.STDIN_FILENO, &original_termios);
         // copy struct:
@@ -138,14 +140,15 @@ pub const Display = struct {
         return original_termios;
     }
 
-    pub fn exitFromRawMode() void {
-        clearScreen();
-        showCursor();
+    pub fn exitFromRawMode() !void {
+        try clearScreen();
+        try showCursor();
         _ = c.tcsetattr(c.STDIN_FILENO, .FLUSH, &original_termios);
     }
 
-    pub inline fn write(str: []const u8) void {
-        _ = c.write(c.STDOUT_FILENO, str.ptr, str.len);
+    pub inline fn write(str: []const u8) !void {
+        if (c.write(c.STDOUT_FILENO, str.ptr, str.len) != str.len)
+            return error.WritenNotAllBytes;
     }
 
     pub const writer = std.io.AnyWriter{ .context = undefined, .writeFn = writeFn };
@@ -153,23 +156,59 @@ pub const Display = struct {
         return @intCast(c.write(c.STDOUT_FILENO, bytes.ptr, bytes.len));
     }
 
-    pub fn clearScreen() void {
+    pub fn clearScreen() !void {
         // Put cursor to the left upper corner
-        write(Text.CUP);
+        try write(Text.CUP);
         // Erase all lines on the screen
-        write(Text.ED_FROM_START);
+        try write(Text.ED_FROM_START);
     }
 
     pub inline fn setCursorPosition(row: u8, col: u8) void {
         _ = c.printf("\x1b[%d;%dH", row, col);
     }
 
-    pub fn hideCursor() void {
-        write(Text.RM_HIDE_CU);
+    pub fn hideCursor() !void {
+        try write(Text.RM_HIDE_CU);
     }
 
-    pub fn showCursor() void {
-        write(Text.SM_SHOW_CU);
+    pub fn showCursor() !void {
+        try write(Text.SM_SHOW_CU);
+    }
+    
+    /// Returns position of the cursor in form of .{ ROWS, COLS }.
+    pub fn getCursorPosition() !struct { u16, u16 } {
+        try write(Text.DSR_GET_POSISION);
+        var buf: [32]u8 = undefined;
+        var i: u8 = 0;
+        while (i < buf.len - 1) {
+            if (c.read(c.STDIN_FILENO, &buf, 1) != 1)
+                break;
+            if (buf[i] == 'R')
+                break;
+            i += 1;
+        }
+        buf[i] = 0;
+        if (buf[0] != Text.ESC or buf[1] != '[')
+            return error.GettingCursoreError;
+        if (std.mem.indexOfScalar(u8, buf[2..], ';')) |idx| {
+            return .{
+                try std.fmt.parseInt(u8, buf[2..idx], 10),
+                try std.fmt.parseInt(u8, buf[idx + 1 ..], 10),
+            };
+        } else {
+            return error.GettingCursoreError;
+        }
+    }
+    
+    /// Returns count of rows and cols of the current window in form of .{ ROWS, COLS }.
+    pub fn getWindowSize() !struct { u16, u16 } {
+        var ws: c.winsize = std.mem.zeroes(c.winsize);
+        if (c.ioctl(c.STDOUT_FILENO, std.posix.system.T.IOCGWINSZ, &ws) == 1 or ws.ws_col == 0) {
+            try write(Text.cursorDown(999) ++ Text.cursorRight(999));
+            return try getCursorPosition();
+        } else {
+            return .{ ws.ws_row, ws.ws_col };
+        }
     }
 };
 
