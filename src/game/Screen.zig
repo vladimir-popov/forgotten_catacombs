@@ -30,6 +30,7 @@ pub fn centeredAround(self: *Self, point: p.Point) void {
     };
 }
 
+/// Try to keep the player inside this region
 pub inline fn innerRegion(self: Self) p.Region {
     var inner_region = self.region;
     inner_region.top_left.row += self.rows_pad;

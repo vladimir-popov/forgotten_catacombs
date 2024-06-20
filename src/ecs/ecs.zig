@@ -168,7 +168,11 @@ pub fn ComponentsManager(comptime ComponentsUnion: type) type {
         }
 
         pub fn getAll(self: Self, comptime C: type) []C {
-            return @field(self.inner_state.components_map, @typeName(C)).components.items;
+            return self.arrayOf(C).components.items;
+        }
+
+        pub fn arrayOf(self: Self, comptime C: type) ComponentArray(C) {
+            return @field(self.inner_state.components_map, @typeName(C));
         }
 
         /// Returns the pointer to the component for the entity, if it was added before, or null.

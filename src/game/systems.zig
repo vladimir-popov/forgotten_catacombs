@@ -39,6 +39,12 @@ pub fn handleInput(session: *game.GameSession) anyerror!void {
     }
 }
 
+const Obstacle = union(enum) {
+    closed_door,
+    wall,
+    entity: game.Entity,
+};
+
 pub fn handleMove(session: *game.GameSession) anyerror!void {
     var itr = session.query.get2(game.Move, game.Position);
     while (itr.next()) |components| {
@@ -48,26 +54,56 @@ pub fn handleMove(session: *game.GameSession) anyerror!void {
         if (move.direction) |direction| {
             // try to move:
             const new_point = position.point.movedTo(direction);
-            if (session.dungeon.cellAt(new_point)) |cell| {
-                switch (cell) {
-                    .floor => {
-                        doMove(session, move, position, entity);
-                    },
-                    .door => |door| {
-                        if (door == .opened) {
-                            doMove(session, move, position, entity);
-                        } else {
-                            session.dungeon.openDoor(new_point);
-                            move.cancel();
-                        }
-                    },
-                    else => {},
-                }
+            if (handledCollision(session, entity, new_point)) {
+                doMove(session, move, position, entity);
+            } else {
+                move.cancel();
             }
         }
     }
 }
 
+/// Should return true if it possible for entity to move to the new_point
+fn handledCollision(session: *game.GameSession, entity: game.Entity, new_point: p.Point) bool {
+    _ = entity;
+    if (collision(session, new_point)) |obstacle| {
+        switch (obstacle) {
+            .wall => return false,
+            .closed_door => {
+                session.dungeon.openDoor(new_point);
+                return false;
+            },
+            .entity => {
+                return false;
+            },
+        }
+    } else {
+        return true;
+    }
+}
+
+fn collision(session: *game.GameSession, new_point: p.Point) ?Obstacle {
+    if (session.dungeon.cellAt(new_point)) |cell| {
+        switch (cell) {
+            .nothing, .wall => return .wall,
+            .door => |door| if (door == .opened) return null else return .closed_door,
+            .entity => |e| return .{ .entity = e },
+            .floor => if (entityAt(session, new_point)) |e| return .{ .entity = e } else return null,
+        }
+    }
+    return .wall;
+}
+
+fn entityAt(session: *game.GameSession, place: p.Point) ?game.Entity {
+    for (session.components.arrayOf(game.Position).components.items, 0..) |pos, idx| {
+        if (pos.point.eql(place)) {
+            return session.components.arrayOf(game.Position).index_entity.get(@intCast(idx));
+        }
+    }
+    return null;
+}
+
+/// Apply move and maybe change position of the screen
 fn doMove(session: *game.GameSession, move: *game.Move, position: *game.Position, entity: game.Entity) void {
     const orig_point = position.point;
     const direction = move.direction.?;
