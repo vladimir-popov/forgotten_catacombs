@@ -11,6 +11,8 @@ const Self = @This();
 
 var window_size: tty.Display.RowsCols = undefined;
 var act: std.posix.Sigaction = undefined;
+/// true if game should be rendered in the center of the terminal window:
+var should_render_in_center: bool = true;
 var rows_pad: u16 = 0;
 var cols_pad: u16 = 0;
 
@@ -25,7 +27,7 @@ termios: std.c.termios,
 prev_key: ?tty.Keyboard.Button = null,
 pressed_at: i64 = 0,
 
-pub fn init(alloc: std.mem.Allocator, rand: std.Random) !Self {
+pub fn init(alloc: std.mem.Allocator, rand: std.Random, render_in_center: bool) !Self {
     const instance = Self{
         .alloc = alloc,
         .arena = std.heap.ArenaAllocator.init(alloc),
@@ -35,6 +37,7 @@ pub fn init(alloc: std.mem.Allocator, rand: std.Random) !Self {
     };
     try tty.Display.hideCursor();
     try tty.Display.handleWindowResize(&act, handleWindowResize);
+    should_render_in_center = render_in_center;
     return instance;
 }
 
@@ -48,7 +51,7 @@ pub fn deinit(self: *Self) void {
 pub fn run(self: *Self, game_session: anytype) !void {
     handleWindowResize(0);
     while (!self.isExit()) {
-        try self.drawBorders();
+        self.buffer = utf8.Buffer.init(self.arena.allocator());
         try game_session.*.tick();
         try self.writeBuffer(tty.Display.writer);
         _ = self.arena.reset(.retain_capacity);
@@ -58,19 +61,10 @@ pub fn run(self: *Self, game_session: anytype) !void {
 fn handleWindowResize(_: i32) callconv(.C) void {
     window_size = tty.Display.getWindowSize() catch unreachable;
     tty.Display.clearScreen() catch unreachable;
-    rows_pad = (window_size.rows - game.DISPLPAY_ROWS) / 2;
-    cols_pad = (window_size.cols - game.DISPLPAY_COLS) / 2;
-}
-
-fn drawBorders(self: *Self) !void {
-    self.buffer = utf8.Buffer.init(self.arena.allocator());
-    try self.buffer.addLine("╔" ++ "═" ** game.DISPLPAY_COLS ++ "╗");
-    for (0..game.DISPLPAY_ROWS) |_| {
-        try self.buffer.addLine("║" ++ " " ** game.DISPLAY_DUNG_COLS ++ "║" ++ " " ** (game.STATS_COLS - 1) ++ "║");
+    if (should_render_in_center) {
+        rows_pad = (window_size.rows - game.DISPLPAY_ROWS) / 2;
+        cols_pad = (window_size.cols - game.DISPLPAY_COLS) / 2;
     }
-    try self.buffer.addLine("╚" ++ "═" ** game.DISPLPAY_COLS ++ "╝");
-    try self.buffer.lines.items[0].set(game.DISPLAY_DUNG_COLS + 1, '╦');
-    try self.buffer.lines.items[game.DISPLPAY_ROWS + 1].set(game.DISPLAY_DUNG_COLS + 1, '╩');
 }
 
 fn isExit(self: Self) bool {
@@ -99,6 +93,7 @@ pub fn any(self: *Self) game.AnyRuntime {
         .vtable = &.{
             .currentMillis = currentMillis,
             .readButtons = readButtons,
+            .drawUI = drawUI,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
             .drawLabel = drawLabel,
@@ -153,6 +148,17 @@ fn readButtons(ptr: *anyopaque) anyerror!?game.AnyRuntime.Buttons {
         }
     }
     return null;
+}
+
+fn drawUI(ptr: *anyopaque) !void {
+    var self: *Self = @ptrCast(@alignCast(ptr));
+    try self.buffer.addLine("╔" ++ "═" ** game.DISPLPAY_COLS ++ "╗");
+    for (0..game.DISPLPAY_ROWS) |_| {
+        try self.buffer.addLine("║" ++ " " ** game.DISPLAY_DUNG_COLS ++ "║" ++ " " ** (game.STATS_COLS - 1) ++ "║");
+    }
+    try self.buffer.addLine("╚" ++ "═" ** game.DISPLPAY_COLS ++ "╝");
+    try self.buffer.lines.items[0].set(game.DISPLAY_DUNG_COLS + 1, '╦');
+    try self.buffer.lines.items[game.DISPLPAY_ROWS + 1].set(game.DISPLAY_DUNG_COLS + 1, '╩');
 }
 
 fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {

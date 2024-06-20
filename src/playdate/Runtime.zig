@@ -59,6 +59,7 @@ pub fn any(self: *Self) game.AnyRuntime {
         .vtable = &.{
             .currentMillis = currentMillis,
             .readButtons = readButtons,
+            .drawUI = drawUI,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
             .drawLabel = drawLabel,
@@ -103,14 +104,15 @@ fn readButtons(ptr: *anyopaque) anyerror!?game.AnyRuntime.Buttons {
     return null;
 }
 
-fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {
-    // separate dung and stats:
+fn drawUI(ptr: *anyopaque) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
+    // separate dung and stats:
     const x = (game.DISPLAY_DUNG_COLS + 1) * game.FONT_WIDTH;
     self.playdate.graphics.drawLine(x, 0, x, game.DISPLPAY_HEGHT, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
     self.playdate.graphics.drawLine(x + 2, 0, x + 2, game.DISPLPAY_HEGHT, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
+}
 
-    // draw dung:
+fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {
     var itr = dungeon.cellsInRegion(screen.region) orelse return;
     var position = game.Position{ .point = screen.region.top_left };
     var sprite = game.Sprite{ .letter = undefined };

@@ -14,7 +14,7 @@ pub fn main() !void {
     const alloc = gpa.allocator();
     defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK DETECTED!");
 
-    var runtime = try Runtime.init(alloc, std.crypto.random);
+    var runtime = try Runtime.init(alloc, std.crypto.random, true);
     defer runtime.deinit();
     const session = try game.GameSession.create(runtime.any());
     defer session.destroy();

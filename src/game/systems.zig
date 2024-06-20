@@ -7,6 +7,9 @@ const log = std.log.scoped(.systems);
 
 pub fn render(session: *game.GameSession) anyerror!void {
     const screen = &session.screen;
+
+    try session.runtime.drawUI();
+
     try session.runtime.drawDungeon(screen, session.dungeon);
 
     for (session.components.getAll(game.Position)) |*position| {
