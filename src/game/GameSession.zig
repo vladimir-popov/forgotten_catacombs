@@ -89,7 +89,7 @@ fn initPlayer(
     try components.addToEntity(player, game.Position{ .point = init_position });
     try components.addToEntity(player, game.Move{});
     try components.addToEntity(player, game.Sprite{ .letter = "@" });
-    try components.addToEntity(player, game.Health{ .health = 100 });
+    try components.addToEntity(player, game.Health{ .hp = 100 });
     return player;
 }
 
@@ -102,7 +102,7 @@ fn addRat(
         const rat = try entities.newEntity();
         try components.addToEntity(rat, game.Position{ .point = position });
         try components.addToEntity(rat, game.Sprite{ .letter = "r" });
-        try components.addToEntity(rat, game.Health{ .health = 10 });
+        try components.addToEntity(rat, game.Health{ .hp = 10 });
     }
 }
 

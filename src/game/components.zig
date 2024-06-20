@@ -35,7 +35,8 @@ pub const Move = struct {
 };
 
 pub const Health = struct {
-    health: u8,
+    hp: u8,
+    damage: ?u8 = null,
     pub fn deinit(_: *@This()) void {}
 };
 

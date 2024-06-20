@@ -196,13 +196,14 @@ fn drawSprite(
 ) anyerror!void {
     if (screen.region.containsPoint(position.point)) {
         var self: *Self = @ptrCast(@alignCast(ptr));
-        const r = position.point.row - screen.region.top_left.row + 1;
+        const r = position.point.row - screen.region.top_left.row + 1; // +1 for border
         const c = position.point.col - screen.region.top_left.col + 1;
         try self.buffer.mergeLine(sprite.letter, r, c);
     }
 }
 
+// row and col - position of the lable in the window, not inside the screen!
 fn drawLabel(ptr: *anyopaque, label: []const u8, row: u8, col: u8) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    try self.buffer.mergeLine(label, row, col);
+    try self.buffer.mergeLine(label, row, col); // do not subtract, coz border! 
 }

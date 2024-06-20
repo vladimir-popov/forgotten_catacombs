@@ -118,7 +118,7 @@ fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game
     var sprite = game.Sprite{ .letter = undefined };
     while (itr.next()) |cell| {
         sprite.letter = switch (cell) {
-            .nothing => " ",
+            .nothing, .entity => " ",
             .floor => ".",
             .wall => "#",
             .door => |door| if (door == .opened) "\'" else "+",
