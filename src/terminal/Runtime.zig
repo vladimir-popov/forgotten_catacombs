@@ -172,7 +172,7 @@ fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game
     var row: u8 = 1;
     while (itr.next()) |cell| {
         line[idx] = switch (cell) {
-            .nothing => ' ',
+            .nothing, .entity => ' ',
             .floor => '.',
             .wall => '#',
             .door => |door| if (door == .opened) '\'' else '+',

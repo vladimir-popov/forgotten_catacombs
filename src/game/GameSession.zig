@@ -4,6 +4,8 @@ const p = algs.primitives;
 const ecs = @import("ecs");
 const game = @import("game.zig");
 
+const log = std.log.scoped(.GameSession);
+
 const Self = @This();
 
 const System = *const fn (game: *Self) anyerror!void;
@@ -11,13 +13,14 @@ const System = *const fn (game: *Self) anyerror!void;
 pub const Timers = enum { key_pressed };
 
 runtime: game.AnyRuntime,
-screen: game.Screen,
-timers: []i64,
 entities: ecs.EntitiesManager,
 components: ecs.ComponentsManager(game.Components),
+screen: game.Screen,
+timers: []i64,
 systems: std.ArrayList(System),
 dungeon: *game.Dungeon,
 player: game.Entity = undefined,
+query: ecs.ComponentsQuery(game.Components) = undefined,
 
 pub fn create(runtime: game.AnyRuntime) !*Self {
     const session = try runtime.alloc.create(Self);
@@ -30,10 +33,10 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
         .systems = std.ArrayList(System).init(runtime.alloc),
         .dungeon = try game.Dungeon.createRandom(runtime.alloc, runtime.rand),
     };
-    const player_position = session.dungeon.randomPlaceInRoom();
-    session.screen.centeredAround(player_position);
-
-    session.player = try initPlayer(&session.entities, &session.components, player_position);
+    session.query = .{ .entities = &session.entities, .components = &session.components };
+    const player_and_position = try initLevel(session.dungeon, &session.entities, &session.components);
+    session.player = player_and_position[0];
+    session.screen.centeredAround(player_and_position[1]);
 
     // Initialize systems:
     try session.systems.append(game.handleInput);
@@ -62,30 +65,22 @@ pub fn tick(self: *Self) anyerror!void {
     }
 }
 
-pub fn Query2(comptime Cmp1: type, Cmp2: type) type {
-    return struct {
-        const Q2 = @This();
-        session: *Self,
-        entities: ecs.EntitiesManager.EntitiesIterator,
+// this is public to reuse in the DungeonsGenerator
+pub fn initLevel(
+    dungeon: *game.Dungeon,
+    entities: *ecs.EntitiesManager,
+    components: *ecs.ComponentsManager(game.Components),
+) !struct { game.Entity, p.Point } {
+    const player_position = dungeon.randomPlace();
+    const player = try initPlayer(entities, components, player_position);
+    for (0..dungeon.rand.uintLessThan(u8, 10) + 10) |_| {
+        try addRat(dungeon, entities, components);
+    }
 
-        pub fn next(self: *Q2) ?struct { *game.Entity, *Cmp1, *Cmp2 } {
-            if (self.entities.next()) |entity| {
-                if (self.session.components.getForEntity(entity.*, Cmp1)) |c1| {
-                    if (self.session.components.getForEntity(entity.*, Cmp2)) |c2| {
-                        return .{ entity, c1, c2 };
-                    }
-                }
-            }
-            return null;
-        }
-    };
+    return .{ player, player_position };
 }
 
-pub fn queryComponents2(self: *Self, comptime Cmp1: type, Cmp2: type) Query2(Cmp1, Cmp2) {
-    return .{ .session = self, .entities = self.entities.iterator() };
-}
-
-pub fn initPlayer(
+fn initPlayer(
     entities: *ecs.EntitiesManager,
     components: *ecs.ComponentsManager(game.Components),
     init_position: p.Point,
@@ -96,4 +91,34 @@ pub fn initPlayer(
     try components.addToEntity(player, game.Sprite{ .letter = "@" });
     try components.addToEntity(player, game.Health{ .health = 100 });
     return player;
+}
+
+fn addRat(
+    dungeon: *game.Dungeon,
+    entities: *ecs.EntitiesManager,
+    components: *ecs.ComponentsManager(game.Components),
+) !void {
+    if (randomEmptyPlace(dungeon, components)) |position| {
+        const rat = try entities.newEntity();
+        try components.addToEntity(rat, game.Position{ .point = position });
+        try components.addToEntity(rat, game.Sprite{ .letter = "r" });
+        try components.addToEntity(rat, game.Health{ .health = 10 });
+    }
+}
+
+fn randomEmptyPlace(dungeon: *game.Dungeon, components: *const ecs.ComponentsManager(game.Components)) ?p.Point {
+    var attempt: u8 = 10;
+    while (attempt > 0) : (attempt -= 1) {
+        const place = dungeon.randomPlace();
+        if (dungeon.cellAt(place)) |cl| if (cl == .floor) {
+            var is_empty = true;
+            for (components.getAll(game.Position)) |pos| {
+                if (pos.point.eql(place)) {
+                    is_empty = false;
+                }
+            }
+            if (is_empty) return place;
+        };
+    }
+    return null;
 }

@@ -12,11 +12,10 @@ pub fn render(session: *game.GameSession) anyerror!void {
 
     try session.runtime.drawDungeon(screen, session.dungeon);
 
-    for (session.components.getAll(game.Position)) |*position| {
-        if (screen.region.containsPoint(position.point)) {
-            for (session.components.getAll(game.Sprite)) |*sprite| {
-                try session.runtime.drawSprite(screen, sprite, position);
-            }
+    var itr = session.query.get2(game.Sprite, game.Position);
+    while (itr.next()) |components| {
+        if (screen.region.containsPoint(components[2].point)) {
+            try session.runtime.drawSprite(screen, components[1], components[2]);
         }
     }
 
@@ -41,7 +40,7 @@ pub fn handleInput(session: *game.GameSession) anyerror!void {
 }
 
 pub fn handleMove(session: *game.GameSession) anyerror!void {
-    var itr = session.queryComponents2(game.Move, game.Position);
+    var itr = session.query.get2(game.Move, game.Position);
     while (itr.next()) |components| {
         const entity = components[0];
         const move = components[1];
@@ -52,11 +51,11 @@ pub fn handleMove(session: *game.GameSession) anyerror!void {
             if (session.dungeon.cellAt(new_point)) |cell| {
                 switch (cell) {
                     .floor => {
-                        doMove(session, move, position, entity.*);
+                        doMove(session, move, position, entity);
                     },
                     .door => |door| {
                         if (door == .opened) {
-                            doMove(session, move, position, entity.*);
+                            doMove(session, move, position, entity);
                         } else {
                             session.dungeon.openDoor(new_point);
                             move.cancel();

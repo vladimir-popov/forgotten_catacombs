@@ -4,6 +4,7 @@ const algs_and_types = @import("algs_and_types");
 const p = algs_and_types.primitives;
 
 const bsp = algs_and_types.BSP;
+const game = @import("game.zig");
 
 const log = std.log.scoped(.dungeon);
 
@@ -80,12 +81,13 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
 
         const BitMap = algs_and_types.BitMap(Rows, Cols);
 
-        /// Possible types of objects inside the dung
+        /// Possible types of objects inside the dungeon.
         pub const CellEnum = enum {
             nothing,
             floor,
             wall,
             door,
+            entity,
         };
 
         /// Particular object in the cell of the dung
@@ -94,6 +96,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             floor,
             wall,
             door: Door,
+            entity: game.Entity,
         };
 
         alloc: std.mem.Allocator,
@@ -102,6 +105,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
         walls: BitMap,
         objects: BitMap,
 
+        // Only static entities should be stored here.
         objects_map: std.AutoHashMap(p.Point, Cell),
 
         // meta data about the dungeon:
@@ -162,12 +166,45 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             return dungeon;
         }
 
-        pub fn randomPlaceInRoom(self: Self) p.Point {
+        pub inline fn randomPlace(self: Self) p.Point {
+            return if (self.rand.uintLessThan(u8, 5) > 3 and self.passages.items.len > 0)
+                    self.randomPlaceInPassage()
+                else
+                    self.randomPlaceInRoom();
+        }
+
+        fn randomPlaceInRoom(self: Self) p.Point {
             const room = self.rooms.items[self.rand.uintLessThan(usize, self.rooms.items.len)];
             return .{
                 .row = room.top_left.row + self.rand.uintLessThan(u8, room.rows - 2) + 1,
                 .col = room.top_left.col + self.rand.uintLessThan(u8, room.cols - 2) + 1,
             };
+        }
+
+        fn randomPlaceInPassage(self: Self) p.Point {
+            const passage = self.passages.items[self.rand.uintLessThan(usize, self.passages.items.len)];
+            const from_idx = self.rand.uintLessThan(usize, passage.turns.items.len - 1);
+            const from_turn = passage.turns.items[from_idx];
+            const to_turn = passage.turns.items[from_idx + 1];
+            if (from_turn.to_direction == .left or from_turn.to_direction == .right) {
+                return .{
+                    .row = from_turn.place.row,
+                    .col = self.rand.intRangeAtMost(
+                        u8,
+                        @min(from_turn.place.col, to_turn.place.col),
+                        @max(from_turn.place.col, to_turn.place.col),
+                    ),
+                };
+            } else {
+                return .{
+                    .row = self.rand.intRangeAtMost(
+                        u8,
+                        @min(from_turn.place.row, to_turn.place.row),
+                        @max(from_turn.place.row, to_turn.place.row),
+                    ),
+                    .col = from_turn.place.col,
+                };
+            }
         }
 
         /// For tests only
@@ -639,9 +676,6 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                 if (self.cellAt(place)) |cl| {
                     switch (cl) {
                         .nothing => {},
-                        .door => {
-                            return null;
-                        },
                         .wall => {
                             if (!self.isCellAt(place.movedTo(direction), .floor)) {
                                 return null;
@@ -655,7 +689,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                             }
                             return place;
                         },
-                        .floor => {
+                        else => {
                             return null;
                         },
                     }

@@ -38,7 +38,7 @@ pub fn ComponentArray(comptime C: anytype) type {
             self.index_entity.deinit();
         }
 
-        /// Returns the pointer to the component for the entity, if it was added before, or null.
+        /// Returns the pointer to the component for the entity if it was added before, or null.
         pub fn getForEntity(self: Self, entity: Entity) ?*C {
             if (self.entity_index.get(entity)) |idx| {
                 return &self.components.items[idx];
@@ -172,7 +172,7 @@ pub fn ComponentsManager(comptime ComponentsUnion: type) type {
         }
 
         /// Returns the pointer to the component for the entity, if it was added before, or null.
-        pub fn getForEntity(self: *Self, entity: Entity, comptime C: type) ?*C {
+        pub fn getForEntity(self: *const Self, entity: Entity, comptime C: type) ?*C {
             return @field(self.inner_state.components_map, @typeName(C)).getForEntity(entity);
         }
 
@@ -274,7 +274,38 @@ pub const EntitiesManager = struct {
         _ = self.entities.remove(entity);
     }
 
-    pub inline fn iterator(self: *Self) EntitiesIterator {
+    pub inline fn iterator(self: *const Self) EntitiesIterator {
         return self.entities.keyIterator();
     }
 };
+
+pub fn ComponentsQuery(comptime ComponentsUnion: type) type {
+    return struct {
+        const Self = @This();
+        entities: *const EntitiesManager,
+        components: *const ComponentsManager(ComponentsUnion),
+
+        pub fn Query2(comptime Cmp1: type, Cmp2: type) type {
+            return struct {
+                components: *const ComponentsManager(ComponentsUnion),
+                entities_itr: EntitiesManager.EntitiesIterator,
+
+                pub fn next(query: *@This()) ?struct { Entity, *Cmp1, *Cmp2 } {
+                    while (query.entities_itr.next()) |entity_ptr| {
+                        const entity = entity_ptr.*;
+                        if (query.components.getForEntity(entity, Cmp1)) |c1| {
+                            if (query.components.getForEntity(entity, Cmp2)) |c2| {
+                                return .{ entity, c1, c2 };
+                            }
+                        }
+                    }
+                    return null;
+                }
+            };
+        }
+
+        pub fn get2(self: *const Self, comptime Cmp1: type, Cmp2: type) Query2(Cmp1, Cmp2) {
+            return .{ .components = self.components, .entities_itr = self.entities.iterator() };
+        }
+    };
+}

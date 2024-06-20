@@ -41,6 +41,7 @@ const DungeonsGenerator = struct {
     components: ecs.ComponentsManager(game.Components),
     screen: game.Screen,
     dungeon: *game.Dungeon,
+    query: ecs.ComponentsQuery(game.Components) = undefined,
 
     pub fn create(runtime: game.AnyRuntime) !*DungeonsGenerator {
         const self = try runtime.alloc.create(DungeonsGenerator);
@@ -56,16 +57,9 @@ const DungeonsGenerator = struct {
             .components = undefined,
             .dungeon = undefined,
         };
+        self.query = .{ .entities = &self.entities, .components = &self.components };
         try self.generate(runtime.rand);
         return self;
-    }
-
-    // we use custom rand here to be able to predict the seed
-    fn generate(self: *DungeonsGenerator, rand: std.Random) !void {
-        self.entities = try ecs.EntitiesManager.init(self.runtime.alloc);
-        self.components = try ecs.ComponentsManager(game.Components).init(self.runtime.alloc);
-        self.dungeon = try game.Dungeon.createRandom(self.runtime.alloc, rand);
-        _ = try game.GameSession.initPlayer(&self.entities, &self.components, self.dungeon.randomPlaceInRoom());
     }
 
     pub fn destroy(self: *DungeonsGenerator) void {
@@ -74,6 +68,21 @@ const DungeonsGenerator = struct {
         self.entities.deinit();
         self.screen.deinit();
         self.runtime.alloc.destroy(self);
+    }
+
+    // we use custom rand here to be able to predict the seed
+    fn generate(self: *DungeonsGenerator, rand: std.Random) !void {
+        self.entities = try ecs.EntitiesManager.init(self.runtime.alloc);
+        self.components = try ecs.ComponentsManager(game.Components).init(self.runtime.alloc);
+        self.dungeon = try game.Dungeon.createRandom(self.runtime.alloc, rand);
+        _ = try game.GameSession.initLevel(self.dungeon, &self.entities, &self.components);
+    }
+
+    fn regenerate(self: *DungeonsGenerator, rand: std.Random) !void {
+        self.dungeon.destroy();
+        self.entities.deinit();
+        self.components.deinit();
+        try self.generate(rand);
     }
 
     pub fn tick(self: *DungeonsGenerator) !void {
@@ -91,20 +100,12 @@ const DungeonsGenerator = struct {
         }
     }
 
-    fn regenerate(self: *DungeonsGenerator, rand: std.Random) !void {
-        self.dungeon.destroy();
-        self.entities.deinit();
-        self.components.deinit();
-        try self.generate(rand);
-    }
-
     fn render(self: *DungeonsGenerator) anyerror!void {
         try self.runtime.drawDungeon(&self.screen, self.dungeon);
-        for (self.components.getAll(game.Position)) |*position| {
-            if (self.screen.region.containsPoint(position.point)) {
-                for (self.components.getAll(game.Sprite)) |*sprite| {
-                    try self.runtime.drawSprite(&self.screen, sprite, position);
-                }
+        var itr = self.query.get2(game.Position, game.Sprite);
+        while (itr.next()) |components| {
+            if (self.screen.region.containsPoint(components[1].point)) {
+                try self.runtime.drawSprite(&self.screen, components[2], components[1]);
             }
         }
     }

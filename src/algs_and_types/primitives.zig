@@ -64,6 +64,10 @@ pub const Point = struct {
             .right => self.col += 1,
         }
     }
+
+    pub inline fn eql(self: Point, other: Point) bool {
+        return self.row == other.row and self.col == other.col;
+    }
 };
 
 /// The region described as its top left corner
