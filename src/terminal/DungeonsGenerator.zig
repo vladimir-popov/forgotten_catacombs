@@ -29,34 +29,51 @@ pub fn main() !void {
     var runtime = try Runtime.init(alloc, rnd.random(), false);
     defer runtime.deinit();
 
-    var generator = try DungeonsGenerator.init(runtime.any());
-    defer generator.deinit();
+    var generator = try DungeonsGenerator.create(runtime.any());
+    defer generator.destroy();
 
     try runtime.run(&generator);
 }
 
 const DungeonsGenerator = struct {
     runtime: game.AnyRuntime,
+    entities: ecs.EntitiesManager,
+    components: ecs.ComponentsManager(game.Components),
     screen: game.Screen,
     dungeon: *game.Dungeon,
 
-    pub fn init(runtime: game.AnyRuntime) !DungeonsGenerator {
-        return .{
+    pub fn create(runtime: game.AnyRuntime) !*DungeonsGenerator {
+        const self = try runtime.alloc.create(DungeonsGenerator);
+        self.* = .{
             .runtime = runtime,
-            // Generate dungeon:
-            .dungeon = try game.Dungeon.createRandom(runtime.alloc, runtime.rand),
             // The screen to see whole dungeon:
             .screen = game.Screen.init(
                 game.Dungeon.Region.rows,
                 game.Dungeon.Region.cols,
                 game.Dungeon.Region,
             ),
+            .entities = undefined,
+            .components = undefined,
+            .dungeon = undefined,
         };
+        try self.generate(runtime.rand);
+        return self;
     }
 
-    pub fn deinit(self: *DungeonsGenerator) void {
+    // we use custom rand here to be able to predict the seed
+    fn generate(self: *DungeonsGenerator, rand: std.Random) !void {
+        self.entities = try ecs.EntitiesManager.init(self.runtime.alloc);
+        self.components = try ecs.ComponentsManager(game.Components).init(self.runtime.alloc);
+        self.dungeon = try game.Dungeon.createRandom(self.runtime.alloc, rand);
+        _ = try game.GameSession.initPlayer(&self.entities, &self.components, self.dungeon.randomPlaceInRoom());
+    }
+
+    pub fn destroy(self: *DungeonsGenerator) void {
         self.dungeon.destroy();
+        self.components.deinit();
+        self.entities.deinit();
         self.screen.deinit();
+        self.runtime.alloc.destroy(self);
     }
 
     pub fn tick(self: *DungeonsGenerator) !void {
@@ -70,15 +87,25 @@ const DungeonsGenerator = struct {
             const seed = self.runtime.rand.int(u64);
             log.debug("The random seed is {d}", .{seed});
             var rnd = std.Random.DefaultPrng.init(seed);
-            self.dungeon.destroy();
-            self.dungeon = try game.Dungeon.createRandom(
-                self.runtime.alloc,
-                rnd.random(),
-            );
+            try self.regenerate(rnd.random());
         }
+    }
+
+    fn regenerate(self: *DungeonsGenerator, rand: std.Random) !void {
+        self.dungeon.destroy();
+        self.entities.deinit();
+        self.components.deinit();
+        try self.generate(rand);
     }
 
     fn render(self: *DungeonsGenerator) anyerror!void {
         try self.runtime.drawDungeon(&self.screen, self.dungeon);
+        for (self.components.getAll(game.Position)) |*position| {
+            if (self.screen.region.containsPoint(position.point)) {
+                for (self.components.getAll(game.Sprite)) |*sprite| {
+                    try self.runtime.drawSprite(&self.screen, sprite, position);
+                }
+            }
+        }
     }
 };

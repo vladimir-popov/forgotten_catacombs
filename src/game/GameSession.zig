@@ -1,4 +1,6 @@
 const std = @import("std");
+const algs = @import("algs_and_types");
+const p = algs.primitives;
 const ecs = @import("ecs");
 const game = @import("game.zig");
 
@@ -6,7 +8,7 @@ const Self = @This();
 
 const System = *const fn (game: *Self) anyerror!void;
 
-pub const Timers = enum { key_pressed};
+pub const Timers = enum { key_pressed };
 
 runtime: game.AnyRuntime,
 screen: game.Screen,
@@ -28,14 +30,10 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
         .systems = std.ArrayList(System).init(runtime.alloc),
         .dungeon = try game.Dungeon.createRandom(runtime.alloc, runtime.rand),
     };
-    const player_position = session.dungeon.findRandomPlaceForPlayer();
+    const player_position = session.dungeon.randomPlaceInRoom();
     session.screen.centeredAround(player_position);
 
-    session.player = try session.entities.newEntity();
-    try session.components.addToEntity(session.player, game.Position{ .point = player_position });
-    try session.components.addToEntity(session.player, game.Move{});
-    try session.components.addToEntity(session.player, game.Sprite{ .letter = "@" });
-    try session.components.addToEntity(session.player, game.Health{ .health = 100 });
+    session.player = try initPlayer(&session.entities, &session.components, player_position);
 
     // Initialize systems:
     try session.systems.append(game.handleInput);
@@ -85,4 +83,17 @@ pub fn Query2(comptime Cmp1: type, Cmp2: type) type {
 
 pub fn queryComponents2(self: *Self, comptime Cmp1: type, Cmp2: type) Query2(Cmp1, Cmp2) {
     return .{ .session = self, .entities = self.entities.iterator() };
+}
+
+pub fn initPlayer(
+    entities: *ecs.EntitiesManager,
+    components: *ecs.ComponentsManager(game.Components),
+    init_position: p.Point,
+) !game.Entity {
+    const player = try entities.newEntity();
+    try components.addToEntity(player, game.Position{ .point = init_position });
+    try components.addToEntity(player, game.Move{});
+    try components.addToEntity(player, game.Sprite{ .letter = "@" });
+    try components.addToEntity(player, game.Health{ .health = 100 });
+    return player;
 }

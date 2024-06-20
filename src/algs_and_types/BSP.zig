@@ -5,8 +5,8 @@ const BinaryTree = @import("BinaryTree.zig");
 pub const Tree = BinaryTree.Node(p.Region);
 
 pub const MinRegion = struct {
-    min_rows: u8 = 12,
-    min_cols: u8 = 30,
+    min_rows: u8 = 10,
+    min_cols: u8 = 24,
     /// rows / cols ratio:
     square_ratio: f16 = 0.3,
 

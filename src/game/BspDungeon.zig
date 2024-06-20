@@ -162,9 +162,12 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             return dungeon;
         }
 
-        pub fn findRandomPlaceForPlayer(self: Self) p.Point {
-            const room = self.rand.uintLessThan(usize, self.rooms.items.len);
-            return self.rooms.items[room].middle();
+        pub fn randomPlaceInRoom(self: Self) p.Point {
+            const room = self.rooms.items[self.rand.uintLessThan(usize, self.rooms.items.len)];
+            return .{
+                .row = room.top_left.row + self.rand.uintLessThan(u8, room.rows - 2) + 1,
+                .col = room.top_left.col + self.rand.uintLessThan(u8, room.cols - 2) + 1,
+            };
         }
 
         /// For tests only

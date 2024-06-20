@@ -9,6 +9,7 @@ pub const AnyRuntime = @import("AnyRuntime.zig");
 pub const Entity = ecs.Entity;
 pub const Screen = @import("Screen.zig");
 pub const Dungeon = @import("BspDungeon.zig").BspDungeon(TOTAL_DUNG_ROWS, TOTAL_DUNG_COLS);
+// pub const Dungeon = @import("BspDungeon.zig").BspDungeon(DISPLPAY_ROWS, DISPLPAY_COLS);
 
 pub const GameSession = @import("GameSession.zig");
 
