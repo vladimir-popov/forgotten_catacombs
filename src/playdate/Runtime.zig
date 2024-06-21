@@ -1,6 +1,8 @@
 const std = @import("std");
 const api = @import("api.zig");
 const game = @import("game");
+const algs = @import("algs_and_types");
+const p = algs.primitives;
 const Allocator = @import("Allocator.zig");
 
 const log = std.log.scoped(.runtime);
@@ -114,8 +116,7 @@ fn drawUI(ptr: *anyopaque) anyerror!void {
 
 fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {
     var itr = dungeon.cellsInRegion(screen.region) orelse return;
-    var position = game.Position{ .point = screen.region.top_left };
-    var sprite = game.Sprite{ .letter = undefined };
+    var sprite = game.Sprite{ .letter = undefined, .position = screen.region.top_left};
     while (itr.next()) |cell| {
         sprite.letter = switch (cell) {
             .nothing, .entity => " ",
@@ -123,11 +124,11 @@ fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game
             .wall => "#",
             .door => |door| if (door == .opened) "\'" else "+",
         };
-        try drawSprite(ptr, screen, &sprite, &position);
-        position.point.move(.right);
-        if (!screen.region.containsPoint(position.point)) {
-            position.point.col = screen.region.top_left.col;
-            position.point.move(.down);
+        try drawSprite(ptr, screen, &sprite);
+        sprite.position.move(.right);
+        if (!screen.region.containsPoint(sprite.position)) {
+            sprite.position.col = screen.region.top_left.col;
+            sprite.position.move(.down);
         }
     }
 }
@@ -136,23 +137,22 @@ fn drawSprite(
     ptr: *anyopaque,
     screen: *const game.Screen,
     sprite: *const game.Sprite,
-    position: *const game.Position,
 ) anyerror!void {
-    if (screen.region.containsPoint(position.point)) {
+    if (screen.region.containsPoint(sprite.position)) {
         const self: *Self = @ptrCast(@alignCast(ptr));
-        const y: c_int = game.FONT_HEIGHT * @as(c_int, position.point.row - screen.region.top_left.row + 1);
-        const x: c_int = game.FONT_WIDTH * @as(c_int, position.point.col - screen.region.top_left.col + 1);
+        const y: c_int = game.FONT_HEIGHT * @as(c_int, sprite.position.row - screen.region.top_left.row + 1);
+        const x: c_int = game.FONT_WIDTH * @as(c_int, sprite.position.col - screen.region.top_left.col + 1);
         _ = self.playdate.graphics.drawText(sprite.letter.ptr, sprite.letter.len, .UTF8Encoding, x, y);
     }
 }
 
-fn drawLabel(ptr: *anyopaque, label: []const u8, row: u8, col: u8) !void {
+fn drawLabel(ptr: *anyopaque, label: []const u8, absolute_position: p.Point) !void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     _ = self.playdate.graphics.drawText(
         label.ptr,
         label.len,
         .UTF8Encoding,
-        @as(c_int, col) * game.FONT_WIDTH,
-        @as(c_int, row) * game.FONT_HEIGHT,
+        @as(c_int, absolute_position.col) * game.FONT_WIDTH,
+        @as(c_int, absolute_position.row) * game.FONT_HEIGHT,
     );
 }

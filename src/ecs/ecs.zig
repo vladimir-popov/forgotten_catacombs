@@ -11,7 +11,7 @@ pub const Entity = u32;
 ///
 /// The components are stored in the array, and can be got
 /// for an entity for O(1) thanks for additional indexes inside.
-pub fn ComponentArray(comptime C: anytype) type {
+pub fn ArraySet(comptime C: anytype) type {
     return struct {
         const Self = @This();
         // all components have to be stored in the array for perf. boost.
@@ -38,6 +38,12 @@ pub fn ComponentArray(comptime C: anytype) type {
             self.index_entity.deinit();
         }
 
+        pub fn clear(self: *Self) !void {
+            try self.components.resize(0);
+            self.entity_index.clearAndFree();
+            self.index_entity.clearAndFree();
+        }
+
         /// Returns the pointer to the component for the entity if it was added before, or null.
         pub fn getForEntity(self: Self, entity: Entity) ?*C {
             if (self.entity_index.get(entity)) |idx| {
@@ -47,11 +53,16 @@ pub fn ComponentArray(comptime C: anytype) type {
             }
         }
 
-        /// Adds the component of the type `C` for the entity.
-        pub fn addToEntity(self: *Self, entity: Entity, component: C) !void {
-            try self.entity_index.put(entity, @intCast(self.components.items.len));
-            try self.index_entity.put(@intCast(self.components.items.len), entity);
-            try self.components.append(component);
+        /// Adds the component of the type `C` for the entity, or replaces existed.
+        pub fn setToEntity(self: *Self, entity: Entity, component: C) !void {
+            if (self.entity_index.get(entity)) |idx| {
+                self.components.items[idx].deinit();
+                self.components.items[idx] = component;
+            } else {
+                try self.entity_index.put(entity, @intCast(self.components.items.len));
+                try self.index_entity.put(@intCast(self.components.items.len), entity);
+                try self.components.append(component);
+            }
         }
 
         /// Deletes the components of the entity from the all inner stores,
@@ -110,7 +121,7 @@ fn ComponentsMap(comptime ComponentsUnion: anytype) type {
     for (union_fields, 0..) |f, i| {
         struct_fields[i] = .{
             .name = @typeName(f.type),
-            .type = ComponentArray(f.type),
+            .type = ArraySet(f.type),
             .default_value = null,
             .is_comptime = false,
             .alignment = 0,
@@ -171,8 +182,12 @@ pub fn ComponentsManager(comptime ComponentsUnion: type) type {
             return self.arrayOf(C).components.items;
         }
 
-        pub fn arrayOf(self: Self, comptime C: type) ComponentArray(C) {
+        pub fn arrayOf(self: Self, comptime C: type) ArraySet(C) {
             return @field(self.inner_state.components_map, @typeName(C));
+        }
+
+        pub fn removeAll(self: *Self, comptime C: type) !void {
+            try @field(self.inner_state.components_map, @typeName(C)).clear();
         }
 
         /// Returns the pointer to the component for the entity, if it was added before, or null.
@@ -180,10 +195,10 @@ pub fn ComponentsManager(comptime ComponentsUnion: type) type {
             return @field(self.inner_state.components_map, @typeName(C)).getForEntity(entity);
         }
 
-        /// Adds the component of the type `C` to the entity.
-        pub fn addToEntity(self: *Self, entity: Entity, component: anytype) !void {
+        /// Adds the component of the type `C` to the entity, or replace existed.
+        pub fn setToEntity(self: *Self, entity: Entity, component: anytype) !void {
             const C = @TypeOf(component);
-            try @field(self.inner_state.components_map, @typeName(C)).addToEntity(entity, component);
+            try @field(self.inner_state.components_map, @typeName(C)).setToEntity(entity, component);
         }
 
         /// Removes the component of the type `C` from the entity if it was added before, or does nothing.
@@ -192,9 +207,9 @@ pub fn ComponentsManager(comptime ComponentsUnion: type) type {
         }
 
         /// Removes all components from all stores which belong to the entity.
-        pub fn removeAllForEntity(self: *Self, entity: Entity) void {
+        pub fn removeAllForEntity(self: *Self, entity: Entity) !void {
             inline for (@typeInfo(ComponentsMap(ComponentsUnion)).Struct.fields) |field| {
-                @field(self.inner_state.components_map, field.name).removeFromEntity(entity);
+                try @field(self.inner_state.components_map, field.name).removeFromEntity(entity);
             }
         }
     };
@@ -224,7 +239,7 @@ test "ComponentsManager: Add/Get/Remove component" {
 
     // should return the component, which was added before
     const entity = 1;
-    try manager.addToEntity(entity, try TestComponent.init(123));
+    try manager.setToEntity(entity, try TestComponent.init(123));
     var component = manager.getForEntity(entity, TestComponent);
     try std.testing.expectEqual(123, component.?.state.items[0]);
 

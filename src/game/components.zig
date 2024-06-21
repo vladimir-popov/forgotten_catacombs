@@ -4,45 +4,56 @@ const p = algs_and_types.primitives;
 const game = @import("game.zig");
 const dung = @import("BspDungeon.zig");
 
-pub const Position = struct {
-    point: p.Point,
-    pub fn deinit(_: *@This()) void {}
-};
-
 pub const Sprite = struct {
+    position: p.Point,
     letter: []const u8,
     pub fn deinit(_: *@This()) void {}
 };
 
 pub const Move = struct {
-    direction: ?p.Direction = null,
+    direction: p.Direction,
     keep_moving: bool = false,
 
-    pub fn applyTo(self: *Move, position: *Position) void {
-        if (self.direction) |direction| {
-            position.point.move(direction);
-        }
-        if (!self.keep_moving)
-            self.direction = null;
-    }
+    pub fn deinit(_: *@This()) void {}
+};
 
-    pub inline fn cancel(self: *Move) void {
-        self.direction = null;
-        self.keep_moving = false;
-    }
+pub const Collision = struct {
+    pub const Obstacle = union(enum) {
+        closed_door,
+        wall,
+        entity: game.Entity,
+    };
+
+    /// How met obstacle
+    entity: game.Entity,
+    obstacle: Obstacle,
+    at: p.Point,
 
     pub fn deinit(_: *@This()) void {}
 };
 
 pub const Health = struct {
-    hp: u8,
-    damage: ?u8 = null,
+    hp: i16,
+    pub fn deinit(_: *@This()) void {}
+};
+
+pub const Damage = struct {
+    entity: game.Entity,
+    amount: u8,
+    pub fn deinit(_: *@This()) void {}
+};
+
+pub const Description = struct {
+    name: []const u8,
+    description: []const u8 = "",
+
     pub fn deinit(_: *@This()) void {}
 };
 
 pub const Components = union {
-    position: Position,
-    move: Move,
     sprite: Sprite,
+    move: Move,
     health: Health,
+    damage: Damage,
+    collision: Collision,
 };

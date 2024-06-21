@@ -109,6 +109,7 @@ pub fn build(b: *std.Build) !void {
     });
     lib.root_module.addImport("ecs", ecs_module);
     lib.root_module.addImport("game", game_module);
+    lib.root_module.addImport("algs_and_types", algs_and_types_module);
     _ = writer.addCopyFile(lib.getEmittedBin(), "pdex" ++ switch (os_tag) {
         .windows => ".dll",
         .macos => ".dylib",
@@ -128,6 +129,7 @@ pub fn build(b: *std.Build) !void {
     });
     elf.root_module.addImport("ecs", ecs_module);
     elf.root_module.addImport("game", game_module);
+    elf.root_module.addImport("algs_and_types", algs_and_types_module);
     elf.link_emit_relocs = true;
     elf.entry = .{ .symbol_name = "eventHandler" };
 

@@ -12,15 +12,21 @@ const System = *const fn (game: *Self) anyerror!void;
 
 pub const Timers = enum { key_pressed };
 
+pub const QuickAction = union(enum) {
+    hit: game.Entity,
+    open,
+};
+
 runtime: game.AnyRuntime,
 entities: ecs.EntitiesManager,
 components: ecs.ComponentsManager(game.Components),
+query: ecs.ComponentsQuery(game.Components) = undefined,
 screen: game.Screen,
 timers: []i64,
 systems: std.ArrayList(System),
 dungeon: *game.Dungeon,
 player: game.Entity = undefined,
-query: ecs.ComponentsQuery(game.Components) = undefined,
+quick_actions: std.ArrayList(QuickAction),
 
 pub fn create(runtime: game.AnyRuntime) !*Self {
     const session = try runtime.alloc.create(Self);
@@ -32,6 +38,7 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
         .components = try ecs.ComponentsManager(game.Components).init(runtime.alloc),
         .systems = std.ArrayList(System).init(runtime.alloc),
         .dungeon = try game.Dungeon.createRandom(runtime.alloc, runtime.rand),
+        .quick_actions = std.ArrayList(QuickAction).init(runtime.alloc),
     };
     session.query = .{ .entities = &session.entities, .components = &session.components };
     const player_and_position = try initLevel(session.dungeon, &session.entities, &session.components);
@@ -41,7 +48,9 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     // Initialize systems:
     try session.systems.append(game.handleInput);
     try session.systems.append(game.handleMove);
+    try session.systems.append(game.handleCollisions);
     try session.systems.append(game.render);
+    try session.systems.append(game.handleDamage);
 
     return session;
 }
@@ -51,6 +60,7 @@ pub fn destroy(self: *Self) void {
     self.components.deinit();
     self.systems.deinit();
     self.dungeon.destroy();
+    self.quick_actions.deinit();
     self.runtime.alloc.free(self.timers);
     self.runtime.alloc.destroy(self);
 }
@@ -63,6 +73,20 @@ pub fn tick(self: *Self) anyerror!void {
     for (self.systems.items) |system| {
         try system(self);
     }
+}
+
+pub fn entityAt(session: *game.GameSession, place: p.Point) ?game.Entity {
+    for (session.components.arrayOf(game.Sprite).components.items, 0..) |sprite, idx| {
+        if (sprite.position.eql(place)) {
+            return session.components.arrayOf(game.Sprite).index_entity.get(@intCast(idx));
+        }
+    }
+    return null;
+}
+
+pub fn removeEntity(self: *Self, entity: game.Entity) !void {
+    try self.components.removeAllForEntity(entity);
+    self.entities.removeEntity(entity);
 }
 
 // this is public to reuse in the DungeonsGenerator
@@ -86,10 +110,8 @@ fn initPlayer(
     init_position: p.Point,
 ) !game.Entity {
     const player = try entities.newEntity();
-    try components.addToEntity(player, game.Position{ .point = init_position });
-    try components.addToEntity(player, game.Move{});
-    try components.addToEntity(player, game.Sprite{ .letter = "@" });
-    try components.addToEntity(player, game.Health{ .hp = 100 });
+    try components.setToEntity(player, game.Sprite{ .letter = "@", .position = init_position });
+    try components.setToEntity(player, game.Health{ .hp = 100 });
     return player;
 }
 
@@ -100,9 +122,8 @@ fn addRat(
 ) !void {
     if (randomEmptyPlace(dungeon, components)) |position| {
         const rat = try entities.newEntity();
-        try components.addToEntity(rat, game.Position{ .point = position });
-        try components.addToEntity(rat, game.Sprite{ .letter = "r" });
-        try components.addToEntity(rat, game.Health{ .hp = 10 });
+        try components.setToEntity(rat, game.Sprite{ .letter = "r", .position = position });
+        try components.setToEntity(rat, game.Health{ .hp = 10 });
     }
 }
 
@@ -112,8 +133,8 @@ fn randomEmptyPlace(dungeon: *game.Dungeon, components: *const ecs.ComponentsMan
         const place = dungeon.randomPlace();
         if (dungeon.cellAt(place)) |cl| if (cl == .floor) {
             var is_empty = true;
-            for (components.getAll(game.Position)) |pos| {
-                if (pos.point.eql(place)) {
+            for (components.getAll(game.Sprite)) |sprite| {
+                if (sprite.position.eql(place)) {
                     is_empty = false;
                 }
             }

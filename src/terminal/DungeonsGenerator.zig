@@ -102,10 +102,9 @@ const DungeonsGenerator = struct {
 
     fn render(self: *DungeonsGenerator) anyerror!void {
         try self.runtime.drawDungeon(&self.screen, self.dungeon);
-        var itr = self.query.get2(game.Position, game.Sprite);
-        while (itr.next()) |components| {
-            if (self.screen.region.containsPoint(components[1].point)) {
-                try self.runtime.drawSprite(&self.screen, components[2], components[1]);
+        for (self.components.getAll(game.Sprite)) |*sprite| {
+            if (self.screen.region.containsPoint(sprite.position)) {
+                try self.runtime.drawSprite(&self.screen, sprite);
             }
         }
     }

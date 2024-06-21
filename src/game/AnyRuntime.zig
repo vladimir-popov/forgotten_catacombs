@@ -53,13 +53,11 @@ const VTable = struct {
         context: *anyopaque,
         screen: *const game.Screen,
         sprite: *const game.Sprite,
-        position: *const game.Position,
     ) anyerror!void,
     drawLabel: *const fn (
         context: *anyopaque,
         label: []const u8,
-        row: u8,
-        col: u8,
+        absolute_position: p.Point,
     ) anyerror!void,
     currentMillis: *const fn (context: *anyopaque) i64,
 };
@@ -89,11 +87,10 @@ pub inline fn drawSprite(
     self: Self,
     screen: *const game.Screen,
     sprite: *const game.Sprite,
-    position: *const game.Position,
 ) !void {
-    try self.vtable.drawSprite(self.context, screen, sprite, position);
+    try self.vtable.drawSprite(self.context, screen, sprite);
 }
 
-pub inline fn drawLabel(self: Self, label: []const u8, row: u8, col: u8) !void {
-    try self.vtable.drawLabel(self.context, label, row, col);
+pub inline fn drawLabel(self: Self, label: []const u8, absolute_position: p.Point) !void {
+    try self.vtable.drawLabel(self.context, label, absolute_position);
 }
