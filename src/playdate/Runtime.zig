@@ -116,13 +116,13 @@ fn drawUI(ptr: *anyopaque) anyerror!void {
 
 fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {
     var itr = dungeon.cellsInRegion(screen.region) orelse return;
-    var sprite = game.Sprite{ .letter = undefined, .position = screen.region.top_left};
+    var sprite = game.Sprite{ .codepoint = undefined, .position = screen.region.top_left};
     while (itr.next()) |cell| {
-        sprite.letter = switch (cell) {
-            .nothing, .entity => " ",
-            .floor => ".",
-            .wall => "#",
-            .door => |door| if (door == .opened) "\'" else "+",
+        sprite.codepoint = switch (cell) {
+            .nothing, .entity => ' ',
+            .floor => '.',
+            .wall => '#',
+            .door => |door| if (door == .opened) '\'' else '+',
         };
         try drawSprite(ptr, screen, &sprite);
         sprite.position.move(.right);
@@ -142,7 +142,9 @@ fn drawSprite(
         const self: *Self = @ptrCast(@alignCast(ptr));
         const y: c_int = game.FONT_HEIGHT * @as(c_int, sprite.position.row - screen.region.top_left.row + 1);
         const x: c_int = game.FONT_WIDTH * @as(c_int, sprite.position.col - screen.region.top_left.col + 1);
-        _ = self.playdate.graphics.drawText(sprite.letter.ptr, sprite.letter.len, .UTF8Encoding, x, y);
+        var buf: [4]u8 = undefined;
+        const len = try std.unicode.utf8Encode(sprite.codepoint, &buf);
+        _ = self.playdate.graphics.drawText(&buf, len, .UTF8Encoding, x, y);
     }
 }
 

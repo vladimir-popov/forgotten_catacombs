@@ -20,17 +20,15 @@ pub fn render(session: *game.GameSession) anyerror!void {
         }
     }
     // Draw animations
-    // var itr = session.entities.iterator();
-    // while (itr.next()) |entity| {
-    //     if (session.components.getForEntity(entity.*, game.Animation)) |animation| {
-    //         if (animation.frames.popOrNull()) |*frame| {
-    //             try session.runtime.drawSprite(screen, frame);
-    //             // frame.deinit();
-    //         } else {
-    //             try session.components.removeFromEntity(entity.*, game.Animation);
-    //         }
-    //     }
-    // }
+    for (session.components.getAll(game.Animation)) |*animation| {
+        if (animation.frames.len > 0 and screen.region.containsPoint(animation.position)) {
+            try session.runtime.drawSprite(
+                screen,
+                &.{ .codepoint = animation.frames[animation.frames.len - 1], .position = animation.position },
+            );
+            animation.frames.len -= 1;
+        }
+    }
     // Draw stats
     if (session.components.getForEntity(session.player, game.Health)) |health| {
         var buf: [8]u8 = [_]u8{0} ** 8;
@@ -145,6 +143,14 @@ pub fn handleCollisions(session: *game.GameSession) anyerror!void {
                                     .amount = session.runtime.rand.uintLessThan(u8, 3) + 1,
                                 },
                             );
+                        } else {
+                            try session.components.setToEntity(
+                                entity,
+                                game.Animation{
+                                    .frames = &game.Animation.Presets.miss,
+                                    .position = collision.at,
+                                },
+                            );
                         }
                     }
                 }
@@ -157,10 +163,6 @@ pub fn handleCollisions(session: *game.GameSession) anyerror!void {
 pub fn handleDamage(session: *game.GameSession) anyerror!void {
     var itr = session.query.get3(game.Damage, game.Health, game.Sprite);
     while (itr.next()) |components| {
-        log.debug(
-            "Make {d} damage to {d} entity with {d} hp",
-            .{ components[1].amount, components[0], components[2].hp },
-        );
         components[2].hp -= @as(i16, @intCast(components[1].amount));
         try session.components.removeFromEntity(components[0], game.Damage);
         try session.components.setToEntity(

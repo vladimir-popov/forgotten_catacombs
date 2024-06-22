@@ -15,6 +15,7 @@ pub const Sprite = struct {
 pub const Animation = struct {
     pub const Presets = struct {
         pub const hit: [1]Codepoint = [_]Codepoint{ '*' };
+        pub const miss: [1]Codepoint = [_]Codepoint{ '.' };
     };
 
     frames: []const Codepoint,
