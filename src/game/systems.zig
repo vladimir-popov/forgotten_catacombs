@@ -5,7 +5,7 @@ const game = @import("game.zig");
 
 const log = std.log.scoped(.systems);
 
-pub fn render(session: *game.GameSession) anyerror!void {
+pub fn render(session: *game.GameSession, _: c_uint) anyerror!void {
     const screen = &session.screen;
     // Draw UI
     try session.runtime.drawUI();
@@ -39,7 +39,7 @@ pub fn render(session: *game.GameSession) anyerror!void {
     }
 }
 
-pub fn handleInput(session: *game.GameSession) anyerror!void {
+pub fn handleInput(session: *game.GameSession, _: c_uint) anyerror!void {
     const btn = try session.runtime.readButtons() orelse return;
     if (btn.toDirection()) |direction| {
         try session.components.setToEntity(session.player, game.Move{
@@ -49,7 +49,7 @@ pub fn handleInput(session: *game.GameSession) anyerror!void {
     }
 }
 
-pub fn handleMove(session: *game.GameSession) anyerror!void {
+pub fn handleMove(session: *game.GameSession, _: c_uint) anyerror!void {
     var itr = session.query.get2(game.Move, game.Sprite);
     while (itr.next()) |components| {
         const entity = components[0];
@@ -125,7 +125,7 @@ fn collectQuickAction(session: *game.GameSession, position: p.Point) !bool {
     return session.quick_actions.items.len > 0;
 }
 
-pub fn handleCollisions(session: *game.GameSession) anyerror!void {
+pub fn handleCollisions(session: *game.GameSession, _: c_uint) anyerror!void {
     for (session.components.getAll(game.Collision)) |collision| {
         switch (collision.obstacle) {
             .wall => {},
@@ -160,7 +160,7 @@ pub fn handleCollisions(session: *game.GameSession) anyerror!void {
     try session.components.removeAll(game.Collision);
 }
 
-pub fn handleDamage(session: *game.GameSession) anyerror!void {
+pub fn handleDamage(session: *game.GameSession, _: c_uint) anyerror!void {
     var itr = session.query.get3(game.Damage, game.Health, game.Sprite);
     while (itr.next()) |components| {
         components[2].hp -= @as(i16, @intCast(components[1].amount));

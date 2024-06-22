@@ -8,7 +8,7 @@ const log = std.log.scoped(.GameSession);
 
 const Self = @This();
 
-const System = *const fn (game: *Self) anyerror!void;
+const System = *const fn (game: *Self, delay: c_uint) anyerror!void;
 
 pub const Timers = enum { tick };
 
@@ -78,9 +78,8 @@ pub fn tick(self: *Self) anyerror!void {
     const now = self.runtime.currentMillis();
     const delay = now - self.getTimer(.tick);
     self.setTimer(.tick, now);
-    _ = delay;
     for (self.systems.items) |system| {
-        try system(self);
+        try system(self, delay);
     }
 }
 
