@@ -39,6 +39,9 @@ pub fn ArraySet(comptime C: anytype) type {
         }
 
         pub fn clear(self: *Self) !void {
+            for (self.components.items) |*component| {
+                component.deinit();
+            }
             try self.components.resize(0);
             self.entity_index.clearAndFree();
             self.index_entity.clearAndFree();
@@ -324,6 +327,31 @@ pub fn ComponentsQuery(comptime ComponentsUnion: type) type {
         }
 
         pub fn get2(self: *const Self, comptime Cmp1: type, Cmp2: type) Query2(Cmp1, Cmp2) {
+            return .{ .components = self.components, .entities_itr = self.entities.iterator() };
+        }
+
+        pub fn Query3(comptime Cmp1: type, Cmp2: type, Cmp3: type) type {
+            return struct {
+                components: *const ComponentsManager(ComponentsUnion),
+                entities_itr: EntitiesManager.EntitiesIterator,
+
+                pub fn next(query: *@This()) ?struct { Entity, *Cmp1, *Cmp2, *Cmp3 } {
+                    while (query.entities_itr.next()) |entity_ptr| {
+                        const entity = entity_ptr.*;
+                        if (query.components.getForEntity(entity, Cmp1)) |c1| {
+                            if (query.components.getForEntity(entity, Cmp2)) |c2| {
+                                if (query.components.getForEntity(entity, Cmp3)) |c3| {
+                                    return .{ entity, c1, c2, c3 };
+                                }
+                            }
+                        }
+                    }
+                    return null;
+                }
+            };
+        }
+
+        pub fn get3(self: *const Self, comptime Cmp1: type, Cmp2: type, Cmp3: type) Query3(Cmp1, Cmp2, Cmp3) {
             return .{ .components = self.components, .entities_itr = self.entities.iterator() };
         }
     };

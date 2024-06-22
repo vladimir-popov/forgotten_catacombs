@@ -49,8 +49,8 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     try session.systems.append(game.handleInput);
     try session.systems.append(game.handleMove);
     try session.systems.append(game.handleCollisions);
-    try session.systems.append(game.render);
     try session.systems.append(game.handleDamage);
+    try session.systems.append(game.render);
 
     return session;
 }

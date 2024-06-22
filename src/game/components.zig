@@ -10,6 +10,19 @@ pub const Sprite = struct {
     pub fn deinit(_: *@This()) void {}
 };
 
+pub const Animation = struct {
+    frames: std.ArrayList(Sprite),
+
+    pub fn deinit(self: *@This()) void {
+        self.deinit();
+    }
+    pub fn hit(alloc: std.mem.Allocator, position: p.Point) !Animation {
+        var animation = Animation{ .frames = try std.ArrayList(Sprite).initCapacity(alloc, 1) };
+        try animation.frames.append(Sprite{ .letter = "*", .position = position });
+        return animation;
+    }
+};
+
 pub const Move = struct {
     direction: p.Direction,
     keep_moving: bool = false,
@@ -52,6 +65,7 @@ pub const Description = struct {
 
 pub const Components = union {
     sprite: Sprite,
+    animation: Animation,
     move: Move,
     health: Health,
     damage: Damage,
