@@ -101,8 +101,8 @@ pub fn any(self: *Self) game.AnyRuntime {
     };
 }
 
-fn currentMillis(_: *anyopaque) i64 {
-    return std.time.milliTimestamp();
+fn currentMillis(_: *anyopaque) c_uint {
+    return @truncate(@as(u64, @intCast(std.time.milliTimestamp())));
 }
 
 fn readButtons(ptr: *anyopaque) anyerror!?game.AnyRuntime.Buttons {
@@ -204,5 +204,5 @@ fn drawSprite(
 // row and col - position of the lable in the window, not inside the screen!
 fn drawLabel(ptr: *anyopaque, label: []const u8, absolute_position: p.Point) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    try self.buffer.mergeLine(label, absolute_position.row, absolute_position.col); // do not subtract, coz border! 
+    try self.buffer.mergeLine(label, absolute_position.row, absolute_position.col); // do not subtract, coz border!
 }

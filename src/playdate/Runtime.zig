@@ -71,7 +71,7 @@ pub fn any(self: *Self) game.AnyRuntime {
 
 // ======== Private methods: ==============
 
-fn currentMillis(ptr: *anyopaque) i64 {
+fn currentMillis(ptr: *anyopaque) c_uint {
     const self: *Self = @ptrCast(@alignCast(ptr));
     return self.playdate.system.getCurrentTimeMilliseconds();
 }

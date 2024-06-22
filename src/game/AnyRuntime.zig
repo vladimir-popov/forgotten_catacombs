@@ -59,7 +59,7 @@ const VTable = struct {
         label: []const u8,
         absolute_position: p.Point,
     ) anyerror!void,
-    currentMillis: *const fn (context: *anyopaque) i64,
+    currentMillis: *const fn (context: *anyopaque) c_uint,
 };
 
 context: *anyopaque,
@@ -67,7 +67,7 @@ alloc: std.mem.Allocator,
 rand: std.Random,
 vtable: *const VTable,
 
-pub inline fn currentMillis(self: Self) i64 {
+pub inline fn currentMillis(self: Self) c_uint {
     return self.vtable.currentMillis(self.context);
 }
 

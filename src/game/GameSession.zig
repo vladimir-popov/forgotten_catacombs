@@ -10,7 +10,7 @@ const Self = @This();
 
 const System = *const fn (game: *Self) anyerror!void;
 
-pub const Timers = enum { key_pressed };
+pub const Timers = enum { tick };
 
 pub const QuickAction = union(enum) {
     hit: game.Entity,
@@ -22,7 +22,7 @@ entities: ecs.EntitiesManager,
 components: ecs.ComponentsManager(game.Components),
 query: ecs.ComponentsQuery(game.Components) = undefined,
 screen: game.Screen,
-timers: []i64,
+timers: []c_uint,
 systems: std.ArrayList(System),
 dungeon: *game.Dungeon,
 player: game.Entity = undefined,
@@ -33,7 +33,7 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     session.* = .{
         .runtime = runtime,
         .screen = game.Screen.init(game.DISPLAY_DUNG_ROWS, game.DISPLAY_DUNG_COLS, game.Dungeon.Region),
-        .timers = try runtime.alloc.alloc(i64, std.meta.tags(Timers).len),
+        .timers = try runtime.alloc.alloc(c_uint, std.meta.tags(Timers).len),
         .entities = try ecs.EntitiesManager.init(runtime.alloc),
         .components = try ecs.ComponentsManager(game.Components).init(runtime.alloc),
         .systems = std.ArrayList(System).init(runtime.alloc),
@@ -51,6 +51,7 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     try session.systems.append(game.handleCollisions);
     try session.systems.append(game.handleDamage);
     try session.systems.append(game.render);
+    session.setTimer(.tick, 0);
 
     return session;
 }
@@ -65,11 +66,19 @@ pub fn destroy(self: *Self) void {
     self.runtime.alloc.destroy(self);
 }
 
-pub inline fn timer(self: Self, t: Timers) *i64 {
-    return &self.timers[@intFromEnum(t)];
+pub inline fn getTimer(self: Self, t: Timers) c_uint {
+    return self.timers[@intFromEnum(t)];
+}
+
+pub inline fn setTimer(self: *Self, t: Timers, value: c_uint) void {
+    self.timers[@intFromEnum(t)] = value;
 }
 
 pub fn tick(self: *Self) anyerror!void {
+    const now = self.runtime.currentMillis();
+    const delay = now - self.getTimer(.tick);
+    self.setTimer(.tick, now);
+    _ = delay;
     for (self.systems.items) |system| {
         try system(self);
     }
