@@ -40,9 +40,9 @@ pub fn initFill(alloc: std.mem.Allocator, char: u8, count: usize) Error!String {
     return res;
 }
 
-pub fn fromOneSymbol(alloc: std.mem.Allocator, symbol: u21) Error!String {
+pub fn fromSingleSymbol(alloc: std.mem.Allocator, codepoint: u21) Error!String {
     var bytes: [4]u8 = undefined;
-    const len = try std.unicode.utf8Encode(symbol, &bytes);
+    const len = try std.unicode.utf8Encode(codepoint, &bytes);
     var str = String{ .bytes = try std.ArrayList(u8).initCapacity(alloc, len) };
     try str.bytes.insertSlice(0, bytes[0..len]);
     return str;
@@ -189,7 +189,7 @@ pub fn merge(self: *String, source: String, left_pad_symbols: usize) Error!void 
 /// If the s_idx more than length of the string, appropriate count of spaces
 /// will be added.
 pub fn set(self: *String, s_idx: usize, symbol: u21) Error!void {
-    const str = try fromOneSymbol(self.bytes.allocator, symbol);
+    const str = try fromSingleSymbol(self.bytes.allocator, symbol);
     defer str.deinit();
     try self.merge(str, s_idx);
 }
@@ -207,7 +207,7 @@ pub fn set(self: *String, s_idx: usize, symbol: u21) Error!void {
 // ░	0xE2 0x96 0x91
 
 test "should treat uint as a utf8 symbol" {
-    const str = try String.fromOneSymbol(std.testing.allocator, 'Ⓐ');
+    const str = try String.fromSingleSymbol(std.testing.allocator, 'Ⓐ');
     defer str.deinit();
     try std.testing.expectEqualStrings("Ⓐ", str.bytes.items);
 }

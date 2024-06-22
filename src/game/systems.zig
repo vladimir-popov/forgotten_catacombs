@@ -20,17 +20,17 @@ pub fn render(session: *game.GameSession) anyerror!void {
         }
     }
     // Draw animations
-    var itr = session.entities.iterator();
-    while (itr.next()) |entity| {
-        if (session.components.getForEntity(entity.*, game.Animation)) |animation| {
-            if (animation.frames.popOrNull()) |*frame| {
-                try session.runtime.drawSprite(screen, frame);
-                // frame.deinit();
-            } else {
-                try session.components.removeFromEntity(entity.*, game.Animation);
-            }
-        }
-    }
+    // var itr = session.entities.iterator();
+    // while (itr.next()) |entity| {
+    //     if (session.components.getForEntity(entity.*, game.Animation)) |animation| {
+    //         if (animation.frames.popOrNull()) |*frame| {
+    //             try session.runtime.drawSprite(screen, frame);
+    //             // frame.deinit();
+    //         } else {
+    //             try session.components.removeFromEntity(entity.*, game.Animation);
+    //         }
+    //     }
+    // }
     // Draw stats
     if (session.components.getForEntity(session.player, game.Health)) |health| {
         var buf: [8]u8 = [_]u8{0} ** 8;
@@ -165,7 +165,7 @@ pub fn handleDamage(session: *game.GameSession) anyerror!void {
         try session.components.removeFromEntity(components[0], game.Damage);
         try session.components.setToEntity(
             components[0],
-            try game.Animation.hit(session.runtime.alloc, components[3].position),
+            game.Animation{ .frames = &game.Animation.Presets.hit, .position = components[3].position },
         );
         if (components[2].hp <= 0) {
             try session.removeEntity(components[0]);

@@ -110,6 +110,11 @@ pub fn merge(self: *Buffer, other: Buffer, lines_pad: u8, left_symbols_pad: u8) 
     }
 }
 
+pub fn set(self: *Buffer, codepoint: u21, lines_pad: u8, left_symbols_pad: u8) Error!void {
+    try self.addAbsentLines(lines_pad);
+    try self.lines.items[lines_pad].set(left_symbols_pad, codepoint);
+}
+
 test "parse string" {
     const data =
         \\12345

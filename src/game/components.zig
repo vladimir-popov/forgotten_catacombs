@@ -4,23 +4,23 @@ const p = algs_and_types.primitives;
 const game = @import("game.zig");
 const dung = @import("BspDungeon.zig");
 
+pub const Codepoint = u21;
+
 pub const Sprite = struct {
     position: p.Point,
-    letter: []const u8,
+    codepoint: Codepoint,
     pub fn deinit(_: *@This()) void {}
 };
 
 pub const Animation = struct {
-    frames: std.ArrayList(Sprite),
+    pub const Presets = struct {
+        pub const hit: [1]Codepoint = [_]Codepoint{ '*' };
+    };
 
-    pub fn deinit(self: *@This()) void {
-        self.deinit();
-    }
-    pub fn hit(alloc: std.mem.Allocator, position: p.Point) !Animation {
-        var animation = Animation{ .frames = try std.ArrayList(Sprite).initCapacity(alloc, 1) };
-        try animation.frames.append(Sprite{ .letter = "*", .position = position });
-        return animation;
-    }
+    frames: []const Codepoint,
+    position: p.Point,
+
+    pub fn deinit(_: *@This()) void {}
 };
 
 pub const Move = struct {

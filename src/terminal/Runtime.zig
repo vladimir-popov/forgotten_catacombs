@@ -197,7 +197,7 @@ fn drawSprite(
         var self: *Self = @ptrCast(@alignCast(ptr));
         const r = sprite.position.row - screen.region.top_left.row + 1; // +1 for border
         const c = sprite.position.col - screen.region.top_left.col + 1;
-        try self.buffer.mergeLine(sprite.letter, r, c);
+        try self.buffer.set(sprite.codepoint, r, c);
     }
 }
 

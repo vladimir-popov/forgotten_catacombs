@@ -110,7 +110,7 @@ fn initPlayer(
     init_position: p.Point,
 ) !game.Entity {
     const player = try entities.newEntity();
-    try components.setToEntity(player, game.Sprite{ .letter = "@", .position = init_position });
+    try components.setToEntity(player, game.Sprite{ .codepoint = '@', .position = init_position });
     try components.setToEntity(player, game.Health{ .hp = 100 });
     return player;
 }
@@ -122,7 +122,7 @@ fn addRat(
 ) !void {
     if (randomEmptyPlace(dungeon, components)) |position| {
         const rat = try entities.newEntity();
-        try components.setToEntity(rat, game.Sprite{ .letter = "r", .position = position });
+        try components.setToEntity(rat, game.Sprite{ .codepoint = 'r', .position = position });
         try components.setToEntity(rat, game.Health{ .hp = 10 });
     }
 }
