@@ -14,7 +14,9 @@ pub const Timers = enum { tick };
 
 pub const QuickAction = union(enum) {
     hit: game.Entity,
+    take: game.Entity,
     open,
+    close,
 };
 
 runtime: game.AnyRuntime,
@@ -131,6 +133,7 @@ fn addRat(
     if (randomEmptyPlace(dungeon, components)) |position| {
         const rat = try entities.newEntity();
         try components.setToEntity(rat, game.Sprite{ .codepoint = 'r', .position = position });
+        try components.setToEntity(rat, game.Description{ .name = "Rat" });
         try components.setToEntity(rat, game.Health{ .hp = 10 });
     }
 }

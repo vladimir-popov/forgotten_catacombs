@@ -179,7 +179,6 @@ fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game
         };
         idx += 1;
         if (itr.cursor.col == itr.region.top_left.col) {
-            // try buffer.addLine(line);
             try buffer.mergeLine(line, row, 1);
             @memset(line, 0);
             idx = 0;

@@ -68,6 +68,7 @@ pub const Components = union {
     sprite: Sprite,
     animation: Animation,
     move: Move,
+    description: Description,
     health: Health,
     damage: Damage,
     collision: Collision,

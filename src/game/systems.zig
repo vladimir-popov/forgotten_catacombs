@@ -12,7 +12,7 @@ pub fn render(session: *game.GameSession, _: c_uint) anyerror!void {
     // Draw walls and floor
     try session.runtime.drawDungeon(screen, session.dungeon);
     // Draw quick actions list
-
+    try drawQuickActionsList(session);
     // Draw sprites inside the screen
     for (session.components.getAll(game.Sprite)) |*sprite| {
         if (screen.region.containsPoint(sprite.position)) {
@@ -36,6 +36,37 @@ pub fn render(session: *game.GameSession, _: c_uint) anyerror!void {
             try std.fmt.bufPrint(&buf, "HP: {d}", .{health.hp}),
             .{ .row = 2, .col = game.DISPLAY_DUNG_COLS + 3 },
         );
+    }
+}
+
+fn drawQuickActionsList(session: *game.GameSession) !void {
+    const prompt_position = p.Point{ .row = game.DISPLPAY_ROWS, .col = game.DISPLAY_DUNG_COLS + 3 };
+    for (session.quick_actions.items) |action| {
+        switch (action) {
+            .open => try session.runtime.drawLabel("Open", prompt_position),
+            .close => try session.runtime.drawLabel("Close", prompt_position),
+            .take => |_| {
+                try session.runtime.drawLabel("Take", prompt_position);
+            },
+            .hit => |enemy| {
+                // Draw details about the enemy:
+                if (session.components.getForEntity(enemy, game.Health)) |hp| {
+                    if (session.components.getForEntity(enemy, game.Description)) |desc| {
+                        try session.runtime.drawLabel("Attack", prompt_position);
+                        try session.runtime.drawLabel(desc.name, .{
+                            .row = 5,
+                            .col = game.DISPLAY_DUNG_COLS + 3,
+                        });
+                        var buf: [2]u8 = undefined;
+                        _ = std.fmt.formatIntBuf(&buf, hp.hp, 10, .lower, .{});
+                        try session.runtime.drawLabel(&buf, .{
+                            .row = 6,
+                            .col = game.DISPLAY_DUNG_COLS + 3,
+                        });
+                    }
+                }
+            },
+        }
     }
 }
 
@@ -86,7 +117,7 @@ fn checkCollision(session: *game.GameSession, new_position: p.Point) ?game.Colli
 /// Returns true if move should be kept.
 fn doMove(session: *game.GameSession, move: *game.Move, position: *p.Point, entity: game.Entity) !bool {
     position.move(move.direction);
-    try session.quick_actions.resize(0);
+    _ = try collectQuickAction(session);
 
     if (entity != session.player) {
         return false;
@@ -104,22 +135,44 @@ fn doMove(session: *game.GameSession, move: *game.Move, position: *p.Point, enti
     if (move.direction == .right and position.col > inner_region.bottomRightCol())
         screen.move(move.direction);
 
-    if (try collectQuickAction(session, position.*)) {
+    if (try collectQuickAction(session)) {
         return move.keep_moving;
     } else {
         return false;
     }
 }
 
-fn collectQuickAction(session: *game.GameSession, position: p.Point) !bool {
+fn collectQuickAction(session: *game.GameSession) !bool {
+    const position = if (session.components.getForEntity(session.player, game.Sprite)) |player|
+        player.position
+    else
+        return false;
+    try session.quick_actions.resize(0);
     var neighbors = session.dungeon.cellsAround(position) orelse return false;
     while (neighbors.next()) |neighbor| {
         if (std.meta.eql(neighbors.cursor, position))
             continue;
         switch (neighbor) {
-            .door => |door| if (door == .closed) try session.quick_actions.append(.open),
-            .entity => |entity| try session.quick_actions.append(.{ .hit = entity }),
+            .door => |door| try session.quick_actions.append(if (door == .closed) .open else .close),
+            .entity => |entity| try session.quick_actions.append(.{ .take = entity }),
             else => {},
+        }
+    }
+    // TODO improve:
+    const sprites = session.components.arrayOf(game.Sprite);
+    const region = p.Region{
+        .top_left = .{
+            .row = @max(position.row - 1, 1),
+            .col = @max(position.col - 1, 1),
+        },
+        .rows = 3,
+        .cols = 3,
+    };
+    for (sprites.components.items, 0..) |sprite, idx| {
+        if (region.containsPoint(sprite.position)) {
+            if (sprites.index_entity.get(@intCast(idx))) |entity| {
+                try session.quick_actions.append(.{ .hit = entity });
+            }
         }
     }
     return session.quick_actions.items.len > 0;
@@ -156,6 +209,7 @@ pub fn handleCollisions(session: *game.GameSession, _: c_uint) anyerror!void {
                 }
             },
         }
+        _ = try collectQuickAction(session);
     }
     try session.components.removeAll(game.Collision);
 }

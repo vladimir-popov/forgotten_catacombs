@@ -21,8 +21,8 @@ pub const DISPLPAY_WIGHT = 400;
 pub const FONT_HEIGHT = 16;
 pub const FONT_WIDTH = 8;
 
-pub const DISPLPAY_ROWS = DISPLPAY_HEGHT / FONT_HEIGHT;
-pub const DISPLPAY_COLS = DISPLPAY_WIGHT / FONT_WIDTH;
+pub const DISPLPAY_ROWS = DISPLPAY_HEGHT / FONT_HEIGHT - 1;
+pub const DISPLPAY_COLS = DISPLPAY_WIGHT / FONT_WIDTH - 1;
 
 // The size of the zone with stats:
 pub const STATS_ROWS = DISPLPAY_ROWS;
