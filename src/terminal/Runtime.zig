@@ -117,9 +117,9 @@ fn readButtons(ptr: *anyopaque) anyerror!?game.AnyRuntime.Buttons {
         self.prev_key = key;
         const known_key_code: ?game.AnyRuntime.Buttons.Code = switch (key) {
             .char => switch (key.char.char) {
-                ' ' => game.AnyRuntime.Buttons.A,
-                'f' => game.AnyRuntime.Buttons.B,
-                'd' => game.AnyRuntime.Buttons.A,
+                // (B) (A)
+                ' ', 's' => game.AnyRuntime.Buttons.A,
+                'b', 'a' => game.AnyRuntime.Buttons.B,
                 'h' => game.AnyRuntime.Buttons.Left,
                 'j' => game.AnyRuntime.Buttons.Down,
                 'k' => game.AnyRuntime.Buttons.Up,
@@ -183,7 +183,7 @@ fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game
             .door => |door| if (door == .opened) '\'' else '+',
         };
         idx += 1;
-        if (itr.cursor.col == itr.region.top_left.col) {
+        if (itr.current_place.col == itr.region.bottomRightCol()) {
             try buffer.mergeLine(line, row, 1);
             @memset(line, 0);
             idx = 0;

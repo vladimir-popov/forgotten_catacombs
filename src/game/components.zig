@@ -41,6 +41,7 @@ pub const Action = union(enum) {
 
 pub const Collision = struct {
     pub const Obstacle = union(enum) {
+        opened_door,
         closed_door,
         wall,
         entity: game.Entity,

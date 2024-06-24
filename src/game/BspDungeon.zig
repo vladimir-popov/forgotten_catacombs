@@ -168,9 +168,9 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
 
         pub inline fn randomPlace(self: Self) p.Point {
             return if (self.rand.uintLessThan(u8, 5) > 3 and self.passages.items.len > 0)
-                    self.randomPlaceInPassage()
-                else
-                    self.randomPlaceInRoom();
+                self.randomPlaceInPassage()
+            else
+                self.randomPlaceInRoom();
         }
 
         fn randomPlaceInRoom(self: Self) p.Point {
@@ -250,7 +250,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                 return .{
                     .dungeon = self,
                     .region = reg,
-                    .cursor = reg.top_left,
+                    .next_place = reg.top_left,
                 };
             } else {
                 return null;
@@ -271,17 +271,19 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
         pub const CellsIterator = struct {
             dungeon: *const Self,
             region: p.Region,
-            cursor: p.Point,
+            next_place: p.Point,
+            current_place: p.Point = undefined,
 
             pub fn next(self: *CellsIterator) ?Cell {
-                if (!self.region.containsPoint(self.cursor))
+                self.current_place = self.next_place;
+                if (!self.region.containsPoint(self.current_place))
                     return null;
 
-                if (self.dungeon.cellAt(self.cursor)) |cl| {
-                    self.cursor.move(.right);
-                    if (self.cursor.col > self.region.bottomRightCol()) {
-                        self.cursor.col = self.region.top_left.col;
-                        self.cursor.row += 1;
+                if (self.dungeon.cellAt(self.current_place)) |cl| {
+                    self.next_place = self.current_place.movedTo(.right);
+                    if (self.next_place.col > self.region.bottomRightCol()) {
+                        self.next_place.col = self.region.top_left.col;
+                        self.next_place.row += 1;
                     }
                     return cl;
                 }
@@ -289,11 +291,22 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             }
         };
 
-        pub fn openDoor(self: *Self, position: p.Point) void {
-            if (self.objects_map.getPtr(position)) |cell_ptr| {
+        pub fn openDoor(self: *Self, place: p.Point) void {
+            if (self.objects_map.getPtr(place)) |cell_ptr| {
                 switch (cell_ptr.*) {
                     .door => {
                         cell_ptr.* = .{ .door = .opened };
+                    },
+                    else => {},
+                }
+            }
+        }
+
+        pub fn closeDoor(self: *Self, place: p.Point) void {
+            if (self.objects_map.getPtr(place)) |cell_ptr| {
+                switch (cell_ptr.*) {
+                    .door => {
+                        cell_ptr.* = .{ .door = .closed };
                     },
                     else => {},
                 }
@@ -462,8 +475,6 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                 return Error.NoSpaceForDoor;
             const door2 = try self.findPlaceForDoorInRegionRnd(r2, direction.opposite()) orelse
                 return Error.NoSpaceForDoor;
-
-            log.debug("Creating the passage from {any} {s} to {any}", .{ door1, @tagName(direction), door2 });
 
             const passage = try self.passages.addOne();
             passage.turns = std.ArrayList(Passage.Turn).init(self.alloc);

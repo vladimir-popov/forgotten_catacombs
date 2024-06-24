@@ -2,7 +2,9 @@ const std = @import("std");
 const ecs = @import("ecs");
 
 pub usingnamespace @import("components.zig");
-pub usingnamespace @import("systems.zig");
+pub usingnamespace @import("ActionSystem.zig");
+pub usingnamespace @import("CollisionSystem.zig");
+pub usingnamespace @import("DamageSystem.zig");
 
 pub const AnyRuntime = @import("AnyRuntime.zig");
 

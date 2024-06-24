@@ -44,6 +44,7 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     try session.systems.append(game.doActions);
     try session.systems.append(game.handleCollisions);
     try session.systems.append(game.handleDamage);
+    try session.systems.append(game.collectQuickAction);
 
     return session;
 }
@@ -73,9 +74,6 @@ pub fn handleInput(session: *game.GameSession, buttons: game.AnyRuntime.Buttons)
 }
 
 pub fn tick(self: *Self) anyerror!void {
-    // rendering should be independent on input,
-    // to be able to play animations
-    try self.render.render(self);
     // Nothing should happened until player pushes a button
     if (try self.runtime.readButtons()) |btn| {
         try self.handleInput(btn);
@@ -86,6 +84,9 @@ pub fn tick(self: *Self) anyerror!void {
             try self.render.render(self);
         }
     }
+    // rendering should be independent on input,
+    // to be able to play animations
+    try self.render.render(self);
 }
 
 

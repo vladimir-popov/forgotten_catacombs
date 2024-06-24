@@ -19,7 +19,7 @@ pub fn main() !void {
         try std.fmt.parseInt(u64, arg, 10)
     else
         std.crypto.random.int(u64);
-    log.debug("The random seed is {d}", .{seed});
+    log.info("The random seed is {d}", .{seed});
     var rnd = std.Random.DefaultPrng.init(seed);
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -94,7 +94,7 @@ const DungeonsGenerator = struct {
         const btn = try self.runtime.readButtons() orelse return;
         if (btn.code & game.AnyRuntime.Buttons.A > 0) {
             const seed = self.runtime.rand.int(u64);
-            log.debug("The random seed is {d}", .{seed});
+            log.info("The random seed is {d}", .{seed});
             var rnd = std.Random.DefaultPrng.init(seed);
             try self.regenerate(rnd.random());
         }
