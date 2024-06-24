@@ -4,11 +4,13 @@ const p = algs.primitives;
 const ecs = @import("ecs");
 const game = @import("game.zig");
 
+const Render = @import("Render.zig");
+
 const log = std.log.scoped(.GameSession);
 
 const Self = @This();
 
-const System = *const fn (game: *Self, delay: c_uint) anyerror!void;
+const System = *const fn (game: *Self) anyerror!void;
 
 pub const Timers = enum { tick };
 
@@ -48,11 +50,9 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     session.screen.centeredAround(player_and_position[1]);
 
     // Initialize systems:
-    try session.systems.append(game.handleInput);
     try session.systems.append(game.handleMove);
     try session.systems.append(game.handleCollisions);
     try session.systems.append(game.handleDamage);
-    try session.systems.append(game.render);
     session.setTimer(.tick, 0);
 
     return session;
@@ -68,6 +68,15 @@ pub fn destroy(self: *Self) void {
     self.runtime.alloc.destroy(self);
 }
 
+pub fn handleInput(session: *game.GameSession, buttons: game.AnyRuntime.Buttons) anyerror!void {
+    if (buttons.toDirection()) |direction| {
+        try session.components.setToEntity(session.player, game.Move{
+            .direction = direction,
+            .keep_moving = false, // btn.state == .double_pressed,
+        });
+    }
+}
+
 pub inline fn getTimer(self: Self, t: Timers) c_uint {
     return self.timers[@intFromEnum(t)];
 }
@@ -77,12 +86,13 @@ pub inline fn setTimer(self: *Self, t: Timers, value: c_uint) void {
 }
 
 pub fn tick(self: *Self) anyerror!void {
-    const now = self.runtime.currentMillis();
-    const delay = now - self.getTimer(.tick);
-    self.setTimer(.tick, now);
-    for (self.systems.items) |system| {
-        try system(self, delay);
+    if (try self.runtime.readButtons()) |btn| {
+        try self.handleInput(btn);
+        for (self.systems.items) |system| {
+            try system(self);
+        }
     }
+    try Render.render(self);
 }
 
 pub fn entityAt(session: *game.GameSession, place: p.Point) ?game.Entity {
