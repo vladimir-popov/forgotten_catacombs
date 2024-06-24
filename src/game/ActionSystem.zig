@@ -3,7 +3,7 @@ const algs_and_types = @import("algs_and_types");
 const p = algs_and_types.primitives;
 const game = @import("game.zig");
 
-const log = std.log.scoped(.systems);
+const log = std.log.scoped(.action_system);
 
 pub fn doActions(session: *game.GameSession) anyerror!void {
     var itr = session.query.get2(game.Action, game.Sprite);
@@ -15,6 +15,25 @@ pub fn doActions(session: *game.GameSession) anyerror!void {
             .move => |*move| try handleMoveAction(session, entity, sprite, move),
             .open => |at| session.dungeon.openDoor(at),
             .close => |at| session.dungeon.closeDoor(at),
+            .hit => |enemy| {
+                if (session.runtime.rand.boolean()) {
+                    try session.components.setToEntity(
+                        enemy,
+                        game.Damage{
+                            .entity = enemy,
+                            .amount = session.runtime.rand.uintLessThan(u8, 3) + 1,
+                        },
+                    );
+                } else if (session.components.getForEntity(enemy, game.Sprite)) |enemy_sprite| {
+                    try session.components.setToEntity(
+                        enemy,
+                        game.Animation{
+                            .frames = &game.Animation.Presets.miss,
+                            .position = enemy_sprite.position,
+                        },
+                    );
+                }
+            },
             else => {}, // TODO do not ignore other actions
         }
         try session.components.removeFromEntity(entity, game.Action);
@@ -104,5 +123,4 @@ pub fn collectQuickAction(session: *game.GameSession) anyerror!void {
             }
         }
     }
-    log.debug("Position {any} \n actions {any}", .{position, session.quick_actions.items});
 }

@@ -3,7 +3,7 @@ const algs_and_types = @import("algs_and_types");
 const p = algs_and_types.primitives;
 const game = @import("game.zig");
 
-const log = std.log.scoped(.collisions);
+const log = std.log.scoped(.damage_system);
 
 pub fn handleDamage(session: *game.GameSession) anyerror!void {
     var itr = session.query.get3(game.Damage, game.Health, game.Sprite);

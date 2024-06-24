@@ -47,7 +47,7 @@ pub const Collision = struct {
         entity: game.Entity,
     };
 
-    /// How met obstacle
+    /// Who met obstacle
     entity: game.Entity,
     obstacle: Obstacle,
     at: p.Point,
@@ -61,6 +61,7 @@ pub const Health = struct {
 };
 
 pub const Damage = struct {
+    /// Who was harmed
     entity: game.Entity,
     amount: u8,
     pub fn deinit(_: *@This()) void {}
