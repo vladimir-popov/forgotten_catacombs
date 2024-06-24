@@ -43,6 +43,7 @@ pub const Buttons = struct {
 
 const VTable = struct {
     readButtons: *const fn (context: *anyopaque) anyerror!?Buttons,
+    clearScreen: *const fn (context: *anyopaque) anyerror!void,
     drawUI: *const fn (context: *anyopaque) anyerror!void,
     drawDungeon: *const fn (
         context: *anyopaque,
@@ -73,6 +74,10 @@ pub inline fn currentMillis(self: Self) c_uint {
 
 pub inline fn readButtons(self: Self) !?Buttons {
     return try self.vtable.readButtons(self.context);
+}
+
+pub inline fn clearScreen(self: Self) !void {
+    try self.vtable.clearScreen(self.context);
 }
 
 pub inline fn drawUI(self: Self) !void {

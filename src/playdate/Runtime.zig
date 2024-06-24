@@ -61,6 +61,7 @@ pub fn any(self: *Self) game.AnyRuntime {
         .vtable = &.{
             .currentMillis = currentMillis,
             .readButtons = readButtons,
+            .clearScreen = clearScreen,
             .drawUI = drawUI,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
@@ -106,6 +107,8 @@ fn readButtons(ptr: *anyopaque) anyerror!?game.AnyRuntime.Buttons {
     return null;
 }
 
+fn clearScreen(_: *anyopaque) anyerror!void {}
+
 fn drawUI(ptr: *anyopaque) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     // separate dung and stats:
@@ -116,7 +119,7 @@ fn drawUI(ptr: *anyopaque) anyerror!void {
 
 fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {
     var itr = dungeon.cellsInRegion(screen.region) orelse return;
-    var sprite = game.Sprite{ .codepoint = undefined, .position = screen.region.top_left};
+    var sprite = game.Sprite{ .codepoint = undefined, .position = screen.region.top_left };
     while (itr.next()) |cell| {
         sprite.codepoint = switch (cell) {
             .nothing, .entity => ' ',

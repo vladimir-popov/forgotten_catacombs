@@ -17,6 +17,7 @@ pub fn render(self: *Self, session: *game.GameSession) anyerror!void {
     if (self.lag > game.RENDER_DELAY_MS) self.lag = 0;
 
     const screen = &session.screen;
+    try session.runtime.clearScreen();
     // Draw UI
     try session.runtime.drawUI();
     // Draw walls and floor

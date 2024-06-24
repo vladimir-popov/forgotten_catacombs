@@ -51,11 +51,15 @@ pub fn deinit(self: *Self) void {
 pub fn run(self: *Self, game_session: anytype) !void {
     handleWindowResize(0);
     while (!self.isExit()) {
-        self.buffer = utf8.Buffer.init(self.arena.allocator());
         try game_session.*.tick();
         try self.writeBuffer(tty.Display.writer);
-        _ = self.arena.reset(.retain_capacity);
     }
+}
+
+fn clearScreen(ptr: *anyopaque) !void {
+    var self: *Self = @ptrCast(@alignCast(ptr));
+    _ = self.arena.reset(.retain_capacity);
+    self.buffer = utf8.Buffer.init(self.arena.allocator());
 }
 
 fn handleWindowResize(_: i32) callconv(.C) void {
@@ -93,6 +97,7 @@ pub fn any(self: *Self) game.AnyRuntime {
         .vtable = &.{
             .currentMillis = currentMillis,
             .readButtons = readButtons,
+            .clearScreen = clearScreen,
             .drawUI = drawUI,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
