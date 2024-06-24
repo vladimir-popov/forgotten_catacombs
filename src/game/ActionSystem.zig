@@ -5,6 +5,7 @@ const game = @import("game.zig");
 
 const log = std.log.scoped(.action_system);
 
+/// Handles intentions to do some actions
 pub fn doActions(session: *game.GameSession) anyerror!void {
     var itr = session.query.get2(game.Action, game.Sprite);
     while (itr.next()) |components| {

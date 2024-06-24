@@ -46,6 +46,8 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     try session.systems.append(game.handleDamage);
     try session.systems.append(game.collectQuickAction);
 
+    // for cases when player appears near entities 
+    try game.collectQuickAction(session);
     return session;
 }
 
@@ -68,15 +70,18 @@ pub fn handleInput(session: *game.GameSession, buttons: game.AnyRuntime.Buttons)
         });
     }
     if (buttons.code == game.AnyRuntime.Buttons.A) {
+        // TODO choose the current action, not the last
         if (session.quick_actions.getLastOrNull()) |action|
             try session.components.setToEntity(session.player, action);
     }
 }
 
 pub fn tick(self: *Self) anyerror!void {
-    // Nothing should happened until player pushes a button
+    // Nothing should happened until the player pushes a button
     if (try self.runtime.readButtons()) |btn| {
         try self.handleInput(btn);
+        // TODO add speed score for actions
+        // We should not run a new action until finish previous one
         while (self.components.getForEntity(self.player, game.Action)) |_| {
             for (self.systems.items) |system| {
                 try system(self);
