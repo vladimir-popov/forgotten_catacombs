@@ -14,8 +14,8 @@ pub const Sprite = struct {
 
 pub const Animation = struct {
     pub const Presets = struct {
-        pub const hit: [1]Codepoint = [_]Codepoint{ '*' };
-        pub const miss: [1]Codepoint = [_]Codepoint{ '.' };
+        pub const hit: [1]Codepoint = [_]Codepoint{'*'};
+        pub const miss: [1]Codepoint = [_]Codepoint{'.'};
     };
 
     frames: []const Codepoint,
@@ -24,9 +24,17 @@ pub const Animation = struct {
     pub fn deinit(_: *@This()) void {}
 };
 
-pub const Move = struct {
-    direction: p.Direction,
-    keep_moving: bool = false,
+pub const Action = union(enum) {
+    pub const Move = struct {
+        direction: p.Direction,
+        keep_moving: bool = false,
+    };
+
+    open: p.Point,
+    close: p.Point,
+    move: Move,
+    hit: game.Entity,
+    take: game.Entity,
 
     pub fn deinit(_: *@This()) void {}
 };
@@ -67,7 +75,7 @@ pub const Description = struct {
 pub const Components = union {
     sprite: Sprite,
     animation: Animation,
-    move: Move,
+    move: Action,
     description: Description,
     health: Health,
     damage: Damage,

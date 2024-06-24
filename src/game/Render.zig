@@ -5,7 +5,17 @@ const game = @import("game.zig");
 
 const log = std.log.scoped(.render);
 
-pub fn render(session: *game.GameSession) anyerror!void {
+const Self = @This();
+
+previous_render_time: c_uint = 0,
+lag: u32 = 0,
+
+pub fn render(self: *Self, session: *game.GameSession) anyerror!void {
+    const now = session.runtime.currentMillis();
+    self.lag += now - self.previous_render_time;
+    self.previous_render_time = now;
+    if (self.lag > game.RENDER_DELAY_MS) self.lag = 0;
+
     const screen = &session.screen;
     // Draw UI
     try session.runtime.drawUI();
@@ -26,7 +36,8 @@ pub fn render(session: *game.GameSession) anyerror!void {
                 screen,
                 &.{ .codepoint = animation.frames[animation.frames.len - 1], .position = animation.position },
             );
-            animation.frames.len -= 1;
+            if (self.lag == 0)
+                animation.frames.len -= 1;
         }
     }
     // Draw stats
@@ -58,15 +69,15 @@ fn drawQuickActionsList(session: *game.GameSession) !void {
                             .col = game.DISPLAY_DUNG_COLS + 3,
                         });
                         var buf: [2]u8 = undefined;
-                        _ = std.fmt.formatIntBuf(&buf, hp.hp, 10, .lower, .{});
-                        try session.runtime.drawLabel(&buf, .{
+                        const len = std.fmt.formatIntBuf(&buf, hp.hp, 10, .lower, .{});
+                        try session.runtime.drawLabel(buf[0..len], .{
                             .row = 6,
                             .col = game.DISPLAY_DUNG_COLS + 3,
                         });
                     }
                 }
             },
+            .move => {},
         }
     }
 }
-

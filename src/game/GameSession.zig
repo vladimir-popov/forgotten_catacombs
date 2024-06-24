@@ -12,37 +12,28 @@ const Self = @This();
 
 const System = *const fn (game: *Self) anyerror!void;
 
-pub const Timers = enum { tick };
-
-pub const QuickAction = union(enum) {
-    hit: game.Entity,
-    take: game.Entity,
-    open,
-    close,
-};
-
 runtime: game.AnyRuntime,
+render: Render,
 entities: ecs.EntitiesManager,
 components: ecs.ComponentsManager(game.Components),
 query: ecs.ComponentsQuery(game.Components) = undefined,
 screen: game.Screen,
-timers: []c_uint,
 systems: std.ArrayList(System),
 dungeon: *game.Dungeon,
 player: game.Entity = undefined,
-quick_actions: std.ArrayList(QuickAction),
+quick_actions: std.ArrayList(game.Action),
 
 pub fn create(runtime: game.AnyRuntime) !*Self {
     const session = try runtime.alloc.create(Self);
     session.* = .{
         .runtime = runtime,
+        .render = .{},
         .screen = game.Screen.init(game.DISPLAY_DUNG_ROWS, game.DISPLAY_DUNG_COLS, game.Dungeon.Region),
-        .timers = try runtime.alloc.alloc(c_uint, std.meta.tags(Timers).len),
         .entities = try ecs.EntitiesManager.init(runtime.alloc),
         .components = try ecs.ComponentsManager(game.Components).init(runtime.alloc),
         .systems = std.ArrayList(System).init(runtime.alloc),
         .dungeon = try game.Dungeon.createRandom(runtime.alloc, runtime.rand),
-        .quick_actions = std.ArrayList(QuickAction).init(runtime.alloc),
+        .quick_actions = std.ArrayList(game.Action).init(runtime.alloc),
     };
     session.query = .{ .entities = &session.entities, .components = &session.components };
     const player_and_position = try initLevel(session.dungeon, &session.entities, &session.components);
@@ -50,10 +41,9 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     session.screen.centeredAround(player_and_position[1]);
 
     // Initialize systems:
-    try session.systems.append(game.handleMove);
+    try session.systems.append(game.doActions);
     try session.systems.append(game.handleCollisions);
     try session.systems.append(game.handleDamage);
-    session.setTimer(.tick, 0);
 
     return session;
 }
@@ -64,36 +54,40 @@ pub fn destroy(self: *Self) void {
     self.systems.deinit();
     self.dungeon.destroy();
     self.quick_actions.deinit();
-    self.runtime.alloc.free(self.timers);
     self.runtime.alloc.destroy(self);
 }
 
-pub fn handleInput(session: *game.GameSession, buttons: game.AnyRuntime.Buttons) anyerror!void {
+pub fn handleInput(session: *game.GameSession, buttons: game.AnyRuntime.Buttons) !void {
     if (buttons.toDirection()) |direction| {
-        try session.components.setToEntity(session.player, game.Move{
-            .direction = direction,
-            .keep_moving = false, // btn.state == .double_pressed,
+        try session.components.setToEntity(session.player, game.Action{
+            .move = .{
+                .direction = direction,
+                .keep_moving = false, // btn.state == .double_pressed,
+            },
         });
     }
-}
-
-pub inline fn getTimer(self: Self, t: Timers) c_uint {
-    return self.timers[@intFromEnum(t)];
-}
-
-pub inline fn setTimer(self: *Self, t: Timers, value: c_uint) void {
-    self.timers[@intFromEnum(t)] = value;
+    if (buttons.code == game.AnyRuntime.Buttons.A) {
+        if (session.quick_actions.getLastOrNull()) |action|
+            try session.components.setToEntity(session.player, action);
+    }
 }
 
 pub fn tick(self: *Self) anyerror!void {
+    // rendering should be independent on input,
+    // to be able to play animations
+    try self.render.render(self);
+    // Nothing should happened until player pushes a button
     if (try self.runtime.readButtons()) |btn| {
         try self.handleInput(btn);
-        for (self.systems.items) |system| {
-            try system(self);
+        while (self.components.getForEntity(self.player, game.Action)) |_| {
+            for (self.systems.items) |system| {
+                try system(self);
+            }
+            try self.render.render(self);
         }
     }
-    try Render.render(self);
 }
+
 
 pub fn entityAt(session: *game.GameSession, place: p.Point) ?game.Entity {
     for (session.components.arrayOf(game.Sprite).components.items, 0..) |sprite, idx| {

@@ -13,6 +13,8 @@ pub const Dungeon = @import("BspDungeon.zig").BspDungeon(TOTAL_DUNG_ROWS, TOTAL_
 
 pub const GameSession = @import("GameSession.zig");
 
+pub const RENDER_DELAY_MS = 150;
+
 // Playdate display resolution px:
 pub const DISPLPAY_HEGHT = 240;
 pub const DISPLPAY_WIGHT = 400;
