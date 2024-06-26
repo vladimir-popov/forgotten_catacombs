@@ -3,46 +3,10 @@ const algs_and_types = @import("algs_and_types");
 const p = algs_and_types.primitives;
 const game = @import("game.zig");
 
-pub const DOUBLE_PRESS_DELAY_MS = 150;
-pub const HOLD_DELAY_MS = 500;
-
 const Self = @This();
 
-pub const Buttons = struct {
-    pub const Code = c_int;
-
-    pub const State = enum { pressed, hold, double_pressed };
-
-    code: Code,
-    state: State,
-
-    pub const Left: Code = (1 << 0);
-    pub const Right: Code = (1 << 1);
-    pub const Up: Code = (1 << 2);
-    pub const Down: Code = (1 << 3);
-    pub const B: Code = (1 << 4);
-    pub const A: Code = (1 << 5);
-
-    pub inline fn isMove(btn: Code) bool {
-        return (Up | Down | Left | Right) & btn > 0;
-    }
-
-    pub inline fn toDirection(btn: Buttons) ?p.Direction {
-        return if (btn.code & Buttons.Up > 0)
-            p.Direction.up
-        else if (btn.code & Buttons.Down > 0)
-            p.Direction.down
-        else if (btn.code & Buttons.Left > 0)
-            p.Direction.left
-        else if (btn.code & Buttons.Right > 0)
-            p.Direction.right
-        else
-            null;
-    }
-};
-
 const VTable = struct {
-    readButtons: *const fn (context: *anyopaque) anyerror!?Buttons,
+    readPushedButtons: *const fn (context: *anyopaque) anyerror!?game.Buttons,
     clearScreen: *const fn (context: *anyopaque) anyerror!void,
     drawUI: *const fn (context: *anyopaque) anyerror!void,
     drawDungeon: *const fn (
@@ -72,8 +36,8 @@ pub inline fn currentMillis(self: Self) c_uint {
     return self.vtable.currentMillis(self.context);
 }
 
-pub inline fn readButtons(self: Self) !?Buttons {
-    return try self.vtable.readButtons(self.context);
+pub inline fn readPushedButtons(self: Self) !?game.Buttons {
+    return try self.vtable.readPushedButtons(self.context);
 }
 
 pub inline fn clearScreen(self: Self) !void {

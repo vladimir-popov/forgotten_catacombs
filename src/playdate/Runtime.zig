@@ -13,7 +13,7 @@ const ButtonsLog = struct {
     button: api.PDButtons = 0,
     pressed_at: u32 = 0,
     released_at: u32 = 0,
-    press_count: u16 = 0,
+    release_count: u16 = 0,
 };
 
 playdate: *api.PlaydateAPI,
@@ -60,7 +60,7 @@ pub fn any(self: *Self) game.AnyRuntime {
         .rand = self.prng.random(),
         .vtable = &.{
             .currentMillis = currentMillis,
-            .readButtons = readButtons,
+            .readPushedButtons = readPushedButtons,
             .clearScreen = clearScreen,
             .drawUI = drawUI,
             .drawDungeon = drawDungeon,
@@ -77,32 +77,33 @@ fn currentMillis(ptr: *anyopaque) c_uint {
     return self.playdate.system.getCurrentTimeMilliseconds();
 }
 
-fn readButtons(ptr: *anyopaque) anyerror!?game.AnyRuntime.Buttons {
+fn readPushedButtons(ptr: *anyopaque) anyerror!?game.Buttons {
     const self: *Self = @ptrCast(@alignCast(ptr));
 
     var current_buttons: api.PDButtons = 0;
     var pressed_buttons: api.PDButtons = 0;
-    var released_button: api.PDButtons = 0;
-    self.playdate.system.getButtonState(&current_buttons, &pressed_buttons, &released_button);
+    var released_buttons: api.PDButtons = 0;
+    self.playdate.system.getButtonState(&current_buttons, &pressed_buttons, &released_buttons);
 
     if (pressed_buttons > 0) {
-        self.button_log.press_count = if (pressed_buttons == self.button_log.button)
-            self.button_log.press_count + 1
-        else
-            1;
         self.button_log.pressed_at = self.playdate.system.getCurrentTimeMilliseconds();
-        self.button_log.button = pressed_buttons;
-        const press_delay = self.button_log.pressed_at - self.button_log.released_at;
-        if (self.button_log.press_count > 1 and press_delay < game.AnyRuntime.DOUBLE_PRESS_DELAY_MS)
-            return .{ .code = current_buttons, .state = .double_pressed }
-        else
-            return .{ .code = pressed_buttons, .state = .pressed };
     } else if (current_buttons > 0) {
         const hold_delay = self.playdate.system.getCurrentTimeMilliseconds() - self.button_log.pressed_at;
-        if (hold_delay > game.AnyRuntime.HOLD_DELAY_MS)
+        if (hold_delay > game.Buttons.HOLD_DELAY_MS)
             return .{ .code = current_buttons, .state = .hold };
-    } else if (released_button > 0) {
-        self.button_log.released_at = self.playdate.system.getCurrentTimeMilliseconds();
+    } else if (released_buttons > 0) {
+        self.button_log.release_count = if (released_buttons == self.button_log.button)
+            self.button_log.release_count + 1
+        else
+            1;
+        const now = self.playdate.system.getCurrentTimeMilliseconds();
+        self.button_log.button = released_buttons;
+        const delay = now - self.button_log.released_at;
+        self.button_log.released_at = now;
+        if (self.button_log.release_count > 1 and delay < game.Buttons.DOUBLE_PUSH_DELAY_MS)
+            return .{ .code = current_buttons, .state = .double_pushed }
+        else
+            return .{ .code = released_buttons, .state = .pushed };
     }
     return null;
 }

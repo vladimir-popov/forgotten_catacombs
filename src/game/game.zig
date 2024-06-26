@@ -7,6 +7,7 @@ pub usingnamespace @import("CollisionSystem.zig");
 pub usingnamespace @import("DamageSystem.zig");
 
 pub const AnyRuntime = @import("AnyRuntime.zig");
+pub const Buttons = @import("Buttons.zig");
 
 pub const Entity = ecs.Entity;
 pub const Screen = @import("Screen.zig");

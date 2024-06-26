@@ -96,7 +96,7 @@ pub fn any(self: *Self) game.AnyRuntime {
         .rand = self.rand,
         .vtable = &.{
             .currentMillis = currentMillis,
-            .readButtons = readButtons,
+            .readPushedButtons = readPushedButtons,
             .clearScreen = clearScreen,
             .drawUI = drawUI,
             .drawDungeon = drawDungeon,
@@ -110,27 +110,27 @@ fn currentMillis(_: *anyopaque) c_uint {
     return @truncate(@as(u64, @intCast(std.time.milliTimestamp())));
 }
 
-fn readButtons(ptr: *anyopaque) anyerror!?game.AnyRuntime.Buttons {
+fn readPushedButtons(ptr: *anyopaque) anyerror!?game.Buttons {
     var self: *Self = @ptrCast(@alignCast(ptr));
     const prev_key = self.prev_key;
     if (tty.Keyboard.readPressedButton()) |key| {
         self.prev_key = key;
-        const known_key_code: ?game.AnyRuntime.Buttons.Code = switch (key) {
+        const known_key_code: ?game.Buttons.Code = switch (key) {
             .char => switch (key.char.char) {
                 // (B) (A)
-                ' ', 's' => game.AnyRuntime.Buttons.A,
-                'b', 'a' => game.AnyRuntime.Buttons.B,
-                'h' => game.AnyRuntime.Buttons.Left,
-                'j' => game.AnyRuntime.Buttons.Down,
-                'k' => game.AnyRuntime.Buttons.Up,
-                'l' => game.AnyRuntime.Buttons.Right,
+                ' ', 's' => game.Buttons.A,
+                'b', 'a' => game.Buttons.B,
+                'h' => game.Buttons.Left,
+                'j' => game.Buttons.Down,
+                'k' => game.Buttons.Up,
+                'l' => game.Buttons.Right,
                 else => null,
             },
             .control => switch (key.control) {
-                .LEFT => game.AnyRuntime.Buttons.Left,
-                .DOWN => game.AnyRuntime.Buttons.Down,
-                .UP => game.AnyRuntime.Buttons.Up,
-                .RIGHT => game.AnyRuntime.Buttons.Right,
+                .LEFT => game.Buttons.Left,
+                .DOWN => game.Buttons.Down,
+                .UP => game.Buttons.Up,
+                .RIGHT => game.Buttons.Right,
                 else => null,
             },
             else => null,
@@ -139,11 +139,11 @@ fn readButtons(ptr: *anyopaque) anyerror!?game.AnyRuntime.Buttons {
             const now = std.time.milliTimestamp();
             const delay = now - self.pressed_at;
             self.pressed_at = now;
-            var state: game.AnyRuntime.Buttons.State = .pressed;
+            var state: game.Buttons.State = .pushed;
             if (key.eql(prev_key)) {
-                if (delay < game.AnyRuntime.DOUBLE_PRESS_DELAY_MS)
-                    state = .double_pressed
-                else if (delay > game.AnyRuntime.HOLD_DELAY_MS)
+                if (delay < game.Buttons.DOUBLE_PUSH_DELAY_MS)
+                    state = .double_pushed
+                else if (delay > game.Buttons.HOLD_DELAY_MS)
                     state = .hold;
             }
             return .{ .code = code, .state = state };

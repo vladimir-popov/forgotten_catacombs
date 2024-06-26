@@ -60,7 +60,7 @@ pub fn destroy(self: *Self) void {
     self.runtime.alloc.destroy(self);
 }
 
-pub fn handleInput(session: *game.GameSession, buttons: game.AnyRuntime.Buttons) !void {
+pub fn handleInput(session: *game.GameSession, buttons: game.Buttons) !void {
     if (buttons.toDirection()) |direction| {
         try session.components.setToEntity(session.player, game.Action{
             .move = .{
@@ -69,7 +69,7 @@ pub fn handleInput(session: *game.GameSession, buttons: game.AnyRuntime.Buttons)
             },
         });
     }
-    if (buttons.code == game.AnyRuntime.Buttons.A) {
+    if (buttons.code == game.Buttons.A) {
         // TODO choose the current action, not the last
         if (session.quick_actions.getLastOrNull()) |action|
             try session.components.setToEntity(session.player, action);
@@ -78,7 +78,7 @@ pub fn handleInput(session: *game.GameSession, buttons: game.AnyRuntime.Buttons)
 
 pub fn tick(self: *Self) anyerror!void {
     // Nothing should happened until the player pushes a button
-    if (try self.runtime.readButtons()) |btn| {
+    if (try self.runtime.readPushedButtons()) |btn| {
         try self.handleInput(btn);
         // TODO add speed score for actions
         // We should not run a new action until finish previous one
