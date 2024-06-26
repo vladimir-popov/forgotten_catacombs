@@ -23,15 +23,15 @@ pub const DISPLPAY_HEGHT = 240;
 pub const DISPLPAY_WIGHT = 400;
 
 // Font size px:
-pub const FONT_HEIGHT = 16;
-pub const FONT_WIDTH = 8;
+pub const FONT_HEIGHT = 20;
+pub const FONT_WIDTH = 10;
 
 pub const DISPLPAY_ROWS = DISPLPAY_HEGHT / FONT_HEIGHT - 1;
 pub const DISPLPAY_COLS = DISPLPAY_WIGHT / FONT_WIDTH - 1;
 
 // The size of the zone with stats:
 pub const STATS_ROWS = DISPLPAY_ROWS;
-pub const STATS_COLS = 12;
+pub const STATS_COLS = 10;
 
 /// The maximum rows count in the dungeon
 pub const TOTAL_DUNG_ROWS: u8 = 40;
