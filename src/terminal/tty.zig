@@ -51,15 +51,21 @@ pub const Text = struct {
         }
     }
 
-    pub inline fn italic(comptime str: []const u8) *const [7 + str.len:0]u8 {
-        comptime {
-            return fmt.comptimePrint("{s}{s}{s}", .{ SGR_ITALIC, str, SGR_RESET });
-        }
-    }
-
     pub inline fn bold(comptime str: []const u8) *const [7 + str.len:0]u8 {
         comptime {
             return fmt.comptimePrint("{s}{s}{s}", .{ SGR_BOLD, str, SGR_RESET });
+        }
+    }
+
+    pub inline fn inverted(comptime str: []const u8) *const [7 + str.len:0]u8 {
+        comptime {
+            return fmt.comptimePrint("{s}{s}{s}", .{ SGR_INVERT_COLORS, str, SGR_RESET });
+        }
+    }
+
+    pub inline fn italic(comptime str: []const u8) *const [7 + str.len:0]u8 {
+        comptime {
+            return fmt.comptimePrint("{s}{s}{s}", .{ SGR_ITALIC, str, SGR_RESET });
         }
     }
 

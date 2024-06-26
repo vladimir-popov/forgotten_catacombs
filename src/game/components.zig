@@ -11,6 +11,7 @@ pub const Sprite = struct {
     // The sprite and position are merged together for better performance
     position: p.Point,
     codepoint: Codepoint,
+    is_inverted: bool = false,
     pub fn deinit(_: *@This()) void {}
 };
 

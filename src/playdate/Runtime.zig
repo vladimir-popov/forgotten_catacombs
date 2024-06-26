@@ -19,19 +19,27 @@ const ButtonsLog = struct {
 playdate: *api.PlaydateAPI,
 alloc: std.mem.Allocator,
 prng: std.rand.Xoshiro256,
-font: ?*api.LCDFont,
+text_font: ?*api.LCDFont,
+sprites_font: ?*api.LCDFont,
 button_log: ButtonsLog = .{},
 
 pub fn create(playdate: *api.PlaydateAPI) !*Self {
     const err: ?*[*c]const u8 = null;
-    const font = playdate.graphics.loadFont("Roobert-11-Mono-Condensed.pft", err) orelse {
-        const err_msg = err orelse "Unknown error.";
-        std.debug.panic("Error on load font: {s}", .{err_msg});
-    };
-    errdefer _ = playdate.system.realloc(font, 0);
 
-    playdate.graphics.setFont(font);
-    playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeFillWhite);
+    const text_font = playdate.graphics.loadFont("Roobert-11-Mono-Condensed.pft", err) orelse {
+        const err_msg = err orelse "Unknown error.";
+        std.debug.panic("Error on load font for text: {s}", .{err_msg});
+    };
+    errdefer _ = playdate.system.realloc(text_font, 0);
+
+    const sprites_font = playdate.graphics.loadFont("sprites-font.pft", err) orelse {
+        const err_msg = err orelse "Unknown error.";
+        std.debug.panic("Error on load font for sprites: {s}", .{err_msg});
+    };
+    errdefer _ = playdate.system.realloc(sprites_font, 0);
+
+    playdate.graphics.setFont(sprites_font);
+    playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeCopy);
 
     var millis: c_uint = undefined;
     _ = playdate.system.getSecondsSinceEpoch(&millis);
@@ -42,14 +50,16 @@ pub fn create(playdate: *api.PlaydateAPI) !*Self {
         .playdate = playdate,
         .alloc = alloc,
         .prng = std.Random.DefaultPrng.init(@intCast(millis)),
-        .font = font,
+        .text_font = text_font,
+        .sprites_font = sprites_font,
     };
 
     return runtime;
 }
 
 pub fn destroy(self: *Self) void {
-    self.playdate.realloc(0, self.font);
+    self.playdate.realloc(0, self.text_font);
+    self.playdate.realloc(0, self.sprites_font);
     self.alloc.destroy(self);
 }
 
@@ -148,12 +158,22 @@ fn drawSprite(
         const x: c_int = game.FONT_WIDTH * @as(c_int, sprite.position.col - screen.region.top_left.col + 1);
         var buf: [4]u8 = undefined;
         const len = try std.unicode.utf8Encode(sprite.codepoint, &buf);
-        _ = self.playdate.graphics.drawText(&buf, len, .UTF8Encoding, x, y);
+        if (sprite.is_inverted) {
+            self.playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeInverted);
+            _ = self.playdate.graphics.drawText(&buf, len, .UTF8Encoding, x, y);
+            self.playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeCopy);
+        } else {
+            _ = self.playdate.graphics.drawText(&buf, len, .UTF8Encoding, x, y);
+        }
     }
 }
 
 fn drawLabel(ptr: *anyopaque, label: []const u8, absolute_position: p.Point) !void {
     var self: *Self = @ptrCast(@alignCast(ptr));
+    // choose the font for text:
+    self.playdate.graphics.setFont(self.text_font);
+    self.playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeFillWhite);
+    // draw label:
     _ = self.playdate.graphics.drawText(
         label.ptr,
         label.len,
@@ -161,4 +181,7 @@ fn drawLabel(ptr: *anyopaque, label: []const u8, absolute_position: p.Point) !vo
         @as(c_int, absolute_position.col) * game.FONT_WIDTH,
         @as(c_int, absolute_position.row) * game.FONT_HEIGHT,
     );
+    // revert font for sprites:
+    self.playdate.graphics.setFont(self.sprites_font);
+    self.playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeCopy);
 }

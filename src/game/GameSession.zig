@@ -130,7 +130,7 @@ fn initPlayer(
     init_position: p.Point,
 ) !game.Entity {
     const player = try entities.newEntity();
-    try components.setToEntity(player, game.Sprite{ .codepoint = '@', .position = init_position });
+    try components.setToEntity(player, game.Sprite{ .codepoint = '@', .position = init_position, .is_inverted = true });
     try components.setToEntity(player, game.Health{ .hp = 100 });
     return player;
 }

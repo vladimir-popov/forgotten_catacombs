@@ -201,7 +201,18 @@ fn drawSprite(
         var self: *Self = @ptrCast(@alignCast(ptr));
         const r = sprite.position.row - screen.region.top_left.row + 1; // +1 for border
         const c = sprite.position.col - screen.region.top_left.col + 1;
-        try self.buffer.set(sprite.codepoint, r, c);
+        if (sprite.is_inverted) {
+            var symbol: [4]u8 = undefined;
+            const len = try std.unicode.utf8Encode(sprite.codepoint, &symbol);
+            var buf: [12]u8 = undefined;
+            try self.buffer.mergeLine(
+                try std.fmt.bufPrint(&buf, tty.Text.inverted("{s}"), .{symbol[0..len]}),
+                r,
+                c,
+            );
+        } else {
+            try self.buffer.set(sprite.codepoint, r, c);
+        }
     }
 }
 
