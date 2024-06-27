@@ -16,25 +16,13 @@ pub fn doActions(session: *game.GameSession) anyerror!void {
             .move => |*move| try handleMoveAction(session, entity, sprite, move),
             .open => |at| session.dungeon.openDoor(at),
             .close => |at| session.dungeon.closeDoor(at),
-            .hit => |enemy| {
-                if (session.runtime.rand.boolean()) {
-                    try session.components.setToEntity(
-                        enemy,
-                        game.Damage{
-                            .entity = enemy,
-                            .amount = session.runtime.rand.uintLessThan(u8, 3) + 1,
-                        },
-                    );
-                } else if (session.components.getForEntity(enemy, game.Sprite)) |enemy_sprite| {
-                    try session.components.setToEntity(
-                        enemy,
-                        game.Animation{
-                            .frames = &game.Animation.Presets.miss,
-                            .position = enemy_sprite.position,
-                        },
-                    );
-                }
-            },
+            .hit => |enemy| try session.components.setToEntity(
+                enemy,
+                game.Damage{
+                    .entity = enemy,
+                    .amount = session.runtime.rand.uintLessThan(u8, 3),
+                },
+            ),
             else => {}, // TODO do not ignore other actions
         }
         try session.components.removeFromEntity(entity, game.Action);
@@ -89,23 +77,13 @@ fn checkCollision(session: *game.GameSession, new_position: p.Point) ?game.Colli
     return .wall;
 }
 
-pub fn collectQuickAction(session: *game.GameSession) anyerror!void {
+pub fn collectQuickActions(session: *game.GameSession) anyerror!void {
     const position = if (session.components.getForEntity(session.player, game.Sprite)) |player|
         player.position
     else
         return;
-    var neighbors = session.dungeon.cellsAround(position) orelse return;
-    try session.quick_actions.resize(0);
-    while (neighbors.next()) |neighbor| {
-        switch (neighbor) {
-            .door => |door| try session.quick_actions.append(if (door == .closed)
-                .{ .open = neighbors.current_place }
-            else
-                .{ .close = neighbors.current_place }),
-            .entity => |entity| try session.quick_actions.append(.{ .take = entity }),
-            else => {},
-        }
-    }
+
+    session.quick_actions.reset();
     // TODO improve:
     const sprites = session.components.arrayOf(game.Sprite);
     const region = p.Region{
@@ -119,9 +97,34 @@ pub fn collectQuickAction(session: *game.GameSession) anyerror!void {
     for (sprites.components.items, 0..) |sprite, idx| {
         if (region.containsPoint(sprite.position)) {
             if (sprites.index_entity.get(@intCast(idx))) |entity| {
-                if (session.player != entity)
-                    try session.quick_actions.append(.{ .hit = entity });
+                if (session.player != entity) {
+                    session.quick_actions.add(.{ .hit = entity }, sprite);
+                }
             }
         }
     }
+
+    var neighbors = session.dungeon.cellsAround(position) orelse return;
+    while (neighbors.next()) |neighbor| {
+        if (neighbors.current_place.eql(position))
+            continue;
+
+        switch (neighbor) {
+            .door => |door| {
+                if (door == .opened) {
+                    session.quick_actions.add(
+                        .{ .close = neighbors.current_place },
+                        .{ .position = neighbors.current_place, .codepoint = '\'' },
+                    );
+                } else {
+                    session.quick_actions.add(
+                        .{ .open = neighbors.current_place },
+                        .{ .position = neighbors.current_place, .codepoint = '+' },
+                    );
+                }
+            },
+            else => {},
+        }
+    }
+    session.quick_actions.add(.wait, null);
 }

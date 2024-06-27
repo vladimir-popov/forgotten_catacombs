@@ -5,12 +5,50 @@ const ecs = @import("ecs");
 const game = @import("game.zig");
 
 const Render = @import("Render.zig");
+const InputHandler = @import("InputHandler.zig");
 
 const log = std.log.scoped(.GameSession);
 
 const Self = @This();
 
 const System = *const fn (game: *Self) anyerror!void;
+
+const State = enum {
+    play,
+    pause,
+};
+
+const QuickActions = struct {
+    const QuickAction = struct {
+        action: game.Action = .wait,
+        sprite: ?game.Sprite = null,
+    };
+
+    actions: [9]QuickAction = undefined,
+    len: u8 = 0,
+    current_idx: u8 = 0,
+
+    pub inline fn current(self: QuickActions) QuickAction {
+        return self.actions[self.current_idx];
+    }
+
+    pub fn next(self: *QuickActions) void {
+        self.current_idx += 1;
+        if (self.current_idx >= self.len)
+            self.current_idx = 0;
+    }
+
+    pub fn add(self: *QuickActions, action: game.Action, sprite: ?game.Sprite) void {
+        self.actions[self.len] = .{ .action = action, .sprite = sprite };
+        self.len += 1;
+        std.debug.assert(self.len < 10);
+    }
+
+    pub fn reset(self: *QuickActions) void {
+        self.len = 0;
+        self.current_idx = 0;
+    }
+};
 
 runtime: game.AnyRuntime,
 render: Render,
@@ -21,7 +59,8 @@ screen: game.Screen,
 systems: std.ArrayList(System),
 dungeon: *game.Dungeon,
 player: game.Entity = undefined,
-quick_actions: std.ArrayList(game.Action),
+quick_actions: QuickActions = .{},
+state: State = .play,
 
 pub fn create(runtime: game.AnyRuntime) !*Self {
     const session = try runtime.alloc.create(Self);
@@ -33,7 +72,6 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
         .components = try ecs.ComponentsManager(game.Components).init(runtime.alloc),
         .systems = std.ArrayList(System).init(runtime.alloc),
         .dungeon = try game.Dungeon.createRandom(runtime.alloc, runtime.rand),
-        .quick_actions = std.ArrayList(game.Action).init(runtime.alloc),
     };
     session.query = .{ .entities = &session.entities, .components = &session.components };
     const player_and_position = try initLevel(session.dungeon, &session.entities, &session.components);
@@ -44,10 +82,10 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     try session.systems.append(game.doActions);
     try session.systems.append(game.handleCollisions);
     try session.systems.append(game.handleDamage);
-    try session.systems.append(game.collectQuickAction);
+    try session.systems.append(game.collectQuickActions);
 
-    // for cases when player appears near entities 
-    try game.collectQuickAction(session);
+    // for cases when player appears near entities
+    try game.collectQuickActions(session);
     return session;
 }
 
@@ -56,30 +94,13 @@ pub fn destroy(self: *Self) void {
     self.components.deinit();
     self.systems.deinit();
     self.dungeon.destroy();
-    self.quick_actions.deinit();
     self.runtime.alloc.destroy(self);
-}
-
-pub fn handleInput(session: *game.GameSession, buttons: game.Buttons) !void {
-    if (buttons.toDirection()) |direction| {
-        try session.components.setToEntity(session.player, game.Action{
-            .move = .{
-                .direction = direction,
-                .keep_moving = false, // btn.state == .double_pressed,
-            },
-        });
-    }
-    if (buttons.code == game.Buttons.A) {
-        // TODO choose the current action, not the last
-        if (session.quick_actions.getLastOrNull()) |action|
-            try session.components.setToEntity(session.player, action);
-    }
 }
 
 pub fn tick(self: *Self) anyerror!void {
     // Nothing should happened until the player pushes a button
     if (try self.runtime.readPushedButtons()) |btn| {
-        try self.handleInput(btn);
+        try InputHandler.handleInput(self, btn);
         // TODO add speed score for actions
         // We should not run a new action until finish previous one
         while (self.components.getForEntity(self.player, game.Action)) |_| {
@@ -93,7 +114,6 @@ pub fn tick(self: *Self) anyerror!void {
     // to be able to play animations
     try self.render.render(self);
 }
-
 
 pub fn entityAt(session: *game.GameSession, place: p.Point) ?game.Entity {
     for (session.components.arrayOf(game.Sprite).components.items, 0..) |sprite, idx| {
@@ -130,7 +150,7 @@ fn initPlayer(
     init_position: p.Point,
 ) !game.Entity {
     const player = try entities.newEntity();
-    try components.setToEntity(player, game.Sprite{ .codepoint = '@', .position = init_position, .is_inverted = true });
+    try components.setToEntity(player, game.Sprite{ .codepoint = '@', .position = init_position });
     try components.setToEntity(player, game.Health{ .hp = 100 });
     return player;
 }

@@ -196,12 +196,13 @@ fn drawSprite(
     ptr: *anyopaque,
     screen: *const game.Screen,
     sprite: *const game.Sprite,
+    mode: game.AnyRuntime.DrawingMode,
 ) anyerror!void {
     if (screen.region.containsPoint(sprite.position)) {
         var self: *Self = @ptrCast(@alignCast(ptr));
         const r = sprite.position.row - screen.region.top_left.row + 1; // +1 for border
         const c = sprite.position.col - screen.region.top_left.col + 1;
-        if (sprite.is_inverted) {
+        if (mode == .inverted) {
             var symbol: [4]u8 = undefined;
             const len = try std.unicode.utf8Encode(sprite.codepoint, &symbol);
             var buf: [12]u8 = undefined;

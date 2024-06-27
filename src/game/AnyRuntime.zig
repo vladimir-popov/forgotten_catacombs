@@ -5,6 +5,8 @@ const game = @import("game.zig");
 
 const Self = @This();
 
+pub const DrawingMode = enum { normal, inverted, transparent };
+
 const VTable = struct {
     readPushedButtons: *const fn (context: *anyopaque) anyerror!?game.Buttons,
     clearScreen: *const fn (context: *anyopaque) anyerror!void,
@@ -18,6 +20,7 @@ const VTable = struct {
         context: *anyopaque,
         screen: *const game.Screen,
         sprite: *const game.Sprite,
+        mode: DrawingMode,
     ) anyerror!void,
     drawLabel: *const fn (
         context: *anyopaque,
@@ -56,8 +59,9 @@ pub inline fn drawSprite(
     self: Self,
     screen: *const game.Screen,
     sprite: *const game.Sprite,
+    mode: DrawingMode,
 ) !void {
-    try self.vtable.drawSprite(self.context, screen, sprite);
+    try self.vtable.drawSprite(self.context, screen, sprite, mode);
 }
 
 pub inline fn drawLabel(self: Self, label: []const u8, absolute_position: p.Point) !void {

@@ -138,7 +138,7 @@ fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game
             .wall => '#',
             .door => |door| if (door == .opened) '\'' else '+',
         };
-        try drawSprite(ptr, screen, &sprite);
+        try drawSprite(ptr, screen, &sprite, .normal);
         sprite.position.move(.right);
         if (!screen.region.containsPoint(sprite.position)) {
             sprite.position.col = screen.region.top_left.col;
@@ -151,6 +151,7 @@ fn drawSprite(
     ptr: *anyopaque,
     screen: *const game.Screen,
     sprite: *const game.Sprite,
+    mode: game.AnyRuntime.DrawingMode,
 ) anyerror!void {
     if (screen.region.containsPoint(sprite.position)) {
         const self: *Self = @ptrCast(@alignCast(ptr));
@@ -158,7 +159,7 @@ fn drawSprite(
         const x: c_int = game.FONT_WIDTH * @as(c_int, sprite.position.col - screen.region.top_left.col + 1);
         var buf: [4]u8 = undefined;
         const len = try std.unicode.utf8Encode(sprite.codepoint, &buf);
-        if (sprite.is_inverted) {
+        if (mode == .inverted) {
             self.playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeInverted);
             _ = self.playdate.graphics.drawText(&buf, len, .UTF8Encoding, x, y);
             self.playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeCopy);

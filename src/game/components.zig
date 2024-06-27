@@ -11,7 +11,6 @@ pub const Sprite = struct {
     // The sprite and position are merged together for better performance
     position: p.Point,
     codepoint: Codepoint,
-    is_inverted: bool = false,
     pub fn deinit(_: *@This()) void {}
 };
 
@@ -37,6 +36,8 @@ pub const Action = union(enum) {
         keep_moving: bool = false,
     };
 
+    /// Skip the round
+    wait,
     /// An entity is going to open a door at some place
     open: p.Point,
     /// An entity is going to close a door at some place
