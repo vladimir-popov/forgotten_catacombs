@@ -84,11 +84,15 @@ fn findStartOfSymbol(bytes: []u8, b_idx: usize) ?Symbol {
                 const c = bytes[idx];
                 idx += 1;
                 // TODO skip CS more generally
-                if (c == 'B' or c == 'C' or c == 'J' or c == 'H' or c == 'h' or c == 'm' or c == 'l' or c == 'n')
-                    break;
+                switch (c) {
+                    'B', 'C', 'J', 'H', 'h', 'm', 'l', 'n' => break,
+                    else => {},
+                }
             }
         }
     }
+    if (idx >= bytes.len)
+        return null;
 
     // count symbol's bytes
     var n: u8 = 1;
@@ -158,30 +162,35 @@ pub fn appendRepeate(self: *String, str: []const u8, count: usize) Error!void {
 pub fn merge(self: *String, source: String, left_pad_symbols: usize) Error!void {
     // find an start index of the left_pad_symbols + 1 symbol
     // from which replacement should become
-    var left_pad_index: ?usize = self.indexOfSymbol(left_pad_symbols);
-
-    // This string is shorter than left_pad_symbols.
-    // Let's fill it by appropriate count of spaces
-    if (left_pad_index == null) {
-        const scount = self.symbolsCount();
-        try self.appendRepeate(" ", left_pad_symbols - scount);
+    var left_pad_index: usize = undefined;
+    if (self.indexOfSymbol(left_pad_symbols)) |idx| {
+        left_pad_index = idx;
+    } else {
+        // This string is shorter than left_pad_symbols.
+        // Let's fill it by appropriate count of spaces
+        try self.appendRepeate(" ", left_pad_symbols - self.symbolsCount());
         left_pad_index = self.bytes.items.len;
     }
+
     // Now, let's find an index of the last byte of the symbol till which
     // replacement should happened
-    const source_symbols = source.symbolsCount();
-
     var appendix: ?[]u8 = null;
-    if (self.indexOfSymbol(source_symbols + left_pad_symbols)) |app_idx| {
-        appendix = try self.bytes.allocator.alloc(u8, self.bytes.items.len - app_idx);
-        @memcpy(appendix.?.ptr, self.bytes.items[app_idx..]);
+    var appx_idx = self.bytes.items.len;
+    // try to get the next index right after the last symbol in the merged part:
+    if (self.indexOfSymbol(left_pad_symbols + source.symbolsCount() - 1)) |idx| {
+        if (self.symbolAfter(idx)) |s|
+            appx_idx = s.index + s.len;
+    }
+    if (appx_idx < self.bytes.items.len) {
+        appendix = try self.bytes.allocator.alloc(u8, self.bytes.items.len - appx_idx);
+        @memcpy(appendix.?.ptr, self.bytes.items[appx_idx..]);
     }
     defer if (appendix) |app| self.bytes.allocator.free(app);
 
-    try self.bytes.resize(left_pad_index orelse 0);
+    try self.bytes.resize(left_pad_index);
     try self.append(source.bytes.items);
-    if (appendix) |app| {
-        try self.append(app);
+    if (appendix) |appx| {
+        try self.append(appx);
     }
 }
 
@@ -275,6 +284,14 @@ test "merge to short string" {
     try std.testing.expectEqualStrings("  ***", str1.bytes.items);
 }
 
+test "parse inverted symbol as a single symbol" {
+    // when:
+    const str = try String.initParse(std.testing.allocator, "\x1b[7m@\x1b[m");
+    defer str.deinit();
+    // then:
+    try std.testing.expectEqual(1, str.symbolsCount());
+}
+
 test "set symbol at existed char" {
     // given:
     const alloc = std.testing.allocator;
@@ -306,4 +323,36 @@ test "set symbol at the end of the string" {
     try u8str.set(5, 'Ⓐ');
     // then:
     try std.testing.expectEqualStrings("123  Ⓐ", u8str.bytes.items);
+}
+
+test "set an ascii symbol right on the symbol wrapped in esc sequence" {
+    // given:
+    var str = try String.initParse(std.testing.allocator, "#\x1b[7m@\x1b[m#");
+    defer str.deinit();
+    // when:
+    try str.set(1, '!');
+    // then:
+    try std.testing.expectEqualStrings("#\x1b[7m!\x1b[m#", str.bytes.items);
+}
+
+test "set an utf8 symbol right on the symbol wrapped in esc sequence" {
+    // given:
+    var str = try String.initParse(std.testing.allocator, "\x1b[7m@\x1b[m");
+    defer str.deinit();
+    // when:
+    try str.set(0, 'Ⓐ');
+    // then:
+    try std.testing.expectEqualStrings("\x1b[7mⒶ\x1b[m", str.bytes.items);
+}
+
+test "merge a string with wrapped in esc seq symbol with similar string" {
+    // given:
+    var str1 = try String.initParse(std.testing.allocator, "###\x1b[7m@\x1b[m###");
+    defer str1.deinit();
+    var str2 = try String.initParse(std.testing.allocator, "\x1b[7m!\x1b[m");
+    defer str2.deinit();
+    // when:
+    try str1.merge(str2, 3);
+    // then:
+    try std.testing.expectEqualStrings("###\x1b[7m\x1b[7m!\x1b[m\x1b[m###", str1.bytes.items);
 }
