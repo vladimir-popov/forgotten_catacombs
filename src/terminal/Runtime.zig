@@ -157,11 +157,12 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?game.Buttons {
 
 fn drawUI(ptr: *anyopaque) !void {
     var self: *Self = @ptrCast(@alignCast(ptr));
-    try self.buffer.addLine("╔" ++ "═" ** game.DISPLPAY_COLS ++ "╗");
+    const width = game.DISPLPAY_COLS + 1; // +1 for the separator between dung and stats
+    try self.buffer.addLine("╔" ++ "═" ** width ++ "╗");
     for (0..game.DISPLPAY_ROWS) |_| {
-        try self.buffer.addLine("║" ++ " " ** game.DISPLAY_DUNG_COLS ++ "║" ++ " " ** (game.STATS_COLS - 1) ++ "║");
+        try self.buffer.addLine("║" ++ " " ** game.DISPLAY_DUNG_COLS ++ "║" ++ " " ** game.STATS_COLS  ++ "║");
     }
-    try self.buffer.addLine("╚" ++ "═" ** game.DISPLPAY_COLS ++ "╝");
+    try self.buffer.addLine("╚" ++ "═" ** width ++ "╝");
     try self.buffer.lines.items[0].set(game.DISPLAY_DUNG_COLS + 1, '╦');
     try self.buffer.lines.items[game.DISPLPAY_ROWS + 1].set(game.DISPLAY_DUNG_COLS + 1, '╩');
 }
