@@ -28,8 +28,12 @@ pub fn render(self: *Self, session: *game.GameSession) anyerror!void {
             try session.runtime.drawSprite(screen, sprite, .normal);
         }
     }
-    // Draw quick actions list
-    try drawQuickAction(session);
+    // Highlight entity and draw quick action
+    if (session.entity_in_focus) |target| {
+        try highlightEntityInFocus(session, target.entity);
+        if (target.quick_action) |qa|
+            try drawQuickAction(session, qa);
+    }
     // Draw animations
     for (session.components.getAll(game.Animation)) |*animation| {
         if (animation.frames.len > 0 and screen.region.containsPoint(animation.position)) {
@@ -54,32 +58,39 @@ pub fn render(self: *Self, session: *game.GameSession) anyerror!void {
     }
 }
 
-fn drawQuickAction(session: *game.GameSession) !void {
-    switch (session.quick_actions.current().action) {
-        .open => {
-            try drawLabelAndHighlightQuickActionTarget(session, "Open");
+fn highlightEntityInFocus(session: *const game.GameSession, entity: game.Entity) !void {
+    if (session.components.getForEntity(entity, game.Sprite)) |s|
+        try session.runtime.drawSprite(&session.screen, s, .inverted);
+}
+
+fn drawQuickAction(session: *const game.GameSession, quick_action: game.Action) !void {
+    switch (quick_action) {
+        .open => |at| {
+            try drawLabelAndHighlightQuickActionTarget(session, "Open", &.{ .position = at, .codepoint = '+' });
         },
-        .close => {
-            try drawLabelAndHighlightQuickActionTarget(session, "Close");
+        .close => |at| {
+            try drawLabelAndHighlightQuickActionTarget(session, "Close", &.{ .position = at, .codepoint = '\'' });
         },
         .take => |_| {
-            try drawLabelAndHighlightQuickActionTarget(session, "Take");
+            // try drawLabelAndHighlightQuickActionTarget(session, "Take");
         },
         .hit => |enemy| {
             // Draw details about the enemy:
-            if (session.components.getForEntity(enemy, game.Health)) |hp| {
-                if (session.components.getForEntity(enemy, game.Description)) |desc| {
-                    try drawLabelAndHighlightQuickActionTarget(session, "Attack");
-                    try session.runtime.drawLabel(desc.name, .{
-                        .row = 5,
-                        .col = game.DISPLAY_DUNG_COLS + 2,
-                    });
-                    var buf: [2]u8 = undefined;
-                    const len = std.fmt.formatIntBuf(&buf, hp.hp, 10, .lower, .{});
-                    try session.runtime.drawLabel(buf[0..len], .{
-                        .row = 6,
-                        .col = game.DISPLAY_DUNG_COLS + 2,
-                    });
+            if (session.components.getForEntity(enemy, game.Sprite)) |sprite| {
+                if (session.components.getForEntity(enemy, game.Health)) |hp| {
+                    if (session.components.getForEntity(enemy, game.Description)) |desc| {
+                        try drawLabelAndHighlightQuickActionTarget(session, "Attack", sprite);
+                        try session.runtime.drawLabel(desc.name, .{
+                            .row = 5,
+                            .col = game.DISPLAY_DUNG_COLS + 2,
+                        });
+                        var buf: [2]u8 = undefined;
+                        const len = std.fmt.formatIntBuf(&buf, hp.hp, 10, .lower, .{});
+                        try session.runtime.drawLabel(buf[0..len], .{
+                            .row = 6,
+                            .col = game.DISPLAY_DUNG_COLS + 2,
+                        });
+                    }
                 }
             }
         },
@@ -88,11 +99,11 @@ fn drawQuickAction(session: *game.GameSession) !void {
 }
 
 inline fn drawLabelAndHighlightQuickActionTarget(
-    session: *game.GameSession,
+    session: *const game.GameSession,
     label: []const u8,
+    sprite: *const game.Sprite,
 ) !void {
     const prompt_position = p.Point{ .row = game.DISPLPAY_ROWS, .col = game.DISPLAY_DUNG_COLS + 2 };
     try session.runtime.drawLabel(label, prompt_position);
-    if (session.quick_actions.current().sprite) |*sprite|
-        try session.runtime.drawSprite(&session.screen, sprite, .inverted);
+    try session.runtime.drawSprite(&session.screen, sprite, .inverted);
 }

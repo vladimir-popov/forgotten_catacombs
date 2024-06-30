@@ -18,49 +18,33 @@ const State = enum {
     pause,
 };
 
-const QuickActions = struct {
-    const QuickAction = struct {
-        action: game.Action = .wait,
-        sprite: ?game.Sprite = null,
-    };
-
-    actions: [9]QuickAction = undefined,
-    len: u8 = 0,
-    current_idx: u8 = 0,
-
-    pub inline fn current(self: QuickActions) QuickAction {
-        return self.actions[self.current_idx];
-    }
-
-    pub fn next(self: *QuickActions) void {
-        self.current_idx += 1;
-        if (self.current_idx >= self.len)
-            self.current_idx = 0;
-    }
-
-    pub fn add(self: *QuickActions, action: game.Action, sprite: ?game.Sprite) void {
-        self.actions[self.len] = .{ .action = action, .sprite = sprite };
-        self.len += 1;
-        std.debug.assert(self.len < 10);
-    }
-
-    pub fn reset(self: *QuickActions) void {
-        self.len = 0;
-        self.current_idx = 0;
-    }
+const EntityInFocus = struct {
+    entity: game.Entity,
+    quick_action: ?game.Action,
 };
 
+/// Playdate or terminal
 runtime: game.AnyRuntime,
+/// Describes in which sequence everything should be drawn
 render: Render,
+/// Collection of the entities of this game session
 entities: ecs.EntitiesManager,
+/// Collection of the components of the entities
 components: ecs.ComponentsManager(game.Components),
+/// Aggregates requests of few components for the same entities at once
 query: ecs.ComponentsQuery(game.Components) = undefined,
-screen: game.Screen,
+/// Game mechanics
 systems: std.ArrayList(System),
-dungeon: *game.Dungeon,
-player: game.Entity = undefined,
-quick_actions: QuickActions = .{},
+/// Visible area
+screen: game.Screen,
+/// The current state of the game    
 state: State = .play,
+/// The pointer to the current dungeon
+dungeon: *game.Dungeon,
+/// Entity of the player
+player: game.Entity = undefined,
+/// An entity in player's focus to which a quick action can be applied
+entity_in_focus: ?EntityInFocus = null,
 
 pub fn create(runtime: game.AnyRuntime) !*Self {
     const session = try runtime.alloc.create(Self);
@@ -82,10 +66,10 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     try session.systems.append(game.doActions);
     try session.systems.append(game.handleCollisions);
     try session.systems.append(game.handleDamage);
-    try session.systems.append(game.collectQuickActions);
+    try session.systems.append(keepEntityInFocus);
 
     // for cases when player appears near entities
-    try game.collectQuickActions(session);
+    try session.keepEntityInFocus();
     return session;
 }
 
@@ -183,4 +167,67 @@ fn randomEmptyPlace(dungeon: *game.Dungeon, components: *const ecs.ComponentsMan
         };
     }
     return null;
+}
+
+pub fn keepEntityInFocus(session: *Self) anyerror!void {
+    const player_position = if (session.components.getForEntity(session.player, game.Sprite)) |player|
+        player.position
+    else
+        return;
+
+    if (session.entity_in_focus) |target| {
+        // Check if we should change the current quick action or not
+        if (target.quick_action) |qa| {
+            const target_position = switch (qa) {
+                .open => |at| at,
+                .close => |at| at,
+                else => if (session.components.getForEntity(target.entity, game.Sprite)) |s| s.position else null,
+            };
+            if (target_position) |tp| if (player_position.near(tp)) return;
+        }
+        session.calculateQuickAction(player_position, target.entity);
+        return;
+    }
+
+    // Check the nearest entities:
+    // TODO improve:
+    const sprites = session.components.arrayOf(game.Sprite);
+    const region = p.Region{
+        .top_left = .{
+            .row = @max(player_position.row - 1, 1),
+            .col = @max(player_position.col - 1, 1),
+        },
+        .rows = 3,
+        .cols = 3,
+    };
+    for (sprites.components.items, 0..) |sprite, idx| {
+        if (region.containsPoint(sprite.position)) {
+            if (sprites.index_entity.get(@intCast(idx))) |entity| {
+                if (session.player != entity) {
+                    session.calculateQuickAction(player_position, entity);
+                    return;
+                }
+            }
+        }
+    }
+}
+
+pub fn chooseNextEntity(session: *Self) void {
+    _ = session;
+}
+
+fn calculateQuickAction(session: *Self, player_position: p.Point, target: game.Entity) void {
+    if (session.components.getForEntity(target, game.Sprite)) |s| {
+        if (player_position.near(s.position)) {
+            session.entity_in_focus = .{
+                .entity = target,
+                .quick_action = if (session.components.getForEntity(target, game.Health)) |_|
+                    .{ .hit = target }
+                else
+                    null,
+            };
+            return;
+        }
+    }
+    session.entity_in_focus = .{ .entity = target, .quick_action = null };
 }
