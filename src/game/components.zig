@@ -4,6 +4,7 @@ const p = algs_and_types.primitives;
 const game = @import("game.zig");
 const dung = @import("BspDungeon.zig");
 
+// coz zig uses u21 for utf8 symbols
 pub const Codepoint = u21;
 
 /// Describes how and where something should look.

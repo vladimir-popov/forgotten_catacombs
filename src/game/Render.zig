@@ -8,6 +8,7 @@ const log = std.log.scoped(.render);
 const Self = @This();
 
 previous_render_time: c_uint = 0,
+// this lag is used to play animations
 lag: u32 = 0,
 
 pub fn render(self: *Self, session: *game.GameSession) anyerror!void {
@@ -29,7 +30,7 @@ pub fn render(self: *Self, session: *game.GameSession) anyerror!void {
         }
     }
     // Highlight entity and draw quick action
-    if (session.entity_in_focus) |target| {
+    if (session.target_entity) |target| {
         try highlightEntityInFocus(session, target.entity);
         if (target.quick_action) |qa|
             try drawQuickAction(session, qa);
@@ -102,7 +103,7 @@ fn drawQuickAction(session: *const game.GameSession, quick_action: game.Action) 
     }
 }
 
-inline fn drawLabelAndHighlightQuickActionTarget(
+fn drawLabelAndHighlightQuickActionTarget(
     session: *const game.GameSession,
     label: []const u8,
     sprite: *const game.Sprite,

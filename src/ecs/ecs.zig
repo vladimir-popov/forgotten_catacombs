@@ -185,8 +185,8 @@ pub fn ComponentsManager(comptime ComponentsUnion: type) type {
             return self.arrayOf(C).components.items;
         }
 
-        pub fn arrayOf(self: Self, comptime C: type) ArraySet(C) {
-            return @field(self.inner_state.components_map, @typeName(C));
+        pub fn arrayOf(self: Self, comptime C: type) *ArraySet(C) {
+            return &@field(self.inner_state.components_map, @typeName(C));
         }
 
         pub fn removeAll(self: *Self, comptime C: type) !void {

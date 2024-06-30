@@ -7,8 +7,8 @@ pub fn handleInput(session: *game.GameSession, buttons: game.Buttons) !void {
     switch (buttons.code) {
         game.Buttons.A => if (session.state == .play) {
             var quick_action: game.Action = .wait;
-            if (session.entity_in_focus) |e| {
-                if (e.quick_action) |qa| quick_action = qa;
+            if (session.target_entity) |target| {
+                if (target.quick_action) |qa| quick_action = qa;
             }
             try session.components.setToEntity(session.player, quick_action);
         },

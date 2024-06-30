@@ -24,7 +24,7 @@ pub fn doActions(session: *game.GameSession) anyerror!void {
                         .amount = session.runtime.rand.uintLessThan(u8, 3),
                     },
                 );
-                session.entity_in_focus = .{ .entity = enemy };
+                session.target_entity = .{ .entity = enemy };
             },
             else => {}, // TODO do not ignore other actions
         }
