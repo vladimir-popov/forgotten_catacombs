@@ -20,7 +20,7 @@ const State = enum {
 
 const EntityInFocus = struct {
     entity: game.Entity,
-    quick_action: ?game.Action,
+    quick_action: ?game.Action = null,
 };
 
 /// Playdate or terminal
@@ -37,7 +37,7 @@ query: ecs.ComponentsQuery(game.Components) = undefined,
 systems: std.ArrayList(System),
 /// Visible area
 screen: game.Screen,
-/// The current state of the game    
+/// The current state of the game
 state: State = .play,
 /// The pointer to the current dungeon
 dungeon: *game.Dungeon,
@@ -62,7 +62,7 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     session.player = player_and_position[0];
     session.screen.centeredAround(player_and_position[1]);
 
-    // Initialize systems:
+    // Register systems:
     try session.systems.append(game.doActions);
     try session.systems.append(game.handleCollisions);
     try session.systems.append(game.handleDamage);
@@ -113,19 +113,48 @@ pub fn removeEntity(self: *Self, entity: game.Entity) !void {
     self.entities.removeEntity(entity);
 }
 
+pub fn openDoor(self: *Self, door: game.Entity) !void {
+    if (self.components.getForEntity(door, game.Sprite)) |s| {
+        try self.components.setToEntity(door, game.Door.opened);
+        try self.components.setToEntity(door, game.Sprite{ .position = s.position, .codepoint = '\'' });
+    }
+}
+
+pub fn closeDoor(self: *Self, door: game.Entity) !void {
+    if (self.components.getForEntity(door, game.Sprite)) |s| {
+        try self.components.setToEntity(door, game.Door.closed);
+        try self.components.setToEntity(door, game.Sprite{ .position = s.position, .codepoint = '+' });
+    }
+}
+
 // this is public to reuse in the DungeonsGenerator
 pub fn initLevel(
     dungeon: *game.Dungeon,
     entities: *ecs.EntitiesManager,
     components: *ecs.ComponentsManager(game.Components),
 ) !struct { game.Entity, p.Point } {
-    const player_position = dungeon.randomPlace();
+    var doors = dungeon.doors.keyIterator();
+    while (doors.next()) |at| {
+        try addClosedDoor(entities, components, at);
+    }
+
+    const player_position = randomEmptyPlace(dungeon, components) orelse unreachable;
     const player = try initPlayer(entities, components, player_position);
     for (0..dungeon.rand.uintLessThan(u8, 10) + 10) |_| {
         try addRat(dungeon, entities, components);
     }
 
     return .{ player, player_position };
+}
+
+fn addClosedDoor(
+    entities: *ecs.EntitiesManager,
+    components: *ecs.ComponentsManager(game.Components),
+    door_at: *p.Point,
+) !void {
+    const door = try entities.newEntity();
+    try components.setToEntity(door, game.Door.closed);
+    try components.setToEntity(door, game.Sprite{ .position = door_at.*, .codepoint = '+' });
 }
 
 fn initPlayer(
@@ -156,15 +185,13 @@ fn randomEmptyPlace(dungeon: *game.Dungeon, components: *const ecs.ComponentsMan
     var attempt: u8 = 10;
     while (attempt > 0) : (attempt -= 1) {
         const place = dungeon.randomPlace();
-        if (dungeon.cellAt(place)) |cl| if (cl == .floor) {
-            var is_empty = true;
-            for (components.getAll(game.Sprite)) |sprite| {
-                if (sprite.position.eql(place)) {
-                    is_empty = false;
-                }
+        var is_empty = true;
+        for (components.getAll(game.Sprite)) |sprite| {
+            if (sprite.position.eql(place)) {
+                is_empty = false;
             }
-            if (is_empty) return place;
-        };
+        }
+        if (is_empty) return place;
     }
     return null;
 }
@@ -176,18 +203,31 @@ pub fn keepEntityInFocus(session: *Self) anyerror!void {
         return;
 
     if (session.entity_in_focus) |target| {
-        // Check if we should change the current quick action or not
+        // Check if we can keep the current quick action and target
         if (target.quick_action) |qa| {
-            const target_position = switch (qa) {
-                .open => |at| at,
-                .close => |at| at,
-                else => if (session.components.getForEntity(target.entity, game.Sprite)) |s| s.position else null,
-            };
-            if (target_position) |tp| if (player_position.near(tp)) return;
+            if (session.components.getForEntity(target.entity, game.Sprite)) |target_sprite| {
+                if (player_position.near(target_sprite.position)) {
+                    // handle a case when player entered to the door
+                    switch (qa) {
+                        .open => |door| if (session.components.getForEntity(door, game.Door)) |door_state| {
+                            if (door_state.* == .closed and !player_position.eql(target_sprite.position)) return;
+                        },
+                        .close => |door| if (session.components.getForEntity(door, game.Door)) |door_state| {
+                            if (door_state.* == .opened and !player_position.eql(target_sprite.position)) return;
+                        },
+                        else => return,
+                    }
+                }
+            }
+        } else {
+            session.calculateQuickActionForTarget(player_position, target.entity);
+            if (session.entity_in_focus.?.quick_action) |_| return;
         }
-        session.calculateQuickAction(player_position, target.entity);
-        return;
     }
+
+    // ===== Recalculate an entity in focus and a quick action for it =====
+
+    session.entity_in_focus = null;
 
     // Check the nearest entities:
     // TODO improve:
@@ -204,7 +244,7 @@ pub fn keepEntityInFocus(session: *Self) anyerror!void {
         if (region.containsPoint(sprite.position)) {
             if (sprites.index_entity.get(@intCast(idx))) |entity| {
                 if (session.player != entity) {
-                    session.calculateQuickAction(player_position, entity);
+                    session.calculateQuickActionForTarget(player_position, entity);
                     return;
                 }
             }
@@ -212,22 +252,29 @@ pub fn keepEntityInFocus(session: *Self) anyerror!void {
     }
 }
 
-pub fn chooseNextEntity(session: *Self) void {
-    _ = session;
-}
+fn calculateQuickActionForTarget(
+    session: *Self,
+    player_position: p.Point,
+    target: game.Entity,
+) void {
+    var entity_in_focus = EntityInFocus{ .entity = target, .quick_action = null };
 
-fn calculateQuickAction(session: *Self, player_position: p.Point, target: game.Entity) void {
-    if (session.components.getForEntity(target, game.Sprite)) |s| {
-        if (player_position.near(s.position)) {
-            session.entity_in_focus = .{
-                .entity = target,
-                .quick_action = if (session.components.getForEntity(target, game.Health)) |_|
-                    .{ .hit = target }
-                else
-                    null,
-            };
-            return;
+    if (session.components.getForEntity(target, game.Sprite)) |target_sprite| {
+        if (player_position.near(target_sprite.position)) {
+            if (session.components.getForEntity(target, game.Health)) |_| {
+                entity_in_focus.quick_action = .{ .hit = target };
+            } else if (session.components.getForEntity(target, game.Door)) |door| {
+                if (!player_position.eql(target_sprite.position))
+                    entity_in_focus.quick_action = switch (door.*) {
+                        .opened => .{ .close = target },
+                        .closed => .{ .open = target },
+                    };
+            }
         }
     }
-    session.entity_in_focus = .{ .entity = target, .quick_action = null };
+    session.entity_in_focus = entity_in_focus;
+}
+
+pub fn chooseNextEntity(session: *Self) void {
+    _ = session;
 }

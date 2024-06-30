@@ -9,15 +9,21 @@ pub fn handleCollisions(session: *game.GameSession) anyerror!void {
     for (session.components.getAll(game.Collision)) |collision| {
         switch (collision.obstacle) {
             .wall => {},
-            .opened_door => try session.components.setToEntity(collision.entity, game.Action{ .close = collision.at }),
-            .closed_door => try session.components.setToEntity(collision.entity, game.Action{ .open = collision.at }),
-            .entity => |entity| {
+            .door => |door| try session.components.setToEntity(
+                collision.entity,
+                if (door.state == .closed)
+                    game.Action{ .open = door.entity }
+                else
+                    game.Action{ .close = door.entity },
+            ),
+            .enemy => |enemy| {
                 if (session.components.getForEntity(collision.entity, game.Health)) |_| {
-                    if (session.components.getForEntity(entity, game.Health)) |_| {
-                        try session.components.setToEntity(collision.entity, game.Action{ .hit = entity });
+                    if (session.components.getForEntity(enemy, game.Health)) |_| {
+                        try session.components.setToEntity(collision.entity, game.Action{ .hit = enemy });
                     }
                 }
             },
+            .item => {},
         }
     }
     try session.components.removeAll(game.Collision);

@@ -15,8 +15,6 @@ pub const Error = error{
 
 pub const Room = p.Region;
 
-pub const Door = enum { opened, closed };
-
 pub const Passage = struct {
     const Turn = struct {
         place: p.Point,
@@ -82,31 +80,18 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
         const BitMap = algs_and_types.BitMap(Rows, Cols);
 
         /// Possible types of objects inside the dungeon.
-        pub const CellEnum = enum {
+        pub const Cell = enum {
             nothing,
             floor,
             wall,
             door,
-            entity,
-        };
-
-        /// Particular object in the cell of the dung
-        pub const Cell = union(CellEnum) {
-            nothing,
-            floor,
-            wall,
-            door: Door,
-            entity: game.Entity,
         };
 
         alloc: std.mem.Allocator,
         rand: std.Random,
         floor: BitMap,
         walls: BitMap,
-        objects: BitMap,
-
-        // Only static entities should be stored here.
-        objects_map: std.AutoHashMap(p.Point, Cell),
+        doors: std.AutoHashMap(p.Point, void),
 
         // meta data about the dungeon:
         rooms: std.ArrayList(Room),
@@ -115,13 +100,12 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
         pub fn destroy(self: *Self) void {
             self.floor.deinit();
             self.walls.deinit();
-            self.objects.deinit();
+            self.doors.deinit();
             for (self.passages.items) |passage| {
                 passage.deinit();
             }
             self.passages.deinit();
             self.rooms.deinit();
-            self.objects_map.deinit();
             self.alloc.destroy(self);
         }
 
@@ -132,10 +116,9 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                 .rand = rand,
                 .floor = try BitMap.initEmpty(alloc),
                 .walls = try BitMap.initEmpty(alloc),
-                .objects = try BitMap.initEmpty(alloc),
+                .doors = std.AutoHashMap(p.Point, void).init(alloc),
                 .rooms = std.ArrayList(Room).init(alloc),
                 .passages = std.ArrayList(Passage).init(alloc),
-                .objects_map = std.AutoHashMap(p.Point, Cell).init(alloc),
             };
             return instance;
         }
@@ -231,18 +214,14 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             if (self.floor.isSet(place.row, place.col)) {
                 return .floor;
             }
-            if (self.objects.isSet(place.row, place.col)) {
-                return self.objects_map.get(place) orelse unreachable;
+            if (self.doors.get(place)) |_| {
+                return .door;
             }
             return .nothing;
         }
 
-        pub inline fn isCellAt(self: Self, place: p.Point, assumption: CellEnum) bool {
-            if (self.cellAt(place)) |cl| {
-                return @intFromEnum(cl) == @intFromEnum(assumption);
-            } else {
-                return false;
-            }
+        pub inline fn isCellAt(self: Self, place: p.Point, assumption: Cell) bool {
+            if (self.cellAt(place)) |cl| return cl == assumption else return false;
         }
 
         pub fn cellsInRegion(self: *const Self, region: p.Region) ?CellsIterator {
@@ -291,38 +270,13 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             }
         };
 
-        pub fn openDoor(self: *Self, place: p.Point) void {
-            if (self.objects_map.getPtr(place)) |cell_ptr| {
-                switch (cell_ptr.*) {
-                    .door => {
-                        cell_ptr.* = .{ .door = .opened };
-                    },
-                    else => {},
-                }
-            }
-        }
-
-        pub fn closeDoor(self: *Self, place: p.Point) void {
-            if (self.objects_map.getPtr(place)) |cell_ptr| {
-                switch (cell_ptr.*) {
-                    .door => {
-                        cell_ptr.* = .{ .door = .closed };
-                    },
-                    else => {},
-                }
-            }
-        }
-
         fn cleanAt(self: *Self, place: p.Point) void {
             if (!Region.containsPoint(place)) {
                 return;
             }
             self.floor.unsetAt(place);
             self.walls.unsetAt(place);
-            if (self.objects.isSet(place.row, place.col)) {
-                _ = self.objects_map.remove(place);
-                self.objects.unsetAt(place);
-            }
+            _ = self.doors.remove(place);
         }
 
         fn forceCreateFloorAt(self: *Self, place: p.Point) !void {
@@ -341,13 +295,12 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             self.walls.setAt(place);
         }
 
-        fn forceCreateDoorAt(self: *Self, place: p.Point, is_open: bool) !void {
+        fn forceCreateDoorAt(self: *Self, place: p.Point) !void {
             if (!Region.containsPoint(place)) {
                 return;
             }
             self.cleanAt(place);
-            self.objects.setAt(place);
-            try self.objects_map.put(place, .{ .door = if (is_open) .opened else .closed });
+            try self.doors.put(place, {});
         }
 
         fn createWallAt(self: *Self, place: p.Point) void {
@@ -509,8 +462,8 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             _ = try passage.turnAt(door2, direction);
 
             try self.digPassage(passage);
-            try self.forceCreateDoorAt(door1, self.rand.boolean());
-            try self.forceCreateDoorAt(door2, self.rand.boolean());
+            try self.forceCreateDoorAt(door1);
+            try self.forceCreateDoorAt(door2);
 
             return r1.unionWith(r2);
         }

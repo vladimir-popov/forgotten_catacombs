@@ -160,7 +160,7 @@ fn drawUI(ptr: *anyopaque) !void {
     const width = game.DISPLPAY_COLS + 1; // +1 for the separator between dung and stats
     try self.buffer.addLine("╔" ++ "═" ** width ++ "╗");
     for (0..game.DISPLPAY_ROWS) |_| {
-        try self.buffer.addLine("║" ++ " " ** game.DISPLAY_DUNG_COLS ++ "║" ++ " " ** game.STATS_COLS  ++ "║");
+        try self.buffer.addLine("║" ++ " " ** game.DISPLAY_DUNG_COLS ++ "║" ++ " " ** game.STATS_COLS ++ "║");
     }
     try self.buffer.addLine("╚" ++ "═" ** width ++ "╝");
     try self.buffer.lines.items[0].set(game.DISPLAY_DUNG_COLS + 1, '╦');
@@ -178,10 +178,9 @@ fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game
     var row: u8 = 1;
     while (itr.next()) |cell| {
         line[idx] = switch (cell) {
-            .nothing, .entity => ' ',
             .floor => '.',
             .wall => '#',
-            .door => |door| if (door == .opened) '\'' else '+',
+            else => ' ',
         };
         idx += 1;
         if (itr.current_place.col == itr.region.bottomRightCol()) {

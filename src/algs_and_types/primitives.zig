@@ -70,8 +70,8 @@ pub const Point = struct {
     }
 
     pub inline fn near(self: Point, other: Point) bool {
-        return @max(self.row, other.row) - @min(self.row, other.row) <= 1 and
-            @max(self.col, other.col) - @min(self.col, other.col) <= 1;
+        return @max(self.row, other.row) - @min(self.row, other.row) < 2 and
+            @max(self.col, other.col) - @min(self.col, other.col) < 2;
     }
 };
 

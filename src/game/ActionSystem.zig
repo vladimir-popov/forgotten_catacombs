@@ -9,23 +9,26 @@ const log = std.log.scoped(.action_system);
 pub fn doActions(session: *game.GameSession) anyerror!void {
     var itr = session.query.get2(game.Action, game.Sprite);
     while (itr.next()) |components| {
-        const entity = components[0];
-        const action = components[1];
-        const sprite = components[2];
-        switch (action.*) {
-            .move => |*move| try handleMoveAction(session, entity, sprite, move),
-            .open => |at| session.dungeon.openDoor(at),
-            .close => |at| session.dungeon.closeDoor(at),
-            .hit => |enemy| try session.components.setToEntity(
-                enemy,
-                game.Damage{
-                    .entity = enemy,
-                    .amount = session.runtime.rand.uintLessThan(u8, 3),
-                },
-            ),
+        const actor_entity = components[0];
+        const actor_action = components[1];
+        const actor_sprite = components[2];
+        switch (actor_action.*) {
+            .move => |*move| try handleMoveAction(session, actor_entity, actor_sprite, move),
+            .open => |door| try session.openDoor(door),
+            .close => |door| try session.closeDoor(door),
+            .hit => |enemy| {
+                try session.components.setToEntity(
+                    enemy,
+                    game.Damage{
+                        .entity = enemy,
+                        .amount = session.runtime.rand.uintLessThan(u8, 3),
+                    },
+                );
+                session.entity_in_focus = .{ .entity = enemy };
+            },
             else => {}, // TODO do not ignore other actions
         }
-        try session.components.removeFromEntity(entity, game.Action);
+        try session.components.removeFromEntity(actor_entity, game.Action);
     }
 }
 
@@ -42,36 +45,41 @@ fn handleMoveAction(
             game.Collision{ .entity = entity, .obstacle = obstacle, .at = new_position },
         );
     } else {
-        try doMove(session, move, &sprite.position, entity);
+        sprite.position.move(move.direction);
+        if (entity != session.player) return;
+
+        // keep player on the screen:
+        const screen = &session.screen;
+        const inner_region = screen.innerRegion();
+        if (move.direction == .up and sprite.position.row < inner_region.top_left.row)
+            screen.move(move.direction);
+        if (move.direction == .down and sprite.position.row > inner_region.bottomRightRow())
+            screen.move(move.direction);
+        if (move.direction == .left and sprite.position.col < inner_region.top_left.col)
+            screen.move(move.direction);
+        if (move.direction == .right and sprite.position.col > inner_region.bottomRightCol())
+            screen.move(move.direction);
     }
 }
 
-/// Apply move and maybe change position of the screen.
-/// Returns true if move should be kept.
-fn doMove(session: *game.GameSession, move: *game.Action.Move, position: *p.Point, entity: game.Entity) !void {
-    position.move(move.direction);
-    if (entity != session.player) return;
-
-    // keep player on the screen:
-    const screen = &session.screen;
-    const inner_region = screen.innerRegion();
-    if (move.direction == .up and position.row < inner_region.top_left.row)
-        screen.move(move.direction);
-    if (move.direction == .down and position.row > inner_region.bottomRightRow())
-        screen.move(move.direction);
-    if (move.direction == .left and position.col < inner_region.top_left.col)
-        screen.move(move.direction);
-    if (move.direction == .right and position.col > inner_region.bottomRightCol())
-        screen.move(move.direction);
-}
-
-fn checkCollision(session: *game.GameSession, new_position: p.Point) ?game.Collision.Obstacle {
-    if (session.dungeon.cellAt(new_position)) |cell| {
+fn checkCollision(session: *game.GameSession, position: p.Point) ?game.Collision.Obstacle {
+    if (session.dungeon.cellAt(position)) |cell| {
         switch (cell) {
             .nothing, .wall => return .wall,
-            .door => |door| if (door == .opened) return null else return .closed_door,
-            .entity => |e| return .{ .entity = e },
-            .floor => if (session.entityAt(new_position)) |e| return .{ .entity = e } else return null,
+            .floor, .door => if (session.entityAt(position)) |entity| {
+                if (session.components.getForEntity(entity, game.Door)) |door|
+                    if (door.* == .closed)
+                        return .{ .door = .{ .entity = entity, .state = .closed } }
+                    else
+                        return null;
+
+                if (session.components.getForEntity(entity, game.Health)) |_|
+                    return .{ .enemy = entity };
+
+                return .{ .item = entity };
+            } else {
+                return null;
+            },
         }
     }
     return .wall;

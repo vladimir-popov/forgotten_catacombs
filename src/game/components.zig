@@ -14,6 +14,12 @@ pub const Sprite = struct {
     pub fn deinit(_: *@This()) void {}
 };
 
+pub const Door = enum {
+    opened,
+    closed,
+    pub fn deinit(_: *@This()) void {}
+};
+
 pub const Animation = struct {
     pub const Presets = struct {
         pub const hit: [1]Codepoint = [_]Codepoint{'*'};
@@ -38,12 +44,12 @@ pub const Action = union(enum) {
 
     /// Skip the round
     wait,
-    /// An entity is going to open a door at some place
-    open: p.Point,
-    /// An entity is going to close a door at some place
-    close: p.Point,
     /// An entity is going to move in the direction
     move: Move,
+    /// An entity is going to open a door
+    open: game.Entity,
+    /// An entity is going to close a door
+    close: game.Entity,
     /// An entity is going to hit the enemy
     hit: game.Entity,
     /// An entity is going to take the item
@@ -55,10 +61,10 @@ pub const Action = union(enum) {
 /// Intersection of two objects
 pub const Collision = struct {
     pub const Obstacle = union(enum) {
-        opened_door,
-        closed_door,
         wall,
-        entity: game.Entity,
+        door: struct { entity: game.Entity, state: game.Door },
+        item: game.Entity,
+        enemy: game.Entity,
     };
 
     /// Who met obstacle
@@ -95,6 +101,7 @@ pub const Description = struct {
 
 pub const Components = union {
     sprite: Sprite,
+    door: Door,
     animation: Animation,
     move: Action,
     description: Description,

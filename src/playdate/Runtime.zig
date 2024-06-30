@@ -133,10 +133,9 @@ fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game
     var sprite = game.Sprite{ .codepoint = undefined, .position = screen.region.top_left };
     while (itr.next()) |cell| {
         sprite.codepoint = switch (cell) {
-            .nothing, .entity => ' ',
             .floor => '.',
             .wall => '#',
-            .door => |door| if (door == .opened) '\'' else '+',
+            else => ' ',
         };
         try drawSprite(ptr, screen, &sprite, .normal);
         sprite.position.move(.right);

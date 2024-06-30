@@ -59,17 +59,21 @@ pub fn render(self: *Self, session: *game.GameSession) anyerror!void {
 }
 
 fn highlightEntityInFocus(session: *const game.GameSession, entity: game.Entity) !void {
-    if (session.components.getForEntity(entity, game.Sprite)) |s|
-        try session.runtime.drawSprite(&session.screen, s, .inverted);
+    if (session.components.getForEntity(session.player, game.Sprite)) |player_sprite| {
+        if (session.components.getForEntity(entity, game.Sprite)) |target_sprite| {
+            if (!player_sprite.position.eql(target_sprite.position))
+                try session.runtime.drawSprite(&session.screen, target_sprite, .inverted);
+        }
+    }
 }
 
 fn drawQuickAction(session: *const game.GameSession, quick_action: game.Action) !void {
     switch (quick_action) {
-        .open => |at| {
-            try drawLabelAndHighlightQuickActionTarget(session, "Open", &.{ .position = at, .codepoint = '+' });
+        .open => |door| if (session.components.getForEntity(door, game.Sprite)) |s| {
+            try drawLabelAndHighlightQuickActionTarget(session, "Open", s);
         },
-        .close => |at| {
-            try drawLabelAndHighlightQuickActionTarget(session, "Close", &.{ .position = at, .codepoint = '\'' });
+        .close => |door| if (session.components.getForEntity(door, game.Sprite)) |s| {
+            try drawLabelAndHighlightQuickActionTarget(session, "Close", s);
         },
         .take => |_| {
             // try drawLabelAndHighlightQuickActionTarget(session, "Take");
