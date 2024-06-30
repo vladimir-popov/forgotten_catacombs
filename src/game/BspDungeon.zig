@@ -91,7 +91,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
         rand: std.Random,
         floor: BitMap,
         walls: BitMap,
-        doors: std.AutoHashMap(p.Point, bool),
+        doors: std.AutoHashMap(p.Point, void),
 
         // meta data about the dungeon:
         rooms: std.ArrayList(Room),
@@ -116,7 +116,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                 .rand = rand,
                 .floor = try BitMap.initEmpty(alloc),
                 .walls = try BitMap.initEmpty(alloc),
-                .doors = std.AutoHashMap(p.Point, bool).init(alloc),
+                .doors = std.AutoHashMap(p.Point, void).init(alloc),
                 .rooms = std.ArrayList(Room).init(alloc),
                 .passages = std.ArrayList(Passage).init(alloc),
             };
@@ -300,7 +300,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                 return;
             }
             self.cleanAt(place);
-            try self.doors.put(place, true);
+            try self.doors.put(place, {});
         }
 
         fn createWallAt(self: *Self, place: p.Point) void {
