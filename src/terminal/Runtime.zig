@@ -184,7 +184,7 @@ fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game
         };
         idx += 1;
         if (itr.current_place.col == itr.region.bottomRightCol()) {
-            try buffer.mergeLine(line, row, 1);
+            try buffer.mergeLine(line[0..idx], row, 1);
             @memset(line, 0);
             idx = 0;
             row += 1;
