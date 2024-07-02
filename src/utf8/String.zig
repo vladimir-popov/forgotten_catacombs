@@ -70,12 +70,8 @@ fn findStartOfSymbol(bytes: []u8, b_idx: usize) ?Symbol {
         idx += 1;
     }
 
-    // looks like no one full symbol till the end
-    if (idx >= bytes.len)
-        return null;
-
     // skip control sequence
-    if (bytes[idx] == '\x1b') {
+    while (idx < bytes.len and bytes[idx] == '\x1b') {
         idx += 1;
 
         if (bytes[idx] == '[') {
@@ -355,4 +351,17 @@ test "merge a string with wrapped in esc seq symbol with similar string" {
     try str1.merge(str2, 3);
     // then:
     try std.testing.expectEqualStrings("###\x1b[7m\x1b[7m!\x1b[m\x1b[m###", str1.bytes.items);
+}
+
+test "merge a string with a lot of esc symbols" {
+    // given:
+    // ###@###
+    var str1 = try String.initParse(std.testing.allocator, "###\x1b[7m\x1b[7m@\x1b[m\x1b[m###");
+    defer str1.deinit();
+    var str2 = try String.initParse(std.testing.allocator, " ! ");
+    defer str2.deinit();
+    // when:
+    try str1.merge(str2, 4);
+    // then:
+    try std.testing.expectEqualStrings("###\x1b[7m\x1b[7m@\x1b[m\x1b[m ! ", str1.bytes.items);
 }
