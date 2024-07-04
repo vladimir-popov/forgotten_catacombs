@@ -5,26 +5,31 @@ const game = @import("game.zig");
 
 const log = std.log.scoped(.collision_system);
 
-pub fn handleCollisions(play_mode: *game.PlayMode) anyerror!void {
-    for (play_mode.session.components.getAll(game.Collision)) |collision| {
+pub fn handleCollisions(session: *game.GameSession) anyerror!void {
+    for (session.components.getAll(game.Collision)) |collision| {
         switch (collision.obstacle) {
             .wall => {},
-            .door => |door| try play_mode.session.components.setToEntity(
+            .door => |door| try session.components.setToEntity(
                 collision.entity,
                 if (door.state == .closed)
-                    game.Action{ .open = door.entity }
+                    game.Action{ .type = .{ .open = door.entity }, .move_points = 10 }
                 else
-                    game.Action{ .close = door.entity },
+                    game.Action{ .type = .{ .close = door.entity }, .move_points = 10 },
             ),
             .enemy => |enemy| {
-                if (play_mode.session.components.getForEntity(collision.entity, game.Health)) |_| {
-                    if (play_mode.session.components.getForEntity(enemy, game.Health)) |_| {
-                        try play_mode.session.components.setToEntity(collision.entity, game.Action{ .hit = enemy });
+                if (session.components.getForEntity(collision.entity, game.Health)) |_| {
+                    if (session.components.getForEntity(enemy, game.Health)) |_| {
+                        if (session.components.getForEntity(session.player, game.MeleeWeapon)) |weapon| {
+                            try session.components.setToEntity(
+                                collision.entity,
+                                game.Action{ .type = .{ .hit = enemy }, .move_points = weapon.move_points },
+                            );
+                        }
                     }
                 }
             },
             .item => {},
         }
     }
-    try play_mode.session.components.removeAll(game.Collision);
+    try session.components.removeAll(game.Collision);
 }

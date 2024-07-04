@@ -51,7 +51,7 @@ pub fn deinit(self: *Self) void {
 pub fn run(self: *Self, game_session: anytype) !void {
     handleWindowResize(0);
     while (!self.isExit()) {
-        try game_session.*.tick();
+        try game_session.tick();
         try self.writeBuffer(tty.Display.writer);
     }
 }

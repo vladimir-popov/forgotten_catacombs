@@ -15,6 +15,13 @@ pub const Sprite = struct {
     pub fn deinit(_: *@This()) void {}
 };
 
+pub const Description = struct {
+    name: []const u8,
+    description: []const u8 = "",
+
+    pub fn deinit(_: *@This()) void {}
+};
+
 pub const Door = enum {
     opened,
     closed,
@@ -37,24 +44,29 @@ pub const Animation = struct {
 
 /// The intension to perform an action.
 /// Describes what some entity is going to do.
-pub const Action = union(enum) {
+pub const Action = struct {
     pub const Move = struct {
         direction: p.Direction,
         keep_moving: bool = false,
     };
+    pub const Type = union(enum) {
+        /// Skip the round
+        wait,
+        /// An entity is going to move in the direction
+        move: Move,
+        /// An entity is going to open a door
+        open: game.Entity,
+        /// An entity is going to close a door
+        close: game.Entity,
+        /// An entity which should be hit
+        hit: game.Entity,
+        /// An entity is going to take the item
+        take: game.Entity,
+    };
 
-    /// Skip the round
-    wait,
-    /// An entity is going to move in the direction
-    move: Move,
-    /// An entity is going to open a door
-    open: game.Entity,
-    /// An entity is going to close a door
-    close: game.Entity,
-    /// An entity is going to hit the enemy
-    hit: game.Entity,
-    /// An entity is going to take the item
-    take: game.Entity,
+    type: Type,
+
+    move_points: u8,
 
     pub fn deinit(_: *@This()) void {}
 };
@@ -79,23 +91,45 @@ pub const Collision = struct {
 };
 
 pub const Health = struct {
-    hp: i16,
+    total: u8,
+    current: i16,
     pub fn deinit(_: *@This()) void {}
 };
 
 /// This is only **intension** to make a damage.
 /// The real damage will be counted in the DamageSystem
 pub const Damage = struct {
-    /// Who should be harmed
-    entity: game.Entity,
     /// Damage amount
     amount: u8,
     pub fn deinit(_: *@This()) void {}
 };
 
-pub const Description = struct {
-    name: []const u8,
-    description: []const u8 = "",
+/// Move points are used to calculate a turn of the entity.
+/// Any could be done only if the entity has enough move points.
+pub const MovePoints = struct {
+    /// Current count of move points of the entity
+    count: u8,
+    /// How many move points are needed for the single action
+    speed: u8 = 10,
+
+    pub inline fn subtract(self: *MovePoints, amount: u8) void {
+        if (amount > self.count) self.count = 0 else self.count -= amount;
+    }
+
+    pub inline fn add(self: *MovePoints, amount: u8) void {
+        if (255 - self.count < amount) self.count += amount;
+    }
+
+    pub fn deinit(_: *@This()) void {}
+};
+
+pub const MeleeWeapon = struct {
+    max_damage: u8,
+    move_points: u8,
+
+    pub fn damage(self: MeleeWeapon, rand: std.Random) Damage {
+        return .{ .amount = rand.uintAtMost(u8, self.max_damage) };
+    }
 
     pub fn deinit(_: *@This()) void {}
 };
@@ -109,4 +143,6 @@ pub const Components = union {
     health: Health,
     damage: Damage,
     collision: Collision,
+    move_points: MovePoints,
+    melee: MeleeWeapon,
 };

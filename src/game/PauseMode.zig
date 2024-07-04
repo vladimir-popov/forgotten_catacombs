@@ -34,17 +34,23 @@ pub fn deinit(self: *PauseMode) void {
     self.entities_on_screen.deinit();
 }
 
-pub fn handleInput(self: *PauseMode, buttons: game.Buttons) !void {
-    switch (buttons.code) {
-        game.Buttons.A => {},
-        game.Buttons.B => {
-            self.session.play();
-        },
-        game.Buttons.Left, game.Buttons.Right, game.Buttons.Up, game.Buttons.Down => {
-            self.chooseNextEntity(buttons.toDirection().?);
-        },
-        else => {},
+pub fn tick(self: *PauseMode) anyerror!void {
+    // Nothing should happened until the player pushes a button
+    if (try self.session.runtime.readPushedButtons()) |btn| {
+        switch (btn.code) {
+            game.Buttons.A => {},
+            game.Buttons.B => {
+                self.session.play();
+            },
+            game.Buttons.Left, game.Buttons.Right, game.Buttons.Up, game.Buttons.Down => {
+                self.chooseNextEntity(btn.toDirection().?);
+            },
+            else => {},
+        }
     }
+    // rendering should be independent on input,
+    // to be able to play animations
+    try self.session.render.render(self.session);
 }
 
 pub fn draw(self: PauseMode) !void {

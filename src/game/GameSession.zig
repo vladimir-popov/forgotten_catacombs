@@ -21,29 +21,7 @@ const Mode = union(enum) {
         }
     }
 
-    fn handleInput(mode: *Mode, buttons: game.Buttons) !void {
-        switch (mode.*) {
-            .play => |play_mode| try play_mode.handleInput(buttons),
-            .pause => |*pause_mode| try pause_mode.handleInput(buttons),
-        }
-    }
-
-    fn runSystems(mode: *Mode) !void {
-        return switch (mode.*) {
-            .play => |*play_mode| {
-                for (play_mode.systems) |sys| {
-                    try sys(play_mode);
-                }
-            },
-            .pause => {
-                // for (pause_mode.systems) |sys| {
-                //     try sys(pause_mode);
-                // }
-            },
-        };
-    }
-
-    pub fn draw(mode: *Mode) !void {
+    pub inline fn draw(mode: *Mode) !void {
         switch (mode.*) {
             .play => |play_mode| try play_mode.draw(),
             .pause => |pause_mode| try pause_mode.draw(),
@@ -90,6 +68,14 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     return session;
 }
 
+pub fn destroy(self: *Self) void {
+    self.entities.deinit();
+    self.components.deinit();
+    self.dungeon.destroy();
+    self.mode.deinit();
+    self.runtime.alloc.destroy(self);
+}
+
 pub fn play(session: *Self) void {
     const target = switch (session.mode) {
         .pause => |pause_mode| pause_mode.target,
@@ -104,28 +90,11 @@ pub fn pause(session: *Self) !void {
     session.mode = .{ .pause = try game.PauseMode.init(session) };
 }
 
-pub fn destroy(self: *Self) void {
-    self.entities.deinit();
-    self.components.deinit();
-    self.dungeon.destroy();
-    self.mode.deinit();
-    self.runtime.alloc.destroy(self);
-}
-
-pub fn tick(self: *Self) anyerror!void {
-    // Nothing should happened until the player pushes a button
-    if (try self.runtime.readPushedButtons()) |btn| {
-        try self.mode.handleInput(btn);
-        // TODO add speed score for actions
-        // We should not run a new action until finish previous one
-        while (self.components.getForEntity(self.player, game.Action)) |_| {
-            try self.mode.runSystems();
-            try self.render.render(self);
-        }
+pub inline fn tick(session: *Self) !void {
+    switch (session.mode) {
+        .play => |*play_mode| try play_mode.tick(),
+        .pause => |*pause_mode| try pause_mode.tick(),
     }
-    // rendering should be independent on input,
-    // to be able to play animations
-    try self.render.render(self);
 }
 
 pub fn entityAt(session: *game.GameSession, place: p.Point) ?game.Entity {
@@ -170,7 +139,7 @@ fn addClosedDoor(
     const door = try entities.newEntity();
     try components.setToEntity(door, game.Door.closed);
     try components.setToEntity(door, game.Sprite{ .position = door_at.*, .codepoint = '+' });
-    try components.setToEntity(door, game.Description{ .name = "Door"});
+    try components.setToEntity(door, game.Description{ .name = "Door" });
 }
 
 fn initPlayer(
@@ -180,8 +149,10 @@ fn initPlayer(
 ) !game.Entity {
     const player = try entities.newEntity();
     try components.setToEntity(player, game.Sprite{ .codepoint = '@', .position = init_position });
-    try components.setToEntity(player, game.Health{ .hp = 100 });
-    try components.setToEntity(player, game.Description{ .name = "You"});
+    try components.setToEntity(player, game.Description{ .name = "You" });
+    try components.setToEntity(player, game.Health{ .total = 100, .current = 100 });
+    try components.setToEntity(player, game.MeleeWeapon{ .max_damage = 3, .move_points = 10 });
+    try components.setToEntity(player, game.MovePoints{ .speed = 10, .count = 10 });
     return player;
 }
 
@@ -194,7 +165,9 @@ fn addRat(
         const rat = try entities.newEntity();
         try components.setToEntity(rat, game.Sprite{ .codepoint = 'r', .position = position });
         try components.setToEntity(rat, game.Description{ .name = "Rat" });
-        try components.setToEntity(rat, game.Health{ .hp = 10 });
+        try components.setToEntity(rat, game.Health{ .total = 10, .current = 10 });
+        try components.setToEntity(rat, game.MeleeWeapon{ .max_damage = 3, .move_points = 5 });
+        try components.setToEntity(rat, game.MovePoints{ .speed = 10, .count = 0 });
     }
 }
 

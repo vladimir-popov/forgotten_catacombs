@@ -198,6 +198,10 @@ pub fn ComponentsManager(comptime ComponentsUnion: type) type {
             return @field(self.inner_state.components_map, @typeName(C)).getForEntity(entity);
         }
 
+        pub fn getForEntityUnsafe(self: *const Self, entity: Entity, comptime C: type) *C {
+            return getForEntity(self, entity, C) orelse unreachable;
+        }
+
         /// Adds the component of the type `C` to the entity, or replace existed.
         pub fn setToEntity(self: *Self, entity: Entity, component: anytype) !void {
             const C = @TypeOf(component);
@@ -306,6 +310,25 @@ pub fn ComponentsQuery(comptime ComponentsUnion: type) type {
         const Self = @This();
         entities: *const EntitiesManager,
         components: *const ComponentsManager(ComponentsUnion),
+
+        pub fn Query1(comptime Cmp: type) type {
+            return struct {
+                components: *ArraySet(Cmp),
+                idx: u8 = 0,
+
+                pub fn next(self: *@This()) ?struct { Entity, *Cmp } {
+                    while (self.idx < self.components.components.items.len) : (self.idx += 1) {
+                        if (self.components.index_entity.get(self.idx)) |entity|
+                            return .{ entity, &self.components.components.items[self.idx] };
+                    }
+                    return null;
+                }
+            };
+        }
+
+        pub fn get(self: *const Self, comptime Cmp: type) Query1(Cmp) {
+            return .{ .component = self.components.arrayOf(Cmp) };
+        }
 
         pub fn Query2(comptime Cmp1: type, Cmp2: type) type {
             return struct {

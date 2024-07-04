@@ -32,7 +32,7 @@ pub fn main() !void {
     var generator = try DungeonsGenerator.create(runtime.any());
     defer generator.destroy();
 
-    try runtime.run(&generator);
+    try runtime.run(generator);
 }
 
 const DungeonsGenerator = struct {

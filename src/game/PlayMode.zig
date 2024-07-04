@@ -4,6 +4,7 @@ const algs = @import("algs_and_types");
 const p = algs.primitives;
 
 const Render = @import("Render.zig");
+const AI = @import("AI.zig");
 const ActionSystem = @import("ActionSystem.zig");
 const CollisionSystem = @import("CollisionSystem.zig");
 const DamageSystem = @import("DamageSystem.zig");
@@ -20,12 +21,6 @@ const PlayMode = @This();
 const System = *const fn (play_mode: *PlayMode) anyerror!void;
 
 session: *game.GameSession,
-systems: [4]System = .{
-    ActionSystem.doActions,
-    CollisionSystem.handleCollisions,
-    DamageSystem.handleDamage,
-    updateTarget,
-},
 /// An entity in player's focus to which a quick action can be applied
 target_entity: ?EntityInFocus = null,
 
@@ -41,7 +36,7 @@ pub fn init(session: *game.GameSession, target: game.Entity) PlayMode {
     return mode;
 }
 
-fn reachable(session: *game.GameSession, target: game.Entity, player_position: p.Point) ?game.Entity {
+inline fn reachable(session: *game.GameSession, target: game.Entity, player_position: p.Point) ?game.Entity {
     if (session.player == target) return null;
     if (session.components.getForEntity(target, game.Sprite)) |s| {
         if (s.position.near(player_position)) return target;
@@ -49,27 +44,63 @@ fn reachable(session: *game.GameSession, target: game.Entity, player_position: p
     return null;
 }
 
-pub fn handleInput(self: PlayMode, buttons: game.Buttons) !void {
-    switch (buttons.code) {
-        game.Buttons.A => {
-            var quick_action: game.Action = .wait;
-            if (self.target_entity) |target| {
-                if (target.quick_action) |qa| quick_action = qa;
-            }
-            try self.session.components.setToEntity(self.session.player, quick_action);
-        },
-        game.Buttons.B => {
-            try self.session.pause();
-        },
-        game.Buttons.Left, game.Buttons.Right, game.Buttons.Up, game.Buttons.Down => {
-            try self.session.components.setToEntity(self.session.player, game.Action{
-                .move = .{
-                    .direction = buttons.toDirection().?,
-                    .keep_moving = false, // btn.state == .double_pressed,
-                },
-            });
-        },
-        else => {},
+pub fn tick(self: *PlayMode) anyerror!void {
+    if (self.session.components.getAll(game.Action).len > 0) {
+        try ActionSystem.doActions(self.session);
+        try CollisionSystem.handleCollisions(self.session);
+        try DamageSystem.handleDamage(self.session);
+        try updateTarget(self);
+    } else {
+        if (self.isPlayerTurn()) {
+            try self.handleInput();
+        } else {
+            updateMovePoints(self.session);
+            try AI.doMove(self);
+        }
+    }
+    try self.session.render.render(self.session);
+}
+
+inline fn isPlayerTurn(self: PlayMode) bool {
+    if (self.session.components.getForEntity(self.session.player, game.MovePoints)) |mp| {
+        return mp.count >= 10;
+    } else {
+        return false;
+    }
+}
+
+fn updateMovePoints(session: *game.GameSession) void {
+    for (session.components.getAll(game.MovePoints)) |*mp| {
+        mp.count += 1;
+    }
+}
+
+pub fn handleInput(self: PlayMode) !void {
+    if (try self.session.runtime.readPushedButtons()) |buttons| {
+        switch (buttons.code) {
+            game.Buttons.A => {
+                var quick_action: game.Action = .{ .type = .wait, .move_points = 10 };
+                if (self.target_entity) |target| {
+                    if (target.quick_action) |qa| quick_action = qa;
+                }
+                try self.session.components.setToEntity(self.session.player, quick_action);
+            },
+            game.Buttons.B => {
+                try self.session.pause();
+            },
+            game.Buttons.Left, game.Buttons.Right, game.Buttons.Up, game.Buttons.Down => {
+                try self.session.components.setToEntity(self.session.player, game.Action{
+                    .type = .{
+                        .move = .{
+                            .direction = buttons.toDirection().?,
+                            .keep_moving = false, // btn.state == .double_pressed,
+                        },
+                    },
+                    .move_points = 10,
+                });
+            },
+            else => {},
+        }
     }
 }
 
@@ -92,7 +123,7 @@ fn highlightEntityInFocus(session: *const game.GameSession, entity: game.Entity)
 }
 
 fn drawQuickAction(session: *const game.GameSession, quick_action: game.Action) !void {
-    switch (quick_action) {
+    switch (quick_action.type) {
         .open => |door| if (session.components.getForEntity(door, game.Sprite)) |s| {
             try drawLabelAndHighlightQuickActionTarget(session, "Open", s);
         },
@@ -126,20 +157,6 @@ fn drawLabelAndHighlightQuickActionTarget(
     const prompt_position = p.Point{ .row = game.DISPLPAY_ROWS, .col = game.DISPLAY_DUNG_COLS + 2 };
     try session.runtime.drawLabel(label, prompt_position);
     try session.runtime.drawSprite(&session.screen, sprite, .inverted);
-}
-
-pub fn openDoor(self: *PlayMode, door: game.Entity) !void {
-    if (self.session.components.getForEntity(door, game.Sprite)) |s| {
-        try self.session.components.setToEntity(door, game.Door.opened);
-        try self.session.components.setToEntity(door, game.Sprite{ .position = s.position, .codepoint = '\'' });
-    }
-}
-
-pub fn closeDoor(self: *PlayMode, door: game.Entity) !void {
-    if (self.session.components.getForEntity(door, game.Sprite)) |s| {
-        try self.session.components.setToEntity(door, game.Door.closed);
-        try self.session.components.setToEntity(door, game.Sprite{ .position = s.position, .codepoint = '+' });
-    }
 }
 
 fn updateTarget(self: *PlayMode) anyerror!void {
@@ -183,7 +200,7 @@ fn keepEntityInFocus(self: *PlayMode) bool {
             if (session.components.getForEntity(target.entity, game.Sprite)) |target_sprite| {
                 if (player_position.near(target_sprite.position)) {
                     // handle a case when player entered to the door
-                    switch (qa) {
+                    switch (qa.type) {
                         .open => |door| if (session.components.getForEntity(door, game.Door)) |door_state| {
                             if (door_state.* == .closed and !player_position.eql(target_sprite.position)) return true;
                         },
@@ -211,16 +228,21 @@ fn calculateQuickActionForTarget(
     if (self.session.components.getForEntity(target_entity, game.Sprite)) |target_sprite| {
         if (player_position.near(target_sprite.position)) {
             if (self.session.components.getForEntity(target_entity, game.Health)) |_| {
-                self.target_entity.?.quick_action = .{ .hit = target_entity };
+                const weapon = self.session.components.getForEntityUnsafe(self.session.player, game.MeleeWeapon);
+                self.target_entity.?.quick_action = .{
+                    .type = .{ .hit = target_entity },
+                    .move_points = weapon.move_points,
+                };
                 return;
             }
             if (self.session.components.getForEntity(target_entity, game.Door)) |door| {
-                if (!player_position.eql(target_sprite.position))
+                if (!player_position.eql(target_sprite.position)) {
+                    const mp = self.session.components.getForEntityUnsafe(self.session.player, game.MovePoints);
                     self.target_entity.?.quick_action = switch (door.*) {
-                        .opened => .{ .close = target_entity },
-                        .closed => .{ .open = target_entity },
+                        .opened => .{ .type = .{ .close = target_entity }, .move_points = mp.speed },
+                        .closed => .{ .type = .{ .open = target_entity }, .move_points = mp.speed },
                     };
-                return;
+                }
             }
         }
     }

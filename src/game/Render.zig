@@ -47,7 +47,7 @@ pub fn render(self: *Self, session: *game.GameSession) anyerror!void {
     if (session.components.getForEntity(session.player, game.Health)) |health| {
         var buf = [_]u8{0} ** game.STATS_COLS;
         try session.runtime.drawLabel(
-            try std.fmt.bufPrint(&buf, "HP: {d}", .{health.hp}),
+            try std.fmt.bufPrint(&buf, "HP: {d}", .{health.current}),
             .{ .row = 2, .col = game.DISPLAY_DUNG_COLS + 2 },
         );
     }
@@ -62,7 +62,7 @@ pub fn drawEntityName(session: *const game.GameSession, name: []const u8) !void 
 
 pub fn drawEnemyHP(session: *const game.GameSession, hp: *const game.Health) !void {
     var buf: [3]u8 = undefined;
-    const len = std.fmt.formatIntBuf(&buf, hp.hp, 10, .lower, .{});
+    const len = std.fmt.formatIntBuf(&buf, hp.current, 10, .lower, .{});
     try session.runtime.drawLabel(buf[0..len], .{
         .row = 6,
         .col = game.DISPLAY_DUNG_COLS + 2,
