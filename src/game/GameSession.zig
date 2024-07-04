@@ -91,8 +91,12 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
 }
 
 pub fn play(session: *Self) void {
+    const target = switch (session.mode) {
+        .pause => |pause_mode| pause_mode.target,
+        else => session.player,
+    };
     session.mode.deinit();
-    session.mode = .{ .play = game.PlayMode.init(session) };
+    session.mode = .{ .play = game.PlayMode.init(session, target) };
 }
 
 pub fn pause(session: *Self) !void {
