@@ -65,6 +65,23 @@ pub const Point = struct {
         }
     }
 
+    pub inline fn moveNTimes(point: *Point, direction: Direction, n: u8) void {
+        switch (direction) {
+            .up => if (point.row >= n) {
+                point.row -= n;
+            },
+            .down => if (point.row <= (255 - n)) {
+                point.row += n;
+            },
+            .left => if (point.col >= n) {
+                point.col -= n;
+            },
+            .right => if (point.col <= (255 - n)) {
+                point.col += n;
+            },
+        }
+    }
+
     pub inline fn eql(self: Point, other: Point) bool {
         return self.row == other.row and self.col == other.col;
     }

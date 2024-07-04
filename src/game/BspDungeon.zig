@@ -196,8 +196,8 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                 @compileError("The function `parse` is for test purpose only");
             }
             const dungeon = try Self.createEmpty(alloc, rand);
-            dungeon.floor = try BitMap.parse('.', str);
-            dungeon.walls = try BitMap.parse('#', str);
+            try dungeon.floor.parse('.', str);
+            try dungeon.walls.parse('#', str);
             return dungeon;
         }
 

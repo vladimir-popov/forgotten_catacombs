@@ -44,7 +44,7 @@ pub fn handleInput(self: PlayMode, buttons: game.Buttons) !void {
             try self.session.components.setToEntity(self.session.player, quick_action);
         },
         game.Buttons.B => {
-            self.session.pause();
+            try self.session.pause();
         },
         game.Buttons.Left, game.Buttons.Right, game.Buttons.Up, game.Buttons.Down => {
             try self.session.components.setToEntity(self.session.player, game.Action{

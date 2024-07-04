@@ -41,3 +41,7 @@ pub const TOTAL_DUNG_COLS: u8 = 100;
 pub const DISPLAY_DUNG_ROWS = STATS_ROWS;
 /// The rows count to display
 pub const DISPLAY_DUNG_COLS = DISPLPAY_COLS - STATS_COLS;
+
+test {
+    std.testing.refAllDecls(@This());
+}

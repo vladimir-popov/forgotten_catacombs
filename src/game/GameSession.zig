@@ -14,6 +14,13 @@ const Mode = union(enum) {
     play: game.PlayMode,
     pause: game.PauseMode,
 
+    fn deinit(mode: *Mode) void {
+        switch (mode.*) {
+            .pause => |*pause_mode| pause_mode.deinit(),
+            else => {},
+        }
+    }
+
     fn handleInput(mode: *Mode, buttons: game.Buttons) !void {
         switch (mode.*) {
             .play => |play_mode| try play_mode.handleInput(buttons),
@@ -84,17 +91,20 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
 }
 
 pub fn play(session: *Self) void {
+    session.mode.deinit();
     session.mode = .{ .play = game.PlayMode.init(session) };
 }
 
-pub fn pause(session: *Self) void {
-    session.mode = .{ .pause = game.PauseMode.init(session) };
+pub fn pause(session: *Self) !void {
+    session.mode.deinit();
+    session.mode = .{ .pause = try game.PauseMode.init(session) };
 }
 
 pub fn destroy(self: *Self) void {
     self.entities.deinit();
     self.components.deinit();
     self.dungeon.destroy();
+    self.mode.deinit();
     self.runtime.alloc.destroy(self);
 }
 
