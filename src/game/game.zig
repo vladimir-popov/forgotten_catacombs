@@ -2,9 +2,6 @@ const std = @import("std");
 const ecs = @import("ecs");
 
 pub usingnamespace @import("components.zig");
-pub usingnamespace @import("ActionSystem.zig");
-pub usingnamespace @import("CollisionSystem.zig");
-pub usingnamespace @import("DamageSystem.zig");
 
 pub const AnyRuntime = @import("AnyRuntime.zig");
 pub const Buttons = @import("Buttons.zig");
@@ -15,6 +12,8 @@ pub const Dungeon = @import("BspDungeon.zig").BspDungeon(TOTAL_DUNG_ROWS, TOTAL_
 // pub const Dungeon = @import("BspDungeon.zig").BspDungeon(DISPLPAY_ROWS, DISPLPAY_COLS);
 
 pub const GameSession = @import("GameSession.zig");
+pub const PlayMode = @import("PlayMode.zig");
+pub const PauseMode = @import("PauseMode.zig");
 
 pub const RENDER_DELAY_MS = 150;
 

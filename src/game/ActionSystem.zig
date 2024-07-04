@@ -6,29 +6,29 @@ const game = @import("game.zig");
 const log = std.log.scoped(.action_system);
 
 /// Handles intentions to do some actions
-pub fn doActions(session: *game.GameSession) anyerror!void {
-    var itr = session.query.get2(game.Action, game.Sprite);
+pub fn doActions(play_mode: *game.PlayMode) anyerror!void {
+    var itr = play_mode.session.query.get2(game.Action, game.Sprite);
     while (itr.next()) |components| {
         const actor_entity = components[0];
         const actor_action = components[1];
         const actor_sprite = components[2];
         switch (actor_action.*) {
-            .move => |*move| try handleMoveAction(session, actor_entity, actor_sprite, move),
-            .open => |door| try session.openDoor(door),
-            .close => |door| try session.closeDoor(door),
+            .move => |*move| try handleMoveAction(play_mode.session, actor_entity, actor_sprite, move),
+            .open => |door| try play_mode.openDoor(door),
+            .close => |door| try play_mode.closeDoor(door),
             .hit => |enemy| {
-                try session.components.setToEntity(
+                try play_mode.session.components.setToEntity(
                     enemy,
                     game.Damage{
                         .entity = enemy,
-                        .amount = session.runtime.rand.uintLessThan(u8, 3),
+                        .amount = play_mode.session.runtime.rand.uintLessThan(u8, 3),
                     },
                 );
-                session.target_entity = .{ .entity = enemy };
+                play_mode.target_entity = .{ .entity = enemy };
             },
             else => {}, // TODO do not ignore other actions
         }
-        try session.components.removeFromEntity(actor_entity, game.Action);
+        try play_mode.session.components.removeFromEntity(actor_entity, game.Action);
     }
 }
 

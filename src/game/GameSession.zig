@@ -5,22 +5,43 @@ const ecs = @import("ecs");
 const game = @import("game.zig");
 
 const Render = @import("Render.zig");
-const InputHandler = @import("InputHandler.zig");
 
 const log = std.log.scoped(.GameSession);
 
 const Self = @This();
 
-const System = *const fn (game: *Self) anyerror!void;
+const Mode = union(enum) {
+    play: game.PlayMode,
+    pause: game.PauseMode,
 
-const State = enum {
-    play,
-    pause,
-};
+    fn handleInput(mode: *Mode, buttons: game.Buttons) !void {
+        switch (mode.*) {
+            .play => |play_mode| try play_mode.handleInput(buttons),
+            .pause => |*pause_mode| try pause_mode.handleInput(buttons),
+        }
+    }
 
-const EntityInFocus = struct {
-    entity: game.Entity,
-    quick_action: ?game.Action = null,
+    fn runSystems(mode: *Mode) !void {
+        return switch (mode.*) {
+            .play => |*play_mode| {
+                for (play_mode.systems) |sys| {
+                    try sys(play_mode);
+                }
+            },
+            .pause => {
+                // for (pause_mode.systems) |sys| {
+                //     try sys(pause_mode);
+                // }
+            },
+        };
+    }
+
+    pub fn draw(mode: *Mode) !void {
+        switch (mode.*) {
+            .play => |play_mode| try play_mode.draw(),
+            .pause => |pause_mode| try pause_mode.draw(),
+        }
+    }
 };
 
 /// Playdate or terminal
@@ -33,18 +54,14 @@ entities: ecs.EntitiesManager,
 components: ecs.ComponentsManager(game.Components),
 /// Aggregates requests of few components for the same entities at once
 query: ecs.ComponentsQuery(game.Components) = undefined,
-/// Game mechanics
-systems: std.ArrayList(System),
 /// Visible area
 screen: game.Screen,
-/// The current state of the game
-state: State = .play,
 /// The pointer to the current dungeon
 dungeon: *game.Dungeon,
 /// Entity of the player
 player: game.Entity = undefined,
-/// An entity in player's focus to which a quick action can be applied
-target_entity: ?EntityInFocus = null,
+/// The current mode of the game
+mode: Mode = undefined,
 
 pub fn create(runtime: game.AnyRuntime) !*Self {
     const session = try runtime.alloc.create(Self);
@@ -54,7 +71,6 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
         .screen = game.Screen.init(game.DISPLAY_DUNG_ROWS, game.DISPLAY_DUNG_COLS, game.Dungeon.Region),
         .entities = try ecs.EntitiesManager.init(runtime.alloc),
         .components = try ecs.ComponentsManager(game.Components).init(runtime.alloc),
-        .systems = std.ArrayList(System).init(runtime.alloc),
         .dungeon = try game.Dungeon.createRandom(runtime.alloc, runtime.rand),
     };
     session.query = .{ .entities = &session.entities, .components = &session.components };
@@ -62,21 +78,22 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     session.player = player_and_position[0];
     session.screen.centeredAround(player_and_position[1]);
 
-    // Register systems:
-    try session.systems.append(game.doActions);
-    try session.systems.append(game.handleCollisions);
-    try session.systems.append(game.handleDamage);
-    try session.systems.append(updateTarget);
+    session.play();
 
-    // for cases when player appears near entities
-    session.findTarget();
     return session;
+}
+
+pub fn play(session: *Self) void {
+    session.mode = .{ .play = game.PlayMode.init(session) };
+}
+
+pub fn pause(session: *Self) void {
+    session.mode = .{ .pause = game.PauseMode.init(session) };
 }
 
 pub fn destroy(self: *Self) void {
     self.entities.deinit();
     self.components.deinit();
-    self.systems.deinit();
     self.dungeon.destroy();
     self.runtime.alloc.destroy(self);
 }
@@ -84,13 +101,11 @@ pub fn destroy(self: *Self) void {
 pub fn tick(self: *Self) anyerror!void {
     // Nothing should happened until the player pushes a button
     if (try self.runtime.readPushedButtons()) |btn| {
-        try InputHandler.handleInput(self, btn);
+        try self.mode.handleInput(btn);
         // TODO add speed score for actions
         // We should not run a new action until finish previous one
         while (self.components.getForEntity(self.player, game.Action)) |_| {
-            for (self.systems.items) |system| {
-                try system(self);
-            }
+            try self.mode.runSystems();
             try self.render.render(self);
         }
     }
@@ -111,20 +126,6 @@ pub fn entityAt(session: *game.GameSession, place: p.Point) ?game.Entity {
 pub fn removeEntity(self: *Self, entity: game.Entity) !void {
     try self.components.removeAllForEntity(entity);
     self.entities.removeEntity(entity);
-}
-
-pub fn openDoor(self: *Self, door: game.Entity) !void {
-    if (self.components.getForEntity(door, game.Sprite)) |s| {
-        try self.components.setToEntity(door, game.Door.opened);
-        try self.components.setToEntity(door, game.Sprite{ .position = s.position, .codepoint = '\'' });
-    }
-}
-
-pub fn closeDoor(self: *Self, door: game.Entity) !void {
-    if (self.components.getForEntity(door, game.Sprite)) |s| {
-        try self.components.setToEntity(door, game.Door.closed);
-        try self.components.setToEntity(door, game.Sprite{ .position = s.position, .codepoint = '+' });
-    }
 }
 
 // this is public to reuse in the DungeonsGenerator
@@ -194,91 +195,4 @@ fn randomEmptyPlace(dungeon: *game.Dungeon, components: *const ecs.ComponentsMan
         if (is_empty) return place;
     }
     return null;
-}
-
-fn updateTarget(session: *Self) anyerror!void {
-    if (!session.keepEntityInFocus())
-        session.findTarget();
-}
-
-fn findTarget(session: *Self) void {
-    const player_position = session.components.getForEntity(session.player, game.Sprite).?.position;
-    // TODO improve:
-    // Check the nearest entities:
-    const region = p.Region{
-        .top_left = .{
-            .row = @max(player_position.row - 1, 1),
-            .col = @max(player_position.col - 1, 1),
-        },
-        .rows = 3,
-        .cols = 3,
-    };
-    const sprites = session.components.arrayOf(game.Sprite);
-    for (sprites.components.items, 0..) |*sprite, idx| {
-        if (region.containsPoint(sprite.position)) {
-            if (sprites.index_entity.get(@intCast(idx))) |entity| {
-                if (session.player != entity) {
-                    session.target_entity = .{ .entity = entity, .quick_action = null };
-                    session.calculateQuickActionForTarget(player_position, &session.target_entity.?);
-                    return;
-                }
-            }
-        }
-    }
-}
-
-/// Returns true if the focus is kept
-fn keepEntityInFocus(session: *Self) bool {
-    const player_position = session.components.getForEntity(session.player, game.Sprite).?.position;
-    if (session.target_entity) |*target| {
-        // Check if we can keep the current quick action and target
-        if (target.quick_action) |qa| {
-            if (session.components.getForEntity(target.entity, game.Sprite)) |target_sprite| {
-                if (player_position.near(target_sprite.position)) {
-                    // handle a case when player entered to the door
-                    switch (qa) {
-                        .open => |door| if (session.components.getForEntity(door, game.Door)) |door_state| {
-                            if (door_state.* == .closed and !player_position.eql(target_sprite.position)) return true;
-                        },
-                        .close => |door| if (session.components.getForEntity(door, game.Door)) |door_state| {
-                            if (door_state.* == .opened and !player_position.eql(target_sprite.position)) return true;
-                        },
-                        else => return true,
-                    }
-                }
-            }
-        } else {
-            session.calculateQuickActionForTarget(player_position, target);
-            if (session.target_entity.?.quick_action != null) return true;
-        }
-    }
-    session.target_entity = null;
-    return false;
-}
-
-fn calculateQuickActionForTarget(
-    session: *Self,
-    player_position: p.Point,
-    target_entity: *EntityInFocus,
-) void {
-    if (session.components.getForEntity(target_entity.entity, game.Sprite)) |target_sprite| {
-        if (player_position.near(target_sprite.position)) {
-            if (session.components.getForEntity(target_entity.entity, game.Health)) |_| {
-                target_entity.quick_action = .{ .hit = target_entity.entity };
-                return;
-            }
-            if (session.components.getForEntity(target_entity.entity, game.Door)) |door| {
-                if (!player_position.eql(target_sprite.position))
-                    target_entity.quick_action = switch (door.*) {
-                        .opened => .{ .close = target_entity.entity },
-                        .closed => .{ .open = target_entity.entity },
-                    };
-                return;
-            }
-        }
-    }
-}
-
-pub fn chooseNextEntity(session: *Self) void {
-    _ = session;
 }
