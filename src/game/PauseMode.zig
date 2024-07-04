@@ -3,6 +3,8 @@ const game = @import("game.zig");
 const algs = @import("algs_and_types");
 const p = algs.primitives;
 
+const Render = @import("Render.zig");
+
 const log = std.log.scoped(.pause_mode);
 
 const PauseMode = @This();
@@ -45,9 +47,15 @@ pub fn handleInput(self: *PauseMode, buttons: game.Buttons) !void {
     }
 }
 
-pub fn draw(pause_mode: PauseMode) !void {
-    try pause_mode.session.runtime.drawLabel("pause", .{ .row = 1, .col = game.DISPLAY_DUNG_COLS + 2 });
-    try highlightEntityInFocus(pause_mode.session, pause_mode.target);
+pub fn draw(self: PauseMode) !void {
+    try self.session.runtime.drawLabel("pause", .{ .row = 1, .col = game.DISPLAY_DUNG_COLS + 2 });
+    try highlightEntityInFocus(self.session, self.target);
+    if (self.session.components.getForEntity(self.target, game.Description)) |description| {
+        try Render.drawEntityName(self.session, description.name);
+    }
+    if (self.session.components.getForEntity(self.target, game.Health)) |hp| {
+        try Render.drawEnemyHP(self.session, hp);
+    }
 }
 
 fn highlightEntityInFocus(session: *const game.GameSession, entity: game.Entity) !void {

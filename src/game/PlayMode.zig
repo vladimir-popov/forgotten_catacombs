@@ -3,6 +3,7 @@ const game = @import("game.zig");
 const algs = @import("algs_and_types");
 const p = algs.primitives;
 
+const Render = @import("Render.zig");
 const ActionSystem = @import("ActionSystem.zig");
 const CollisionSystem = @import("CollisionSystem.zig");
 const DamageSystem = @import("DamageSystem.zig");
@@ -105,18 +106,10 @@ fn drawQuickAction(session: *const game.GameSession, quick_action: game.Action) 
             // Draw details about the enemy:
             if (session.components.getForEntity(enemy, game.Sprite)) |sprite| {
                 if (session.components.getForEntity(enemy, game.Health)) |hp| {
-                    if (session.components.getForEntity(enemy, game.Description)) |desc| {
+                    if (session.components.getForEntity(enemy, game.Description)) |description| {
                         try drawLabelAndHighlightQuickActionTarget(session, "Attack", sprite);
-                        try session.runtime.drawLabel(desc.name, .{
-                            .row = 5,
-                            .col = game.DISPLAY_DUNG_COLS + 2,
-                        });
-                        var buf: [2]u8 = undefined;
-                        const len = std.fmt.formatIntBuf(&buf, hp.hp, 10, .lower, .{});
-                        try session.runtime.drawLabel(buf[0..len], .{
-                            .row = 6,
-                            .col = game.DISPLAY_DUNG_COLS + 2,
-                        });
+                        try Render.drawEntityName(session, description.name);
+                        try Render.drawEnemyHP(session, hp);
                     }
                 }
             }

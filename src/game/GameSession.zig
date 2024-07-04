@@ -170,6 +170,7 @@ fn addClosedDoor(
     const door = try entities.newEntity();
     try components.setToEntity(door, game.Door.closed);
     try components.setToEntity(door, game.Sprite{ .position = door_at.*, .codepoint = '+' });
+    try components.setToEntity(door, game.Description{ .name = "Door"});
 }
 
 fn initPlayer(
@@ -180,6 +181,7 @@ fn initPlayer(
     const player = try entities.newEntity();
     try components.setToEntity(player, game.Sprite{ .codepoint = '@', .position = init_position });
     try components.setToEntity(player, game.Health{ .hp = 100 });
+    try components.setToEntity(player, game.Description{ .name = "You"});
     return player;
 }
 

@@ -52,3 +52,19 @@ pub fn render(self: *Self, session: *game.GameSession) anyerror!void {
         );
     }
 }
+
+pub fn drawEntityName(session: *const game.GameSession, name: []const u8) !void {
+    try session.runtime.drawLabel(name, .{
+        .row = 5,
+        .col = game.DISPLAY_DUNG_COLS + 2,
+    });
+}
+
+pub fn drawEnemyHP(session: *const game.GameSession, hp: *const game.Health) !void {
+    var buf: [3]u8 = undefined;
+    const len = std.fmt.formatIntBuf(&buf, hp.hp, 10, .lower, .{});
+    try session.runtime.drawLabel(buf[0..len], .{
+        .row = 6,
+        .col = game.DISPLAY_DUNG_COLS + 2,
+    });
+}
