@@ -30,7 +30,7 @@ pub fn render(self: *Self, session: *game.GameSession) anyerror!void {
         }
     }
     // Draw mode's specifics
-    try session.mode.draw();
+    try session.drawMode();
     // Draw animations
     for (session.components.getAll(game.Animation)) |*animation| {
         if (animation.frames.len > 0 and screen.region.containsPoint(animation.position)) {

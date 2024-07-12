@@ -6,16 +6,19 @@ const game = @import("game.zig");
 const log = std.log.scoped(.action_system);
 
 /// Handles intentions to do some actions
-pub fn doActions(session: *game.GameSession) anyerror!void {
-    var itr = session.query.get3(game.Action, game.Sprite, game.MovePoints);
+pub fn doActions(session: *game.GameSession) !u8 {
+    var used_move_points: u8 = 0;
+    var itr = session.query.get2(game.Action, game.Sprite);
     while (itr.next()) |components| {
         const actor_entity = components[0];
         const actor_action = components[1];
         const actor_sprite = components[2];
-        const actor_mp = components[3];
         switch (actor_action.type) {
             .move => |*move| if (try handleMoveAction(session, actor_entity, actor_sprite, move)) {
-                actor_mp.subtract(actor_action.move_points);
+                if (session.components.getForEntity(actor_entity, game.MovePoints)) |move_points| {
+                    move_points.subtract(actor_action.move_points);
+                    used_move_points += actor_action.move_points;
+                }
             },
             .open => |door| {
                 if (session.components.getForEntity(door, game.Sprite)) |s| {
@@ -24,7 +27,10 @@ pub fn doActions(session: *game.GameSession) anyerror!void {
                         door,
                         game.Sprite{ .position = s.position, .codepoint = '\'' },
                     );
-                    actor_mp.subtract(actor_action.move_points);
+                    if (session.components.getForEntity(actor_entity, game.MovePoints)) |move_points| {
+                        move_points.subtract(actor_action.move_points);
+                        used_move_points += actor_action.move_points;
+                    }
                 }
             },
             .close => |door| {
@@ -34,7 +40,10 @@ pub fn doActions(session: *game.GameSession) anyerror!void {
                         door,
                         game.Sprite{ .position = s.position, .codepoint = '+' },
                     );
-                    actor_mp.subtract(actor_action.move_points);
+                    if (session.components.getForEntity(actor_entity, game.MovePoints)) |move_points| {
+                        move_points.subtract(actor_action.move_points);
+                        used_move_points += actor_action.move_points;
+                    }
                 }
             },
             .hit => |enemy| {
@@ -43,13 +52,20 @@ pub fn doActions(session: *game.GameSession) anyerror!void {
                         enemy,
                         weapon.damage(session.runtime.rand),
                     );
-                    actor_mp.subtract(actor_action.move_points);
+                    if (session.components.getForEntity(actor_entity, game.MovePoints)) |move_points| {
+                        move_points.subtract(actor_action.move_points);
+                        used_move_points += actor_action.move_points;
+                    }
                 }
             },
-            else => actor_mp.subtract(actor_mp.speed),
+            else => if (session.components.getForEntity(actor_entity, game.MovePoints)) |move_points| {
+                move_points.subtract(actor_action.move_points);
+                used_move_points += actor_action.move_points;
+            },
         }
         try session.components.removeFromEntity(actor_entity, game.Action);
     }
+    return used_move_points;
 }
 
 fn handleMoveAction(

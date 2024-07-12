@@ -317,7 +317,8 @@ pub fn ComponentsQuery(comptime ComponentsUnion: type) type {
                 idx: u8 = 0,
 
                 pub fn next(self: *@This()) ?struct { Entity, *Cmp } {
-                    while (self.idx < self.components.components.items.len) : (self.idx += 1) {
+                    while (self.idx < self.components.components.items.len) {
+                        defer self.idx += 1;
                         if (self.components.index_entity.get(self.idx)) |entity|
                             return .{ entity, &self.components.components.items[self.idx] };
                     }
@@ -327,7 +328,7 @@ pub fn ComponentsQuery(comptime ComponentsUnion: type) type {
         }
 
         pub fn get(self: *const Self, comptime Cmp: type) Query1(Cmp) {
-            return .{ .component = self.components.arrayOf(Cmp) };
+            return .{ .components = self.components.arrayOf(Cmp) };
         }
 
         pub fn Query2(comptime Cmp1: type, Cmp2: type) type {

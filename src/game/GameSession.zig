@@ -10,24 +10,7 @@ const log = std.log.scoped(.GameSession);
 
 const Self = @This();
 
-const Mode = union(enum) {
-    play: game.PlayMode,
-    pause: game.PauseMode,
-
-    fn deinit(mode: *Mode) void {
-        switch (mode.*) {
-            .pause => |*pause_mode| pause_mode.deinit(),
-            else => {},
-        }
-    }
-
-    pub inline fn draw(mode: *Mode) !void {
-        switch (mode.*) {
-            .play => |play_mode| try play_mode.draw(),
-            .pause => |pause_mode| try pause_mode.draw(),
-        }
-    }
-};
+const Mode = enum { play, pause };
 
 /// Playdate or terminal
 runtime: game.AnyRuntime,
@@ -46,7 +29,9 @@ dungeon: *game.Dungeon,
 /// Entity of the player
 player: game.Entity = undefined,
 /// The current mode of the game
-mode: Mode = undefined,
+mode: Mode = .play,
+play_mode: *game.PlayMode = undefined,
+pause_mode: *game.PauseMode = undefined,
 
 pub fn create(runtime: game.AnyRuntime) !*Self {
     const session = try runtime.alloc.create(Self);
@@ -62,9 +47,10 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     const player_and_position = try initLevel(session.dungeon, &session.entities, &session.components);
     session.player = player_and_position[0];
     session.screen.centeredAround(player_and_position[1]);
+    session.play_mode = try game.PlayMode.create(session);
+    session.pause_mode = try game.PauseMode.create(session);
 
     session.play();
-
     return session;
 }
 
@@ -72,28 +58,40 @@ pub fn destroy(self: *Self) void {
     self.entities.deinit();
     self.components.deinit();
     self.dungeon.destroy();
-    self.mode.deinit();
+    self.play_mode.destroy();
+    self.pause_mode.destroy();
     self.runtime.alloc.destroy(self);
 }
 
 pub fn play(session: *Self) void {
-    const target = switch (session.mode) {
-        .pause => |pause_mode| pause_mode.target,
-        else => session.player,
-    };
-    session.mode.deinit();
-    session.mode = .{ .play = game.PlayMode.init(session, target) };
+    var target = session.player;
+    switch (session.mode) {
+        .pause => {
+            target = session.pause_mode.target.entity;
+            session.pause_mode.clear();
+        },
+        else => {},
+    }
+    session.mode = .play;
+    session.play_mode.refresh(target);
 }
 
 pub fn pause(session: *Self) !void {
-    session.mode.deinit();
-    session.mode = .{ .pause = try game.PauseMode.init(session) };
+    session.mode = .pause;
+    try session.pause_mode.refresh();
 }
 
 pub inline fn tick(session: *Self) !void {
     switch (session.mode) {
-        .play => |*play_mode| try play_mode.tick(),
-        .pause => |*pause_mode| try pause_mode.tick(),
+        .play => try session.play_mode.tick(),
+        .pause => try session.pause_mode.tick(),
+    }
+}
+
+pub inline fn drawMode(session: *Self) !void {
+    switch (session.mode) {
+        .play => try session.play_mode.draw(),
+        .pause => try session.pause_mode.draw(),
     }
 }
 

@@ -31,6 +31,18 @@ pub const Direction = enum {
 
 /// The coordinates of a point. Index begins from 1.
 pub const Point = struct {
+    pub const HashContext = struct {
+        pub fn hash(_: HashContext, point: Point) u64 {
+            var res: u64 = @intCast(point.col);
+            res = (res << 8) + point.row;
+            return res;
+        }
+
+        pub fn eql(_: HashContext, x: Point, y: Point) bool {
+            return x.eql(y);
+        }
+    };
+
     row: u8,
     col: u8,
 
@@ -91,6 +103,19 @@ pub const Point = struct {
             @max(self.col, other.col) - @min(self.col, other.col) < 2;
     }
 };
+
+test "Point.HashContext" {
+    // given:
+    var map = std.HashMap(Point, u8, Point.HashContext, 80).init(std.testing.allocator);
+    defer map.deinit();
+    try map.put(.{ .row = 1, .col = 1 }, 1);
+    try map.put(.{ .row = 2, .col = 2 }, 2);
+    try map.put(.{ .row = 3, .col = 3 }, 3);
+    // when:
+    try std.testing.expectEqual(1, map.get(Point{ .row = 1, .col = 1 }));
+    try std.testing.expectEqual(2, map.get(Point{ .row = 2, .col = 2 }));
+    try std.testing.expectEqual(3, map.get(Point{ .row = 3, .col = 3 }));
+}
 
 /// The region described as its top left corner
 /// and count of rows and columns.
