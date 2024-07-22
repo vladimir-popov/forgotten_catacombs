@@ -30,14 +30,25 @@ pub const Door = enum {
 
 pub const Animation = struct {
     pub const Presets = struct {
-        pub const hit: [1]Codepoint = [_]Codepoint{'*'};
+        pub const hit: [3]Codepoint = [_]Codepoint{ 0, 'X', 0 };
         pub const miss: [1]Codepoint = [_]Codepoint{'.'};
     };
 
     /// Frames of the animation. One frame per render circle will be shown.
     frames: []const Codepoint,
-    /// Where the animation should be played
-    position: p.Point,
+    current_frame: u8 = 0,
+    previous_render_time: c_uint = 0,
+    lag: u32 = 0,
+
+    pub fn frame(self: *Animation, now: c_uint) ?Codepoint {
+        self.lag += now - self.previous_render_time;
+        self.previous_render_time = now;
+        if (self.lag > game.RENDER_DELAY_MS) {
+            self.lag = 0;
+            self.current_frame += 1;
+        }
+        return if (self.current_frame <= self.frames.len) self.frames[self.current_frame - 1] else null;
+    }
 
     pub fn deinit(_: *@This()) void {}
 };

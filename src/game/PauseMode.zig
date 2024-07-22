@@ -64,7 +64,7 @@ pub fn tick(self: *PauseMode) anyerror!void {
     }
     // rendering should be independent on input,
     // to be able to play animations
-    try self.session.render.render(self.session);
+    try Render.render(self.session);
 }
 
 pub fn draw(self: PauseMode) !void {

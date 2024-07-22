@@ -53,25 +53,31 @@ inline fn reachable(session: *game.GameSession, target: game.Entity, player_posi
 }
 
 pub fn tick(self: *PlayMode) anyerror!void {
+    try Render.render(self.session);
+    if (self.session.components.getAll(game.Animation).len > 0)
+        return;
+
     if (try self.session.runtime.readPushedButtons()) |buttons| {
         try self.handleInput(buttons);
         self.updateMovePoints(try self.runSystems());
-        try AI.doMove(self);
         _ = try self.runSystems();
     }
-    try self.session.render.render(self.session);
+    if (self.session.components.getAll(game.Animation).len > 0)
+        return;
+    try AI.doMove(self);
+    _ = try self.runSystems();
 }
 
 fn runSystems(self: *PlayMode) !u8 {
-    var used_moved_points: u8 = 0;
+    var used_move_points: u8 = 0;
     for (self.session.components.getAll(game.Action)) |_| {
-        used_moved_points += try ActionSystem.doActions(self.session);
+        used_move_points += try ActionSystem.doActions(self.session);
         try CollisionSystem.handleCollisions(self.session);
         try DamageSystem.handleDamage(self.session);
         try updateTarget(self);
-        try self.session.render.render(self.session);
+        try Render.render(self.session);
     }
-    return used_moved_points;
+    return used_move_points;
 }
 
 inline fn updateMovePoints(self: *game.PlayMode, amount: u8) void {
@@ -170,7 +176,7 @@ fn updateTarget(self: *PlayMode) anyerror!void {
 }
 
 fn findTarget(self: *PlayMode) void {
-    const player_position = self.session.components.getForEntity(self.session.player, game.Sprite).?.position;
+    const player_position = self.session.components.getForEntityUnsafe(self.session.player, game.Sprite).position;
     // TODO improve:
     // Check the nearest entities:
     const region = p.Region{
@@ -198,7 +204,7 @@ fn findTarget(self: *PlayMode) void {
 /// Returns true if the focus is kept
 fn keepEntityInFocus(self: *PlayMode) bool {
     const session = self.session;
-    const player_position = session.components.getForEntity(session.player, game.Sprite).?.position;
+    const player_position = session.components.getForEntityUnsafe(session.player, game.Sprite).position;
     if (self.target_entity) |*target| {
         // Check if we can keep the current quick action and target
         if (target.quick_action) |qa| {

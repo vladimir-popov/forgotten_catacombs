@@ -14,8 +14,6 @@ const Mode = enum { play, pause };
 
 /// Playdate or terminal
 runtime: game.AnyRuntime,
-/// Describes in which sequence everything should be drawn
-render: Render,
 /// Collection of the entities of this game session
 entities: ecs.EntitiesManager,
 /// Collection of the components of the entities
@@ -37,7 +35,6 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     const session = try runtime.alloc.create(Self);
     session.* = .{
         .runtime = runtime,
-        .render = .{},
         .screen = game.Screen.init(game.DISPLAY_DUNG_ROWS, game.DISPLAY_DUNG_COLS, game.Dungeon.Region),
         .entities = try ecs.EntitiesManager.init(runtime.alloc),
         .components = try ecs.ComponentsManager(game.Components).init(runtime.alloc),
