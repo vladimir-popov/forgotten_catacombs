@@ -35,7 +35,7 @@ pub fn destroy(self: *PlayMode) void {
 }
 
 pub fn refresh(self: *PlayMode, target: game.Entity) void {
-    const player_position = self.session.components.getForEntityUnsafe(self.session.player, game.Sprite).position;
+    const player_position = self.session.components.getForEntityUnsafe(self.session.player, game.Position).point;
     if (reachable(self.session, target, player_position)) |entity| {
         self.target_entity = .{ .entity = entity };
         self.calculateQuickActionForTarget(entity, player_position);
@@ -46,8 +46,8 @@ pub fn refresh(self: *PlayMode, target: game.Entity) void {
 
 inline fn reachable(session: *game.GameSession, target: game.Entity, player_position: p.Point) ?game.Entity {
     if (session.player == target) return null;
-    if (session.components.getForEntity(target, game.Sprite)) |s| {
-        if (s.position.near(player_position)) return target;
+    if (session.components.getForEntity(target, game.Position)) |position| {
+        if (position.point.near(player_position)) return target;
     }
     return null;
 }
@@ -125,21 +125,25 @@ pub fn draw(play_mode: *const PlayMode) !void {
 }
 
 fn highlightEntityInFocus(session: *const game.GameSession, entity: game.Entity) !void {
-    if (session.components.getForEntity(session.player, game.Sprite)) |player_sprite| {
-        if (session.components.getForEntity(entity, game.Sprite)) |target_sprite| {
-            if (!player_sprite.position.eql(target_sprite.position))
-                try session.runtime.drawSprite(&session.screen, target_sprite, .inverted);
+    if (session.components.getForEntity(session.player, game.Position)) |player_position| {
+        if (session.components.getForEntity(entity, game.Position)) |target_position| {
+            if (!player_position.point.eql(target_position.point)) {
+                const sprite = session.components.getForEntityUnsafe(entity, game.Sprite);
+                try session.runtime.drawSprite(&session.screen, sprite, target_position, .inverted);
+            }
         }
     }
 }
 
 fn drawQuickAction(session: *const game.GameSession, quick_action: game.Action) !void {
     switch (quick_action.type) {
-        .open => |door| if (session.components.getForEntity(door, game.Sprite)) |s| {
-            try drawLabelAndHighlightQuickActionTarget(session, "Open", s);
+        .open => |door| if (session.components.getForEntity(door, game.Sprite)) |sprite| {
+            const position = session.components.getForEntityUnsafe(door, game.Position);
+            try drawLabelAndHighlightQuickActionTarget(session, "Open", sprite, position);
         },
-        .close => |door| if (session.components.getForEntity(door, game.Sprite)) |s| {
-            try drawLabelAndHighlightQuickActionTarget(session, "Close", s);
+        .close => |door| if (session.components.getForEntity(door, game.Sprite)) |sprite| {
+            const position = session.components.getForEntityUnsafe(door, game.Position);
+            try drawLabelAndHighlightQuickActionTarget(session, "Close", sprite, position);
         },
         .take => |_| {
             // try drawLabelAndHighlightQuickActionTarget(session, "Take");
@@ -149,7 +153,8 @@ fn drawQuickAction(session: *const game.GameSession, quick_action: game.Action) 
             if (session.components.getForEntity(enemy, game.Sprite)) |sprite| {
                 if (session.components.getForEntity(enemy, game.Health)) |hp| {
                     if (session.components.getForEntity(enemy, game.Description)) |description| {
-                        try drawLabelAndHighlightQuickActionTarget(session, "Attack", sprite);
+                        const position = session.components.getForEntityUnsafe(enemy, game.Position);
+                        try drawLabelAndHighlightQuickActionTarget(session, "Attack", sprite, position);
                         try Render.drawEntityName(session, description.name);
                         try Render.drawEnemyHP(session, hp);
                     }
@@ -164,10 +169,11 @@ fn drawLabelAndHighlightQuickActionTarget(
     session: *const game.GameSession,
     label: []const u8,
     sprite: *const game.Sprite,
+    position: *const game.Position,
 ) !void {
     const prompt_position = p.Point{ .row = game.DISPLPAY_ROWS, .col = game.DISPLAY_DUNG_COLS + 2 };
     try session.runtime.drawLabel(label, prompt_position);
-    try session.runtime.drawSprite(&session.screen, sprite, .inverted);
+    try session.runtime.drawSprite(&session.screen, sprite, position, .inverted);
 }
 
 fn updateTarget(self: *PlayMode) anyerror!void {
@@ -176,7 +182,7 @@ fn updateTarget(self: *PlayMode) anyerror!void {
 }
 
 fn findTarget(self: *PlayMode) void {
-    const player_position = self.session.components.getForEntityUnsafe(self.session.player, game.Sprite).position;
+    const player_position = self.session.components.getForEntityUnsafe(self.session.player, game.Position).point;
     // TODO improve:
     // Check the nearest entities:
     const region = p.Region{
@@ -187,10 +193,10 @@ fn findTarget(self: *PlayMode) void {
         .rows = 3,
         .cols = 3,
     };
-    const sprites = self.session.components.arrayOf(game.Sprite);
-    for (sprites.components.items, 0..) |*sprite, idx| {
-        if (region.containsPoint(sprite.position)) {
-            if (sprites.index_entity.get(@intCast(idx))) |entity| {
+    const positions = self.session.components.arrayOf(game.Position);
+    for (positions.components.items, 0..) |position, idx| {
+        if (region.containsPoint(position.point)) {
+            if (positions.index_entity.get(@intCast(idx))) |entity| {
                 if (self.session.player != entity) {
                     self.target_entity = .{ .entity = entity, .quick_action = null };
                     self.calculateQuickActionForTarget(entity, player_position);
@@ -204,19 +210,19 @@ fn findTarget(self: *PlayMode) void {
 /// Returns true if the focus is kept
 fn keepEntityInFocus(self: *PlayMode) bool {
     const session = self.session;
-    const player_position = session.components.getForEntityUnsafe(session.player, game.Sprite).position;
+    const player_position = session.components.getForEntityUnsafe(session.player, game.Position).point;
     if (self.target_entity) |*target| {
         // Check if we can keep the current quick action and target
         if (target.quick_action) |qa| {
-            if (session.components.getForEntity(target.entity, game.Sprite)) |target_sprite| {
-                if (player_position.near(target_sprite.position)) {
+            if (session.components.getForEntity(target.entity, game.Position)) |target_position| {
+                if (player_position.near(target_position.point)) {
                     // handle a case when player entered to the door
                     switch (qa.type) {
                         .open => |door| if (session.components.getForEntity(door, game.Door)) |door_state| {
-                            if (door_state.* == .closed and !player_position.eql(target_sprite.position)) return true;
+                            if (door_state.* == .closed and !player_position.eql(target_position.point)) return true;
                         },
                         .close => |door| if (session.components.getForEntity(door, game.Door)) |door_state| {
-                            if (door_state.* == .opened and !player_position.eql(target_sprite.position)) return true;
+                            if (door_state.* == .opened and !player_position.eql(target_position.point)) return true;
                         },
                         else => return true,
                     }
@@ -236,8 +242,8 @@ fn calculateQuickActionForTarget(
     target_entity: game.Entity,
     player_position: p.Point,
 ) void {
-    if (self.session.components.getForEntity(target_entity, game.Sprite)) |target_sprite| {
-        if (player_position.near(target_sprite.position)) {
+    if (self.session.components.getForEntity(target_entity, game.Position)) |target_position| {
+        if (player_position.near(target_position.point)) {
             if (self.session.components.getForEntity(target_entity, game.Health)) |_| {
                 const weapon = self.session.components.getForEntityUnsafe(self.session.player, game.MeleeWeapon);
                 self.target_entity.?.quick_action = .{
@@ -247,7 +253,7 @@ fn calculateQuickActionForTarget(
                 return;
             }
             if (self.session.components.getForEntity(target_entity, game.Door)) |door| {
-                if (!player_position.eql(target_sprite.position)) {
+                if (!player_position.eql(target_position.point)) {
                     const mp = self.session.components.getForEntityUnsafe(self.session.player, game.MovePoints);
                     self.target_entity.?.quick_action = switch (door.*) {
                         .opened => .{ .type = .{ .close = target_entity }, .move_points = mp.speed },

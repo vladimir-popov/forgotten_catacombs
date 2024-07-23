@@ -20,6 +20,7 @@ const VTable = struct {
         context: *anyopaque,
         screen: *const game.Screen,
         sprite: *const game.Sprite,
+        position: *const game.Position,
         mode: DrawingMode,
     ) anyerror!void,
     drawLabel: *const fn (
@@ -59,9 +60,10 @@ pub inline fn drawSprite(
     self: Self,
     screen: *const game.Screen,
     sprite: *const game.Sprite,
+    position: *const game.Position,
     mode: DrawingMode,
 ) !void {
-    try self.vtable.drawSprite(self.context, screen, sprite, mode);
+    try self.vtable.drawSprite(self.context, screen, sprite, position, mode);
 }
 
 pub inline fn drawLabel(self: Self, label: []const u8, absolute_position: p.Point) !void {

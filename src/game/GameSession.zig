@@ -93,9 +93,9 @@ pub inline fn drawMode(session: *Self) !void {
 }
 
 pub fn entityAt(session: *game.GameSession, place: p.Point) ?game.Entity {
-    for (session.components.arrayOf(game.Sprite).components.items, 0..) |sprite, idx| {
-        if (sprite.position.eql(place)) {
-            return session.components.arrayOf(game.Sprite).index_entity.get(@intCast(idx));
+    for (session.components.arrayOf(game.Position).components.items, 0..) |position, idx| {
+        if (position.point.eql(place)) {
+            return session.components.arrayOf(game.Position).index_entity.get(@intCast(idx));
         }
     }
     return null;
@@ -133,7 +133,8 @@ fn addClosedDoor(
 ) !void {
     const door = try entities.newEntity();
     try components.setToEntity(door, game.Door.closed);
-    try components.setToEntity(door, game.Sprite{ .position = door_at.*, .codepoint = '+' });
+    try components.setToEntity(door, game.Position{ .point = door_at.* });
+    try components.setToEntity(door, game.Sprite{ .codepoint = '+' });
     try components.setToEntity(door, game.Description{ .name = "Door" });
 }
 
@@ -143,7 +144,8 @@ fn initPlayer(
     init_position: p.Point,
 ) !game.Entity {
     const player = try entities.newEntity();
-    try components.setToEntity(player, game.Sprite{ .codepoint = '@', .position = init_position });
+    try components.setToEntity(player, game.Position{ .point = init_position });
+    try components.setToEntity(player, game.Sprite{ .codepoint = '@' });
     try components.setToEntity(player, game.Description{ .name = "You" });
     try components.setToEntity(player, game.Health{ .total = 100, .current = 100 });
     try components.setToEntity(player, game.MeleeWeapon{ .max_damage = 3, .move_points = 10 });
@@ -158,7 +160,8 @@ fn addRat(
 ) !void {
     if (randomEmptyPlace(dungeon, components)) |position| {
         const rat = try entities.newEntity();
-        try components.setToEntity(rat, game.Sprite{ .codepoint = 'r', .position = position });
+        try components.setToEntity(rat, game.Position{ .point = position });
+        try components.setToEntity(rat, game.Sprite{ .codepoint = 'r' });
         try components.setToEntity(rat, game.Description{ .name = "Rat" });
         try components.setToEntity(rat, game.Health{ .total = 10, .current = 10 });
         try components.setToEntity(rat, game.MeleeWeapon{ .max_damage = 3, .move_points = 5 });
@@ -171,8 +174,8 @@ fn randomEmptyPlace(dungeon: *game.Dungeon, components: *const ecs.ComponentsMan
     while (attempt > 0) : (attempt -= 1) {
         const place = dungeon.randomPlace();
         var is_empty = true;
-        for (components.getAll(game.Sprite)) |sprite| {
-            if (sprite.position.eql(place)) {
+        for (components.getAll(game.Position)) |position| {
+            if (position.point.eql(place)) {
                 is_empty = false;
             }
         }

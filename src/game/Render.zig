@@ -23,9 +23,10 @@ pub fn render(session: *game.GameSession) anyerror!void {
     // Draw walls and floor
     try session.runtime.drawDungeon(screen, session.dungeon);
     // Draw sprites inside the screen
-    for (session.components.getAll(game.Sprite)) |*sprite| {
-        if (screen.region.containsPoint(sprite.position)) {
-            try session.runtime.drawSprite(screen, sprite, .normal);
+    var itr = session.query.get2(game.Position, game.Sprite);
+    while (itr.next()) |tuple| {
+        if (screen.region.containsPoint(tuple[1].point)) {
+            try session.runtime.drawSprite(screen, tuple[2], tuple[1], .normal);
         }
     }
     // Draw mode's specifics
@@ -35,15 +36,16 @@ pub fn render(session: *game.GameSession) anyerror!void {
 }
 
 fn drawAnimationFrame(session: *game.GameSession, now: c_uint) !void {
-    var itr = session.query.get2(game.Sprite, game.Animation);
+    var itr = session.query.get2(game.Position, game.Animation);
     while (itr.next()) |components| {
-        const position = components[1].position;
+        const position = components[1];
         const animation = components[2];
         if (animation.frame(now)) |frame| {
-            if (frame > 0 and session.screen.region.containsPoint(position)) {
+            if (frame > 0 and session.screen.region.containsPoint(position.point)) {
                 try session.runtime.drawSprite(
                     &session.screen,
-                    &.{ .codepoint = frame, .position = position },
+                    &.{ .codepoint = frame },
+                    position,
                     .normal,
                 );
             }

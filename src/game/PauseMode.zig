@@ -35,13 +35,13 @@ pub fn clear(self: *PauseMode) void {
 pub fn refresh(self: *PauseMode) !void {
     self.target.* = Node{
         .entity = self.session.player,
-        .position = self.session.components.getForEntityUnsafe(self.session.player, game.Sprite).position,
+        .position = self.session.components.getForEntityUnsafe(self.session.player, game.Position).point,
     };
-    var itr = self.session.query.get(game.Sprite);
+    var itr = self.session.query.get(game.Position);
     while (itr.next()) |tuple| {
-        if (tuple[0] != self.session.player and self.session.screen.region.containsPoint(tuple[1].position)) {
+        if (tuple[0] != self.session.player and self.session.screen.region.containsPoint(tuple[1].point)) {
             const node = try self.alloc.create(Node);
-            node.* = .{ .entity = tuple[0], .position = tuple[1].position };
+            node.* = .{ .entity = tuple[0], .position = tuple[1].point };
             self.target.add(node);
         }
     }
@@ -71,7 +71,8 @@ pub fn draw(self: PauseMode) !void {
     try self.session.runtime.drawLabel("pause", .{ .row = 1, .col = game.DISPLAY_DUNG_COLS + 2 });
     // highlight entity in focus
     if (self.session.components.getForEntity(self.target.entity, game.Sprite)) |target_sprite| {
-        try self.session.runtime.drawSprite(&self.session.screen, target_sprite, .inverted);
+        const position = self.session.components.getForEntityUnsafe(self.target.entity, game.Position);
+        try self.session.runtime.drawSprite(&self.session.screen, target_sprite, position, .inverted);
     }
     if (self.session.components.getForEntity(self.target.entity, game.Description)) |description| {
         try Render.drawEntityName(self.session, description.name);

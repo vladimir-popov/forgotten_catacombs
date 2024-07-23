@@ -7,10 +7,14 @@ const dung = @import("BspDungeon.zig");
 // coz zig uses u21 for utf8 symbols
 pub const Codepoint = u21;
 
+pub const Position = struct {
+    point: p.Point,
+
+    pub fn deinit(_: *@This()) void {}
+};
+
 /// Describes how and where something should look.
 pub const Sprite = struct {
-    // The sprite and position are merged together for better performance
-    position: p.Point,
     codepoint: Codepoint,
     pub fn deinit(_: *@This()) void {}
 };
@@ -146,6 +150,7 @@ pub const MeleeWeapon = struct {
 };
 
 pub const Components = union {
+    position: Position,
     sprite: Sprite,
     door: Door,
     animation: Animation,

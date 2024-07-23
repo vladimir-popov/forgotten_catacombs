@@ -130,18 +130,19 @@ fn drawUI(ptr: *anyopaque) anyerror!void {
 
 fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {
     var itr = dungeon.cellsInRegion(screen.region) orelse return;
-    var sprite = game.Sprite{ .codepoint = undefined, .position = screen.region.top_left };
+    var position = .{ .point = screen.region.top_left };
+    var sprite = game.Sprite{ .codepoint = undefined };
     while (itr.next()) |cell| {
         sprite.codepoint = switch (cell) {
             .floor => '.',
             .wall => '#',
             else => ' ',
         };
-        try drawSprite(ptr, screen, &sprite, .normal);
-        sprite.position.move(.right);
-        if (!screen.region.containsPoint(sprite.position)) {
-            sprite.position.col = screen.region.top_left.col;
-            sprite.position.move(.down);
+        try drawSprite(ptr, screen, &sprite, &position, .normal);
+        position.point.move(.right);
+        if (!screen.region.containsPoint(position.point)) {
+            position.point.col = screen.region.top_left.col;
+            position.point.move(.down);
         }
     }
 }
@@ -150,12 +151,13 @@ fn drawSprite(
     ptr: *anyopaque,
     screen: *const game.Screen,
     sprite: *const game.Sprite,
+    position: *const game.Position,
     mode: game.AnyRuntime.DrawingMode,
 ) anyerror!void {
-    if (screen.region.containsPoint(sprite.position)) {
+    if (screen.region.containsPoint(position.point)) {
         const self: *Self = @ptrCast(@alignCast(ptr));
-        const y: c_int = game.FONT_HEIGHT * @as(c_int, sprite.position.row - screen.region.top_left.row + 1);
-        const x: c_int = game.FONT_WIDTH * @as(c_int, sprite.position.col - screen.region.top_left.col + 1);
+        const y: c_int = game.FONT_HEIGHT * @as(c_int, position.point.row - screen.region.top_left.row + 1);
+        const x: c_int = game.FONT_WIDTH * @as(c_int, position.point.col - screen.region.top_left.col + 1);
         var buf: [4]u8 = undefined;
         const len = try std.unicode.utf8Encode(sprite.codepoint, &buf);
         if (mode == .inverted) {

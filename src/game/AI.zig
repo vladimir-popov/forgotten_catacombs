@@ -6,14 +6,14 @@ const game = @import("game.zig");
 const log = std.log.scoped(.ai);
 
 pub fn doMove(play_mode: *game.PlayMode) anyerror!void {
-    var itr = play_mode.session.query.get3(game.Sprite, game.Health, game.MovePoints);
+    var itr = play_mode.session.query.get3(game.Position, game.Health, game.MovePoints);
     while (itr.next()) |components| {
         const entity = components[0];
         if (entity == play_mode.session.player) continue;
-        const sprite = components[1];
+        const position = components[1];
         const health = components[2];
         const move_points = components[3];
-        if (nextAction(play_mode.session, entity, sprite.position, health, move_points)) |action|
+        if (nextAction(play_mode.session, entity, position.point, health, move_points)) |action|
             try play_mode.session.components.setToEntity(entity, action);
     }
 }
@@ -25,7 +25,7 @@ fn nextAction(
     _: *const game.Health,
     move_points: *const game.MovePoints,
 ) ?game.Action {
-    const player_position = session.components.getForEntity(session.player, game.Sprite).?.position;
+    const player_position = session.components.getForEntityUnsafe(session.player, game.Position).point;
     if (entity_position.near(player_position)) {
         const weapon = session.components.getForEntityUnsafe(entity, game.MeleeWeapon);
         if (move_points.count >= weapon.move_points) {
