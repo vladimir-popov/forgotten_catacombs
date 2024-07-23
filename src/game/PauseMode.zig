@@ -68,7 +68,7 @@ pub fn tick(self: *PauseMode) anyerror!void {
 }
 
 pub fn draw(self: PauseMode) !void {
-    try self.session.runtime.drawLabel("pause", .{ .row = 1, .col = game.DISPLAY_DUNG_COLS + 2 });
+    try self.session.runtime.drawText("pause", .{ .row = 1, .col = game.DISPLAY_DUNG_COLS + 2 });
     // highlight entity in focus
     if (self.session.components.getForEntity(self.target.entity, game.Sprite)) |target_sprite| {
         const position = self.session.components.getForEntityUnsafe(self.target.entity, game.Position);

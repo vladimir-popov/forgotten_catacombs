@@ -15,7 +15,7 @@ pub fn render(session: *game.GameSession) anyerror!void {
     // Draw the right area (stats)
     if (session.components.getForEntity(session.player, game.Health)) |health| {
         var buf = [_]u8{0} ** game.STATS_COLS;
-        try session.runtime.drawLabel(
+        try session.runtime.drawText(
             try std.fmt.bufPrint(&buf, "HP: {d}", .{health.current}),
             .{ .row = 2, .col = game.DISPLAY_DUNG_COLS + 2 },
         );
@@ -56,7 +56,7 @@ fn drawAnimationFrame(session: *game.GameSession, now: c_uint) !void {
 }
 
 pub fn drawEntityName(session: *const game.GameSession, name: []const u8) !void {
-    try session.runtime.drawLabel(name, .{
+    try session.runtime.drawText(name, .{
         .row = 5,
         .col = game.DISPLAY_DUNG_COLS + 2,
     });
@@ -65,7 +65,7 @@ pub fn drawEntityName(session: *const game.GameSession, name: []const u8) !void 
 pub fn drawEnemyHP(session: *const game.GameSession, hp: *const game.Health) !void {
     var buf: [3]u8 = undefined;
     const len = std.fmt.formatIntBuf(&buf, hp.current, 10, .lower, .{});
-    try session.runtime.drawLabel(buf[0..len], .{
+    try session.runtime.drawText(buf[0..len], .{
         .row = 6,
         .col = game.DISPLAY_DUNG_COLS + 2,
     });

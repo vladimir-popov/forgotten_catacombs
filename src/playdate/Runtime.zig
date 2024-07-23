@@ -75,7 +75,7 @@ pub fn any(self: *Self) game.AnyRuntime {
             .drawUI = drawUI,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
-            .drawLabel = drawLabel,
+            .drawText = drawText,
         },
     };
 }
@@ -170,15 +170,15 @@ fn drawSprite(
     }
 }
 
-fn drawLabel(ptr: *anyopaque, label: []const u8, absolute_position: p.Point) !void {
+fn drawText(ptr: *anyopaque, text: []const u8, absolute_position: p.Point) !void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     // choose the font for text:
     self.playdate.graphics.setFont(self.text_font);
     self.playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeFillWhite);
     // draw label:
     _ = self.playdate.graphics.drawText(
-        label.ptr,
-        label.len,
+        text.ptr,
+        text.len,
         .UTF8Encoding,
         @as(c_int, absolute_position.col) * game.FONT_WIDTH,
         @as(c_int, absolute_position.row) * game.FONT_HEIGHT,

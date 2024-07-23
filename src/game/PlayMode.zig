@@ -172,7 +172,7 @@ fn drawLabelAndHighlightQuickActionTarget(
     position: *const game.Position,
 ) !void {
     const prompt_position = p.Point{ .row = game.DISPLPAY_ROWS, .col = game.DISPLAY_DUNG_COLS + 2 };
-    try session.runtime.drawLabel(label, prompt_position);
+    try session.runtime.drawText(label, prompt_position);
     try session.runtime.drawSprite(&session.screen, sprite, position, .inverted);
 }
 

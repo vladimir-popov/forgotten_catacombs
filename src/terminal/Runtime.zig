@@ -101,7 +101,7 @@ pub fn any(self: *Self) game.AnyRuntime {
             .drawUI = drawUI,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
-            .drawLabel = drawLabel,
+            .drawText = drawText,
         },
     };
 }
@@ -219,7 +219,7 @@ fn drawSprite(
 }
 
 // row and col - position of the lable in the window, not inside the screen!
-fn drawLabel(ptr: *anyopaque, label: []const u8, absolute_position: p.Point) !void {
+fn drawText(ptr: *anyopaque, text: []const u8, absolute_position: p.Point) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    try self.buffer.mergeLine(label, absolute_position.row, absolute_position.col); // do not subtract, coz border!
+    try self.buffer.mergeLine(text, absolute_position.row, absolute_position.col); // do not subtract, coz border!
 }
