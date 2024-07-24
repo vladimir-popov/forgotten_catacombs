@@ -64,7 +64,7 @@ pub fn play(session: *Self) void {
     var target = session.player;
     switch (session.mode) {
         .pause => {
-            target = session.pause_mode.target.entity;
+            target = session.pause_mode.target;
             session.pause_mode.clear();
         },
         else => {},

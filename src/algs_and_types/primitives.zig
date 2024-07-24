@@ -46,12 +46,6 @@ pub const Point = struct {
         try writer.print("Point(r:{d}, c:{d})", .{ self.row, self.col });
     }
 
-    pub fn movedTo(self: Point, direction: Direction) Point {
-        var point = self;
-        point.move(direction);
-        return point;
-    }
-
     pub inline fn move(self: *Point, direction: Direction) void {
         switch (direction) {
             .up => {
@@ -63,6 +57,12 @@ pub const Point = struct {
             },
             .right => self.col += 1,
         }
+    }
+
+    pub fn movedTo(self: Point, direction: Direction) Point {
+        var point = self;
+        point.move(direction);
+        return point;
     }
 
     pub inline fn moveNTimes(point: *Point, direction: Direction, n: u8) void {
@@ -80,6 +80,12 @@ pub const Point = struct {
                 point.col += n;
             },
         }
+    }
+
+    pub fn movedToNTimes(self: Point, direction: Direction, n: u8) Point {
+        var point = self;
+        point.moveNTimes(direction, n);
+        return point;
     }
 
     pub inline fn eql(self: Point, other: Point) bool {

@@ -10,40 +10,34 @@ const log = std.log.scoped(.pause_mode);
 const PauseMode = @This();
 
 session: *game.GameSession,
-arena: std.heap.ArenaAllocator,
-alloc: std.mem.Allocator,
-target: *Node,
+entities_on_screen: std.AutoHashMap(p.Point, game.Entity),
+target: game.Entity,
 
 pub fn create(session: *game.GameSession) !*PauseMode {
     const self = try session.runtime.alloc.create(PauseMode);
     self.session = session;
-    self.arena = std.heap.ArenaAllocator.init(session.runtime.alloc);
-    self.alloc = self.arena.allocator();
-    self.target = try self.alloc.create(Node);
+    self.target = self.session.player;
+    self.entities_on_screen = std.AutoHashMap(p.Point, game.Entity).init(self.session.runtime.alloc);
+    try self.refresh();
     return self;
 }
 
 pub fn destroy(self: *PauseMode) void {
-    self.arena.deinit();
+    self.entities_on_screen.deinit();
     self.session.runtime.alloc.destroy(self);
 }
 
 pub fn clear(self: *PauseMode) void {
-    _ = self.arena.reset(.free_all);
+    self.entities_on_screen.clearAndFree();
 }
 
 pub fn refresh(self: *PauseMode) !void {
-    self.target.* = Node{
-        .entity = self.session.player,
-        .position = self.session.components.getForEntityUnsafe(self.session.player, game.Position).point,
-    };
+    self.target = self.session.player;
+    self.entities_on_screen.clearRetainingCapacity();
     var itr = self.session.query.get(game.Position);
     while (itr.next()) |tuple| {
-        if (tuple[0] != self.session.player and self.session.screen.region.containsPoint(tuple[1].point)) {
-            const node = try self.alloc.create(Node);
-            node.* = .{ .entity = tuple[0], .position = tuple[1].point };
-            self.target.add(node);
-        }
+        if (self.session.screen.region.containsPoint(tuple[1].point))
+            try self.entities_on_screen.put(tuple[1].point, tuple[0]);
     }
 }
 
@@ -70,104 +64,68 @@ pub fn tick(self: *PauseMode) anyerror!void {
 pub fn draw(self: PauseMode) !void {
     try self.session.runtime.drawText("pause", .{ .row = 1, .col = game.DISPLAY_DUNG_COLS + 2 });
     // highlight entity in focus
-    if (self.session.components.getForEntity(self.target.entity, game.Sprite)) |target_sprite| {
-        const position = self.session.components.getForEntityUnsafe(self.target.entity, game.Position);
+    if (self.session.components.getForEntity(self.target, game.Sprite)) |target_sprite| {
+        const position = self.session.components.getForEntityUnsafe(self.target, game.Position);
         try self.session.runtime.drawSprite(&self.session.screen, target_sprite, position, .inverted);
     }
-    if (self.session.components.getForEntity(self.target.entity, game.Description)) |description| {
+    if (self.session.components.getForEntity(self.target, game.Description)) |description| {
         try Render.drawEntityName(self.session, description.name);
     }
-    if (self.session.components.getForEntity(self.target.entity, game.Health)) |hp| {
+    if (self.session.components.getForEntity(self.target, game.Health)) |hp| {
         try Render.drawEnemyHP(self.session, hp);
     }
 }
 
 fn chooseNextEntity(self: *PauseMode, direction: p.Direction) void {
-    self.target = switch (direction) {
-        .up => self.target.top,
-        .down => self.target.bottom,
-        .left => self.target.left,
-        .right => self.target.right,
-    } orelse self.target;
+    const init_position = self.session.components.getForEntityUnsafe(self.target, game.Position).point;
+    var itr = Iterator.init(init_position, direction, self.session.screen.region);
+    while (itr.next()) |position| {
+        if (self.entities_on_screen.get(position)) |entity| {
+            self.target = entity;
+            return;
+        }
+    }
 }
 
-const Node = struct {
-    entity: game.Entity,
-    position: p.Point,
+/// Iterates over points in follow way:
+///      0
+///  5 3 1 2 4
+/// 10 8 6 7 9
+const Iterator = struct {
+    init_position: p.Point,
+    current_position: p.Point,
+    direction: p.Direction,
+    region: p.Region,
+    side_direction: p.Direction,
+    // how far from init_position in the direction
+    distance: u8 = 1,
+    // how far from the init_position in the side_direction
+    range: u8 = 0,
 
-    left: ?*Node = null,
-    right: ?*Node = null,
-    top: ?*Node = null,
-    bottom: ?*Node = null,
-
-    fn add(self: *Node, other: *Node) void {
-        if (self.position.row < other.position.row)
-            self.addBottom(other);
-        if (self.position.row > other.position.row)
-            self.addOnTop(other);
-        if (self.position.col > other.position.col)
-            self.addLeft(other);
-        if (self.position.col < other.position.col)
-            self.addRight(other);
+    fn init(init_position: p.Point, direction: p.Direction, region: p.Region) Iterator {
+        return .{
+            .init_position = init_position,
+            .current_position = init_position,
+            .direction = direction,
+            .side_direction = direction.rotatedClockwise(true),
+            .region = region,
+        };
     }
 
-    fn addOnTop(self: *Node, other: *Node) void {
-        if (self.top) |self_top| {
-            if (self_top.position.row < other.position.row) {
-                self_top.addOnTop(other);
-            } else {
-                other.addOnTop(self_top);
-                self.top = other;
-                other.bottom = self;
-            }
+    fn next(self: *Iterator) ?p.Point {
+        if (self.range == 0) {
+            self.current_position = self.init_position;
+            self.current_position.moveNTimes(self.direction, self.distance);
+            self.range += 1;
         } else {
-            self.top = other;
-            other.bottom = self;
+            self.current_position.moveNTimes(self.side_direction, self.range);
+            self.side_direction = self.side_direction.opposite();
+            self.range += 1;
         }
-    }
-
-    fn addBottom(self: *Node, other: *Node) void {
-        if (self.bottom) |self_bottom| {
-            if (self_bottom.position.row > other.position.row) {
-                self_bottom.addBottom(other);
-            } else {
-                other.addBottom(self_bottom);
-                self.bottom = other;
-                other.top = self;
-            }
-        } else {
-            self.bottom = other;
-            other.top = self;
+        if (!self.region.containsPoint(self.current_position.movedToNTimes(self.side_direction, self.range))) {
+            self.distance += 1;
+            self.range = 0;
         }
-    }
-
-    fn addLeft(self: *Node, other: *Node) void {
-        if (self.left) |self_left| {
-            if (self_left.position.col > other.position.col) {
-                self_left.addLeft(other);
-            } else {
-                other.addLeft(self_left);
-                self.left = other;
-                other.right = self;
-            }
-        } else {
-            self.left = other;
-            other.right = self;
-        }
-    }
-
-    fn addRight(self: *Node, other: *Node) void {
-        if (self.right) |self_right| {
-            if (self_right.position.col < other.position.col) {
-                self_right.addRight(other);
-            } else {
-                other.addRight(self_right);
-                self.right = other;
-                other.left = self;
-            }
-        } else {
-            self.right = other;
-            other.left = self;
-        }
+        if (self.region.containsPoint(self.current_position)) return self.current_position else return null;
     }
 };
