@@ -6,19 +6,15 @@ const game = @import("game.zig");
 const log = std.log.scoped(.action_system);
 
 /// Handles intentions to do some actions
-pub fn doActions(session: *game.GameSession) !u8 {
-    var used_move_points: u8 = 0;
+pub fn doActions(session: *game.GameSession) !void {
     var itr = session.query.get2(game.Action, game.Position);
     while (itr.next()) |components| {
-        const actor_entity = components[0];
-        const actor_action = components[1];
-        const actor_position = components[2];
-        switch (actor_action.type) {
-            .move => |*move| if (try handleMoveAction(session, actor_entity, actor_position, move)) {
-                if (session.components.getForEntity(actor_entity, game.MovePoints)) |move_points| {
-                    move_points.subtract(actor_action.move_points);
-                    used_move_points += actor_action.move_points;
-                }
+        const entity = components[0];
+        const action = components[1];
+        const position = components[2];
+        switch (action.type) {
+            .move => |*move| {
+                _ = try handleMoveAction(session, entity, position, move);
             },
             .open => |door| {
                 try session.components.setToEntity(door, game.Door.opened);
@@ -26,10 +22,6 @@ pub fn doActions(session: *game.GameSession) !u8 {
                     door,
                     game.Sprite{ .codepoint = '\'' },
                 );
-                if (session.components.getForEntity(actor_entity, game.MovePoints)) |move_points| {
-                    move_points.subtract(actor_action.move_points);
-                    used_move_points += actor_action.move_points;
-                }
             },
             .close => |door| {
                 try session.components.setToEntity(door, game.Door.closed);
@@ -37,10 +29,6 @@ pub fn doActions(session: *game.GameSession) !u8 {
                     door,
                     game.Sprite{ .codepoint = '+' },
                 );
-                if (session.components.getForEntity(actor_entity, game.MovePoints)) |move_points| {
-                    move_points.subtract(actor_action.move_points);
-                    used_move_points += actor_action.move_points;
-                }
             },
             .hit => |enemy| {
                 if (session.components.getForEntity(session.player, game.MeleeWeapon)) |weapon| {
@@ -48,20 +36,12 @@ pub fn doActions(session: *game.GameSession) !u8 {
                         enemy,
                         weapon.damage(session.runtime.rand),
                     );
-                    if (session.components.getForEntity(actor_entity, game.MovePoints)) |move_points| {
-                        move_points.subtract(actor_action.move_points);
-                        used_move_points += actor_action.move_points;
-                    }
                 }
             },
-            else => if (session.components.getForEntity(actor_entity, game.MovePoints)) |move_points| {
-                move_points.subtract(actor_action.move_points);
-                used_move_points += actor_action.move_points;
-            },
+            else => {},
         }
-        try session.components.removeFromEntity(actor_entity, game.Action);
+        try session.components.removeFromEntity(entity, game.Action);
     }
-    return used_move_points;
 }
 
 fn handleMoveAction(

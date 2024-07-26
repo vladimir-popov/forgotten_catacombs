@@ -21,16 +21,27 @@ const PlayMode = @This();
 const System = *const fn (play_mode: *PlayMode) anyerror!void;
 
 session: *game.GameSession,
+actors: std.ArrayList(Actor),
+/// Index of the actor, which should do move on next tick
+current_actor: u8,
+players_move: bool,
+moved_actors: u8,
 /// An entity in player's focus to which a quick action can be applied
-target_entity: ?EntityInFocus = null,
+target_entity: ?EntityInFocus,
 
 pub fn create(session: *game.GameSession) !*PlayMode {
     const self = try session.runtime.alloc.create(PlayMode);
     self.session = session;
+    self.actors = std.ArrayList(Actor).init(session.runtime.alloc);
+    self.current_actor = 0;
+    self.moved_actors = 0;
+    self.players_move = true;
+    self.target_entity = null;
     return self;
 }
 
 pub fn destroy(self: *PlayMode) void {
+    self.actors.deinit();
     self.session.runtime.alloc.destroy(self);
 }
 
@@ -57,40 +68,64 @@ pub fn tick(self: *PlayMode) anyerror!void {
     if (self.session.components.getAll(game.Animation).len > 0)
         return;
 
-    if (try self.session.runtime.readPushedButtons()) |buttons| {
-        try self.handleInput(buttons);
-        self.updateMovePoints(try self.runSystems());
-        _ = try self.runSystems();
+    if (self.players_move) {
+        if (try self.session.runtime.readPushedButtons()) |buttons| {
+            try self.handleInput(buttons);
+            if (self.session.components.getForEntity(self.session.player, game.Action)) |action| {
+                self.players_move = false;
+                try self.updateActors(action.move_points);
+            }
+        }
+    } else {
+        if (self.current_actor < self.actors.items.len) {
+            log.info("Current actor {d} {any}", .{ self.current_actor, self.actors.items[self.current_actor] });
+            if (try self.actors.items[self.current_actor].doMove()) {
+                self.moved_actors += 1;
+            }
+            self.current_actor += 1;
+        } else {
+            self.players_move = self.moved_actors == 0;
+            self.current_actor = 0;
+            self.moved_actors = 0;
+        }
     }
-    if (self.session.components.getAll(game.Animation).len > 0)
-        return;
-    try AI.doMove(self);
     _ = try self.runSystems();
 }
 
-fn runSystems(self: *PlayMode) !u8 {
-    var used_move_points: u8 = 0;
-    for (self.session.components.getAll(game.Action)) |_| {
-        used_move_points += try ActionSystem.doActions(self.session);
-        try CollisionSystem.handleCollisions(self.session);
-        try DamageSystem.handleDamage(self.session);
-        try updateTarget(self);
-        try Render.render(self.session);
+const Actor = struct {
+    session: *game.GameSession,
+    entity: game.Entity,
+    move_points: u8,
+
+    inline fn doMove(self: *Actor) !bool {
+        const spent_mp = try AI.meleeMove(self.session, self.entity, self.move_points);
+        self.move_points -= spent_mp;
+        return spent_mp > 0;
     }
-    return used_move_points;
+};
+
+fn updateActors(self: *PlayMode, move_points: u8) !void {
+    self.current_actor = 0;
+    self.actors.clearRetainingCapacity();
+    var itr = self.session.query.get(game.NPC);
+    while (itr.next()) |tuple| {
+        try self.actors.append(.{ .session = self.session, .entity = tuple[0], .move_points = move_points });
+    }
 }
 
-inline fn updateMovePoints(self: *game.PlayMode, amount: u8) void {
-    for (self.session.components.getAll(game.MovePoints)) |*mp| {
-        mp.count += amount;
-    }
+fn runSystems(self: *PlayMode) !void {
+    try ActionSystem.doActions(self.session);
+    try CollisionSystem.handleCollisions(self.session);
+    try DamageSystem.handleDamage(self.session);
+    try updateTarget(self);
+    try Render.render(self.session);
 }
 
 pub fn handleInput(self: PlayMode, buttons: game.Buttons) !void {
     switch (buttons.code) {
         game.Buttons.A => {
-            const move_points = self.session.components.getForEntityUnsafe(self.session.player, game.MovePoints);
-            var quick_action: game.Action = .{ .type = .wait, .move_points = move_points.speed };
+            const speed = self.session.components.getForEntityUnsafe(self.session.player, game.Speed);
+            var quick_action: game.Action = .{ .type = .wait, .move_points = speed.move_points };
             if (self.target_entity) |target| {
                 if (target.quick_action) |qa| quick_action = qa;
             }
@@ -100,7 +135,7 @@ pub fn handleInput(self: PlayMode, buttons: game.Buttons) !void {
             try self.session.pause();
         },
         game.Buttons.Left, game.Buttons.Right, game.Buttons.Up, game.Buttons.Down => {
-            const move_points = self.session.components.getForEntityUnsafe(self.session.player, game.MovePoints);
+            const speed = self.session.components.getForEntityUnsafe(self.session.player, game.Speed);
             try self.session.components.setToEntity(self.session.player, game.Action{
                 .type = .{
                     .move = .{
@@ -108,7 +143,7 @@ pub fn handleInput(self: PlayMode, buttons: game.Buttons) !void {
                         .keep_moving = false, // btn.state == .double_pressed,
                     },
                 },
-                .move_points = move_points.speed,
+                .move_points = speed.move_points,
             });
         },
         else => {},
@@ -254,10 +289,10 @@ fn calculateQuickActionForTarget(
             }
             if (self.session.components.getForEntity(target_entity, game.Door)) |door| {
                 if (!player_position.eql(target_position.point)) {
-                    const mp = self.session.components.getForEntityUnsafe(self.session.player, game.MovePoints);
+                    const speed = self.session.components.getForEntityUnsafe(self.session.player, game.Speed);
                     self.target_entity.?.quick_action = switch (door.*) {
-                        .opened => .{ .type = .{ .close = target_entity }, .move_points = mp.speed },
-                        .closed => .{ .type = .{ .open = target_entity }, .move_points = mp.speed },
+                        .opened => .{ .type = .{ .close = target_entity }, .move_points = speed.move_points },
+                        .closed => .{ .type = .{ .open = target_entity }, .move_points = speed.move_points },
                     };
                 }
             }

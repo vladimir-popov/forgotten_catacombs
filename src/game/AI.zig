@@ -5,34 +5,30 @@ const game = @import("game.zig");
 
 const log = std.log.scoped(.ai);
 
-pub fn doMove(play_mode: *game.PlayMode) anyerror!void {
-    var itr = play_mode.session.query.get3(game.Position, game.Health, game.MovePoints);
-    while (itr.next()) |components| {
-        const entity = components[0];
-        if (entity == play_mode.session.player) continue;
-        const position = components[1];
-        const health = components[2];
-        const move_points = components[3];
-        if (nextAction(play_mode.session, entity, position.point, health, move_points)) |action|
-            try play_mode.session.components.setToEntity(entity, action);
+pub fn meleeMove(session: *game.GameSession, entity: game.Entity, available_move_points: u8) anyerror!u8 {
+    // here check if the entity still exists
+    if (session.components.getForEntity(entity, game.Position)) |position| {
+        const action = nextAction(session, entity, position, available_move_points);
+        try session.components.setToEntity(entity, action);
+        return action.move_points;
+    } else {
+        return 0;
     }
 }
 
 fn nextAction(
     session: *game.GameSession,
     entity: game.Entity,
-    entity_position: p.Point,
-    _: *const game.Health,
-    move_points: *const game.MovePoints,
-) ?game.Action {
-    const player_position = session.components.getForEntityUnsafe(session.player, game.Position).point;
-    if (entity_position.near(player_position)) {
+    entity_position: *const game.Position,
+    available_move_points: u8,
+) game.Action {
+    const player_position = session.components.getForEntityUnsafe(session.player, game.Position);
+    if (entity_position.point.near(player_position.point)) {
         const weapon = session.components.getForEntityUnsafe(entity, game.MeleeWeapon);
-        if (move_points.count >= weapon.move_points) {
+        if (available_move_points >= weapon.move_points) {
             return .{ .type = .{ .hit = session.player }, .move_points = weapon.move_points };
         }
-    } else {
-        return .{ .type = .wait, .move_points = move_points.speed };
     }
-    return null;
+    // wait should always take all available move points
+    return .{ .type = .wait, .move_points = 0 };
 }

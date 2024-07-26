@@ -119,21 +119,9 @@ pub const Damage = struct {
     pub fn deinit(_: *@This()) void {}
 };
 
-/// Move points are used to calculate a turn of the entity.
-/// Any could be done only if the entity has enough move points.
-pub const MovePoints = struct {
-    /// Current count of move points of the entity
-    count: u8,
-    /// How many move points are needed for the single action
-    speed: u8 = 10,
-
-    pub inline fn subtract(self: *MovePoints, amount: u8) void {
-        if (amount > self.count) self.count = 0 else self.count -= amount;
-    }
-
-    pub inline fn add(self: *MovePoints, amount: u8) void {
-        if (255 - self.count < amount) self.count += amount;
-    }
+pub const Speed = struct {
+    /// How many move points are needed for moving on the neighbor position
+    move_points: u8 = 10,
 
     pub fn deinit(_: *@This()) void {}
 };
@@ -149,6 +137,14 @@ pub const MeleeWeapon = struct {
     pub fn deinit(_: *@This()) void {}
 };
 
+pub const NPC = struct {
+    pub const Type = enum{ melee };
+
+    type: Type = .melee,
+
+    pub fn deinit(_: *@This()) void {}
+};
+
 pub const Components = union {
     position: Position,
     sprite: Sprite,
@@ -159,6 +155,7 @@ pub const Components = union {
     health: Health,
     damage: Damage,
     collision: Collision,
-    move_points: MovePoints,
+    speed: Speed,
     melee: MeleeWeapon,
+    npc: NPC,
 };
