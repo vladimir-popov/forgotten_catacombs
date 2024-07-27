@@ -30,7 +30,7 @@ players_move: bool,
 moved_actors: u8,
 /// An entity in player's focus to which a quick action can be applied
 target_entity: ?EntityInFocus,
-/// How is attacking the player right now
+/// Who is attacking the player right now
 attacking_entity: ?game.Entity,
 
 pub fn create(session: *game.GameSession) !*PlayMode {
@@ -101,6 +101,19 @@ pub fn tick(self: *PlayMode) anyerror!void {
         }
     }
     _ = try self.runSystems();
+    if (self.session.components.getForEntity(self.session.player, game.Action)) |action| {
+        if (action.type == .hit) {
+            // FIXME: здесь явно дублирование кода и аргументов.
+            // Мб стоит сделать calculateQuickActionForTarget методом EntityInFocus
+            const player_position = self.session.components.getForEntityUnsafe(
+                self.session.player,
+                game.Position,
+            );
+            log.info("Change target to {d}", .{action.type.hit});
+            self.target_entity = .{ .entity = action.type.hit, .quick_action = null };
+            self.calculateQuickActionForTarget(action.type.hit, player_position.point);
+        }
+    }
 }
 
 const Actor = struct {
