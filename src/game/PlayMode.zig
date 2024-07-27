@@ -24,10 +24,14 @@ session: *game.GameSession,
 actors: std.ArrayList(Actor),
 /// Index of the actor, which should do move on next tick
 current_actor: u8,
+/// Is the player should do its move now?
 players_move: bool,
+/// How many actors except player did their move
 moved_actors: u8,
 /// An entity in player's focus to which a quick action can be applied
 target_entity: ?EntityInFocus,
+/// How is attacking the player right now
+attacking_entity: ?game.Entity,
 
 pub fn create(session: *game.GameSession) !*PlayMode {
     const self = try session.runtime.alloc.create(PlayMode);
@@ -37,6 +41,7 @@ pub fn create(session: *game.GameSession) !*PlayMode {
     self.moved_actors = 0;
     self.players_move = true;
     self.target_entity = null;
+    self.attacking_entity = null;
     return self;
 }
 
@@ -78,8 +83,13 @@ pub fn tick(self: *PlayMode) anyerror!void {
         }
     } else {
         if (self.current_actor < self.actors.items.len) {
-            log.info("Current actor {d} {any}", .{ self.current_actor, self.actors.items[self.current_actor] });
-            if (try self.actors.items[self.current_actor].doMove()) {
+            const actor: *Actor = &self.actors.items[self.current_actor];
+            if (try actor.doMove()) {
+                if (self.session.components.getForEntity(actor.entity, game.Action)) |action| {
+                    if (action.type == .hit) {
+                        self.attacking_entity = actor.entity;
+                    }
+                }
                 self.moved_actors += 1;
             }
             self.current_actor += 1;
@@ -87,6 +97,7 @@ pub fn tick(self: *PlayMode) anyerror!void {
             self.players_move = self.moved_actors == 0;
             self.current_actor = 0;
             self.moved_actors = 0;
+            self.attacking_entity = null;
         }
     }
     _ = try self.runSystems();
@@ -150,49 +161,37 @@ pub fn handleInput(self: PlayMode, buttons: game.Buttons) !void {
     }
 }
 
-pub fn draw(play_mode: *const PlayMode) !void {
-    // Highlight entity and draw quick action
-    if (play_mode.target_entity) |target| {
-        try highlightEntityInFocus(play_mode.session, target.entity);
-        if (target.quick_action) |qa|
-            try drawQuickAction(play_mode.session, qa);
+/// Highlight entity and draw quick action
+pub fn draw(self: *const PlayMode) !void {
+    if (self.attacking_entity) |entity| {
+        try highlightEntity(self.session, entity);
+    } else if (self.target_entity) |target| {
+        try highlightEntity(self.session, target.entity);
     }
+    if (self.target_entity) |target| if (target.quick_action) |qa|
+        try drawQuickAction(self.session, qa);
 }
 
-fn highlightEntityInFocus(session: *const game.GameSession, entity: game.Entity) !void {
-    if (session.components.getForEntity(session.player, game.Position)) |player_position| {
-        if (session.components.getForEntity(entity, game.Position)) |target_position| {
-            if (!player_position.point.eql(target_position.point)) {
-                const sprite = session.components.getForEntityUnsafe(entity, game.Sprite);
-                try session.runtime.drawSprite(&session.screen, sprite, target_position, .inverted);
-            }
-        }
-    }
+fn highlightEntity(session: *const game.GameSession, entity: game.Entity) !void {
+    const target_position = session.components.getForEntityUnsafe(entity, game.Position);
+    const sprite = session.components.getForEntityUnsafe(entity, game.Sprite);
+    try session.runtime.drawSprite(&session.screen, sprite, target_position, .inverted);
 }
 
 fn drawQuickAction(session: *const game.GameSession, quick_action: game.Action) !void {
     switch (quick_action.type) {
-        .open => |door| if (session.components.getForEntity(door, game.Sprite)) |sprite| {
-            const position = session.components.getForEntityUnsafe(door, game.Position);
-            try drawLabelAndHighlightQuickActionTarget(session, "Open", sprite, position);
-        },
-        .close => |door| if (session.components.getForEntity(door, game.Sprite)) |sprite| {
-            const position = session.components.getForEntityUnsafe(door, game.Position);
-            try drawLabelAndHighlightQuickActionTarget(session, "Close", sprite, position);
-        },
+        .open => try drawLabel(session, "Open"),
+        .close => try drawLabel(session, "Close"),
         .take => |_| {
             // try drawLabelAndHighlightQuickActionTarget(session, "Take");
         },
         .hit => |enemy| {
             // Draw details about the enemy:
-            if (session.components.getForEntity(enemy, game.Sprite)) |sprite| {
-                if (session.components.getForEntity(enemy, game.Health)) |hp| {
-                    if (session.components.getForEntity(enemy, game.Description)) |description| {
-                        const position = session.components.getForEntityUnsafe(enemy, game.Position);
-                        try drawLabelAndHighlightQuickActionTarget(session, "Attack", sprite, position);
-                        try Render.drawEntityName(session, description.name);
-                        try Render.drawEnemyHP(session, hp);
-                    }
+            if (session.components.getForEntity(enemy, game.Health)) |hp| {
+                if (session.components.getForEntity(enemy, game.Description)) |description| {
+                    try drawLabel(session, "Attack");
+                    try Render.drawEntityName(session, description.name);
+                    try Render.drawEnemyHP(session, hp);
                 }
             }
         },
@@ -200,15 +199,12 @@ fn drawQuickAction(session: *const game.GameSession, quick_action: game.Action) 
     }
 }
 
-fn drawLabelAndHighlightQuickActionTarget(
+fn drawLabel(
     session: *const game.GameSession,
     label: []const u8,
-    sprite: *const game.Sprite,
-    position: *const game.Position,
 ) !void {
     const prompt_position = p.Point{ .row = game.DISPLPAY_ROWS, .col = game.DISPLAY_DUNG_COLS + 2 };
     try session.runtime.drawText(label, prompt_position);
-    try session.runtime.drawSprite(&session.screen, sprite, position, .inverted);
 }
 
 fn updateTarget(self: *PlayMode) anyerror!void {
