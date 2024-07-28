@@ -57,6 +57,7 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
             state.session = game.GameSession.create(state.runtime.any()) catch
                 @panic("Error on creating game session");
 
+            playdate.display.setRefreshRate(0);
             playdate.system.setUpdateCallback(update_and_render, state);
         },
         else => {},

@@ -126,6 +126,7 @@ fn drawUI(ptr: *anyopaque) anyerror!void {
     const x = (game.DISPLAY_DUNG_COLS + 1) * game.FONT_WIDTH;
     self.playdate.graphics.drawLine(x, 0, x, game.DISPLPAY_HEGHT, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
     self.playdate.graphics.drawLine(x + 2, 0, x + 2, game.DISPLPAY_HEGHT, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
+    self.playdate.system.drawFPS(1, 1);
 }
 
 fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {
