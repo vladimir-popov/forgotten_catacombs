@@ -11,10 +11,7 @@ pub fn handleCollisions(session: *game.GameSession) anyerror!void {
             .wall => {},
             .door => |door| try session.components.setToEntity(
                 collision.entity,
-                if (door.state == .closed)
-                    game.Action{ .type = .{ .open = door.entity }, .move_points = 10 }
-                else
-                    game.Action{ .type = .{ .close = door.entity }, .move_points = 10 },
+                game.Action{ .type = .{ .open = door.entity }, .move_points = 10 },
             ),
             .enemy => |enemy| {
                 if (session.components.getForEntity(collision.entity, game.Health)) |_| {
