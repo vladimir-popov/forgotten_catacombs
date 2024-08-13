@@ -118,7 +118,10 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?game.Buttons {
     return null;
 }
 
-fn clearScreen(_: *anyopaque) anyerror!void {}
+fn clearScreen(ptr: *anyopaque) anyerror!void {
+    var self: *Self = @ptrCast(@alignCast(ptr));
+    self.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
+}
 
 fn drawUI(ptr: *anyopaque) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
@@ -161,30 +164,37 @@ fn drawSprite(
         const x: c_int = game.FONT_WIDTH * @as(c_int, position.point.col - screen.region.top_left.col + 1);
         var buf: [4]u8 = undefined;
         const len = try std.unicode.utf8Encode(sprite.codepoint, &buf);
-        if (mode == .inverted) {
-            self.playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeInverted);
-            _ = self.playdate.graphics.drawText(&buf, len, .UTF8Encoding, x, y);
-            self.playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeCopy);
-        } else {
-            _ = self.playdate.graphics.drawText(&buf, len, .UTF8Encoding, x, y);
-        }
+        try self.drawTextWithMode(buf[0..len], mode, x, y);
     }
 }
 
-fn drawText(ptr: *anyopaque, text: []const u8, absolute_position: p.Point) !void {
+fn drawText(ptr: *anyopaque, text: []const u8, absolute_position: p.Point, mode: game.AnyRuntime.DrawingMode) !void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     // choose the font for text:
     self.playdate.graphics.setFont(self.text_font);
-    self.playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeFillWhite);
-    // draw label:
-    _ = self.playdate.graphics.drawText(
-        text.ptr,
-        text.len,
-        .UTF8Encoding,
+    // draw text:
+    try self.drawTextWithMode(
+        text,
+        mode,
         @as(c_int, absolute_position.col) * game.FONT_WIDTH,
         @as(c_int, absolute_position.row) * game.FONT_HEIGHT,
     );
     // revert font for sprites:
     self.playdate.graphics.setFont(self.sprites_font);
-    self.playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeCopy);
+}
+
+inline fn drawTextWithMode(
+    self: *Self,
+    text: []const u8,
+    mode: game.AnyRuntime.DrawingMode,
+    x: c_int,
+    y: c_int,
+) !void {
+    if (mode == .inverted) {
+        self.playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeInverted);
+        _ = self.playdate.graphics.drawText(text.ptr, text.len, .UTF8Encoding, x, y);
+        self.playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeCopy);
+    } else {
+        _ = self.playdate.graphics.drawText(text.ptr, text.len, .UTF8Encoding, x, y);
+    }
 }

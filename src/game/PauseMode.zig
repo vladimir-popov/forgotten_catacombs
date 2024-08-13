@@ -11,12 +11,10 @@ const PauseMode = @This();
 
 session: *game.GameSession,
 entities_on_screen: std.AutoHashMap(p.Point, game.Entity),
-target: game.Entity,
 
 pub fn create(session: *game.GameSession) !*PauseMode {
     const self = try session.runtime.alloc.create(PauseMode);
     self.session = session;
-    self.target = self.session.player;
     self.entities_on_screen = std.AutoHashMap(p.Point, game.Entity).init(self.session.runtime.alloc);
     try self.refresh();
     return self;
@@ -32,13 +30,14 @@ pub fn clear(self: *PauseMode) void {
 }
 
 pub fn refresh(self: *PauseMode) !void {
-    self.target = self.session.player;
+    self.session.entity_in_focus = self.session.player;
     self.entities_on_screen.clearRetainingCapacity();
     var itr = self.session.query.get(game.Position);
     while (itr.next()) |tuple| {
         if (self.session.screen.region.containsPoint(tuple[1].point))
             try self.entities_on_screen.put(tuple[1].point, tuple[0]);
     }
+    try Render.redraw(self.session);
 }
 
 pub fn tick(self: *PauseMode) anyerror!void {
@@ -47,41 +46,25 @@ pub fn tick(self: *PauseMode) anyerror!void {
         switch (btn.code) {
             game.Buttons.A => {},
             game.Buttons.B => {
-                self.session.play();
+                try self.session.play();
                 return;
             },
             game.Buttons.Left, game.Buttons.Right, game.Buttons.Up, game.Buttons.Down => {
                 self.chooseNextEntity(btn.toDirection().?);
+                try Render.drawScene(self.session);
             },
             else => {},
         }
     }
-    // rendering should be independent on input,
-    // to be able to play animations
-    try Render.render(self.session);
-}
-
-pub fn draw(self: PauseMode) !void {
-    try self.session.runtime.drawText("pause", .{ .row = 1, .col = game.DISPLAY_DUNG_COLS + 2 });
-    // highlight entity in focus
-    if (self.session.components.getForEntity(self.target, game.Sprite)) |target_sprite| {
-        const position = self.session.components.getForEntityUnsafe(self.target, game.Position);
-        try self.session.runtime.drawSprite(&self.session.screen, target_sprite, position, .inverted);
-    }
-    if (self.session.components.getForEntity(self.target, game.Description)) |description| {
-        try Render.drawEntityName(self.session, description.name);
-    }
-    if (self.session.components.getForEntity(self.target, game.Health)) |hp| {
-        try Render.drawEnemyHP(self.session, hp);
-    }
 }
 
 fn chooseNextEntity(self: *PauseMode, direction: p.Direction) void {
-    const init_position = self.session.components.getForEntityUnsafe(self.target, game.Position).point;
-    var itr = Iterator.init(init_position, direction, self.session.screen.region);
+    const target_entity = self.session.entity_in_focus orelse self.session.player;
+    const init_position = self.session.components.getForEntityUnsafe(target_entity, game.Position);
+    var itr = Iterator.init(init_position.point, direction, self.session.screen.region);
     while (itr.next()) |position| {
         if (self.entities_on_screen.get(position)) |entity| {
-            self.target = entity;
+            self.session.entity_in_focus = entity;
             return;
         }
     }

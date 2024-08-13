@@ -131,7 +131,7 @@ pub const MeleeWeapon = struct {
     move_points: u8,
 
     pub fn damage(self: MeleeWeapon, rand: std.Random) Damage {
-        return .{ .amount = rand.uintAtMost(u8, self.max_damage) };
+        return .{ .amount = rand.uintLessThan(u8, self.max_damage) + 1 };
     }
 
     pub fn deinit(_: *@This()) void {}

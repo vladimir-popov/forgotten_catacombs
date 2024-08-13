@@ -219,7 +219,21 @@ fn drawSprite(
 }
 
 // row and col - position of the lable in the window, not inside the screen!
-fn drawText(ptr: *anyopaque, text: []const u8, absolute_position: p.Point) !void {
+fn drawText(
+    ptr: *anyopaque,
+    text: []const u8,
+    absolute_position: p.Point,
+    mode: game.AnyRuntime.DrawingMode,
+) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    try self.buffer.mergeLine(text, absolute_position.row, absolute_position.col); // do not subtract, coz border!
+    if (mode == .inverted) {
+        var buf: [50]u8 = undefined;
+        try self.buffer.mergeLine(
+            try std.fmt.bufPrint(&buf, tty.Text.inverted("{s}"), .{text}),
+            absolute_position.row,
+            absolute_position.col,
+        );
+    } else {
+        try self.buffer.mergeLine(text, absolute_position.row, absolute_position.col); // do not subtract, coz border!
+    }
 }

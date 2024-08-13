@@ -16,7 +16,7 @@ pub fn writeLog(
             @panic("Error on write log");
         };
     } else {
-        log_file = std.fs.cwd().createFile("error.log", .{ .read = false, .truncate = true }) catch {
+        log_file = std.fs.cwd().createFile("game.log", .{ .read = false, .truncate = true }) catch {
             @panic("Error on open log file.");
         };
         writeLog(message_level, scope, format, args);

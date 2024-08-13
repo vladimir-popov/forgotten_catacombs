@@ -67,8 +67,6 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
 
 fn update_and_render(userdata: ?*anyopaque) callconv(.C) c_int {
     const state: *GlobalState = @ptrCast(@alignCast(userdata.?));
-    state.runtime.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
-
     state.session.tick() catch |err|
         std.debug.panic("Error {any} on game tick", .{err});
 
