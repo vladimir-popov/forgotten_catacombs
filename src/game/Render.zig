@@ -29,47 +29,18 @@ pub fn drawScene(session: *game.GameSession) !void {
     try drawStats(session);
 }
 
-fn drawStats(session: *const game.GameSession) !void {
-    // Draw player's health
-    if (session.components.getForEntity(session.player, game.Health)) |health| {
-        var buf = [_]u8{0} ** game.STATS_COLS;
-        try session.runtime.drawText(label_max_length, try std.fmt.bufPrint(&buf, "HP: {d}", .{health.current}), .{ .row = 2, .col = game.DISPLAY_DUNG_COLS + 2 }, .normal, .left);
-    }
-    // Draw the name and health of the entity in focus
-    const name_position = .{ .row = 5, .col = game.DISPLAY_DUNG_COLS + 2 };
-    const hp_position = p.Point{ .row = 6, .col = game.DISPLAY_DUNG_COLS + 2 };
-    if (session.entity_in_focus) |entity| {
-        if (entity != session.player) {
-            // Draw entity's name
-            if (session.components.getForEntity(entity, game.Description)) |desc| {
-                try session.runtime.drawText(label_max_length, desc.name, name_position, .normal, .center);
-            }
-            // Draw enemy's health
-            if (session.components.getForEntity(entity, game.Health)) |hp| {
-                var buf: [3]u8 = undefined;
-                const len = std.fmt.formatIntBuf(&buf, hp.current, 10, .lower, .{});
-                try session.runtime.drawText(label_max_length, buf[0..len], hp_position, .normal, .right);
-            } else {
-                try cleanLabel(session, hp_position);
-            }
-        } else {
-            try cleanLabel(session, name_position);
-            try cleanLabel(session, hp_position);
+/// Draw sprites inside the screen ignoring lights
+fn drawSprites(session: *const game.GameSession) !void {
+    var itr = session.query.get2(game.Position, game.Sprite);
+    while (itr.next()) |tuple| {
+        if (session.screen.region.containsPoint(tuple[1].point)) {
+            const mode: game.AnyRuntime.DrawingMode = if (session.entity_in_focus == tuple[0])
+                .inverted
+            else
+                .normal;
+            try session.runtime.drawSprite(&session.screen, tuple[2], tuple[1], mode);
         }
-    } else {
-        try cleanLabel(session, name_position);
-        try cleanLabel(session, hp_position);
     }
-    // Draw the current mode
-    const mode_position = .{ .row = 1, .col = game.DISPLAY_DUNG_COLS + 2 };
-    switch (session.mode) {
-        .pause => try session.runtime.drawText(label_max_length, "pause", mode_position, .normal, .center),
-        .play => try cleanLabel(session, mode_position),
-    }
-}
-
-inline fn cleanLabel(session: *const game.GameSession, position: p.Point) !void {
-    try session.runtime.drawText(label_max_length, " ", position, .normal, .left);
 }
 
 /// Draws a single frame from every animation.
@@ -99,27 +70,63 @@ fn drawAnimationsFrame(session: *game.GameSession) !void {
     }
 }
 
-/// Draw sprites inside the screen ignoring lights
-fn drawSprites(session: *const game.GameSession) !void {
-    var itr = session.query.get2(game.Position, game.Sprite);
-    while (itr.next()) |tuple| {
-        if (session.screen.region.containsPoint(tuple[1].point)) {
-            const mode: game.AnyRuntime.DrawingMode = if (session.entity_in_focus == tuple[0])
-                .inverted
-            else
-                .normal;
-            try session.runtime.drawSprite(&session.screen, tuple[2], tuple[1], mode);
+fn drawStats(session: *const game.GameSession) !void {
+    // Draw player's health
+    const player_hp_position = .{ .row = 2, .col = game.DISPLAY_DUNG_COLS + 2 };
+    if (session.components.getForEntity(session.player, game.Health)) |health| {
+        var buf = [_]u8{0} ** game.STATS_COLS;
+        try session.runtime.drawText(
+            label_max_length,
+            try std.fmt.bufPrint(&buf, "HP: {d}", .{health.current}),
+            player_hp_position,
+            .normal,
+            .left,
+        );
+    }
+    // Draw the name and health of the entity in focus
+    const name_position = .{ .row = 5, .col = game.DISPLAY_DUNG_COLS + 2 };
+    const enemy_hp_position = p.Point{ .row = 6, .col = game.DISPLAY_DUNG_COLS + 2 };
+    if (session.entity_in_focus) |entity| {
+        // Draw entity's name
+        if (session.components.getForEntity(entity, game.Description)) |desc| {
+            try session.runtime.drawText(label_max_length, desc.name, name_position, .normal, .center);
         }
+        // Draw enemy's health
+        if (entity != session.player) {
+            if (session.components.getForEntity(entity, game.Health)) |hp| {
+                var buf: [3]u8 = undefined;
+                const len = std.fmt.formatIntBuf(&buf, hp.current, 10, .lower, .{});
+                try session.runtime.drawText(label_max_length, buf[0..len], enemy_hp_position, .normal, .right);
+            } else {
+                try cleanLabel(session, enemy_hp_position);
+            }
+        } else {
+            try cleanLabel(session, enemy_hp_position);
+        }
+    } else {
+        try cleanLabel(session, name_position);
+        try cleanLabel(session, enemy_hp_position);
+    }
+    // Draw the current mode
+    const mode_position = .{ .row = 1, .col = game.DISPLAY_DUNG_COLS + 2 };
+    switch (session.mode) {
+        .pause => try session.runtime.drawText(label_max_length, "pause", mode_position, .normal, .center),
+        .play => try cleanLabel(session, mode_position),
+    }
+    // Draw the quick action
+    const prompt_position = p.Point{ .row = game.DISPLPAY_ROWS, .col = game.DISPLAY_DUNG_COLS + 2 };
+    if (session.quick_action) |qa| {
+        switch (qa.type) {
+            .open => try session.runtime.drawText(label_max_length, "Open", prompt_position, .normal, .center),
+            .close => try session.runtime.drawText(label_max_length, "Close", prompt_position, .normal, .center),
+            .hit => try session.runtime.drawText(label_max_length, "Attack", prompt_position, .normal, .center),
+            else => try cleanLabel(session, prompt_position),
+        }
+    } else {
+        try cleanLabel(session, prompt_position);
     }
 }
 
-/// Draws the prompt on right pane with available quick action
-pub fn drawQuickAction(session: *const game.GameSession, quick_action: game.Action) !void {
-    const prompt_position = p.Point{ .row = game.DISPLPAY_ROWS, .col = game.DISPLAY_DUNG_COLS + 2 };
-    switch (quick_action.type) {
-        .open => try session.runtime.drawText(label_max_length, "Open", prompt_position, .normal, .center),
-        .close => try session.runtime.drawText(label_max_length, "Close", prompt_position, .normal, .center),
-        .hit => try session.runtime.drawText(label_max_length, "Attack", prompt_position, .normal, .center),
-        else => {},
-    }
+inline fn cleanLabel(session: *const game.GameSession, position: p.Point) !void {
+    try session.runtime.drawText(label_max_length, " ", position, .normal, .left);
 }

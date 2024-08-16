@@ -25,12 +25,9 @@ pub fn destroy(self: *PauseMode) void {
     self.session.runtime.alloc.destroy(self);
 }
 
-pub fn clear(self: *PauseMode) void {
-    self.entities_on_screen.clearAndFree();
-}
-
 pub fn refresh(self: *PauseMode) !void {
     self.session.entity_in_focus = self.session.player;
+    self.session.quick_action = null;
     self.entities_on_screen.clearRetainingCapacity();
     var itr = self.session.query.get(game.Position);
     while (itr.next()) |tuple| {

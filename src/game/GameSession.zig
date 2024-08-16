@@ -28,6 +28,8 @@ dungeon: *game.Dungeon,
 player: game.Entity = undefined,
 /// Highlighted entity
 entity_in_focus: ?game.Entity = null,
+// An action which could be applied to the entity in focus
+quick_action: ?game.Action,
 /// The current mode of the game
 mode: Mode = .play,
 play_mode: *game.PlayMode = undefined,
@@ -40,6 +42,7 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
         .screen = game.Screen.init(game.DISPLAY_DUNG_ROWS, game.DISPLAY_DUNG_COLS, game.Dungeon.Region),
         .entities = try ecs.EntitiesManager.init(runtime.alloc),
         .entity_in_focus = null,
+        .quick_action = null,
         .components = try ecs.ComponentsManager(game.Components).init(runtime.alloc),
         .dungeon = try game.Dungeon.createRandom(runtime.alloc, runtime.rand),
     };
