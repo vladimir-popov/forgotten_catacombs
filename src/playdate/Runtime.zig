@@ -129,7 +129,6 @@ fn drawUI(ptr: *anyopaque) anyerror!void {
     const x = (game.DISPLAY_DUNG_COLS + 1) * game.FONT_WIDTH;
     self.playdate.graphics.drawLine(x, 0, x, game.DISPLPAY_HEGHT, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
     self.playdate.graphics.drawLine(x + 2, 0, x + 2, game.DISPLPAY_HEGHT, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
-    self.playdate.system.drawFPS(1, 1);
 }
 
 fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {
@@ -160,8 +159,8 @@ fn drawSprite(
 ) anyerror!void {
     if (screen.region.containsPoint(position.point)) {
         const self: *Self = @ptrCast(@alignCast(ptr));
-        const y: c_int = game.FONT_HEIGHT * @as(c_int, position.point.row - screen.region.top_left.row + 1);
-        const x: c_int = game.FONT_WIDTH * @as(c_int, position.point.col - screen.region.top_left.col + 1);
+        const y: c_int = game.FONT_HEIGHT * @as(c_int, position.point.row - screen.region.top_left.row);
+        const x: c_int = game.FONT_WIDTH * @as(c_int, position.point.col - screen.region.top_left.col);
         var buf: [4]u8 = undefined;
         const len = try std.unicode.utf8Encode(sprite.codepoint, &buf);
         try self.drawTextWithMode(buf[0..len], mode, x, y);

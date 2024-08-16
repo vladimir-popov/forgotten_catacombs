@@ -71,17 +71,20 @@ fn drawAnimationsFrame(session: *game.GameSession) !void {
 }
 
 fn drawStats(session: *const game.GameSession) !void {
-    // Draw player's health
-    const player_hp_position = .{ .row = 2, .col = game.DISPLAY_DUNG_COLS + 2 };
-    if (session.components.getForEntity(session.player, game.Health)) |health| {
-        var buf = [_]u8{0} ** game.STATS_COLS;
-        try session.runtime.drawText(
-            label_max_length,
-            try std.fmt.bufPrint(&buf, "HP: {d}", .{health.current}),
-            player_hp_position,
-            .normal,
-            .left,
-        );
+    // Draw player's health, or pause mode indicator
+    const player_hp_position = .{ .row = 1, .col = game.DISPLAY_DUNG_COLS + 2 };
+    switch (session.mode) {
+        .pause => try session.runtime.drawText(label_max_length, "pause", player_hp_position, .normal, .center),
+        .play => if (session.components.getForEntity(session.player, game.Health)) |health| {
+            var buf = [_]u8{0} ** game.STATS_COLS;
+            try session.runtime.drawText(
+                label_max_length,
+                try std.fmt.bufPrint(&buf, "HP: {d}", .{health.current}),
+                player_hp_position,
+                .normal,
+                .left,
+            );
+        },
     }
     // Draw the name and health of the entity in focus
     const name_position = .{ .row = 5, .col = game.DISPLAY_DUNG_COLS + 2 };
@@ -106,12 +109,6 @@ fn drawStats(session: *const game.GameSession) !void {
     } else {
         try cleanLabel(session, name_position);
         try cleanLabel(session, enemy_hp_position);
-    }
-    // Draw the current mode
-    const mode_position = .{ .row = 1, .col = game.DISPLAY_DUNG_COLS + 2 };
-    switch (session.mode) {
-        .pause => try session.runtime.drawText(label_max_length, "pause", mode_position, .normal, .center),
-        .play => try cleanLabel(session, mode_position),
     }
     // Draw the quick action
     const prompt_position = p.Point{ .row = game.DISPLPAY_ROWS, .col = game.DISPLAY_DUNG_COLS + 2 };

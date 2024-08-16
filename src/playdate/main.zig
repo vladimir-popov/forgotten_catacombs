@@ -70,6 +70,8 @@ fn update_and_render(userdata: ?*anyopaque) callconv(.C) c_int {
     state.session.tick() catch |err|
         std.debug.panic("Error {any} on game tick", .{err});
 
+    state.runtime.playdate.system.drawFPS(1, 1);
+
     //returning 1 signals to the OS to draw the frame.
     return 1;
 }
