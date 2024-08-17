@@ -1,6 +1,23 @@
 /// Set of methods to draw the game.
 /// Comparing with `AnyRuntime`, this module contains methods
 /// to draw objects from the game domain.
+///
+///   ╔═══════════════════════════════════════╗
+///   ║                                       ║
+///   ║                                       ║
+///   ║                                       ║
+///   ║                                       ║
+///   ║                                       ║
+///   ║                  Screen               ║
+///   ║                                       ║
+///   ║                                       ║
+///   ║                                       ║
+///   ║                                       ║
+///   ║═══════════════════════════════════════║
+///   ║HP: 100  Wolf:   ||||||||||     Attack ║
+///   ╚═══════════════════════════════════════╝
+///   | Zone 0 | Zone 1 | Zone 2      |Zone 3 |
+///
 const std = @import("std");
 const algs_and_types = @import("algs_and_types");
 const p = algs_and_types.primitives;
@@ -8,8 +25,8 @@ const game = @import("game.zig");
 
 const log = std.log.scoped(.render);
 
-/// The maximum length of any labels in the stats pane
-const label_max_length = 8;
+const DrawingMode = game.AnyRuntime.DrawingMode;
+const TextAlign = game.AnyRuntime.TextAlign;
 
 /// Clears the screen and draw all from scratch.
 /// Removes completed animations.
@@ -72,58 +89,63 @@ fn drawAnimationsFrame(session: *game.GameSession) !void {
 
 fn drawStats(session: *const game.GameSession) !void {
     // Draw player's health, or pause mode indicator
-    const player_hp_position = .{ .row = 1, .col = game.DISPLAY_DUNG_COLS + 2 };
     switch (session.mode) {
-        .pause => try session.runtime.drawText(label_max_length, "pause", player_hp_position, .normal, .center),
+        .pause => try drawZone(0, session, "Pause", .normal, .center),
         .play => if (session.components.getForEntity(session.player, game.Health)) |health| {
-            var buf = [_]u8{0} ** game.STATS_COLS;
-            try session.runtime.drawText(
-                label_max_length,
-                try std.fmt.bufPrint(&buf, "HP: {d}", .{health.current}),
-                player_hp_position,
-                .normal,
-                .left,
-            );
+            var buf = [_]u8{0} ** 8;
+            const text = try std.fmt.bufPrint(&buf, "HP: {d}", .{health.current});
+            try drawZone(0, session, text, .normal, .left);
         },
     }
     // Draw the name and health of the entity in focus
-    const name_position = .{ .row = 5, .col = game.DISPLAY_DUNG_COLS + 2 };
-    const enemy_hp_position = p.Point{ .row = 6, .col = game.DISPLAY_DUNG_COLS + 2 };
     if (session.entity_in_focus) |entity| {
         // Draw entity's name
         if (session.components.getForEntity(entity, game.Description)) |desc| {
-            try session.runtime.drawText(label_max_length, desc.name, name_position, .normal, .center);
+            try drawZone(1, session, desc.name, .normal, .right);
         }
         // Draw enemy's health
         if (entity != session.player) {
             if (session.components.getForEntity(entity, game.Health)) |hp| {
                 var buf: [3]u8 = undefined;
                 const len = std.fmt.formatIntBuf(&buf, hp.current, 10, .lower, .{});
-                try session.runtime.drawText(label_max_length, buf[0..len], enemy_hp_position, .normal, .right);
+                try drawZone(2, session, buf[0..len], .normal, .left);
             } else {
-                try cleanLabel(session, enemy_hp_position);
+                try cleanZone(2, session);
             }
         } else {
-            try cleanLabel(session, enemy_hp_position);
+            try cleanZone(2, session);
         }
     } else {
-        try cleanLabel(session, name_position);
-        try cleanLabel(session, enemy_hp_position);
+        try cleanZone(1, session);
+        try cleanZone(2, session);
     }
     // Draw the quick action
-    const prompt_position = p.Point{ .row = game.DISPLPAY_ROWS, .col = game.DISPLAY_DUNG_COLS + 2 };
     if (session.quick_action) |qa| {
         switch (qa.type) {
-            .open => try session.runtime.drawText(label_max_length, "Open", prompt_position, .normal, .center),
-            .close => try session.runtime.drawText(label_max_length, "Close", prompt_position, .normal, .center),
-            .hit => try session.runtime.drawText(label_max_length, "Attack", prompt_position, .normal, .center),
-            else => try cleanLabel(session, prompt_position),
+            .open => try drawZone(3, session, "Open", .inverted, .center),
+            .close => try drawZone(3, session, "Close", .inverted, .center),
+            .hit => try drawZone(3, session, "Attack", .inverted, .center),
+            else => try cleanZone(3, session),
         }
     } else {
-        try cleanLabel(session, prompt_position);
+        try cleanZone(3, session);
     }
 }
 
-inline fn cleanLabel(session: *const game.GameSession, position: p.Point) !void {
-    try session.runtime.drawText(label_max_length, " ", position, .normal, .left);
+inline fn cleanZone(comptime zone: u8, session: *const game.GameSession) !void {
+    try drawZone(zone, session, " ", .normal, .left);
+}
+
+inline fn drawZone(
+    comptime zone: u8,
+    session: *const game.GameSession,
+    text: []const u8,
+    mode: DrawingMode,
+    aln: TextAlign,
+) !void {
+    switch (zone) {
+        2 => try session.runtime.drawText(game.DISPLAY_COLS - 28, text, .{ .row = game.DISPLAY_ROWS, .col = 19 }, mode, aln),
+        3 => try session.runtime.drawText(8, text, .{ .row = game.DISPLAY_ROWS, .col = game.DISPLAY_COLS - 8 }, mode, aln),
+        else => try session.runtime.drawText(8, text, .{ .row = game.DISPLAY_ROWS, .col = zone * 9 + 1 }, mode, aln),
+    }
 }

@@ -126,9 +126,9 @@ fn clearScreen(ptr: *anyopaque) anyerror!void {
 fn drawUI(ptr: *anyopaque) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     // separate dung and stats:
-    const x = (game.DISPLAY_DUNG_COLS + 1) * game.FONT_WIDTH;
-    self.playdate.graphics.drawLine(x, 0, x, game.DISPLPAY_HEGHT, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
-    self.playdate.graphics.drawLine(x + 2, 0, x + 2, game.DISPLPAY_HEGHT, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
+    const y = game.DISPLAY_HEIGHT - game.FONT_HEIGHT * 2;
+    self.playdate.graphics.drawLine(0, y, game.DISPLAY_WIDHT, y, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
+    self.playdate.graphics.drawLine(0, y + 2, game.DISPLAY_WIDHT, y + 2, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
 }
 
 fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {
@@ -159,8 +159,8 @@ fn drawSprite(
 ) anyerror!void {
     if (screen.region.containsPoint(position.point)) {
         const self: *Self = @ptrCast(@alignCast(ptr));
-        const y: c_int = game.FONT_HEIGHT * @as(c_int, position.point.row - screen.region.top_left.row);
-        const x: c_int = game.FONT_WIDTH * @as(c_int, position.point.col - screen.region.top_left.col);
+        const y: c_int = game.SPRITE_HEIGHT * @as(c_int, position.point.row - screen.region.top_left.row);
+        const x: c_int = game.SPRITE_WIDTH * @as(c_int, position.point.col - screen.region.top_left.col);
         var buf: [4]u8 = undefined;
         const len = try std.unicode.utf8Encode(sprite.codepoint, &buf);
         try self.drawTextWithMode(buf[0..len], mode, x, y);
@@ -172,12 +172,9 @@ fn drawText(ptr: *anyopaque, text: []const u8, absolute_position: p.Point, mode:
     // choose the font for text:
     self.playdate.graphics.setFont(self.text_font);
     // draw text:
-    try self.drawTextWithMode(
-        text,
-        mode,
-        @as(c_int, absolute_position.col) * game.FONT_WIDTH,
-        @as(c_int, absolute_position.row) * game.FONT_HEIGHT,
-    );
+    const x = @as(c_int, absolute_position.col) * game.SPRITE_WIDTH;
+    const y = @as(c_int, absolute_position.row) * game.SPRITE_HEIGHT;
+    try self.drawTextWithMode(text, mode, x, y);
     // revert font for sprites:
     self.playdate.graphics.setFont(self.sprites_font);
 }

@@ -66,8 +66,8 @@ fn handleWindowResize(_: i32) callconv(.C) void {
     window_size = tty.Display.getWindowSize() catch unreachable;
     tty.Display.clearScreen() catch unreachable;
     if (should_render_in_center) {
-        rows_pad = (window_size.rows - game.DISPLPAY_ROWS) / 2;
-        cols_pad = (window_size.cols - game.DISPLPAY_COLS) / 2;
+        rows_pad = (window_size.rows - game.DISPLAY_ROWS) / 2;
+        cols_pad = (window_size.cols - game.DISPLAY_COLS) / 2;
     }
 }
 
@@ -157,14 +157,15 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?game.Buttons {
 
 fn drawUI(ptr: *anyopaque) !void {
     var self: *Self = @ptrCast(@alignCast(ptr));
-    const width = game.DISPLPAY_COLS + 1; // +1 for the separator between dung and stats
+    const width = game.DISPLAY_COLS;
     try self.buffer.addLine("╔" ++ "═" ** width ++ "╗");
-    for (0..game.DISPLPAY_ROWS) |_| {
-        try self.buffer.addLine("║" ++ " " ** game.DISPLAY_DUNG_COLS ++ "║" ++ " " ** game.STATS_COLS ++ "║");
+    for (1..(game.DISPLAY_ROWS + 2)) |r| {
+        if (r == game.DISPLAY_ROWS)
+            try self.buffer.addLine("║" ++ "═" ** width ++ "║")
+        else
+            try self.buffer.addLine("║" ++ " " ** width ++ "║");
     }
     try self.buffer.addLine("╚" ++ "═" ** width ++ "╝");
-    try self.buffer.lines.items[0].set(game.DISPLAY_DUNG_COLS + 1, '╦');
-    try self.buffer.lines.items[game.DISPLPAY_ROWS + 1].set(game.DISPLAY_DUNG_COLS + 1, '╩');
 }
 
 fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {
@@ -226,14 +227,13 @@ fn drawText(
     mode: game.AnyRuntime.DrawingMode,
 ) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
+    // skip horizontal UI separator
+    const r = if (absolute_position.row == game.DISPLAY_ROWS) game.DISPLAY_ROWS + 1 else absolute_position.row;
+    const c = absolute_position.col;
     if (mode == .inverted) {
         var buf: [50]u8 = undefined;
-        try self.buffer.mergeLine(
-            try std.fmt.bufPrint(&buf, tty.Text.inverted("{s}"), .{text}),
-            absolute_position.row,
-            absolute_position.col,
-        );
+        try self.buffer.mergeLine(try std.fmt.bufPrint(&buf, tty.Text.inverted("{s}"), .{text}), r, c);
     } else {
-        try self.buffer.mergeLine(text, absolute_position.row, absolute_position.col); // do not subtract, coz border!
+        try self.buffer.mergeLine(text, r, c);
     }
 }

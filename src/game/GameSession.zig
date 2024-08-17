@@ -39,7 +39,7 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     const session = try runtime.alloc.create(Self);
     session.* = .{
         .runtime = runtime,
-        .screen = game.Screen.init(game.DISPLAY_DUNG_ROWS, game.DISPLAY_DUNG_COLS, game.Dungeon.Region),
+        .screen = game.Screen.init(game.DISPLAY_ROWS - 1, game.DISPLAY_COLS, game.Dungeon.Region),
         .entities = try ecs.EntitiesManager.init(runtime.alloc),
         .entity_in_focus = null,
         .quick_action = null,

@@ -78,21 +78,12 @@ pub fn drawText(
     aln: TextAlign,
 ) !void {
     var buf: [len]u8 = undefined;
+    inline for (0..len) |i| buf[i] = ' ';
     const l = @min(len, text.len);
     switch (aln) {
-        // TODO: add support of the center aligning
-        .left, .center => {
-            std.mem.copyForwards(u8, &buf, text[0..l]);
-            if (l < len) {
-                for (0..(len - l)) |i| buf[l + i] = ' ';
-            }
-        },
-        .right => {
-            if (l < len) {
-                for (0..(len - l)) |i| buf[i] = ' ';
-            }
-            std.mem.copyForwards(u8, buf[(len - l)..], text[0..l]);
-        },
+        .left => std.mem.copyForwards(u8, &buf, text[0..l]),
+        .center => std.mem.copyForwards(u8, buf[(len - l) / 2 ..], text[0..l]),
+        .right => std.mem.copyForwards(u8, buf[(len - l)..], text[0..l]),
     }
     try self.vtable.drawText(self.context, &buf, absolut_position, mode);
 }
