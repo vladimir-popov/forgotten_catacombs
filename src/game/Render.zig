@@ -14,9 +14,9 @@
 ///   ║                                       ║
 ///   ║                                       ║
 ///   ║═══════════════════════════════════════║
-///   ║HP: 100  Wolf:   ||||||||||     Attack ║
+///   ║HP: 100     Wolf:||||||||||     Attack ║
 ///   ╚═══════════════════════════════════════╝
-///   | Zone 0 | Zone 1 | Zone 2      |Zone 3 |
+///   | Zone 0 |        Zone 1       | Zone 2 |
 ///
 const std = @import("std");
 const algs_and_types = @import("algs_and_types");
@@ -99,36 +99,34 @@ fn drawStats(session: *const game.GameSession) !void {
     }
     // Draw the name and health of the entity in focus
     if (session.entity_in_focus) |entity| {
+        var buf: [game.DISPLAY_COLS - 18]u8 = undefined;
+        var len: usize = 0;
         // Draw entity's name
         if (session.components.getForEntity(entity, game.Description)) |desc| {
-            try drawZone(1, session, desc.name, .normal, .right);
+            len = (try std.fmt.bufPrint(&buf, "{s}", .{desc.name})).len;
         }
         // Draw enemy's health
         if (entity != session.player) {
             if (session.components.getForEntity(entity, game.Health)) |hp| {
-                var buf: [3]u8 = undefined;
-                const len = std.fmt.formatIntBuf(&buf, hp.current, 10, .lower, .{});
-                try drawZone(2, session, buf[0..len], .normal, .left);
-            } else {
-                try cleanZone(2, session);
+                buf[len] = ' ';
+                len += 1;
+                len += std.fmt.formatIntBuf(buf[len..], hp.current, 10, .lower, .{});
             }
-        } else {
-            try cleanZone(2, session);
         }
+        try drawZone(1, session, buf[0..len], .normal, .center);
     } else {
         try cleanZone(1, session);
-        try cleanZone(2, session);
     }
     // Draw the quick action
     if (session.quick_action) |qa| {
         switch (qa.type) {
-            .open => try drawZone(3, session, "Open", .inverted, .center),
-            .close => try drawZone(3, session, "Close", .inverted, .center),
-            .hit => try drawZone(3, session, "Attack", .inverted, .center),
-            else => try cleanZone(3, session),
+            .open => try drawZone(2, session, "Open", .inverted, .center),
+            .close => try drawZone(2, session, "Close", .inverted, .center),
+            .hit => try drawZone(2, session, "Attack", .inverted, .center),
+            else => try cleanZone(2, session),
         }
     } else {
-        try cleanZone(3, session);
+        try cleanZone(2, session);
     }
 }
 
@@ -137,15 +135,16 @@ inline fn cleanZone(comptime zone: u8, session: *const game.GameSession) !void {
 }
 
 inline fn drawZone(
-    comptime zone: u8,
+    comptime zone: u2,
     session: *const game.GameSession,
     text: []const u8,
     mode: DrawingMode,
     aln: TextAlign,
 ) !void {
     switch (zone) {
-        2 => try session.runtime.drawText(game.DISPLAY_COLS - 28, text, .{ .row = game.DISPLAY_ROWS, .col = 19 }, mode, aln),
-        3 => try session.runtime.drawText(8, text, .{ .row = game.DISPLAY_ROWS, .col = game.DISPLAY_COLS - 8 }, mode, aln),
-        else => try session.runtime.drawText(8, text, .{ .row = game.DISPLAY_ROWS, .col = zone * 9 + 1 }, mode, aln),
+        0 => try session.runtime.drawText(8, text, .{ .row = game.DISPLAY_ROWS, .col = 1 }, mode, aln),
+        1 => try session.runtime.drawText(game.DISPLAY_COLS - 18, text, .{ .row = game.DISPLAY_ROWS, .col = 10 }, mode, aln),
+        2 => try session.runtime.drawText(8, text, .{ .row = game.DISPLAY_ROWS, .col = game.DISPLAY_COLS - 8 }, mode, aln),
+        else => unreachable,
     }
 }
