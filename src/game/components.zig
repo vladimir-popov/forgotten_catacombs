@@ -106,7 +106,9 @@ pub const Collision = struct {
 };
 
 pub const Health = struct {
-    total: u8,
+    // The count of maximum hp
+    max: u8,
+    // The count of the current hp
     current: i16,
     pub fn deinit(_: *@This()) void {}
 };

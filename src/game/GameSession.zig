@@ -145,7 +145,7 @@ fn initPlayer(
     try components.setToEntity(player, game.Position{ .point = init_position });
     try components.setToEntity(player, game.Sprite{ .codepoint = '@' });
     try components.setToEntity(player, game.Description{ .name = "You" });
-    try components.setToEntity(player, game.Health{ .total = 100, .current = 100 });
+    try components.setToEntity(player, game.Health{ .max = 100, .current = 100 });
     try components.setToEntity(player, game.MeleeWeapon{ .max_damage = 3, .move_points = 10 });
     try components.setToEntity(player, game.Speed{ .move_points = 10 });
     return player;
@@ -162,7 +162,7 @@ fn addRat(
         try components.setToEntity(rat, game.Position{ .point = position });
         try components.setToEntity(rat, game.Sprite{ .codepoint = 'r' });
         try components.setToEntity(rat, game.Description{ .name = "Rat" });
-        try components.setToEntity(rat, game.Health{ .total = 10, .current = 10 });
+        try components.setToEntity(rat, game.Health{ .max = 10, .current = 10 });
         try components.setToEntity(rat, game.MeleeWeapon{ .max_damage = 3, .move_points = 5 });
         try components.setToEntity(rat, game.Speed{ .move_points = 10 });
     }

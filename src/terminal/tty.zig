@@ -51,6 +51,12 @@ pub const Text = struct {
         }
     }
 
+    pub inline fn normal(comptime str: []const u8) *const [3 + str.len:0]u8 {
+        comptime {
+            return fmt.comptimePrint("{s}{s}", .{ SGR_RESET, str });
+        }
+    }
+
     pub inline fn bold(comptime str: []const u8) *const [7 + str.len:0]u8 {
         comptime {
             return fmt.comptimePrint("{s}{s}{s}", .{ SGR_BOLD, str, SGR_RESET });

@@ -99,18 +99,26 @@ fn drawStats(session: *const game.GameSession) !void {
     }
     // Draw the name and health of the entity in focus
     if (session.entity_in_focus) |entity| {
-        var buf: [game.DISPLAY_COLS - 18]u8 = undefined;
+        var buf: [MIDDLE_ZONE_LENGTH]u8 = undefined;
+        inline for (0..MIDDLE_ZONE_LENGTH) |i| buf[i] = ' ';
         var len: usize = 0;
         // Draw entity's name
         if (session.components.getForEntity(entity, game.Description)) |desc| {
             len = (try std.fmt.bufPrint(&buf, "{s}", .{desc.name})).len;
+            std.debug.assert(len < OUT_ZONE_LENGTH);
         }
         // Draw enemy's health
         if (entity != session.player) {
-            if (session.components.getForEntity(entity, game.Health)) |hp| {
-                buf[len] = ' ';
+            if (session.components.getForEntity(entity, game.Health)) |health| {
+                buf[len] = ':';
                 len += 1;
-                len += std.fmt.formatIntBuf(buf[len..], hp.current, 10, .lower, .{});
+                const hp = @max(health.current, 0);
+                const free_length = MIDDLE_ZONE_LENGTH - len;
+                const hp_length = @divFloor(free_length * hp, health.max);
+                for (0..hp_length) |i| {
+                    buf[len + i] = '|';
+                }
+                len += free_length;
             }
         }
         try drawZone(1, session, buf[0..len], .normal, .center);
@@ -134,6 +142,8 @@ inline fn cleanZone(comptime zone: u8, session: *const game.GameSession) !void {
     try drawZone(zone, session, " ", .normal, .left);
 }
 
+const OUT_ZONE_LENGTH = 8;
+const MIDDLE_ZONE_LENGTH = game.DISPLAY_COLS - (OUT_ZONE_LENGTH + 1) * 2;
 inline fn drawZone(
     comptime zone: u2,
     session: *const game.GameSession,
@@ -142,9 +152,27 @@ inline fn drawZone(
     aln: TextAlign,
 ) !void {
     switch (zone) {
-        0 => try session.runtime.drawText(8, text, .{ .row = game.DISPLAY_ROWS, .col = 1 }, mode, aln),
-        1 => try session.runtime.drawText(game.DISPLAY_COLS - 18, text, .{ .row = game.DISPLAY_ROWS, .col = 10 }, mode, aln),
-        2 => try session.runtime.drawText(8, text, .{ .row = game.DISPLAY_ROWS, .col = game.DISPLAY_COLS - 8 }, mode, aln),
+        0 => try session.runtime.drawText(
+            OUT_ZONE_LENGTH,
+            text,
+            .{ .row = game.DISPLAY_ROWS, .col = 1 },
+            mode,
+            aln,
+        ),
+        1 => try session.runtime.drawText(
+            MIDDLE_ZONE_LENGTH,
+            text,
+            .{ .row = game.DISPLAY_ROWS, .col = OUT_ZONE_LENGTH + 1 },
+            mode,
+            aln,
+        ),
+        2 => try session.runtime.drawText(
+            OUT_ZONE_LENGTH,
+            text,
+            .{ .row = game.DISPLAY_ROWS, .col = game.DISPLAY_COLS - OUT_ZONE_LENGTH },
+            mode,
+            aln,
+        ),
         else => unreachable,
     }
 }

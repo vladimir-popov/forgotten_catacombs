@@ -230,10 +230,10 @@ fn drawText(
     // skip horizontal UI separator
     const r = if (absolute_position.row == game.DISPLAY_ROWS) game.DISPLAY_ROWS + 1 else absolute_position.row;
     const c = absolute_position.col;
+    var buf: [50]u8 = undefined;
     if (mode == .inverted) {
-        var buf: [50]u8 = undefined;
         try self.buffer.mergeLine(try std.fmt.bufPrint(&buf, tty.Text.inverted("{s}"), .{text}), r, c);
     } else {
-        try self.buffer.mergeLine(text, r, c);
+        try self.buffer.mergeLine(try std.fmt.bufPrint(&buf, tty.Text.normal("{s}"), .{text}), r, c);
     }
 }
