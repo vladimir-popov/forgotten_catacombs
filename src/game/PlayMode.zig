@@ -89,11 +89,12 @@ fn handleInput(self: PlayMode, buttons: game.Buttons) !void {
 }
 
 pub fn tick(self: *PlayMode) anyerror!void {
+    try Render.drawAnimationsFrame(self.session);
+    if (self.session.components.getAll(game.Animation).len > 0)
+        return;
     try Render.drawScene(self.session);
     // we should update target only if player did some action at this tick
     var should_update_target: bool = false;
-    if (self.session.components.getAll(game.Animation).len > 0)
-        return;
 
     if (self.is_player_turn) {
         if (try self.session.runtime.readPushedButtons()) |buttons| {

@@ -97,11 +97,12 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?game.Buttons {
 
     if (pressed_buttons > 0) {
         self.button_log.pressed_at = self.playdate.system.getCurrentTimeMilliseconds();
-    } else if (current_buttons > 0) {
+    } else if (current_buttons > 0 and self.button_log.pressed_at > 0) {
         const hold_delay = self.playdate.system.getCurrentTimeMilliseconds() - self.button_log.pressed_at;
-        if (hold_delay > game.Buttons.HOLD_DELAY_MS)
+        if (hold_delay > game.HOLD_DELAY_MS)
             return .{ .code = current_buttons, .state = .hold };
     } else if (released_buttons > 0) {
+        self.button_log.pressed_at = 0;
         self.button_log.release_count = if (released_buttons == self.button_log.button)
             self.button_log.release_count + 1
         else
@@ -110,7 +111,7 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?game.Buttons {
         self.button_log.button = released_buttons;
         const delay = now - self.button_log.released_at;
         self.button_log.released_at = now;
-        if (self.button_log.release_count > 1 and delay < game.Buttons.DOUBLE_PUSH_DELAY_MS)
+        if (self.button_log.release_count > 1 and delay < game.DOUBLE_PUSH_DELAY_MS)
             return .{ .code = current_buttons, .state = .double_pushed }
         else
             return .{ .code = released_buttons, .state = .pushed };

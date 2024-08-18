@@ -5,9 +5,6 @@ const Buttons = @This();
 
 pub const Code = c_int;
 
-pub const DOUBLE_PUSH_DELAY_MS = 150;
-pub const HOLD_DELAY_MS = 500;
-
 // a button is pushed on release only
 pub const State = enum { pushed, hold, double_pushed };
 

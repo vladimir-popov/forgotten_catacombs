@@ -62,7 +62,7 @@ fn drawSprites(session: *const game.GameSession) !void {
 
 /// Draws a single frame from every animation.
 /// Removes the animation if the last frame was drawn.
-fn drawAnimationsFrame(session: *game.GameSession) !void {
+pub fn drawAnimationsFrame(session: *game.GameSession) !void {
     const now: c_uint = session.runtime.currentMillis();
     var itr = session.query.get2(game.Position, game.Animation);
     while (itr.next()) |components| {

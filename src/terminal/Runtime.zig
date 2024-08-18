@@ -141,9 +141,9 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?game.Buttons {
             self.pressed_at = now;
             var state: game.Buttons.State = .pushed;
             if (key.eql(prev_key)) {
-                if (delay < game.Buttons.DOUBLE_PUSH_DELAY_MS)
+                if (delay < game.DOUBLE_PUSH_DELAY_MS)
                     state = .double_pushed
-                else if (delay > game.Buttons.HOLD_DELAY_MS)
+                else if (delay > game.HOLD_DELAY_MS)
                     state = .hold;
             }
             return .{ .code = code, .state = state };

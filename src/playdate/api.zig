@@ -1,5 +1,4 @@
 /// This file is copied from https://github.com/DanB91/Zig-Playdate-Template
-
 const std = @import("std");
 const builtin = @import("builtin");
 

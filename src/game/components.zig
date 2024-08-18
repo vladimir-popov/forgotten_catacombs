@@ -140,7 +140,7 @@ pub const MeleeWeapon = struct {
 };
 
 pub const NPC = struct {
-    pub const Type = enum{ melee };
+    pub const Type = enum { melee };
 
     type: Type = .melee,
 

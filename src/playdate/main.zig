@@ -5,9 +5,8 @@ const tools = @import("tools");
 
 const Runtime = @import("Runtime.zig");
 
-pub const log_level: std.log.Level = .info;
-
 pub const std_options = .{
+    .log_level = .info,
     .logFn = writeLog,
 };
 
@@ -17,12 +16,10 @@ fn writeLog(
     comptime format: []const u8,
     args: anytype,
 ) void {
-    if (lvl == log_level) {
-        var buffer = [_]u8{0} ** 128;
-        _ = std.fmt.bufPrint(&buffer, format, args) catch |err|
-            std.debug.panic("Error {any} on log {s}", .{ err, format });
-        playdate_log_to_console("%s (%s) %s", @tagName(lvl), @tagName(scope), (&buffer).ptr);
-    }
+    var buffer = [_]u8{0} ** 128;
+    _ = std.fmt.bufPrint(&buffer, format, args) catch |err|
+        std.debug.panic("Error {any} on log {s}", .{ err, format });
+    playdate_log_to_console("%s (%s) %s", @tagName(lvl), @tagName(scope), (&buffer).ptr);
 }
 
 pub fn panic(
@@ -57,7 +54,7 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
             state.session = game.GameSession.create(state.runtime.any()) catch
                 @panic("Error on creating game session");
 
-            // playdate.display.setRefreshRate(0);
+            playdate.display.setRefreshRate(0);
             playdate.system.setUpdateCallback(update_and_render, state);
         },
         else => {},
