@@ -16,6 +16,8 @@ pub const Position = struct {
 /// Describes how and where something should look.
 pub const Sprite = struct {
     codepoint: Codepoint,
+    /// The sprite with bigger order should be rendered over the sprite with lower
+    z_order: u2 = 0,
     pub fn deinit(_: *@This()) void {}
 };
 

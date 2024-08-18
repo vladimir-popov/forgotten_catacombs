@@ -23,6 +23,9 @@ const algs_and_types = @import("algs_and_types");
 const p = algs_and_types.primitives;
 const game = @import("game.zig");
 
+const OUT_ZONE_LENGTH = 8;
+const MIDDLE_ZONE_LENGTH = game.DISPLAY_COLS - (OUT_ZONE_LENGTH + 1) * 2;
+
 const log = std.log.scoped(.render);
 
 const DrawingMode = game.AnyRuntime.DrawingMode;
@@ -46,18 +49,32 @@ pub fn drawScene(session: *game.GameSession) !void {
     try drawStats(session);
 }
 
+const ZOrderedSprites = struct { game.Entity, *game.Position, *game.Sprite };
+
 /// Draw sprites inside the screen ignoring lights
 fn drawSprites(session: *const game.GameSession) !void {
-    var itr = session.query.get2(game.Position, game.Sprite);
-    while (itr.next()) |tuple| {
+    var visible = std.PriorityQueue(ZOrderedSprites, void, compareZOrder).init(session.runtime.alloc, {});
+    defer visible.deinit();
+
+    var itr1 = session.query.get2(game.Position, game.Sprite);
+    while (itr1.next()) |tuple| {
         if (session.screen.region.containsPoint(tuple[1].point)) {
-            const mode: game.AnyRuntime.DrawingMode = if (session.entity_in_focus == tuple[0])
-                .inverted
-            else
-                .normal;
-            try session.runtime.drawSprite(&session.screen, tuple[2], tuple[1], mode);
+            try visible.add(tuple);
         }
     }
+    while (visible.removeOrNull()) |tuple| {
+        const mode: game.AnyRuntime.DrawingMode = if (session.entity_in_focus == tuple[0])
+            .inverted
+        else
+            .normal;
+        try session.runtime.drawSprite(&session.screen, tuple[2], tuple[1], mode);
+    }
+}
+fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order {
+    if (a[2].z_order < b[2].z_order)
+        return .lt
+    else
+        return .gt;
 }
 
 /// Draws a single frame from every animation.
@@ -142,8 +159,6 @@ inline fn cleanZone(comptime zone: u8, session: *const game.GameSession) !void {
     try drawZone(zone, session, " ", .normal, .left);
 }
 
-const OUT_ZONE_LENGTH = 8;
-const MIDDLE_ZONE_LENGTH = game.DISPLAY_COLS - (OUT_ZONE_LENGTH + 1) * 2;
 inline fn drawZone(
     comptime zone: u2,
     session: *const game.GameSession,
