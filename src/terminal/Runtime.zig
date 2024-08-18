@@ -118,8 +118,8 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?game.Buttons {
         const known_key_code: ?game.Buttons.Code = switch (key) {
             .char => switch (key.char.char) {
                 // (B) (A)
-                ' ', 's' => game.Buttons.A,
-                'b', 'a' => game.Buttons.B,
+                ' ', 's', 'i' => game.Buttons.A,
+                'b', 'a', 'u' => game.Buttons.B,
                 'h' => game.Buttons.Left,
                 'j' => game.Buttons.Down,
                 'k' => game.Buttons.Up,

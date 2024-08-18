@@ -145,6 +145,7 @@ fn drawStats(session: *const game.GameSession) !void {
     // Draw the quick action
     if (session.quick_action) |qa| {
         switch (qa.type) {
+            .wait => try drawZone(2, session, "Wait", .inverted, .center),
             .open => try drawZone(2, session, "Open", .inverted, .center),
             .close => try drawZone(2, session, "Close", .inverted, .center),
             .hit => try drawZone(2, session, "Attack", .inverted, .center),

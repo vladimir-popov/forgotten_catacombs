@@ -58,15 +58,7 @@ pub fn refresh(self: *PlayMode) !void {
 
 fn handleInput(self: PlayMode, buttons: game.Buttons) !void {
     switch (buttons.code) {
-        game.Buttons.A => {
-            const quick_action: game.Action = self.session.quick_action orelse
-                .{
-                .type = .wait,
-                .move_points = self.session.components.getForEntityUnsafe(
-                    self.session.player,
-                    game.Speed,
-                ).move_points,
-            };
+        game.Buttons.A => if (self.session.quick_action) |quick_action| {
             try self.session.components.setToEntity(self.session.player, quick_action);
         },
         game.Buttons.B => {
@@ -92,6 +84,7 @@ pub fn tick(self: *PlayMode) anyerror!void {
     try Render.drawAnimationsFrame(self.session);
     if (self.session.components.getAll(game.Animation).len > 0)
         return;
+
     try Render.drawScene(self.session);
     // we should update target only if player did some action at this tick
     var should_update_target: bool = false;
@@ -174,7 +167,7 @@ fn updateEnemies(self: *PlayMode, move_points: u8) !void {
 
 fn updateTarget(self: *PlayMode) anyerror!void {
     // If we're not able to do any action with previous entity in focus
-    // we should try to change focus
+    // we should try to change the focus
     if (self.calculateQuickActionForTarget(self.session.entity_in_focus)) |qa| {
         self.session.quick_action = qa;
     } else {
@@ -195,6 +188,7 @@ fn updateTarget(self: *PlayMode) anyerror!void {
         for (positions.components.items, 0..) |position, idx| {
             if (region.containsPoint(position.point)) {
                 if (positions.index_entity.get(@intCast(idx))) |entity| {
+                    if (entity == self.session.player) continue;
                     if (self.calculateQuickActionForTarget(entity)) |qa| {
                         self.session.entity_in_focus = entity;
                         self.session.quick_action = qa;
@@ -203,6 +197,8 @@ fn updateTarget(self: *PlayMode) anyerror!void {
                 }
             }
         }
+        // if no other action was found, then use waiting as default
+        self.session.quick_action = waitAction(self.session);
     }
 }
 
@@ -211,7 +207,7 @@ fn calculateQuickActionForTarget(
     target_enemy: ?game.Entity,
 ) ?game.Action {
     const target = target_enemy orelse return null;
-    if (target == self.session.player) return null;
+    if (target == self.session.player) return waitAction(self.session);
 
     const player_position = self.session.components.getForEntityUnsafe(self.session.player, game.Position).point;
     const target_position = self.session.components.getForEntityUnsafe(target, game.Position).point;
@@ -236,4 +232,11 @@ fn calculateQuickActionForTarget(
         }
     }
     return null;
+}
+
+fn waitAction(session: *game.GameSession) game.Action {
+    return .{
+        .type = .wait,
+        .move_points = session.components.getForEntityUnsafe(session.player, game.Speed).move_points,
+    };
 }

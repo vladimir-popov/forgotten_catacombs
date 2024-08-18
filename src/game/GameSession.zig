@@ -160,7 +160,7 @@ fn addRat(
         const rat = try entities.newEntity();
         try components.setToEntity(rat, game.NPC{ .type = .melee });
         try components.setToEntity(rat, game.Position{ .point = position });
-        try components.setToEntity(rat, game.Sprite{ .codepoint = 'r', .z_order = 2 });
+        try components.setToEntity(rat, game.Sprite{ .codepoint = 'r', .z_order = 3 });
         try components.setToEntity(rat, game.Description{ .name = "Rat" });
         try components.setToEntity(rat, game.Health{ .max = 10, .current = 10 });
         try components.setToEntity(rat, game.MeleeWeapon{ .max_damage = 3, .move_points = 5 });

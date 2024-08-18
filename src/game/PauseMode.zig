@@ -18,7 +18,6 @@ pub fn create(session: *game.GameSession) !*PauseMode {
     const self = try session.runtime.alloc.create(PauseMode);
     self.session = session;
     self.entities_on_screen = ArrayOfEntitiesOnScreen.init(self.session.runtime.alloc);
-    try self.refresh();
     return self;
 }
 
