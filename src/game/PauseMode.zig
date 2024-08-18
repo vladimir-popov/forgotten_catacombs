@@ -8,14 +8,16 @@ const Render = @import("Render.zig");
 const log = std.log.scoped(.pause_mode);
 
 const PauseMode = @This();
+const ArrayOfEntitiesOnScreen = std.ArrayList(struct { game.Entity, p.Point });
 
 session: *game.GameSession,
-entities_on_screen: std.AutoHashMap(p.Point, game.Entity),
+/// Arrays of entities and their positions on the screen
+entities_on_screen: ArrayOfEntitiesOnScreen,
 
 pub fn create(session: *game.GameSession) !*PauseMode {
     const self = try session.runtime.alloc.create(PauseMode);
     self.session = session;
-    self.entities_on_screen = std.AutoHashMap(p.Point, game.Entity).init(self.session.runtime.alloc);
+    self.entities_on_screen = ArrayOfEntitiesOnScreen.init(self.session.runtime.alloc);
     try self.refresh();
     return self;
 }
@@ -31,8 +33,10 @@ pub fn refresh(self: *PauseMode) !void {
     self.entities_on_screen.clearRetainingCapacity();
     var itr = self.session.query.get(game.Position);
     while (itr.next()) |tuple| {
-        if (self.session.screen.region.containsPoint(tuple[1].point))
-            try self.entities_on_screen.put(tuple[1].point, tuple[0]);
+        if (self.session.screen.region.containsPoint(tuple[1].point)) {
+            const item = try self.entities_on_screen.addOne();
+            item.* = .{ tuple[0], self.session.screen.relative(tuple[1].point) };
+        }
     }
     try Render.redraw(self.session);
 }
@@ -57,14 +61,42 @@ pub fn tick(self: *PauseMode) anyerror!void {
 
 fn chooseNextEntity(self: *PauseMode, direction: p.Direction) void {
     const target_entity = self.session.entity_in_focus orelse self.session.player;
-    const init_position = self.session.components.getForEntityUnsafe(target_entity, game.Position);
-    var itr = Iterator.init(init_position.point, direction, self.session.screen.region);
-    while (itr.next()) |position| {
-        if (self.entities_on_screen.get(position)) |entity| {
-            self.session.entity_in_focus = entity;
-            return;
+    const target_point = self.session.screen.relative(
+        self.session.components.getForEntityUnsafe(target_entity, game.Position).point,
+    );
+    var min_distance: u8 = 255;
+    for (self.entities_on_screen.items) |tuple| {
+        if (target_entity == tuple[0]) continue;
+
+        const d = distance(target_point, tuple[1], direction);
+        if (d < min_distance) {
+            min_distance = d;
+            self.session.entity_in_focus = tuple[0];
         }
     }
+}
+
+/// Calculates the distance between two points in direction with follow logic:
+/// 1. calculates the difference with multiplayer between points on the axis related to direction
+/// 2. adds the difference between points on the orthogonal axis
+inline fn distance(from: p.Point, to: p.Point, direction: p.Direction) u8 {
+    switch (direction) {
+        .right => {
+            if (to.col <= from.col) return 255;
+            return ((to.col - from.col) << 2) + sub(to.row, from.row);
+        },
+        .left => return distance(to, from, .right),
+        .down => {
+            if (to.row <= from.row) return 255;
+            return ((to.row - from.row) << 2) + sub(to.col, from.col);
+        },
+        .up => return distance(to, from, .down),
+    }
+}
+
+/// Returns y - x if y > x, or x - y otherwise.
+inline fn sub(x: u8, y: u8) u8 {
+    return if (y > x) y - x else x - y;
 }
 
 /// Iterates over points in follow way:

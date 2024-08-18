@@ -27,6 +27,13 @@ pub const Direction = enum {
         };
         return if (is_clockwise) clockwise else clockwise.opposite();
     }
+
+    pub inline fn isHorizontal(self: Direction) bool {
+        return switch (self) {
+            .right, .left => true,
+            else => false,
+        };
+    }
 };
 
 /// The coordinates of a point. Index begins from 1.

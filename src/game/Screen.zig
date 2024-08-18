@@ -40,6 +40,11 @@ pub inline fn innerRegion(self: Self) p.Region {
     return inner_region;
 }
 
+/// Gets the point in the dungeon and return its coordinates on the screen.
+pub inline fn relative(self: Self, point: p.Point) p.Point {
+    return .{ .row = point.row - self.region.top_left.row, .col = point.col - self.region.top_left.col };
+}
+
 pub fn move(self: *Self, direction: p.Direction) void {
     switch (direction) {
         .up => {
