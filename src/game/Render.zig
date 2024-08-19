@@ -33,43 +33,43 @@ const TextAlign = game.AnyRuntime.TextAlign;
 
 /// Clears the screen and draw all from scratch.
 /// Removes completed animations.
-pub fn redraw(session: *game.GameSession) !void {
+pub fn redraw(session: *game.GameSession, entity_in_focus: ?game.Entity) !void {
     try session.runtime.clearScreen();
     try session.runtime.drawUI();
-    try drawScene(session);
+    try drawScene(session, entity_in_focus);
 }
 
-/// Draws sprites and animations on the screen
-pub fn drawScene(session: *game.GameSession) !void {
+/// Draws dungeon, sprites, animations, and stats on the screen.
+/// Removes completed animations.
+pub fn drawScene(session: *game.GameSession, entity_in_focus: ?game.Entity) !void {
     // any runtime can have its own implementation of drawing the dungeon
     // in performance purposes
     try session.runtime.drawDungeon(&session.screen, session.dungeon);
-    try drawSprites(session);
-    try drawAnimationsFrame(session);
-    try drawStats(session);
+    try drawSprites(session, entity_in_focus);
+    try drawAnimationsFrame(session, entity_in_focus);
+    try drawStats(session, entity_in_focus);
 }
 
-const ZOrderedSprites = struct { game.Entity, *game.Position, *game.Sprite };
-
-/// Draw sprites inside the screen ignoring lights
-fn drawSprites(session: *const game.GameSession) !void {
+/// Draw sprites inside the screen and highlights the sprite of the entity in focus.
+pub fn drawSprites(session: *const game.GameSession, entity_in_focus: ?game.Entity) !void {
     var visible = std.PriorityQueue(ZOrderedSprites, void, compareZOrder).init(session.runtime.alloc, {});
     defer visible.deinit();
 
-    var itr1 = session.query.get2(game.Position, game.Sprite);
-    while (itr1.next()) |tuple| {
+    var itr = session.query.get2(game.Position, game.Sprite);
+    while (itr.next()) |tuple| {
         if (session.screen.region.containsPoint(tuple[1].point)) {
             try visible.add(tuple);
         }
     }
     while (visible.removeOrNull()) |tuple| {
-        const mode: game.AnyRuntime.DrawingMode = if (session.entity_in_focus == tuple[0])
+        const mode: game.AnyRuntime.DrawingMode = if (entity_in_focus == tuple[0])
             .inverted
         else
             .normal;
         try session.runtime.drawSprite(&session.screen, tuple[2], tuple[1], mode);
     }
 }
+const ZOrderedSprites = struct { game.Entity, *game.Position, *game.Sprite };
 fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order {
     if (a[2].z_order < b[2].z_order)
         return .lt
@@ -79,7 +79,7 @@ fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order
 
 /// Draws a single frame from every animation.
 /// Removes the animation if the last frame was drawn.
-pub fn drawAnimationsFrame(session: *game.GameSession) !void {
+pub fn drawAnimationsFrame(session: *game.GameSession, entity_in_focus: ?game.Entity) !void {
     const now: c_uint = session.runtime.currentMillis();
     var itr = session.query.get2(game.Position, game.Animation);
     while (itr.next()) |components| {
@@ -87,7 +87,7 @@ pub fn drawAnimationsFrame(session: *game.GameSession) !void {
         const animation = components[2];
         if (animation.frame(now)) |frame| {
             if (frame > 0 and session.screen.region.containsPoint(position.point)) {
-                const mode: game.AnyRuntime.DrawingMode = if (session.entity_in_focus == components[0])
+                const mode: game.AnyRuntime.DrawingMode = if (entity_in_focus == components[0])
                     .inverted
                 else
                     .normal;
@@ -104,7 +104,8 @@ pub fn drawAnimationsFrame(session: *game.GameSession) !void {
     }
 }
 
-fn drawStats(session: *const game.GameSession) !void {
+/// Draws the hit points of the player, and the name and hit points of the entity in focus.
+pub fn drawStats(session: *const game.GameSession, entity_in_focus: ?game.Entity) !void {
     // Draw player's health, or pause mode indicator
     switch (session.mode) {
         .pause => try drawZone(0, session, "Pause", .normal, .center),
@@ -115,7 +116,7 @@ fn drawStats(session: *const game.GameSession) !void {
         },
     }
     // Draw the name and health of the entity in focus
-    if (session.entity_in_focus) |entity| {
+    if (entity_in_focus) |entity| {
         var buf: [MIDDLE_ZONE_LENGTH]u8 = undefined;
         inline for (0..MIDDLE_ZONE_LENGTH) |i| buf[i] = ' ';
         var len: usize = 0;
@@ -142,8 +143,12 @@ fn drawStats(session: *const game.GameSession) !void {
     } else {
         try cleanZone(1, session);
     }
+}
+
+/// Draws quick action button, or hide it if quick_action is null.
+pub fn drawQuickActionButton(session: *game.GameSession, quick_action: ?game.Action) !void {
     // Draw the quick action
-    if (session.quick_action) |qa| {
+    if (quick_action) |qa| {
         switch (qa.type) {
             .wait => try drawZone(2, session, "Wait", .inverted, .center),
             .open => try drawZone(2, session, "Open", .inverted, .center),

@@ -26,10 +26,6 @@ screen: game.Screen,
 dungeon: *game.Dungeon,
 /// Entity of the player
 player: game.Entity = undefined,
-/// Highlighted entity
-entity_in_focus: ?game.Entity = null,
-// An action which could be applied to the entity in focus
-quick_action: ?game.Action,
 /// The current mode of the game
 mode: Mode = .play,
 play_mode: *game.PlayMode = undefined,
@@ -41,8 +37,6 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
         .runtime = runtime,
         .screen = game.Screen.init(game.DISPLAY_ROWS - 1, game.DISPLAY_COLS, game.Dungeon.Region),
         .entities = try ecs.EntitiesManager.init(runtime.alloc),
-        .entity_in_focus = null,
-        .quick_action = null,
         .components = try ecs.ComponentsManager(game.Components).init(runtime.alloc),
         .dungeon = try game.Dungeon.createRandom(runtime.alloc, runtime.rand),
     };
@@ -53,7 +47,7 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     session.play_mode = try game.PlayMode.create(session);
     session.pause_mode = try game.PauseMode.create(session);
 
-    try session.play();
+    try session.play(null);
     return session;
 }
 
@@ -66,9 +60,9 @@ pub fn destroy(self: *Self) void {
     self.runtime.alloc.destroy(self);
 }
 
-pub fn play(session: *Self) !void {
+pub fn play(session: *Self, entity_in_focus: ?game.Entity) !void {
     session.mode = .play;
-    try session.play_mode.refresh();
+    try session.play_mode.refresh(entity_in_focus);
 }
 
 pub fn pause(session: *Self) !void {

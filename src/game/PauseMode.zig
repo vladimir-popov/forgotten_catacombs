@@ -13,11 +13,14 @@ const ArrayOfEntitiesOnScreen = std.ArrayList(struct { game.Entity, p.Point });
 session: *game.GameSession,
 /// Arrays of entities and their positions on the screen
 entities_on_screen: ArrayOfEntitiesOnScreen,
+/// Highlighted entity
+entity_in_focus: ?game.Entity,
 
 pub fn create(session: *game.GameSession) !*PauseMode {
     const self = try session.runtime.alloc.create(PauseMode);
     self.session = session;
     self.entities_on_screen = ArrayOfEntitiesOnScreen.init(self.session.runtime.alloc);
+    self.entity_in_focus = self.session.player;
     return self;
 }
 
@@ -27,8 +30,7 @@ pub fn destroy(self: *PauseMode) void {
 }
 
 pub fn refresh(self: *PauseMode) !void {
-    self.session.entity_in_focus = self.session.player;
-    self.session.quick_action = null;
+    self.entity_in_focus = self.session.player;
     self.entities_on_screen.clearRetainingCapacity();
     var itr = self.session.query.get(game.Position);
     while (itr.next()) |tuple| {
@@ -37,7 +39,7 @@ pub fn refresh(self: *PauseMode) !void {
             item.* = .{ tuple[0], self.session.screen.relative(tuple[1].point) };
         }
     }
-    try Render.redraw(self.session);
+    try Render.redraw(self.session, self.entity_in_focus);
 }
 
 pub fn tick(self: *PauseMode) anyerror!void {
@@ -46,12 +48,12 @@ pub fn tick(self: *PauseMode) anyerror!void {
         switch (btn.code) {
             game.Buttons.A => {},
             game.Buttons.B => {
-                try self.session.play();
+                try self.session.play(self.entity_in_focus);
                 return;
             },
             game.Buttons.Left, game.Buttons.Right, game.Buttons.Up, game.Buttons.Down => {
                 self.chooseNextEntity(btn.toDirection().?);
-                try Render.drawScene(self.session);
+                try Render.drawScene(self.session, self.entity_in_focus);
             },
             else => {},
         }
@@ -59,7 +61,7 @@ pub fn tick(self: *PauseMode) anyerror!void {
 }
 
 fn chooseNextEntity(self: *PauseMode, direction: p.Direction) void {
-    const target_entity = self.session.entity_in_focus orelse self.session.player;
+    const target_entity = self.entity_in_focus orelse self.session.player;
     const target_point = self.session.screen.relative(
         self.session.components.getForEntityUnsafe(target_entity, game.Position).point,
     );
@@ -70,7 +72,7 @@ fn chooseNextEntity(self: *PauseMode, direction: p.Direction) void {
         const d = distance(target_point, tuple[1], direction);
         if (d < min_distance) {
             min_distance = d;
-            self.session.entity_in_focus = tuple[0];
+            self.entity_in_focus = tuple[0];
         }
     }
 }
