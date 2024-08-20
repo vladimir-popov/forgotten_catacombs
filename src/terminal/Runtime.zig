@@ -56,7 +56,7 @@ pub fn run(self: *Self, game_session: anytype) !void {
     }
 }
 
-fn clearScreen(ptr: *anyopaque) !void {
+fn clearDisplay(ptr: *anyopaque) !void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     _ = self.arena.reset(.retain_capacity);
     self.buffer = utf8.Buffer.init(self.arena.allocator());
@@ -97,7 +97,7 @@ pub fn any(self: *Self) game.AnyRuntime {
         .vtable = &.{
             .currentMillis = currentMillis,
             .readPushedButtons = readPushedButtons,
-            .clearScreen = clearScreen,
+            .clearDisplay = clearDisplay,
             .drawUI = drawUI,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,

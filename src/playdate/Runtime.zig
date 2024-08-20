@@ -71,7 +71,7 @@ pub fn any(self: *Self) game.AnyRuntime {
         .vtable = &.{
             .currentMillis = currentMillis,
             .readPushedButtons = readPushedButtons,
-            .clearScreen = clearScreen,
+            .clearDisplay = clearDisplay,
             .drawUI = drawUI,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
@@ -119,7 +119,7 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?game.Buttons {
     return null;
 }
 
-fn clearScreen(ptr: *anyopaque) anyerror!void {
+fn clearDisplay(ptr: *anyopaque) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     self.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
 }

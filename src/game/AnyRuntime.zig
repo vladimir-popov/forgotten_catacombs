@@ -11,7 +11,7 @@ pub const TextAlign = enum { center, left, right };
 
 const VTable = struct {
     readPushedButtons: *const fn (context: *anyopaque) anyerror!?game.Buttons,
-    clearScreen: *const fn (context: *anyopaque) anyerror!void,
+    clearDisplay: *const fn (context: *anyopaque) anyerror!void,
     drawUI: *const fn (context: *anyopaque) anyerror!void,
     drawDungeon: *const fn (
         context: *anyopaque,
@@ -47,8 +47,8 @@ pub inline fn readPushedButtons(self: Self) !?game.Buttons {
     return try self.vtable.readPushedButtons(self.context);
 }
 
-pub inline fn clearScreen(self: Self) !void {
-    try self.vtable.clearScreen(self.context);
+pub inline fn clearDisplay(self: Self) !void {
+    try self.vtable.clearDisplay(self.context);
 }
 
 pub inline fn drawUI(self: Self) !void {

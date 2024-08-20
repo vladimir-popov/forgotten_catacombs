@@ -2,22 +2,22 @@
 /// Comparing with `AnyRuntime`, this module contains methods
 /// to draw objects from the game domain.
 ///
-///   ╔═══════════════════════════════════════╗
+///   ╔═══════════════════════════════════════╗-------
+///   ║                                       ║ |   |
 ///   ║                                       ║
-///   ║                                       ║
-///   ║                                       ║
-///   ║                                       ║
-///   ║                                       ║
-///   ║                  Screen               ║
-///   ║                                       ║
-///   ║                                       ║
-///   ║                                       ║
-///   ║                                       ║
-///   ║═══════════════════════════════════════║
-///   ║HP: 100     Wolf:||||||||||     Attack ║
-///   ╚═══════════════════════════════════════╝
+///   ║                                       ║ S
+///   ║                                       ║ c   D
+///   ║                                       ║ r   i
+///   ║                                       ║ e   s
+///   ║                                       ║ e   p
+///   ║                                       ║ n   l
+///   ║                                       ║     a
+///   ║                                       ║ |   y
+///   ║═══════════════════════════════════════║---
+///   ║HP: 100     Rat:||||||||||||||| Attack ║     |
+///   ╚═══════════════════════════════════════╝-------
 ///   | Zone 0 |        Zone 1       | Zone 2 |
-///
+///   |             Stats            | Button |
 const std = @import("std");
 const algs_and_types = @import("algs_and_types");
 const p = algs_and_types.primitives;
@@ -34,7 +34,7 @@ const TextAlign = game.AnyRuntime.TextAlign;
 /// Clears the screen and draw all from scratch.
 /// Removes completed animations.
 pub fn redraw(session: *game.GameSession, entity_in_focus: ?game.Entity) !void {
-    try session.runtime.clearScreen();
+    try session.runtime.clearDisplay();
     try session.runtime.drawUI();
     try drawScene(session, entity_in_focus);
 }

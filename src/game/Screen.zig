@@ -10,6 +10,7 @@ region: p.Region,
 rows_pad: u8,
 cols_pad: u8,
 /// the whole dungeon region to keep the screen inside
+/// with rows/cols relative to the dungeon
 dungeon_region: p.Region,
 
 pub fn deinit(_: *@This()) void {}

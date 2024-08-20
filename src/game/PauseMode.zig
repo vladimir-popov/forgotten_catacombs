@@ -16,17 +16,16 @@ entities_on_screen: ArrayOfEntitiesOnScreen,
 /// Highlighted entity
 entity_in_focus: ?game.Entity,
 
-pub fn create(session: *game.GameSession) !*PauseMode {
-    const self = try session.runtime.alloc.create(PauseMode);
-    self.session = session;
-    self.entities_on_screen = ArrayOfEntitiesOnScreen.init(self.session.runtime.alloc);
-    self.entity_in_focus = self.session.player;
-    return self;
+pub fn init(session: *game.GameSession) !PauseMode {
+    return .{
+        .session = session,
+        .entities_on_screen = ArrayOfEntitiesOnScreen.init(session.runtime.alloc),
+        .entity_in_focus = session.player,
+    };
 }
 
-pub fn destroy(self: *PauseMode) void {
+pub fn deinit(self: *PauseMode) void {
     self.entities_on_screen.deinit();
-    self.session.runtime.alloc.destroy(self);
 }
 
 pub fn refresh(self: *PauseMode) !void {

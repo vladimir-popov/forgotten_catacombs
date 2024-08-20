@@ -28,8 +28,9 @@ dungeon: *game.Dungeon,
 player: game.Entity = undefined,
 /// The current mode of the game
 mode: Mode = .play,
-play_mode: *game.PlayMode = undefined,
-pause_mode: *game.PauseMode = undefined,
+// stateful modes:
+play_mode: game.PlayMode = undefined,
+pause_mode: game.PauseMode = undefined,
 
 pub fn create(runtime: game.AnyRuntime) !*Self {
     const session = try runtime.alloc.create(Self);
@@ -44,8 +45,8 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     const player_and_position = try initLevel(session.dungeon, &session.entities, &session.components);
     session.player = player_and_position[0];
     session.screen.centeredAround(player_and_position[1]);
-    session.play_mode = try game.PlayMode.create(session);
-    session.pause_mode = try game.PauseMode.create(session);
+    session.play_mode = try game.PlayMode.init(session);
+    session.pause_mode = try game.PauseMode.init(session);
 
     try session.play(null);
     return session;
@@ -55,8 +56,8 @@ pub fn destroy(self: *Self) void {
     self.entities.deinit();
     self.components.deinit();
     self.dungeon.destroy();
-    self.play_mode.destroy();
-    self.pause_mode.destroy();
+    self.play_mode.deinit();
+    self.pause_mode.deinit();
     self.runtime.alloc.destroy(self);
 }
 

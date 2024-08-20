@@ -101,7 +101,7 @@ const DungeonsGenerator = struct {
     }
 
     fn render(self: *DungeonsGenerator) anyerror!void {
-        try self.runtime.clearScreen();
+        try self.runtime.clearDisplay();
         try self.runtime.drawDungeon(&self.screen, self.dungeon);
         var itr = self.query.get2(game.Position, game.Sprite);
         while (itr.next()) |tuple| {

@@ -31,22 +31,21 @@ entity_in_focus: ?game.Entity,
 // An action which could be applied to the entity in focus
 quick_action: ?game.Action,
 
-pub fn create(session: *game.GameSession) !*PlayMode {
-    const self = try session.runtime.alloc.create(PlayMode);
-    self.session = session;
-    self.enemies = std.ArrayList(Enemy).init(session.runtime.alloc);
-    self.current_enemy = 0;
-    self.moved_enemies = 0;
-    self.is_player_turn = true;
-    self.attacking_entity = null;
-    self.entity_in_focus = null;
-    self.quick_action = null;
-    return self;
+pub fn init(session: *game.GameSession) !PlayMode {
+    return .{
+        .session = session,
+        .enemies = std.ArrayList(Enemy).init(session.runtime.alloc),
+        .current_enemy = 0,
+        .moved_enemies = 0,
+        .is_player_turn = true,
+        .attacking_entity = null,
+        .entity_in_focus = null,
+        .quick_action = null,
+    };
 }
 
-pub fn destroy(self: *PlayMode) void {
+pub fn deinit(self: *PlayMode) void {
     self.enemies.deinit();
-    self.session.runtime.alloc.destroy(self);
 }
 
 /// Updates the target entity after switching back to the play mode
