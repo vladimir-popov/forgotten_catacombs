@@ -56,12 +56,6 @@ pub fn run(self: *Self, game_session: anytype) !void {
     }
 }
 
-fn clearDisplay(ptr: *anyopaque) !void {
-    var self: *Self = @ptrCast(@alignCast(ptr));
-    _ = self.arena.reset(.retain_capacity);
-    self.buffer = utf8.Buffer.init(self.arena.allocator());
-}
-
 fn handleWindowResize(_: i32) callconv(.C) void {
     window_size = tty.Display.getWindowSize() catch unreachable;
     tty.Display.clearScreen() catch unreachable;
@@ -155,17 +149,20 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?game.Buttons {
     return null;
 }
 
+fn clearDisplay(ptr: *anyopaque) !void {
+    var self: *Self = @ptrCast(@alignCast(ptr));
+    _ = self.arena.reset(.retain_capacity);
+    self.buffer = utf8.Buffer.init(self.arena.allocator());
+    try self.buffer.addLine("╔" ++ "═" ** game.DISPLAY_COLS ++ "╗");
+    for (0..(game.DISPLAY_ROWS + 1)) |_| {
+        try self.buffer.addLine("║" ++ " " ** game.DISPLAY_COLS ++ "║");
+    }
+    try self.buffer.addLine("╚" ++ "═" ** game.DISPLAY_COLS ++ "╝");
+}
+
 fn drawUI(ptr: *anyopaque) !void {
     var self: *Self = @ptrCast(@alignCast(ptr));
-    const width = game.DISPLAY_COLS;
-    try self.buffer.addLine("╔" ++ "═" ** width ++ "╗");
-    for (1..(game.DISPLAY_ROWS + 2)) |r| {
-        if (r == game.DISPLAY_ROWS)
-            try self.buffer.addLine("║" ++ "═" ** width ++ "║")
-        else
-            try self.buffer.addLine("║" ++ " " ** width ++ "║");
-    }
-    try self.buffer.addLine("╚" ++ "═" ** width ++ "╝");
+    try self.buffer.mergeLine("║" ++ "═" ** game.DISPLAY_COLS ++ "║", game.DISPLAY_ROWS, 0);
 }
 
 fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {

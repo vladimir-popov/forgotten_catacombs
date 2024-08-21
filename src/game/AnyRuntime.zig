@@ -7,8 +7,6 @@ const Self = @This();
 
 pub const DrawingMode = enum { normal, inverted, transparent };
 
-pub const TextAlign = enum { center, left, right };
-
 const VTable = struct {
     readPushedButtons: *const fn (context: *anyopaque) anyerror!?game.Buttons,
     clearDisplay: *const fn (context: *anyopaque) anyerror!void,
@@ -69,21 +67,6 @@ pub inline fn drawSprite(
     try self.vtable.drawSprite(self.context, screen, sprite, position, mode);
 }
 
-pub fn drawText(
-    self: Self,
-    comptime len: u8,
-    text: []const u8,
-    absolut_position: p.Point,
-    mode: game.AnyRuntime.DrawingMode,
-    aln: TextAlign,
-) !void {
-    var buf: [len]u8 = undefined;
-    inline for (0..len) |i| buf[i] = ' ';
-    const l = @min(len, text.len);
-    switch (aln) {
-        .left => std.mem.copyForwards(u8, &buf, text[0..l]),
-        .center => std.mem.copyForwards(u8, buf[(len - l) / 2 ..], text[0..l]),
-        .right => std.mem.copyForwards(u8, buf[(len - l)..], text[0..l]),
-    }
-    try self.vtable.drawText(self.context, &buf, absolut_position, mode);
+pub fn drawText(self: Self, text: []const u8, absolut_position: p.Point, mode: game.AnyRuntime.DrawingMode) !void {
+    try self.vtable.drawText(self.context, text, absolut_position, mode);
 }

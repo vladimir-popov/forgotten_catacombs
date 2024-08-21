@@ -1,3 +1,7 @@
+//! This is the root object for the game session,
+//! which contains all entities, components, modes, and current runtime
+//! implementation.
+
 const std = @import("std");
 const algs = @import("algs_and_types");
 const p = algs.primitives;
@@ -10,7 +14,7 @@ const log = std.log.scoped(.GameSession);
 
 const Self = @This();
 
-const Mode = enum { play, pause };
+const Mode = enum { welcome, play, pause, game_over };
 
 /// Playdate or terminal
 runtime: game.AnyRuntime,
@@ -48,7 +52,8 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     session.play_mode = try game.PlayMode.init(session);
     session.pause_mode = try game.PauseMode.init(session);
 
-    try session.play(null);
+    try session.welcome();
+    // try session.play(null);
     return session;
 }
 
@@ -61,6 +66,11 @@ pub fn destroy(self: *Self) void {
     self.runtime.alloc.destroy(self);
 }
 
+pub fn welcome(session: *Self) !void {
+    session.mode = .welcome;
+    try Render.drawWelcomeScreen(session);
+}
+
 pub fn play(session: *Self, entity_in_focus: ?game.Entity) !void {
     session.mode = .play;
     try session.play_mode.refresh(entity_in_focus);
@@ -71,17 +81,26 @@ pub fn pause(session: *Self) !void {
     try session.pause_mode.refresh();
 }
 
-pub inline fn tick(session: *Self) !void {
-    switch (session.mode) {
-        .play => try session.play_mode.tick(),
-        .pause => try session.pause_mode.tick(),
-    }
+pub fn gameOver(session: *Self) !void {
+    session.mode = .game_over;
+    try Render.drawGameOverScreen(session);
 }
 
-pub inline fn drawMode(session: *Self) !void {
+pub inline fn tick(session: *Self) !void {
     switch (session.mode) {
-        .play => try session.play_mode.draw(),
-        .pause => try session.pause_mode.draw(),
+        .welcome, .game_over => if (try session.runtime.readPushedButtons()) |btn| {
+            switch (btn.code) {
+                game.Buttons.A => {
+                    if (session.mode == .welcome)
+                        try session.play(null)
+                    else 
+                        try session.welcome();
+                },
+                else => {},
+            }
+        },
+        .play => try session.play_mode.tick(),
+        .pause => try session.pause_mode.tick(),
     }
 }
 
@@ -140,7 +159,7 @@ fn initPlayer(
     try components.setToEntity(player, game.Position{ .point = init_position });
     try components.setToEntity(player, game.Sprite{ .codepoint = '@', .z_order = 3 });
     try components.setToEntity(player, game.Description{ .name = "You" });
-    try components.setToEntity(player, game.Health{ .max = 100, .current = 100 });
+    try components.setToEntity(player, game.Health{ .max = 100, .current = 50 });
     try components.setToEntity(player, game.MeleeWeapon{ .max_damage = 3, .move_points = 10 });
     try components.setToEntity(player, game.Speed{ .move_points = 10 });
     return player;

@@ -11,16 +11,8 @@ pub const Screen = @import("Screen.zig");
 pub const Dungeon = @import("BspDungeon.zig").BspDungeon(WHOLE_DUNG_ROWS, WHOLE_DUNG_COLS);
 // pub const Dungeon = @import("BspDungeon.zig").BspDungeon(DISPLPAY_ROWS, DISPLPAY_COLS);
 
-/// This is the root object for the game session,
-/// which contains all entities, components, modes, and current runtime
-/// implementation.
 pub const GameSession = @import("GameSession.zig");
-
-/// This is the main mode of the game in which player travel through the dungeons.
 pub const PlayMode = @import("PlayMode.zig");
-
-/// This is the mode in which player are able to look around, get info about
-/// entities on the screen, and change the target entity.
 pub const PauseMode = @import("PauseMode.zig");
 
 /// The maximum rows count in the whole dungeon

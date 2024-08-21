@@ -1,3 +1,5 @@
+//! This is the main mode of the game in which player travel through the dungeons.
+
 const std = @import("std");
 const game = @import("game.zig");
 const algs = @import("algs_and_types");
@@ -44,7 +46,7 @@ pub fn init(session: *game.GameSession) !PlayMode {
     };
 }
 
-pub fn deinit(self: *PlayMode) void {
+pub fn deinit(self: PlayMode) void {
     self.enemies.deinit();
 }
 
@@ -206,7 +208,7 @@ fn updateTarget(self: *PlayMode) anyerror!void {
 }
 
 fn calculateQuickActionForTarget(
-    self: *const PlayMode,
+    self: PlayMode,
     target_enemy: ?game.Entity,
 ) ?game.Action {
     const target = target_enemy orelse return null;

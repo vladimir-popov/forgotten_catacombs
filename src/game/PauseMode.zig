@@ -1,3 +1,6 @@
+//! This is the mode in which player are able to look around, get info about
+//! entities on the screen, and change the target entity.
+
 const std = @import("std");
 const game = @import("game.zig");
 const algs = @import("algs_and_types");

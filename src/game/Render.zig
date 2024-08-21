@@ -29,7 +29,7 @@ const MIDDLE_ZONE_LENGTH = game.DISPLAY_COLS - (OUT_ZONE_LENGTH + 1) * 2;
 const log = std.log.scoped(.render);
 
 const DrawingMode = game.AnyRuntime.DrawingMode;
-const TextAlign = game.AnyRuntime.TextAlign;
+const TextAlign = enum { center, left, right };
 
 /// Clears the screen and draw all from scratch.
 /// Removes completed animations.
@@ -51,7 +51,7 @@ pub fn drawScene(session: *game.GameSession, entity_in_focus: ?game.Entity) !voi
 }
 
 /// Draw sprites inside the screen and highlights the sprite of the entity in focus.
-pub fn drawSprites(session: *const game.GameSession, entity_in_focus: ?game.Entity) !void {
+fn drawSprites(session: *const game.GameSession, entity_in_focus: ?game.Entity) !void {
     var visible = std.PriorityQueue(ZOrderedSprites, void, compareZOrder).init(session.runtime.alloc, {});
     defer visible.deinit();
 
@@ -114,6 +114,7 @@ pub fn drawStats(session: *const game.GameSession, entity_in_focus: ?game.Entity
             const text = try std.fmt.bufPrint(&buf, "HP: {d}", .{health.current});
             try drawZone(0, session, text, .normal, .left);
         },
+        else => {},
     }
     // Draw the name and health of the entity in focus
     if (entity_in_focus) |entity| {
@@ -161,6 +162,19 @@ pub fn drawQuickActionButton(session: *game.GameSession, quick_action: ?game.Act
     }
 }
 
+pub fn drawWelcomeScreen(session: *game.GameSession) !void {
+    try session.runtime.clearDisplay();
+    const middle = game.DISPLAY_ROWS / 2;
+    try drawText(session, game.DISPLAY_COLS, "Welcome", .{ .row = middle - 1, .col = 1 }, .normal, .center);
+    try drawText(session, game.DISPLAY_COLS, "to", .{ .row = middle, .col = 1 }, .normal, .center);
+    try drawText(session, game.DISPLAY_COLS, "Forgotten catacomb", .{ .row = middle + 1, .col = 1 }, .normal, .center);
+}
+
+pub fn drawGameOverScreen(session: *game.GameSession) !void {
+    try session.runtime.clearDisplay();
+    try drawText(session, game.DISPLAY_COLS, "You are dead", .{ .row = game.DISPLAY_ROWS / 2, .col = 1 }, .normal, .center);
+}
+
 inline fn cleanZone(comptime zone: u8, session: *const game.GameSession) !void {
     try drawZone(zone, session, " ", .normal, .left);
 }
@@ -173,21 +187,24 @@ inline fn drawZone(
     aln: TextAlign,
 ) !void {
     switch (zone) {
-        0 => try session.runtime.drawText(
+        0 => try drawText(
+            session,
             OUT_ZONE_LENGTH,
             text,
             .{ .row = game.DISPLAY_ROWS, .col = 1 },
             mode,
             aln,
         ),
-        1 => try session.runtime.drawText(
+        1 => try drawText(
+            session,
             MIDDLE_ZONE_LENGTH,
             text,
             .{ .row = game.DISPLAY_ROWS, .col = OUT_ZONE_LENGTH + 1 },
             mode,
             aln,
         ),
-        2 => try session.runtime.drawText(
+        2 => try drawText(
+            session,
             OUT_ZONE_LENGTH,
             text,
             .{ .row = game.DISPLAY_ROWS, .col = game.DISPLAY_COLS - OUT_ZONE_LENGTH },
@@ -196,4 +213,23 @@ inline fn drawZone(
         ),
         else => unreachable,
     }
+}
+
+fn drawText(
+    session: *const game.GameSession,
+    comptime len: u8,
+    text: []const u8,
+    absolut_position: p.Point,
+    mode: game.AnyRuntime.DrawingMode,
+    aln: TextAlign,
+) !void {
+    var buf: [len]u8 = undefined;
+    inline for (0..len) |i| buf[i] = ' ';
+    const l = @min(len, text.len);
+    switch (aln) {
+        .left => std.mem.copyForwards(u8, &buf, text[0..l]),
+        .center => std.mem.copyForwards(u8, buf[(len - l) / 2 ..], text[0..l]),
+        .right => std.mem.copyForwards(u8, buf[(len - l)..], text[0..l]),
+    }
+    try session.runtime.drawText(&buf, absolut_position, mode);
 }
