@@ -23,7 +23,7 @@ text_font: ?*api.LCDFont,
 sprites_font: ?*api.LCDFont,
 button_log: ButtonsLog = .{},
 
-pub fn create(playdate: *api.PlaydateAPI) !*Self {
+pub fn init(playdate: *api.PlaydateAPI) !Self {
     const err: ?*[*c]const u8 = null;
 
     const text_font = playdate.graphics.loadFont("Roobert-11-Mono-Condensed.pft", err) orelse {
@@ -45,22 +45,18 @@ pub fn create(playdate: *api.PlaydateAPI) !*Self {
     _ = playdate.system.getSecondsSinceEpoch(&millis);
 
     const alloc = Allocator.allocator(playdate);
-    const runtime = try alloc.create(Self);
-    runtime.* = .{
+    return .{
         .playdate = playdate,
         .alloc = alloc,
         .prng = std.Random.DefaultPrng.init(@intCast(millis)),
         .text_font = text_font,
         .sprites_font = sprites_font,
     };
-
-    return runtime;
 }
 
-pub fn destroy(self: *Self) void {
+pub fn deinit(self: *Self) void {
     self.playdate.realloc(0, self.text_font);
     self.playdate.realloc(0, self.sprites_font);
-    self.alloc.destroy(self);
 }
 
 pub fn any(self: *Self) game.AnyRuntime {

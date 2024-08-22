@@ -5,7 +5,6 @@ const game = @import("game.zig");
 const algs = @import("algs_and_types");
 const p = algs.primitives;
 
-const Render = @import("Render.zig");
 const AI = @import("AI.zig");
 const ActionSystem = @import("ActionSystem.zig");
 const CollisionSystem = @import("CollisionSystem.zig");
@@ -36,7 +35,7 @@ quick_action: ?game.Action,
 pub fn init(session: *game.GameSession) !PlayMode {
     return .{
         .session = session,
-        .enemies = std.ArrayList(Enemy).init(session.runtime.alloc),
+        .enemies = std.ArrayList(Enemy).init(session.game.runtime.alloc),
         .current_enemy = 0,
         .moved_enemies = 0,
         .is_player_turn = true,
@@ -54,7 +53,7 @@ pub fn deinit(self: PlayMode) void {
 pub fn refresh(self: *PlayMode, entity_in_focus: ?game.Entity) !void {
     self.entity_in_focus = entity_in_focus;
     try updateTarget(self);
-    try Render.redraw(self.session, self.entity_in_focus);
+    try self.session.game.render.redraw(self.session, self.entity_in_focus);
 }
 
 fn handleInput(self: PlayMode, buttons: game.Buttons) !void {
@@ -82,17 +81,17 @@ fn handleInput(self: PlayMode, buttons: game.Buttons) !void {
 }
 
 pub fn tick(self: *PlayMode) anyerror!void {
-    try Render.drawAnimationsFrame(self.session, self.entity_in_focus);
+    try self.session.game.render.drawAnimationsFrame(self.session, self.entity_in_focus);
     if (self.session.components.getAll(game.Animation).len > 0)
         return;
 
-    try Render.drawScene(self.session, self.entity_in_focus);
-    try Render.drawQuickActionButton(self.session, self.quick_action);
+    try self.session.game.render.drawScene(self.session, self.entity_in_focus);
+    try self.session.game.render.drawQuickActionButton(self.quick_action);
     // we should update target only if player did some action at this tick
     var should_update_target: bool = false;
 
     if (self.is_player_turn) {
-        if (try self.session.runtime.readPushedButtons()) |buttons| {
+        if (try self.session.game.runtime.readPushedButtons()) |buttons| {
             try self.handleInput(buttons);
             // break this function if the mode was changed
             if (self.session.mode != .play) return;

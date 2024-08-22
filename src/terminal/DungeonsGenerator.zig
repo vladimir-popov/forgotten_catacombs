@@ -4,7 +4,7 @@ const game = @import("game");
 const tty = @import("tty.zig");
 
 const Logger = @import("Logger.zig");
-const Runtime = @import("Runtime.zig");
+const Runtime = @import("TtyRuntime.zig");
 
 pub const std_options = .{
     .logFn = Logger.writeLog,

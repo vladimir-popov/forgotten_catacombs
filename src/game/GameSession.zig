@@ -8,16 +8,17 @@ const p = algs.primitives;
 const ecs = @import("ecs");
 const game = @import("game.zig");
 
-const Render = @import("Render.zig");
+const PlayMode = @import("PlayMode.zig");
+const ExploreMode = @import("ExploreMode.zig");
 
 const log = std.log.scoped(.GameSession);
 
-const Self = @This();
+const GameSession = @This();
 
-const Mode = enum { welcome, play, pause, game_over };
+const Mode = enum { play, explore };
 
-/// Playdate or terminal
-runtime: game.AnyRuntime,
+/// The root object of the game
+game: *game.Game,
 /// Collection of the entities of this game session
 entities: ecs.EntitiesManager,
 /// Collection of the components of the entities
@@ -33,74 +34,51 @@ player: game.Entity = undefined,
 /// The current mode of the game
 mode: Mode = .play,
 // stateful modes:
-play_mode: game.PlayMode = undefined,
-pause_mode: game.PauseMode = undefined,
+play_mode: PlayMode = undefined,
+explore_mode: ExploreMode = undefined,
 
-pub fn create(runtime: game.AnyRuntime) !*Self {
-    const session = try runtime.alloc.create(Self);
+pub fn create(gm: *game.Game) !*GameSession {
+    const session = try gm.runtime.alloc.create(GameSession);
     session.* = .{
-        .runtime = runtime,
+        .game = gm,
         .screen = game.Screen.init(game.DISPLAY_ROWS - 1, game.DISPLAY_COLS, game.Dungeon.Region),
-        .entities = try ecs.EntitiesManager.init(runtime.alloc),
-        .components = try ecs.ComponentsManager(game.Components).init(runtime.alloc),
-        .dungeon = try game.Dungeon.createRandom(runtime.alloc, runtime.rand),
+        .entities = try ecs.EntitiesManager.init(gm.runtime.alloc),
+        .components = try ecs.ComponentsManager(game.Components).init(gm.runtime.alloc),
+        .dungeon = try game.Dungeon.createRandom(gm.runtime.alloc, gm.runtime.rand),
     };
     session.query = .{ .entities = &session.entities, .components = &session.components };
     const player_and_position = try initLevel(session.dungeon, &session.entities, &session.components);
     session.player = player_and_position[0];
     session.screen.centeredAround(player_and_position[1]);
-    session.play_mode = try game.PlayMode.init(session);
-    session.pause_mode = try game.PauseMode.init(session);
-
-    try session.welcome();
-    // try session.play(null);
+    session.play_mode = try PlayMode.init(session);
+    session.explore_mode = try ExploreMode.init(session);
+    try session.play(null);
     return session;
 }
 
-pub fn destroy(self: *Self) void {
+pub fn destroy(self: *GameSession) void {
     self.entities.deinit();
     self.components.deinit();
     self.dungeon.destroy();
     self.play_mode.deinit();
-    self.pause_mode.deinit();
-    self.runtime.alloc.destroy(self);
+    self.explore_mode.deinit();
+    self.game.runtime.alloc.destroy(self);
 }
 
-pub fn welcome(session: *Self) !void {
-    session.mode = .welcome;
-    try Render.drawWelcomeScreen(session);
+pub fn play(self: *GameSession, entity_in_focus: ?game.Entity) !void {
+    self.mode = .play;
+    try self.play_mode.refresh(entity_in_focus);
 }
 
-pub fn play(session: *Self, entity_in_focus: ?game.Entity) !void {
-    session.mode = .play;
-    try session.play_mode.refresh(entity_in_focus);
+pub fn pause(self: *GameSession) !void {
+    self.mode = .explore;
+    try self.explore_mode.refresh();
 }
 
-pub fn pause(session: *Self) !void {
-    session.mode = .pause;
-    try session.pause_mode.refresh();
-}
-
-pub fn gameOver(session: *Self) !void {
-    session.mode = .game_over;
-    try Render.drawGameOverScreen(session);
-}
-
-pub inline fn tick(session: *Self) !void {
-    switch (session.mode) {
-        .welcome, .game_over => if (try session.runtime.readPushedButtons()) |btn| {
-            switch (btn.code) {
-                game.Buttons.A => {
-                    if (session.mode == .welcome)
-                        try session.play(null)
-                    else 
-                        try session.welcome();
-                },
-                else => {},
-            }
-        },
-        .play => try session.play_mode.tick(),
-        .pause => try session.pause_mode.tick(),
+pub inline fn tick(self: *GameSession) !void {
+    switch (self.mode) {
+        .play => try self.play_mode.tick(),
+        .explore => try self.explore_mode.tick(),
     }
 }
 
@@ -113,7 +91,7 @@ pub fn entityAt(session: *game.GameSession, place: p.Point) ?game.Entity {
     return null;
 }
 
-pub fn removeEntity(self: *Self, entity: game.Entity) !void {
+pub fn removeEntity(self: *GameSession, entity: game.Entity) !void {
     try self.components.removeAllForEntity(entity);
     self.entities.removeEntity(entity);
 }
@@ -159,7 +137,7 @@ fn initPlayer(
     try components.setToEntity(player, game.Position{ .point = init_position });
     try components.setToEntity(player, game.Sprite{ .codepoint = '@', .z_order = 3 });
     try components.setToEntity(player, game.Description{ .name = "You" });
-    try components.setToEntity(player, game.Health{ .max = 100, .current = 50 });
+    try components.setToEntity(player, game.Health{ .max = 100, .current = 30 });
     try components.setToEntity(player, game.MeleeWeapon{ .max_damage = 3, .move_points = 10 });
     try components.setToEntity(player, game.Speed{ .move_points = 10 });
     return player;

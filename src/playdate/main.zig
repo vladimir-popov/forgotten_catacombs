@@ -3,7 +3,7 @@ const game = @import("game");
 const api = @import("api.zig");
 const tools = @import("tools");
 
-const Runtime = @import("Runtime.zig");
+const PlaydateRuntime = @import("PlaydateRuntime.zig");
 
 pub const std_options = .{
     .log_level = .info,
@@ -37,8 +37,8 @@ var playdate_error_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) v
 var playdate_log_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) void = undefined;
 
 pub const GlobalState = struct {
-    runtime: *Runtime,
-    session: *game.GameSession,
+    runtime: PlaydateRuntime,
+    game: game.Game,
 };
 
 pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent, arg: u32) callconv(.C) c_int {
@@ -49,9 +49,9 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
             playdate_log_to_console = playdate.system.logToConsole;
 
             var state: *GlobalState = @ptrCast(@alignCast(playdate.system.realloc(null, @sizeOf(GlobalState))));
-            state.runtime = Runtime.create(playdate) catch
+            state.runtime = PlaydateRuntime.init(playdate) catch
                 @panic("Error on creating Runtime");
-            state.session = game.GameSession.create(state.runtime.any()) catch
+            state.game = game.Game.init(state.runtime.any()) catch
                 @panic("Error on creating game session");
 
             playdate.display.setRefreshRate(0);
@@ -64,7 +64,7 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
 
 fn update_and_render(userdata: ?*anyopaque) callconv(.C) c_int {
     const state: *GlobalState = @ptrCast(@alignCast(userdata.?));
-    state.session.tick() catch |err|
+    state.game.tick() catch |err|
         std.debug.panic("Error {any} on game tick", .{err});
 
     state.runtime.playdate.system.drawFPS(1, 1);

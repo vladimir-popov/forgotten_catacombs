@@ -2,7 +2,7 @@ const std = @import("std");
 const game = @import("game");
 const tty = @import("tty.zig");
 
-const Runtime = @import("Runtime.zig");
+const TtyRuntime = @import("TtyRuntime.zig");
 const Logger = @import("Logger.zig");
 
 pub const std_options = .{
@@ -25,11 +25,11 @@ pub fn main() !void {
     defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK DETECTED!");
 
     var prng = std.rand.DefaultPrng.init(seed);
-    var runtime = try Runtime.init(alloc, prng.random(), true);
+    var runtime = try TtyRuntime.init(alloc, prng.random(), true);
     defer runtime.deinit();
-    const session = try game.GameSession.create(runtime.any());
-    defer session.destroy();
-    try runtime.run(session);
+    var gm = try game.Game.init(runtime.any());
+    defer gm.deinit();
+    try runtime.run(&gm);
 }
 
 test {

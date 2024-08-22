@@ -7,7 +7,7 @@ const utf8 = @import("utf8");
 
 const log = std.log.scoped(.runtime);
 
-const Self = @This();
+const TtyRuntime = @This();
 
 var window_size: tty.Display.RowsCols = undefined;
 var act: std.posix.Sigaction = undefined;
@@ -27,8 +27,8 @@ termios: std.c.termios,
 prev_key: ?tty.Keyboard.Button = null,
 pressed_at: i64 = 0,
 
-pub fn init(alloc: std.mem.Allocator, rand: std.Random, render_in_center: bool) !Self {
-    const instance = Self{
+pub fn init(alloc: std.mem.Allocator, rand: std.Random, render_in_center: bool) !TtyRuntime {
+    const instance = TtyRuntime{
         .alloc = alloc,
         .arena = std.heap.ArenaAllocator.init(alloc),
         .rand = rand,
@@ -41,17 +41,17 @@ pub fn init(alloc: std.mem.Allocator, rand: std.Random, render_in_center: bool) 
     return instance;
 }
 
-pub fn deinit(self: *Self) void {
+pub fn deinit(self: *TtyRuntime) void {
     tty.Display.exitFromRawMode() catch unreachable;
     tty.Display.showCursor() catch unreachable;
     _ = self.arena.reset(.free_all);
 }
 
 /// Run the main loop of the game
-pub fn run(self: *Self, game_session: anytype) !void {
+pub fn run(self: *TtyRuntime, gm: anytype) !void {
     handleWindowResize(0);
     while (!self.isExit()) {
-        try game_session.tick();
+        try gm.tick();
         try self.writeBuffer(tty.Display.writer);
     }
 }
@@ -65,7 +65,7 @@ fn handleWindowResize(_: i32) callconv(.C) void {
     }
 }
 
-fn isExit(self: Self) bool {
+fn isExit(self: TtyRuntime) bool {
     if (self.prev_key) |btn| {
         switch (btn) {
             .control => return btn.control == tty.Keyboard.ControlButton.ESC,
@@ -76,14 +76,14 @@ fn isExit(self: Self) bool {
     }
 }
 
-fn writeBuffer(self: Self, writer: std.io.AnyWriter) !void {
+fn writeBuffer(self: TtyRuntime, writer: std.io.AnyWriter) !void {
     for (self.buffer.lines.items, rows_pad..) |line, i| {
         try tty.Text.writeSetCursorPosition(writer, @intCast(i), cols_pad);
         _ = try writer.write(line.bytes.items);
     }
 }
 
-pub fn any(self: *Self) game.AnyRuntime {
+pub fn any(self: *TtyRuntime) game.AnyRuntime {
     return .{
         .context = self,
         .alloc = self.alloc,
@@ -105,7 +105,7 @@ fn currentMillis(_: *anyopaque) c_uint {
 }
 
 fn readPushedButtons(ptr: *anyopaque) anyerror!?game.Buttons {
-    var self: *Self = @ptrCast(@alignCast(ptr));
+    var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     const prev_key = self.prev_key;
     if (tty.Keyboard.readPressedButton()) |key| {
         self.prev_key = key;
@@ -150,7 +150,7 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?game.Buttons {
 }
 
 fn clearDisplay(ptr: *anyopaque) !void {
-    var self: *Self = @ptrCast(@alignCast(ptr));
+    var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     _ = self.arena.reset(.retain_capacity);
     self.buffer = utf8.Buffer.init(self.arena.allocator());
     try self.buffer.addLine("╔" ++ "═" ** game.DISPLAY_COLS ++ "╗");
@@ -161,12 +161,12 @@ fn clearDisplay(ptr: *anyopaque) !void {
 }
 
 fn drawUI(ptr: *anyopaque) !void {
-    var self: *Self = @ptrCast(@alignCast(ptr));
+    var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     try self.buffer.mergeLine("║" ++ "═" ** game.DISPLAY_COLS ++ "║", game.DISPLAY_ROWS, 0);
 }
 
 fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {
-    var self: *Self = @ptrCast(@alignCast(ptr));
+    var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     const buffer = &self.buffer;
     var itr = dungeon.cellsInRegion(screen.region) orelse return;
     var line = try self.alloc.alloc(u8, screen.region.cols);
@@ -198,7 +198,7 @@ fn drawSprite(
     mode: game.AnyRuntime.DrawingMode,
 ) anyerror!void {
     if (screen.region.containsPoint(position.point)) {
-        var self: *Self = @ptrCast(@alignCast(ptr));
+        var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
         const r = position.point.row - screen.region.top_left.row + 1; // +1 for border
         const c = position.point.col - screen.region.top_left.col + 1;
         if (mode == .inverted) {
@@ -223,7 +223,7 @@ fn drawText(
     absolute_position: p.Point,
     mode: game.AnyRuntime.DrawingMode,
 ) !void {
-    const self: *Self = @ptrCast(@alignCast(ptr));
+    const self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     // skip horizontal UI separator
     const r = if (absolute_position.row == game.DISPLAY_ROWS) game.DISPLAY_ROWS + 1 else absolute_position.row;
     const c = absolute_position.col;
