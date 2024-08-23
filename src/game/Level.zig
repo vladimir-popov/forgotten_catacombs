@@ -85,8 +85,9 @@ fn randomEmptyPlace(self: *Level) ?p.Point {
     while (attempt > 0) : (attempt -= 1) {
         const place = self.dungeon.randomPlace();
         var is_empty = true;
-        for (self.session.components.getAll(gm.Position)) |position| {
-            if (position.point.eql(place)) {
+        var itr = self.query().get(gm.Position);
+        while (itr.next()) |tuple| {
+            if (tuple[1].point.eql(place)) {
                 is_empty = false;
             }
         }
