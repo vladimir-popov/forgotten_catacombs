@@ -34,6 +34,11 @@ pub const Door = enum {
     pub fn deinit(_: *@This()) void {}
 };
 
+pub const Entrance = struct {
+    to_level: u64,
+    pub fn deinit(_: *@This()) void {}
+};
+
 pub const Animation = struct {
     pub const Presets = struct {
         pub const hit: [3]Codepoint = [_]Codepoint{ 0, 'X', 0 };
@@ -153,6 +158,7 @@ pub const Components = union {
     position: Position,
     sprite: Sprite,
     door: Door,
+    entrance: Entrance,
     animation: Animation,
     move: Action,
     description: Description,

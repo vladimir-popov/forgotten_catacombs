@@ -94,7 +94,8 @@ pub const Game = struct {
     inline fn newGame(self: *Game) !void {
         self.state = .game;
         if (self.game_session) |session| session.destroy();
-        self.game_session = try GameSession.create(self);
+        const seed: u64 = self.runtime.rand.int(u64);
+        self.game_session = try GameSession.create(self, seed);
         try self.game_session.?.beginNew();
         self.render.screen.centeredAround(self.game_session.?.playerPosition());
     }

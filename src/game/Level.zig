@@ -7,23 +7,18 @@ const gm = @import("game.zig");
 const Level = @This();
 
 session: *gm.GameSession,
-dungeon: *gm.Dungeon,
 entities: std.ArrayList(gm.Entity),
+dungeon: *gm.Dungeon,
+/// The depth of the current dungeon. The session.seed + depth is unique seed for the dungeon.
+depth: u8,
 
-pub fn init(session: *gm.GameSession) !Level {
-    return .{
+pub fn generate(session: *gm.GameSession, depth: u8) !Level {
+    var self = Level{
         .session = session,
-        .dungeon = try gm.Dungeon.createRandom(session.game.runtime.alloc, session.game.runtime.rand),
+        .depth = depth,
+        .dungeon = try gm.Dungeon.createRandom(session.game.runtime.alloc, session.seed + depth),
         .entities = std.ArrayList(gm.Entity).init(session.game.runtime.alloc),
     };
-}
-
-pub fn deinit(self: *Level) void {
-    self.dungeon.destroy();
-    self.entities.deinit();
-}
-
-pub fn generate(self: *Level) !void {
     try self.entities.append(self.session.player);
     const player_position = self.randomEmptyPlace() orelse unreachable;
     try self.session.components.setToEntity(self.session.player, gm.Position{ .point = player_position });
@@ -36,6 +31,12 @@ pub fn generate(self: *Level) !void {
     for (0..self.session.game.runtime.rand.uintLessThan(u8, 10) + 10) |_| {
         try self.addRat();
     }
+    return self;
+}
+
+pub fn deinit(self: *Level) void {
+    self.dungeon.destroy();
+    self.entities.deinit();
 }
 
 /// Aggregates requests of few components for the same entities at once

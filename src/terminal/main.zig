@@ -24,7 +24,7 @@ pub fn main() !void {
     const alloc = gpa.allocator();
     defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK DETECTED!");
 
-    var prng = std.rand.DefaultPrng.init(seed);
+    var prng = std.Random.DefaultPrng.init(seed);
     var runtime = try TtyRuntime.init(alloc, prng.random(), true);
     defer runtime.deinit();
     var gm = try game.Game.init(runtime.any());

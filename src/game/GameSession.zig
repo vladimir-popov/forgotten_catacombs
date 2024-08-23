@@ -21,6 +21,10 @@ const Mode = enum { play, explore };
 
 /// The root object of the game
 game: *gm.Game,
+/// The same dungeons should be generated for the same session's seed
+seed: u64,
+/// The PRNG initialized by the session's seed
+prng: std.Random.DefaultPrng,
 /// The current level
 level: gm.Level,
 /// Collection of the components of the entities
@@ -35,15 +39,17 @@ explore_mode: ExploreMode,
 /// Id for the next generate entity
 next_entity: gm.Entity = 0,
 
-pub fn create(game: *gm.Game) !*GameSession {
+pub fn create(game: *gm.Game, seed: u64) !*GameSession {
     const session = try game.runtime.alloc.create(GameSession);
     session.* = .{
         .game = game,
+        .seed = seed,
+        .prng = std.Random.DefaultPrng.init(seed),
         .components = try ecs.ComponentsManager(gm.Components).init(game.runtime.alloc),
         .mode = .play,
         .play_mode = try PlayMode.init(session),
         .explore_mode = try ExploreMode.init(session),
-        .level = try gm.Level.init(session),
+        .level = undefined,
     };
     return session;
 }
@@ -58,7 +64,7 @@ pub fn destroy(self: *GameSession) void {
 
 pub fn beginNew(self: *GameSession) !void {
     try self.initPlayer();
-    try self.level.generate();
+    self.level = try gm.Level.generate(self, 0);
 }
 
 // TODO: Load session from file
