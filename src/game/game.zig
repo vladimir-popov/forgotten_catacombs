@@ -11,7 +11,7 @@ pub const Entity = ecs.Entity;
 pub const Screen = @import("Screen.zig");
 pub const Dungeon = @import("BspDungeon.zig").BspDungeon(WHOLE_DUNG_ROWS, WHOLE_DUNG_COLS);
 // pub const Dungeon = @import("BspDungeon.zig").BspDungeon(DISPLPAY_ROWS, DISPLPAY_COLS);
-
+pub const Level = @import("Level.zig");
 pub const GameSession = @import("GameSession.zig");
 
 /// The maximum rows count in the whole dungeon
@@ -49,14 +49,14 @@ pub const Game = struct {
     game_session: ?*GameSession,
 
     pub fn init(runtime: AnyRuntime) !Game {
-        var instance = Game{
+        var gm = Game{
             .runtime = runtime,
-            .render = Render{ .runtime = runtime },
+            .render = Render.init(runtime),
             .state = .welcome,
             .game_session = null,
         };
-        try instance.welcome();
-        return instance;
+        try gm.welcome();
+        return gm;
     }
 
     pub fn deinit(self: Game) void {
@@ -95,6 +95,8 @@ pub const Game = struct {
         self.state = .game;
         if (self.game_session) |session| session.destroy();
         self.game_session = try GameSession.create(self);
+        try self.game_session.?.beginNew();
+        self.render.screen.centeredAround(self.game_session.?.playerPosition());
     }
 };
 

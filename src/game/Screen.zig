@@ -1,9 +1,9 @@
 const std = @import("std");
 const algs_and_types = @import("algs_and_types");
 const p = algs_and_types.primitives;
-const game = @import("game.zig");
+const gm = @import("game.zig");
 
-const Self = @This();
+const Screen = @This();
 
 /// the region which should be displayed
 region: p.Region,
@@ -15,7 +15,7 @@ dungeon_region: p.Region,
 
 pub fn deinit(_: *@This()) void {}
 
-pub fn init(rows: u8, cols: u8, dungeon_region: p.Region) Self {
+pub fn init(rows: u8, cols: u8, dungeon_region: p.Region) Screen {
     return .{
         .region = .{ .top_left = .{ .row = 1, .col = 1 }, .rows = rows, .cols = cols },
         .rows_pad = @intFromFloat(@as(f16, @floatFromInt(rows)) * 0.2),
@@ -24,7 +24,7 @@ pub fn init(rows: u8, cols: u8, dungeon_region: p.Region) Self {
     };
 }
 
-pub fn centeredAround(self: *Self, point: p.Point) void {
+pub fn centeredAround(self: *Screen, point: p.Point) void {
     self.region.top_left = .{
         .row = if (point.row > self.region.rows / 2) point.row - self.region.rows / 2 else 1,
         .col = if (point.col > self.region.cols / 2) point.col - self.region.cols / 2 else 1,
@@ -32,7 +32,7 @@ pub fn centeredAround(self: *Self, point: p.Point) void {
 }
 
 /// Try to keep the player inside this region
-pub inline fn innerRegion(self: Self) p.Region {
+pub inline fn innerRegion(self: Screen) p.Region {
     var inner_region = self.region;
     inner_region.top_left.row += self.rows_pad;
     inner_region.top_left.col += self.cols_pad;
@@ -42,11 +42,11 @@ pub inline fn innerRegion(self: Self) p.Region {
 }
 
 /// Gets the point in the dungeon and return its coordinates on the screen.
-pub inline fn relative(self: Self, point: p.Point) p.Point {
+pub inline fn relative(self: Screen, point: p.Point) p.Point {
     return .{ .row = point.row - self.region.top_left.row, .col = point.col - self.region.top_left.col };
 }
 
-pub fn move(self: *Self, direction: p.Direction) void {
+pub fn move(self: *Screen, direction: p.Direction) void {
     switch (direction) {
         .up => {
             if (self.region.top_left.row > 1)

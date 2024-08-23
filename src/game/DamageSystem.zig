@@ -20,7 +20,7 @@ pub fn handleDamage(session: *game.GameSession) anyerror!void {
             if (components[0] == session.player)
                 try session.game.gameOver()
             else
-                try session.removeEntity(components[0]);
+                try session.level.removeEntity(components[0]);
         }
     }
 }

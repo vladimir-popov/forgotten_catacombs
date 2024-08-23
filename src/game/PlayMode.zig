@@ -1,7 +1,7 @@
 //! This is the main mode of the game in which player travel through the dungeons.
 
 const std = @import("std");
-const game = @import("game.zig");
+const gm = @import("game.zig");
 const algs = @import("algs_and_types");
 const p = algs.primitives;
 
@@ -16,7 +16,19 @@ const PlayMode = @This();
 
 const System = *const fn (play_mode: *PlayMode) anyerror!void;
 
-session: *game.GameSession,
+const Enemy = struct {
+    session: *gm.GameSession,
+    entity: gm.Entity,
+    move_points: u8,
+
+    inline fn doMove(self: *Enemy) !bool {
+        const spent_mp = try AI.meleeMove(self.session, self.entity, self.move_points);
+        self.move_points -= spent_mp;
+        return spent_mp > 0;
+    }
+};
+
+session: *gm.GameSession,
 /// List of all enemies on the level
 enemies: std.ArrayList(Enemy),
 /// Index of the enemy, which should do move on next tick
@@ -26,13 +38,13 @@ is_player_turn: bool,
 /// How many enemies did their move
 moved_enemies: u8,
 /// Who is attacking the player right now
-attacking_entity: ?game.Entity,
+attacking_entity: ?gm.Entity,
 /// Highlighted entity
-entity_in_focus: ?game.Entity,
+entity_in_focus: ?gm.Entity,
 // An action which could be applied to the entity in focus
-quick_action: ?game.Action,
+quick_action: ?gm.Action,
 
-pub fn init(session: *game.GameSession) !PlayMode {
+pub fn init(session: *gm.GameSession) !PlayMode {
     return .{
         .session = session,
         .enemies = std.ArrayList(Enemy).init(session.game.runtime.alloc),
@@ -50,23 +62,23 @@ pub fn deinit(self: PlayMode) void {
 }
 
 /// Updates the target entity after switching back to the play mode
-pub fn refresh(self: *PlayMode, entity_in_focus: ?game.Entity) !void {
+pub fn refresh(self: *PlayMode, entity_in_focus: ?gm.Entity) !void {
     self.entity_in_focus = entity_in_focus;
-    try updateTarget(self);
+    try self.updateTarget();
     try self.session.game.render.redraw(self.session, self.entity_in_focus);
 }
 
-fn handleInput(self: PlayMode, buttons: game.Buttons) !void {
+fn handleInput(self: PlayMode, buttons: gm.Buttons) !void {
     switch (buttons.code) {
-        game.Buttons.A => if (self.quick_action) |quick_action| {
+        gm.Buttons.A => if (self.quick_action) |quick_action| {
             try self.session.components.setToEntity(self.session.player, quick_action);
         },
-        game.Buttons.B => {
+        gm.Buttons.B => {
             try self.session.pause();
         },
-        game.Buttons.Left, game.Buttons.Right, game.Buttons.Up, game.Buttons.Down => {
-            const speed = self.session.components.getForEntityUnsafe(self.session.player, game.Speed);
-            try self.session.components.setToEntity(self.session.player, game.Action{
+        gm.Buttons.Left, gm.Buttons.Right, gm.Buttons.Up, gm.Buttons.Down => {
+            const speed = self.session.components.getForEntityUnsafe(self.session.player, gm.Speed);
+            try self.session.components.setToEntity(self.session.player, gm.Action{
                 .type = .{
                     .move = .{
                         .direction = buttons.toDirection().?,
@@ -82,7 +94,7 @@ fn handleInput(self: PlayMode, buttons: game.Buttons) !void {
 
 pub fn tick(self: *PlayMode) anyerror!void {
     try self.session.game.render.drawAnimationsFrame(self.session, self.entity_in_focus);
-    if (self.session.components.getAll(game.Animation).len > 0)
+    if (self.session.components.getAll(gm.Animation).len > 0)
         return;
 
     try self.session.game.render.drawScene(self.session, self.entity_in_focus);
@@ -96,7 +108,7 @@ pub fn tick(self: *PlayMode) anyerror!void {
             // break this function if the mode was changed
             if (self.session.mode != .play) return;
             // If the player did some action
-            if (self.session.components.getForEntity(self.session.player, game.Action)) |action| {
+            if (self.session.components.getForEntity(self.session.player, gm.Action)) |action| {
                 self.is_player_turn = false;
                 should_update_target = true;
                 if (self.entity_in_focus == self.session.player and action.type != .wait)
@@ -108,7 +120,7 @@ pub fn tick(self: *PlayMode) anyerror!void {
         if (self.current_enemy < self.enemies.items.len) {
             const actor: *Enemy = &self.enemies.items[self.current_enemy];
             if (try actor.doMove()) {
-                if (self.session.components.getForEntity(actor.entity, game.Action)) |action| {
+                if (self.session.components.getForEntity(actor.entity, gm.Action)) |action| {
                     if (action.type == .hit) {
                         self.attacking_entity = actor.entity;
                     }
@@ -131,7 +143,7 @@ fn runSystems(self: *PlayMode) !void {
     try ActionSystem.doActions(self.session);
     try CollisionSystem.handleCollisions(self.session);
     // if the player had collision with enemy, that enemy should appear in focus
-    if (self.session.components.getForEntity(self.session.player, game.Action)) |action| {
+    if (self.session.components.getForEntity(self.session.player, gm.Action)) |action| {
         switch (action.type) {
             .hit => |enemy| {
                 self.entity_in_focus = enemy;
@@ -147,23 +159,11 @@ fn runSystems(self: *PlayMode) !void {
     try DamageSystem.handleDamage(self.session);
 }
 
-const Enemy = struct {
-    session: *game.GameSession,
-    entity: game.Entity,
-    move_points: u8,
-
-    inline fn doMove(self: *Enemy) !bool {
-        const spent_mp = try AI.meleeMove(self.session, self.entity, self.move_points);
-        self.move_points -= spent_mp;
-        return spent_mp > 0;
-    }
-};
-
 /// Collect NPC and set them move points
 fn updateEnemies(self: *PlayMode, move_points: u8) !void {
     self.current_enemy = 0;
     self.enemies.clearRetainingCapacity();
-    var itr = self.session.query.get(game.NPC);
+    var itr = self.session.query.get(gm.NPC);
     while (itr.next()) |tuple| {
         try self.enemies.append(.{ .session = self.session, .entity = tuple[0], .move_points = move_points });
     }
@@ -177,18 +177,18 @@ fn updateTarget(self: *PlayMode) anyerror!void {
     } else {
         self.entity_in_focus = null;
         self.quick_action = null;
-        const player_position = self.session.components.getForEntityUnsafe(self.session.player, game.Position).point;
+        const player_position = self.session.components.getForEntityUnsafe(self.session.player, gm.Position);
         // Check the nearest entities:
         const region = p.Region{
             .top_left = .{
-                .row = @max(player_position.row - 1, 1),
-                .col = @max(player_position.col - 1, 1),
+                .row = @max(player_position.point.row - 1, 1),
+                .col = @max(player_position.point.col - 1, 1),
             },
             .rows = 3,
             .cols = 3,
         };
         // TODO improve:
-        const positions = self.session.components.arrayOf(game.Position);
+        const positions = self.session.components.arrayOf(gm.Position);
         for (positions.components.items, 0..) |position, idx| {
             if (region.containsPoint(position.point)) {
                 if (positions.index_entity.get(@intCast(idx))) |entity| {
@@ -208,27 +208,27 @@ fn updateTarget(self: *PlayMode) anyerror!void {
 
 fn calculateQuickActionForTarget(
     self: PlayMode,
-    target_enemy: ?game.Entity,
-) ?game.Action {
+    target_enemy: ?gm.Entity,
+) ?gm.Action {
     const target = target_enemy orelse return null;
     if (target == self.session.player) return waitAction(self.session);
 
-    const player_position = self.session.components.getForEntityUnsafe(self.session.player, game.Position);
-    const target_position = self.session.components.getForEntity(target, game.Position) orelse return null;
+    const player_position = self.session.components.getForEntityUnsafe(self.session.player, gm.Position);
+    const target_position = self.session.components.getForEntity(target, gm.Position) orelse return null;
     if (player_position.point.near(target_position.point)) {
-        if (self.session.components.getForEntity(target, game.Health)) |_| {
-            const weapon = self.session.components.getForEntityUnsafe(self.session.player, game.MeleeWeapon);
+        if (self.session.components.getForEntity(target, gm.Health)) |_| {
+            const weapon = self.session.components.getForEntityUnsafe(self.session.player, gm.MeleeWeapon);
             return .{
                 .type = .{ .hit = target },
                 .move_points = weapon.move_points,
             };
         }
-        if (self.session.components.getForEntity(target, game.Door)) |door| {
+        if (self.session.components.getForEntity(target, gm.Door)) |door| {
             // the player should not be able to open/close the door stay in the doorway
             if (player_position.point.eql(target_position.point)) {
                 return null;
             }
-            const player_speed = self.session.components.getForEntityUnsafe(self.session.player, game.Speed);
+            const player_speed = self.session.components.getForEntityUnsafe(self.session.player, gm.Speed);
             return switch (door.*) {
                 .opened => .{ .type = .{ .close = target }, .move_points = player_speed.move_points },
                 .closed => .{ .type = .{ .open = target }, .move_points = player_speed.move_points },
@@ -238,9 +238,9 @@ fn calculateQuickActionForTarget(
     return null;
 }
 
-fn waitAction(session: *game.GameSession) game.Action {
+fn waitAction(session: *gm.GameSession) gm.Action {
     return .{
         .type = .wait,
-        .move_points = session.components.getForEntityUnsafe(session.player, game.Speed).move_points,
+        .move_points = session.components.getForEntityUnsafe(session.player, gm.Speed).move_points,
     };
 }

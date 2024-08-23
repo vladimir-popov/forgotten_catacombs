@@ -62,7 +62,7 @@ fn handleMoveAction(
     if (entity != session.player) return true;
 
     // keep player on the screen:
-    const screen = &session.screen;
+    const screen = &session.game.render.screen;
     const inner_region = screen.innerRegion();
     if (move.direction == .up and position.point.row < inner_region.top_left.row)
         screen.move(move.direction);
@@ -76,10 +76,10 @@ fn handleMoveAction(
 }
 
 fn checkCollision(session: *game.GameSession, position: p.Point) ?game.Collision.Obstacle {
-    if (session.dungeon.cellAt(position)) |cell| {
+    if (session.level.dungeon.cellAt(position)) |cell| {
         switch (cell) {
             .nothing, .wall => return .wall,
-            .floor, .door => if (session.entityAt(position)) |entity| {
+            .floor, .door => if (session.level.entityAt(position)) |entity| {
                 if (session.components.getForEntity(entity, game.Door)) |door|
                     if (door.* == .closed)
                         return .{ .door = .{ .entity = entity, .state = .closed } }
