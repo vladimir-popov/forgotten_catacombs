@@ -40,17 +40,22 @@ pub const DOUBLE_PUSH_DELAY_MS = 250;
 pub const HOLD_DELAY_MS = 500;
 
 pub const Game = struct {
+    const log = std.log.scoped(.Game);
+
     pub const State = enum { welcome, game_over, game };
 
     /// Playdate or terminal
     runtime: AnyRuntime,
     render: Render,
     state: State,
+    prng: std.Random.DefaultPrng,
     game_session: ?*GameSession,
 
-    pub fn init(runtime: AnyRuntime) !Game {
+    pub fn init(runtime: AnyRuntime, seed: u64) !Game {
+        std.log.debug("Init the game with seed {d}", .{seed});
         var gm = Game{
             .runtime = runtime,
+            .prng = std.Random.DefaultPrng.init(seed),
             .render = Render.init(runtime),
             .state = .welcome,
             .game_session = null,
@@ -94,8 +99,7 @@ pub const Game = struct {
     inline fn newGame(self: *Game) !void {
         self.state = .game;
         if (self.game_session) |session| session.destroy();
-        const seed: u64 = self.runtime.rand.int(u64);
-        self.game_session = try GameSession.create(self, seed);
+        self.game_session = try GameSession.create(self, self.prng.next());
         try self.game_session.?.beginNew();
         self.render.screen.centeredAround(self.game_session.?.playerPosition());
     }

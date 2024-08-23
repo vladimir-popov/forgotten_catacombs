@@ -34,7 +34,7 @@ pub fn doActions(session: *game.GameSession) !void {
                 if (session.components.getForEntity(entity, game.MeleeWeapon)) |weapon| {
                     try session.components.setToEntity(
                         enemy,
-                        weapon.damage(session.game.runtime.rand),
+                        weapon.damage(session.prng.random()),
                     );
                 }
             },

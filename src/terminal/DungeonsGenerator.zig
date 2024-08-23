@@ -20,13 +20,12 @@ pub fn main() !void {
     else
         std.crypto.random.int(u64);
     log.info("The random seed is {d}", .{seed});
-    var rnd = std.Random.DefaultPrng.init(seed);
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK DETECTED!");
     const alloc = gpa.allocator();
 
-    var runtime = try Runtime.init(alloc, rnd.random(), false);
+    var runtime = try Runtime.init(alloc, false);
     defer runtime.deinit();
 
     var generator = try DungeonsGenerator.create(runtime.any());

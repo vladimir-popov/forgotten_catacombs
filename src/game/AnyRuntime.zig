@@ -34,7 +34,6 @@ const VTable = struct {
 
 context: *anyopaque,
 alloc: std.mem.Allocator,
-rand: std.Random,
 vtable: *const VTable,
 
 pub inline fn currentMillis(self: Self) c_uint {

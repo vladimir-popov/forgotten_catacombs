@@ -51,7 +51,7 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
             var state: *GlobalState = @ptrCast(@alignCast(playdate.system.realloc(null, @sizeOf(GlobalState))));
             state.runtime = PlaydateRuntime.init(playdate) catch
                 @panic("Error on creating Runtime");
-            state.game = game.Game.init(state.runtime.any()) catch
+            state.game = game.Game.init(state.runtime.any(), playdate.system.getCurrentTimeMilliseconds()) catch
                 @panic("Error on creating game session");
 
             playdate.display.setRefreshRate(0);

@@ -112,6 +112,7 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
         }
 
         pub fn createEmpty(alloc: std.mem.Allocator, seed: u64) !*Self {
+            log.debug("Create the dungeon with seed {d}", .{seed});
             const instance = try alloc.create(Self);
             instance.* = .{
                 .alloc = alloc,

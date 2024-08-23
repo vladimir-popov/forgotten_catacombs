@@ -18,7 +18,6 @@ const ButtonsLog = struct {
 
 playdate: *api.PlaydateAPI,
 alloc: std.mem.Allocator,
-prng: std.rand.Xoshiro256,
 text_font: ?*api.LCDFont,
 sprites_font: ?*api.LCDFont,
 button_log: ButtonsLog = .{},
@@ -48,7 +47,6 @@ pub fn init(playdate: *api.PlaydateAPI) !Self {
     return .{
         .playdate = playdate,
         .alloc = alloc,
-        .prng = std.Random.DefaultPrng.init(@intCast(millis)),
         .text_font = text_font,
         .sprites_font = sprites_font,
     };
@@ -63,7 +61,6 @@ pub fn any(self: *Self) game.AnyRuntime {
     return .{
         .context = self,
         .alloc = self.alloc,
-        .rand = self.prng.random(),
         .vtable = &.{
             .currentMillis = currentMillis,
             .readPushedButtons = readPushedButtons,

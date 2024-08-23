@@ -28,7 +28,7 @@ pub fn generate(session: *gm.GameSession, depth: u8) !Level {
         try self.addClosedDoor(at.*);
     }
 
-    for (0..self.session.game.runtime.rand.uintLessThan(u8, 10) + 10) |_| {
+    for (0..self.session.prng.random().uintLessThan(u8, 10) + 10) |_| {
         try self.addRat();
     }
     return self;

@@ -63,6 +63,7 @@ pub fn destroy(self: *GameSession) void {
 }
 
 pub fn beginNew(self: *GameSession) !void {
+    log.debug("Begin the new game session with seed {d}", .{self.seed});
     try self.initPlayer();
     self.level = try gm.Level.generate(self, 0);
 }

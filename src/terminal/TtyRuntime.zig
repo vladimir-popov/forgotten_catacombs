@@ -19,7 +19,6 @@ var cols_pad: u16 = 0;
 alloc: std.mem.Allocator,
 // used to accumulate the buffer every run-loop circle
 arena: std.heap.ArenaAllocator,
-rand: std.Random,
 buffer: utf8.Buffer,
 termios: std.c.termios,
 // the last read button through readButton function.
@@ -27,11 +26,10 @@ termios: std.c.termios,
 prev_key: ?tty.Keyboard.Button = null,
 pressed_at: i64 = 0,
 
-pub fn init(alloc: std.mem.Allocator, rand: std.Random, render_in_center: bool) !TtyRuntime {
+pub fn init(alloc: std.mem.Allocator, render_in_center: bool) !TtyRuntime {
     const instance = TtyRuntime{
         .alloc = alloc,
         .arena = std.heap.ArenaAllocator.init(alloc),
-        .rand = rand,
         .buffer = undefined,
         .termios = tty.Display.enterRawMode(),
     };
@@ -87,7 +85,6 @@ pub fn any(self: *TtyRuntime) game.AnyRuntime {
     return .{
         .context = self,
         .alloc = self.alloc,
-        .rand = self.rand,
         .vtable = &.{
             .currentMillis = currentMillis,
             .readPushedButtons = readPushedButtons,
