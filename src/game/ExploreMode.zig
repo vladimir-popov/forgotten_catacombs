@@ -32,7 +32,7 @@ pub fn deinit(self: *ExploreMode) void {
 pub fn refresh(self: *ExploreMode) !void {
     self.entity_in_focus = self.session.player;
     self.entities_on_screen.clearRetainingCapacity();
-    var itr = self.session.query.get(gm.Position);
+    var itr = self.session.level.query().get(gm.Position);
     while (itr.next()) |tuple| {
         if (self.session.game.render.screen.region.containsPoint(tuple[1].point)) {
             const item = try self.entities_on_screen.addOne();

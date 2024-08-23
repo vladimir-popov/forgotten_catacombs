@@ -262,54 +262,12 @@ test "ComponentsManager: Add/Get/Remove component" {
     // and finally, no memory leak should happened
 }
 
-/// The manager of the entities and their components.
-pub const EntitiesManager = struct {
-    const Self = @This();
-
-    /// The iterator over entities. It should be used to get
-    /// entities from this manager.
-    pub const EntitiesIterator = std.AutoHashMap(Entity, void).KeyIterator;
-
-    next_entity: Entity,
-    entities: std.AutoHashMap(Entity, void),
-
-    pub fn init(alloc: std.mem.Allocator) !Self {
-        return .{
-            .next_entity = 0,
-            .entities = std.AutoHashMap(Entity, void).init(alloc),
-        };
-    }
-
-    /// Removes cleans up the inner entities storage.
-    pub fn deinit(self: *Self) void {
-        self.entities.deinit();
-    }
-
-    /// Generates an unique id for the new entity, puts it to the inner storage,
-    /// and then returns as the result. The id is unique for whole life circle of
-    /// this manager.
-    pub fn newEntity(self: *Self) !Entity {
-        const entity = self.next_entity;
-        self.next_entity += 1;
-        try self.entities.put(entity, {});
-        return entity;
-    }
-
-    /// Removes all components of the entity and it self from the inner storage.
-    pub fn removeEntity(self: *Self, entity: Entity) void {
-        _ = self.entities.remove(entity);
-    }
-
-    pub inline fn iterator(self: *const Self) EntitiesIterator {
-        return self.entities.keyIterator();
-    }
-};
-
 pub fn ComponentsQuery(comptime ComponentsUnion: type) type {
     return struct {
         const Self = @This();
-        entities: *const EntitiesManager,
-        components: *const ComponentsManager(ComponentsUnion),
+
+        entities: std.ArrayList(Entity),
+        components_manager: ComponentsManager(ComponentsUnion),
 
         pub fn Query1(comptime Cmp: type) type {
             return struct {
@@ -328,19 +286,21 @@ pub fn ComponentsQuery(comptime ComponentsUnion: type) type {
         }
 
         pub fn get(self: *const Self, comptime Cmp: type) Query1(Cmp) {
-            return .{ .components = self.components.arrayOf(Cmp) };
+            return .{ .components = self.components_manager.arrayOf(Cmp) };
         }
 
         pub fn Query2(comptime Cmp1: type, Cmp2: type) type {
             return struct {
-                components: *const ComponentsManager(ComponentsUnion),
-                entities_itr: EntitiesManager.EntitiesIterator,
+                entities: []const Entity,
+                components: ComponentsManager(ComponentsUnion),
+                idx: u8 = 0,
 
-                pub fn next(query: *@This()) ?struct { Entity, *Cmp1, *Cmp2 } {
-                    while (query.entities_itr.next()) |entity_ptr| {
-                        const entity = entity_ptr.*;
-                        if (query.components.getForEntity(entity, Cmp1)) |c1| {
-                            if (query.components.getForEntity(entity, Cmp2)) |c2| {
+                pub fn next(self: *@This()) ?struct { Entity, *Cmp1, *Cmp2 } {
+                    while (self.idx < self.entities.len) {
+                        const entity = self.entities[self.idx];
+                        self.idx += 1;
+                        if (self.components.getForEntity(entity, Cmp1)) |c1| {
+                            if (self.components.getForEntity(entity, Cmp2)) |c2| {
                                 return .{ entity, c1, c2 };
                             }
                         }
@@ -351,20 +311,22 @@ pub fn ComponentsQuery(comptime ComponentsUnion: type) type {
         }
 
         pub fn get2(self: *const Self, comptime Cmp1: type, Cmp2: type) Query2(Cmp1, Cmp2) {
-            return .{ .components = self.components, .entities_itr = self.entities.iterator() };
+            return .{ .components = self.components_manager, .entities = self.entities.items };
         }
 
         pub fn Query3(comptime Cmp1: type, Cmp2: type, Cmp3: type) type {
             return struct {
-                components: *const ComponentsManager(ComponentsUnion),
-                entities_itr: EntitiesManager.EntitiesIterator,
+                entities: []const Entity,
+                components: ComponentsManager(ComponentsUnion),
+                idx: u8 = 0,
 
-                pub fn next(query: *@This()) ?struct { Entity, *Cmp1, *Cmp2, *Cmp3 } {
-                    while (query.entities_itr.next()) |entity_ptr| {
-                        const entity = entity_ptr.*;
-                        if (query.components.getForEntity(entity, Cmp1)) |c1| {
-                            if (query.components.getForEntity(entity, Cmp2)) |c2| {
-                                if (query.components.getForEntity(entity, Cmp3)) |c3| {
+                pub fn next(self: *@This()) ?struct { Entity, *Cmp1, *Cmp2, *Cmp3 } {
+                    while (self.idx < self.entities.len) {
+                        const entity = self.entities[self.idx];
+                        self.idx += 1;
+                        if (self.components.getForEntity(entity, Cmp1)) |c1| {
+                            if (self.components.getForEntity(entity, Cmp2)) |c2| {
+                                if (self.components.getForEntity(entity, Cmp3)) |c3| {
                                     return .{ entity, c1, c2, c3 };
                                 }
                             }
@@ -376,7 +338,7 @@ pub fn ComponentsQuery(comptime ComponentsUnion: type) type {
         }
 
         pub fn get3(self: *const Self, comptime Cmp1: type, Cmp2: type, Cmp3: type) Query3(Cmp1, Cmp2, Cmp3) {
-            return .{ .components = self.components, .entities_itr = self.entities.iterator() };
+            return .{ .components = self.components_manager, .entities = self.entities.items };
         }
     };
 }

@@ -68,7 +68,7 @@ fn drawSprites(self: Render, session: *const gm.GameSession, entity_in_focus: ?g
     var visible = std.PriorityQueue(ZOrderedSprites, void, compareZOrder).init(self.runtime.alloc, {});
     defer visible.deinit();
 
-    var itr = session.query.get2(gm.Position, gm.Sprite);
+    var itr = session.level.query().get2(gm.Position, gm.Sprite);
     while (itr.next()) |tuple| {
         if (self.screen.region.containsPoint(tuple[1].point)) {
             try visible.add(tuple);
@@ -94,7 +94,7 @@ fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order
 /// Removes the animation if the last frame was drawn.
 pub fn drawAnimationsFrame(self: Render, session: *gm.GameSession, entity_in_focus: ?gm.Entity) !void {
     const now: c_uint = self.runtime.currentMillis();
-    var itr = session.query.get2(gm.Position, gm.Animation);
+    var itr = session.level.query().get2(gm.Position, gm.Animation);
     while (itr.next()) |components| {
         const position = components[1];
         const animation = components[2];

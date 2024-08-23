@@ -7,7 +7,7 @@ const log = std.log.scoped(.action_system);
 
 /// Handles intentions to do some actions
 pub fn doActions(session: *game.GameSession) !void {
-    var itr = session.query.get2(game.Action, game.Position);
+    var itr = session.level.query().get2(game.Action, game.Position);
     while (itr.next()) |components| {
         const entity = components[0];
         const action = components[1];
@@ -31,7 +31,7 @@ pub fn doActions(session: *game.GameSession) !void {
                 );
             },
             .hit => |enemy| {
-                if (session.components.getForEntity(session.player, game.MeleeWeapon)) |weapon| {
+                if (session.components.getForEntity(entity, game.MeleeWeapon)) |weapon| {
                     try session.components.setToEntity(
                         enemy,
                         weapon.damage(session.game.runtime.rand),

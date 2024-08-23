@@ -163,7 +163,7 @@ fn runSystems(self: *PlayMode) !void {
 fn updateEnemies(self: *PlayMode, move_points: u8) !void {
     self.current_enemy = 0;
     self.enemies.clearRetainingCapacity();
-    var itr = self.session.query.get(gm.NPC);
+    var itr = self.session.level.query().get(gm.NPC);
     while (itr.next()) |tuple| {
         try self.enemies.append(.{ .session = self.session, .entity = tuple[0], .move_points = move_points });
     }
