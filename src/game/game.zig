@@ -46,17 +46,21 @@ pub const Game = struct {
 
     /// Playdate or terminal
     runtime: AnyRuntime,
+    /// Module to draw the game
     render: Render,
+    /// The seed is used to generate a new game session.
+    /// This seed can be used to pass the value from the user.
+    seed: u64,
+    /// The current state of the game
     state: State,
-    prng: std.Random.DefaultPrng,
+    /// The current game session
     game_session: ?*GameSession,
 
     pub fn init(runtime: AnyRuntime, seed: u64) !Game {
-        std.log.debug("Init the game with seed {d}", .{seed});
         var gm = Game{
             .runtime = runtime,
-            .prng = std.Random.DefaultPrng.init(seed),
             .render = Render.init(runtime),
+            .seed = seed,
             .state = .welcome,
             .game_session = null,
         };
@@ -99,8 +103,7 @@ pub const Game = struct {
     inline fn newGame(self: *Game) !void {
         self.state = .game;
         if (self.game_session) |session| session.destroy();
-        self.game_session = try GameSession.create(self, self.prng.next());
-        try self.game_session.?.beginNew();
+        self.game_session = try GameSession.createNew(self, self.seed);
         self.render.screen.centeredAround(self.game_session.?.playerPosition());
     }
 };

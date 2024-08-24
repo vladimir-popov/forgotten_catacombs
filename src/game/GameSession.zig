@@ -21,9 +21,10 @@ const Mode = enum { play, explore };
 
 /// The root object of the game
 game: *gm.Game,
-/// The same dungeons should be generated for the same session's seed
+/// This seed should help to make all levels of the single game session reproducible.
 seed: u64,
-/// The PRNG initialized by the session's seed
+/// The PRNG initialized by the session's seed. This prng is used to make any dynamic decision by AI, or game events,
+/// and should not be used to generate any level objects, to keep the levels reproducible.
 prng: std.Random.DefaultPrng,
 /// The current level
 level: gm.Level,
@@ -39,7 +40,8 @@ explore_mode: ExploreMode,
 /// Id for the next generate entity
 next_entity: gm.Entity = 0,
 
-pub fn create(game: *gm.Game, seed: u64) !*GameSession {
+pub fn createNew(game: *gm.Game, seed: u64) !*GameSession {
+    log.debug("Begin the new game session with seed {d}", .{seed});
     const session = try game.runtime.alloc.create(GameSession);
     session.* = .{
         .game = game,
@@ -51,6 +53,8 @@ pub fn create(game: *gm.Game, seed: u64) !*GameSession {
         .explore_mode = try ExploreMode.init(session),
         .level = undefined,
     };
+    try session.initPlayer();
+    session.level = try gm.Level.generate(session, 0);
     return session;
 }
 
@@ -60,12 +64,6 @@ pub fn destroy(self: *GameSession) void {
     self.play_mode.deinit();
     self.explore_mode.deinit();
     self.game.runtime.alloc.destroy(self);
-}
-
-pub fn beginNew(self: *GameSession) !void {
-    log.debug("Begin the new game session with seed {d}", .{self.seed});
-    try self.initPlayer();
-    self.level = try gm.Level.generate(self, 0);
 }
 
 // TODO: Load session from file
