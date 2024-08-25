@@ -224,11 +224,8 @@ fn calculateQuickActionForTarget(
             }
             const player_speed = self.session.components.getForEntityUnsafe(self.session.player, gm.Speed).move_points;
             return switch (ladder.*) {
-                .up => |upper_ladder| .{ .type = .{ .move_up_on_level = upper_ladder }, .move_points = player_speed },
-                .down => |maybe_ladder| if (maybe_ladder) |under_ladder|
-                    .{ .type = .{ .move_down_on_level = under_ladder }, .move_points = player_speed }
-                else
-                    .{ .type = .{ .move_down_on_level = null }, .move_points = player_speed },
+                .up => |upper_ladder| .{ .type = .{ .move_up_to_level = upper_ladder }, .move_points = player_speed },
+                .down => |maybe_ladder| .{ .type = .{ .move_down_to_level = maybe_ladder }, .move_points = player_speed },
             };
         }
         if (self.session.components.getForEntity(target, gm.Health)) |_| {

@@ -54,7 +54,7 @@ pub fn createNew(game: *gm.Game, seed: u64) !*GameSession {
         .level = undefined,
     };
     session.player = try session.newEntity();
-    session.level = try gm.Level.generate(session, 0);
+    session.level = try gm.Level.generate(session, 0, null);
     return session;
 }
 
@@ -94,5 +94,15 @@ pub inline fn tick(self: *GameSession) !void {
     switch (self.mode) {
         .play => try self.play_mode.tick(),
         .explore => try self.explore_mode.tick(),
+    }
+}
+
+pub fn moveDownTo(self: *GameSession, from_ladder: gm.Entity, under_ladder: ?gm.Entity) !void {
+    if (under_ladder == null) {
+        const new_level = try gm.Level.generate(self, self.level.depth + 1, from_ladder);
+        // TODO move components to the level
+        self.level.deinit();
+        self.level = new_level;
+        self.game.render.screen.centeredAround(self.playerPosition());
     }
 }

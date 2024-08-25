@@ -90,9 +90,9 @@ pub const Action = struct {
         /// An entity is going to take the item
         take: gm.Entity,
         /// The entity id of the connected ladder on the upper level
-        move_up_on_level: gm.Entity,
+        move_up_to_level: gm.Entity,
         /// The entity id of the connected ladder on the under level 
-        move_down_on_level: ?gm.Entity,
+        move_down_to_level: ?gm.Entity,
     };
 
     type: Type,

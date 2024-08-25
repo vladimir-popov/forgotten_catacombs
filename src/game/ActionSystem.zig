@@ -38,6 +38,7 @@ pub fn doActions(session: *game.GameSession) !void {
                     );
                 }
             },
+            .move_down_to_level => |maybe_ladder| try session.moveDownTo(entity, maybe_ladder),
             else => {},
         }
         try session.components.removeFromEntity(entity, game.Action);

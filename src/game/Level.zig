@@ -14,7 +14,7 @@ dungeon: *gm.Dungeon,
 /// The depth of the current level. The session.seed + depth is unique seed for the level.
 depth: u8,
 
-pub fn generate(session: *gm.GameSession, depth: u8) !Level {
+pub fn generate(session: *gm.GameSession, depth: u8, from_ladder: ?gm.Entity) !Level {
     // This prng is used to generate entity on this level. But the dungeon should have its own prng
     // to be able to be regenerated when the player travels from level to level.
     var prng = std.Random.DefaultPrng.init(session.seed + depth);
@@ -35,7 +35,10 @@ pub fn generate(session: *gm.GameSession, depth: u8) !Level {
     }
 
     try self.addExit(prng.random());
-    try self.initPlayer(prng.random());
+    if (from_ladder) |ladder|
+        try self.addEntrance(prng.random(), ladder)
+    else
+        try self.initPlayer(prng.random());
     return self;
 }
 
