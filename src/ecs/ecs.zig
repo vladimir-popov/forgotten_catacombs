@@ -263,6 +263,16 @@ pub fn ComponentsManager(comptime ComponentsUnion: type) type {
                 try @field(self.inner_state.components_map, field.name).removeFromEntity(entity);
             }
         }
+
+        /// Moves all components defined for the entity to target entity
+        /// manager
+        pub fn movesAllForEntity(self: *const Self, entity: Entity, target: *Self) !void {
+            // TODO implement
+            inline for (@typeInfo(ComponentsMap(ComponentsUnion)).Struct.fields) |field| {
+                if (try @field(self.inner_state.components_map, field.name).detachFromEntity(entity)) |c|
+                    try target.setToEntity(entity, c);
+            }
+        }
     };
 }
 
@@ -304,6 +314,33 @@ test "ComponentsManager: Add/Get/Remove component" {
     try std.testing.expectEqual(null, component);
 
     // and finally, no memory leak should happened
+}
+test "ComponentsManager movesAllForEntity" {
+    const TestComponent1 = struct {
+        const Self = @This();
+        state: std.ArrayList(u8),
+        fn init(value: u8) !Self {
+            var instance: Self = .{ .state = try std.ArrayList(u8).initCapacity(std.testing.allocator, 1) };
+            try instance.state.append(value);
+            return instance;
+        }
+
+        fn deinit(self: *Self) void {
+            self.state.deinit();
+        }
+    };
+    const TestComponent2 = struct {
+        state: bool,
+        fn deinit(_: *@This()) void {}
+    };
+
+    const TestComponents = union { foo: TestComponent1, bar: TestComponent2 };
+
+
+    // then:
+    // 1. TC1 should not be deinited
+    // 2. TC1 should not be available in the CM1
+    // 2. TC1 should be available in the CM2
 }
 
 pub fn ComponentsQuery(comptime ComponentsUnion: type) type {
