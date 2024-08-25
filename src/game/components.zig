@@ -1,7 +1,7 @@
 const std = @import("std");
 const algs_and_types = @import("algs_and_types");
 const p = algs_and_types.primitives;
-const game = @import("game.zig");
+const gm = @import("game.zig");
 const dung = @import("BspDungeon.zig");
 
 // coz zig uses u21 for utf8 symbols
@@ -34,8 +34,13 @@ pub const Door = enum {
     pub fn deinit(_: *@This()) void {}
 };
 
-pub const Entrance = struct {
-    to_level: u64,
+/// The ladder to the upper or under level from the current one
+pub const Ladder = union(enum) {
+    /// The id of the upper level
+    up: gm.Entity,
+    /// The id of the under level, which should be defined right after
+    /// generating the under level
+    down: ?gm.Entity,
     pub fn deinit(_: *@This()) void {}
 };
 
@@ -54,7 +59,7 @@ pub const Animation = struct {
     pub fn frame(self: *Animation, now: c_uint) ?Codepoint {
         self.lag += now - self.previous_render_time;
         self.previous_render_time = now;
-        if (self.lag > game.RENDER_DELAY_MS) {
+        if (self.lag > gm.RENDER_DELAY_MS) {
             self.lag = 0;
             self.current_frame += 1;
         }
@@ -77,13 +82,17 @@ pub const Action = struct {
         /// An entity is going to move in the direction
         move: Move,
         /// An entity is going to open a door
-        open: game.Entity,
+        open: gm.Entity,
         /// An entity is going to close a door
-        close: game.Entity,
+        close: gm.Entity,
         /// An entity which should be hit
-        hit: game.Entity,
+        hit: gm.Entity,
         /// An entity is going to take the item
-        take: game.Entity,
+        take: gm.Entity,
+        /// The entity id of the connected ladder on the upper level
+        move_up_on_level: gm.Entity,
+        /// The entity id of the connected ladder on the under level 
+        move_down_on_level: ?gm.Entity,
     };
 
     type: Type,
@@ -97,13 +106,13 @@ pub const Action = struct {
 pub const Collision = struct {
     pub const Obstacle = union(enum) {
         wall,
-        door: struct { entity: game.Entity, state: game.Door },
-        item: game.Entity,
-        enemy: game.Entity,
+        door: struct { entity: gm.Entity, state: gm.Door },
+        item: gm.Entity,
+        enemy: gm.Entity,
     };
 
     /// Who met obstacle
-    entity: game.Entity,
+    entity: gm.Entity,
     /// With what exactly collision happened
     obstacle: Obstacle,
     /// Where the collision happened
@@ -158,7 +167,7 @@ pub const Components = union {
     position: Position,
     sprite: Sprite,
     door: Door,
-    entrance: Entrance,
+    ladder: Ladder,
     animation: Animation,
     move: Action,
     description: Description,

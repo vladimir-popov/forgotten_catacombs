@@ -136,7 +136,6 @@ pub fn drawStats(self: Render, session: *const gm.GameSession, entity_in_focus: 
         // Draw entity's name
         if (session.components.getForEntity(entity, gm.Description)) |desc| {
             len = (try std.fmt.bufPrint(&buf, "{s}", .{desc.name})).len;
-            std.debug.assert(len < OUT_ZONE_LENGTH);
         }
         // Draw enemy's health
         if (entity != session.player) {
@@ -167,6 +166,8 @@ pub fn drawQuickActionButton(self: Render, quick_action: ?gm.Action) !void {
             .open => try self.drawZone(2, "Open", .inverted, .center),
             .close => try self.drawZone(2, "Close", .inverted, .center),
             .hit => try self.drawZone(2, "Attack", .inverted, .center),
+            .move_up_on_level => try self.drawZone(2, "Go up", .inverted, .center),
+            .move_down_on_level => try self.drawZone(2, "Go down", .inverted, .center),
             else => try self.cleanZone(2),
         }
     } else {

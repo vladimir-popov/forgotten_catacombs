@@ -79,15 +79,21 @@ fn checkCollision(session: *game.GameSession, position: p.Point) ?game.Collision
     if (session.level.dungeon.cellAt(position)) |cell| {
         switch (cell) {
             .nothing, .wall => return .wall,
-            .floor, .door => if (session.level.entityAt(position)) |entity| {
+            .door => if (session.level.entityAt(position)) |entity| {
                 if (session.components.getForEntity(entity, game.Door)) |door|
                     if (door.* == .closed)
                         return .{ .door = .{ .entity = entity, .state = .closed } }
                     else
                         return null;
-
+            } else {
+                return null;
+            },
+            .floor => if (session.level.entityAt(position)) |entity| {
                 if (session.components.getForEntity(entity, game.Health)) |_|
                     return .{ .enemy = entity };
+
+                if (session.components.getForEntity(entity, game.Ladder)) |_|
+                    return null;
 
                 return .{ .item = entity };
             } else {

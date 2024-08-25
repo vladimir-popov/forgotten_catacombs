@@ -30,8 +30,6 @@ prng: std.Random.DefaultPrng,
 level: gm.Level,
 /// Collection of the components of the entities
 components: ecs.ComponentsManager(gm.Components),
-/// Entity of the player
-player: gm.Entity = undefined,
 /// The current mode of the game
 mode: Mode,
 // stateful modes:
@@ -39,6 +37,8 @@ play_mode: PlayMode,
 explore_mode: ExploreMode,
 /// Id for the next generate entity
 next_entity: gm.Entity = 0,
+/// Entity of the player
+player: gm.Entity = undefined,
 
 pub fn createNew(game: *gm.Game, seed: u64) !*GameSession {
     log.debug("Begin the new game session with seed {d}", .{seed});
@@ -53,7 +53,7 @@ pub fn createNew(game: *gm.Game, seed: u64) !*GameSession {
         .explore_mode = try ExploreMode.init(session),
         .level = undefined,
     };
-    try session.initPlayer();
+    session.player = try session.newEntity();
     session.level = try gm.Level.generate(session, 0);
     return session;
 }
@@ -78,16 +78,6 @@ pub fn newEntity(self: *GameSession) !gm.Entity {
 
 pub fn playerPosition(self: *const GameSession) p.Point {
     return self.components.getForEntityUnsafe(self.player, gm.Position).point;
-}
-
-fn initPlayer(self: *GameSession) !void {
-    self.player = try self.newEntity();
-    log.debug("Player entity is {d}", .{self.player});
-    try self.components.setToEntity(self.player, gm.Sprite{ .codepoint = '@', .z_order = 3 });
-    try self.components.setToEntity(self.player, gm.Description{ .name = "You" });
-    try self.components.setToEntity(self.player, gm.Health{ .max = 100, .current = 30 });
-    try self.components.setToEntity(self.player, gm.MeleeWeapon{ .max_damage = 3, .move_points = 10 });
-    try self.components.setToEntity(self.player, gm.Speed{ .move_points = 10 });
 }
 
 pub fn play(self: *GameSession, entity_in_focus: ?gm.Entity) !void {

@@ -216,6 +216,21 @@ fn calculateQuickActionForTarget(
     const player_position = self.session.components.getForEntityUnsafe(self.session.player, gm.Position);
     const target_position = self.session.components.getForEntity(target, gm.Position) orelse return null;
     if (player_position.point.near(target_position.point)) {
+        if (self.session.components.getForEntity(target, gm.Ladder)) |ladder| {
+            // the player should be able to go between levels only from the
+            // place with gate
+            if (!player_position.point.eql(target_position.point)) {
+                return null;
+            }
+            const player_speed = self.session.components.getForEntityUnsafe(self.session.player, gm.Speed).move_points;
+            return switch (ladder.*) {
+                .up => |upper_ladder| .{ .type = .{ .move_up_on_level = upper_ladder }, .move_points = player_speed },
+                .down => |maybe_ladder| if (maybe_ladder) |under_ladder|
+                    .{ .type = .{ .move_down_on_level = under_ladder }, .move_points = player_speed }
+                else
+                    .{ .type = .{ .move_down_on_level = null }, .move_points = player_speed },
+            };
+        }
         if (self.session.components.getForEntity(target, gm.Health)) |_| {
             const weapon = self.session.components.getForEntityUnsafe(self.session.player, gm.MeleeWeapon);
             return .{
@@ -228,10 +243,10 @@ fn calculateQuickActionForTarget(
             if (player_position.point.eql(target_position.point)) {
                 return null;
             }
-            const player_speed = self.session.components.getForEntityUnsafe(self.session.player, gm.Speed);
+            const player_speed = self.session.components.getForEntityUnsafe(self.session.player, gm.Speed).move_points;
             return switch (door.*) {
-                .opened => .{ .type = .{ .close = target }, .move_points = player_speed.move_points },
-                .closed => .{ .type = .{ .open = target }, .move_points = player_speed.move_points },
+                .opened => .{ .type = .{ .close = target }, .move_points = player_speed },
+                .closed => .{ .type = .{ .open = target }, .move_points = player_speed },
             };
         }
     }

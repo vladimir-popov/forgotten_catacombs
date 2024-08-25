@@ -4,6 +4,8 @@ const p = algs.primitives;
 const ecs = @import("ecs");
 const gm = @import("game.zig");
 
+const log = std.log.scoped(.Level);
+
 const Level = @This();
 
 session: *gm.GameSession,
@@ -22,9 +24,6 @@ pub fn generate(session: *gm.GameSession, depth: u8) !Level {
         .dungeon = try gm.Dungeon.createRandom(session.game.runtime.alloc, session.seed + depth),
         .entities = std.ArrayList(gm.Entity).init(session.game.runtime.alloc),
     };
-    try self.entities.append(self.session.player);
-    const player_position = self.randomEmptyPlace(prng.random()) orelse unreachable;
-    try self.session.components.setToEntity(self.session.player, gm.Position{ .point = player_position });
 
     var doors = self.dungeon.doors.keyIterator();
     while (doors.next()) |at| {
@@ -34,6 +33,9 @@ pub fn generate(session: *gm.GameSession, depth: u8) !Level {
     for (0..prng.random().uintLessThan(u8, 10) + 10) |_| {
         try self.addRat(prng.random());
     }
+
+    try self.addExit(prng.random());
+    try self.initPlayer(prng.random());
     return self;
 }
 
@@ -59,6 +61,46 @@ pub fn entityAt(self: Level, place: p.Point) ?gm.Entity {
 pub fn removeEntity(self: *Level, entity: gm.Entity) !void {
     try self.session.components.removeAllForEntity(entity);
     _ = self.entities.swapRemove(entity);
+}
+
+fn initPlayer(self: *Level, rand: std.Random) !void {
+    try self.entities.append(self.session.player);
+    log.debug("Player entity is {d}", .{self.session.player});
+    _ = rand;
+    // try self.session.components.setToEntity(self.session.player, gm.Position{ .point = self.randomEmptyPlace(rand).? });
+    var itr = self.query().get2(gm.Position, gm.Ladder);
+    while (itr.next()) |tuple| {
+        switch (tuple[2].*) {
+            .down => {
+                try self.session.components.setToEntity(self.session.player, tuple[1].*);
+                break;
+            },
+            else => {},
+        }
+    }
+    try self.session.components.setToEntity(self.session.player, gm.Sprite{ .codepoint = '@', .z_order = 3 });
+    try self.session.components.setToEntity(self.session.player, gm.Description{ .name = "You" });
+    try self.session.components.setToEntity(self.session.player, gm.Health{ .max = 100, .current = 30 });
+    try self.session.components.setToEntity(self.session.player, gm.MeleeWeapon{ .max_damage = 3, .move_points = 10 });
+    try self.session.components.setToEntity(self.session.player, gm.Speed{ .move_points = 10 });
+}
+
+fn addEntrance(self: *Level, rand: std.Random, upper_level_exit: gm.Entity) !void {
+    const entrance = try self.session.newEntity();
+    try self.entities.append(entrance);
+    try self.session.components.setToEntity(entrance, gm.Ladder{ .up = upper_level_exit });
+    try self.session.components.setToEntity(entrance, gm.Description{ .name = "Ladder up" });
+    try self.session.components.setToEntity(entrance, gm.Sprite{ .codepoint = '<', .z_order = 2 });
+    try self.session.components.setToEntity(entrance, gm.Position{ .point = self.randomEmptyPlace(rand).? });
+}
+
+fn addExit(self: *Level, rand: std.Random) !void {
+    const exit = try self.session.newEntity();
+    try self.entities.append(exit);
+    try self.session.components.setToEntity(exit, gm.Ladder{ .down = null });
+    try self.session.components.setToEntity(exit, gm.Description{ .name = "Ladder down" });
+    try self.session.components.setToEntity(exit, gm.Sprite{ .codepoint = '>', .z_order = 2 });
+    try self.session.components.setToEntity(exit, gm.Position{ .point = self.randomEmptyPlace(rand).? });
 }
 
 fn addClosedDoor(self: *Level, door_at: p.Point) !void {
