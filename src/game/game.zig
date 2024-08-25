@@ -104,7 +104,6 @@ pub const Game = struct {
         self.state = .game;
         if (self.game_session) |session| session.destroy();
         self.game_session = try GameSession.createNew(self, self.seed);
-        self.render.screen.centeredAround(self.game_session.?.playerPosition());
         try self.game_session.?.play(null);
     }
 };

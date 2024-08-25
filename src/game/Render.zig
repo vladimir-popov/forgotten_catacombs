@@ -112,7 +112,7 @@ pub fn drawAnimationsFrame(self: Render, session: *gm.GameSession, entity_in_foc
                 );
             }
         } else {
-            try session.components.removeFromEntity(components[0], gm.Animation);
+            try session.level.components.removeFromEntity(components[0], gm.Animation);
         }
     }
 }
@@ -122,7 +122,7 @@ pub fn drawStats(self: Render, session: *const gm.GameSession, entity_in_focus: 
     // Draw player's health, or pause mode indicator
     switch (session.mode) {
         .explore => try self.drawZone(0, "Pause", .normal, .center),
-        .play => if (session.components.getForEntity(session.player, gm.Health)) |health| {
+        .play => if (session.level.components.getForEntity(session.player, gm.Health)) |health| {
             var buf = [_]u8{0} ** 8;
             const text = try std.fmt.bufPrint(&buf, "HP: {d}", .{health.current});
             try self.drawZone(0, text, .normal, .left);
@@ -134,12 +134,12 @@ pub fn drawStats(self: Render, session: *const gm.GameSession, entity_in_focus: 
         inline for (0..MIDDLE_ZONE_LENGTH) |i| buf[i] = ' ';
         var len: usize = 0;
         // Draw entity's name
-        if (session.components.getForEntity(entity, gm.Description)) |desc| {
+        if (session.level.components.getForEntity(entity, gm.Description)) |desc| {
             len = (try std.fmt.bufPrint(&buf, "{s}", .{desc.name})).len;
         }
         // Draw enemy's health
         if (entity != session.player) {
-            if (session.components.getForEntity(entity, gm.Health)) |health| {
+            if (session.level.components.getForEntity(entity, gm.Health)) |health| {
                 buf[len] = ':';
                 len += 1;
                 const hp = @max(health.current, 0);

@@ -10,6 +10,8 @@ const Level = @This();
 
 session: *gm.GameSession,
 entities: std.ArrayList(gm.Entity),
+/// Collection of the components of the entities
+components: ecs.ComponentsManager(gm.Components),
 dungeon: *gm.Dungeon,
 /// The depth of the current level. The session.seed + depth is unique seed for the level.
 depth: u8,
@@ -23,6 +25,7 @@ pub fn generate(session: *gm.GameSession, depth: u8, from_ladder: ?gm.Entity) !L
         .depth = depth,
         .dungeon = try gm.Dungeon.createRandom(session.game.runtime.alloc, session.seed + depth),
         .entities = std.ArrayList(gm.Entity).init(session.game.runtime.alloc),
+        .components = try ecs.ComponentsManager(gm.Components).init(session.game.runtime.alloc),
     };
 
     var doors = self.dungeon.doors.keyIterator();
@@ -45,24 +48,29 @@ pub fn generate(session: *gm.GameSession, depth: u8, from_ladder: ?gm.Entity) !L
 pub fn deinit(self: *Level) void {
     self.dungeon.destroy();
     self.entities.deinit();
+    self.components.deinit();
 }
 
 /// Aggregates requests of few components for the same entities at once
 pub fn query(self: *const Level) ecs.ComponentsQuery(gm.Components) {
-    return .{ .entities = self.entities, .components_manager = self.session.components };
+    return .{ .entities = self.entities, .components_manager = self.components };
+}
+
+pub fn playerPosition(self: *const Level) *gm.Position {
+    return self.components.getForEntityUnsafe(self.session.player, gm.Position);
 }
 
 pub fn entityAt(self: Level, place: p.Point) ?gm.Entity {
-    for (self.session.components.arrayOf(gm.Position).components.items, 0..) |position, idx| {
+    for (self.components.arrayOf(gm.Position).components.items, 0..) |position, idx| {
         if (position.point.eql(place)) {
-            return self.session.components.arrayOf(gm.Position).index_entity.get(@intCast(idx));
+            return self.components.arrayOf(gm.Position).index_entity.get(@intCast(idx));
         }
     }
     return null;
 }
 
 pub fn removeEntity(self: *Level, entity: gm.Entity) !void {
-    try self.session.components.removeAllForEntity(entity);
+    try self.components.removeAllForEntity(entity);
     _ = self.entities.swapRemove(entity);
 }
 
@@ -70,62 +78,62 @@ fn initPlayer(self: *Level, rand: std.Random) !void {
     try self.entities.append(self.session.player);
     log.debug("Player entity is {d}", .{self.session.player});
     _ = rand;
-    // try self.session.components.setToEntity(self.session.player, gm.Position{ .point = self.randomEmptyPlace(rand).? });
+    // try self.components.setToEntity(self.session.player, gm.Position{ .point = self.randomEmptyPlace(rand).? });
     var itr = self.query().get2(gm.Position, gm.Ladder);
     while (itr.next()) |tuple| {
         switch (tuple[2].*) {
             .down => {
-                try self.session.components.setToEntity(self.session.player, tuple[1].*);
+                try self.components.setToEntity(self.session.player, tuple[1].*);
                 break;
             },
             else => {},
         }
     }
-    try self.session.components.setToEntity(self.session.player, gm.Sprite{ .codepoint = '@', .z_order = 3 });
-    try self.session.components.setToEntity(self.session.player, gm.Description{ .name = "You" });
-    try self.session.components.setToEntity(self.session.player, gm.Health{ .max = 100, .current = 30 });
-    try self.session.components.setToEntity(self.session.player, gm.MeleeWeapon{ .max_damage = 3, .move_points = 10 });
-    try self.session.components.setToEntity(self.session.player, gm.Speed{ .move_points = 10 });
+    try self.components.setToEntity(self.session.player, gm.Sprite{ .codepoint = '@', .z_order = 3 });
+    try self.components.setToEntity(self.session.player, gm.Description{ .name = "You" });
+    try self.components.setToEntity(self.session.player, gm.Health{ .max = 100, .current = 30 });
+    try self.components.setToEntity(self.session.player, gm.MeleeWeapon{ .max_damage = 3, .move_points = 10 });
+    try self.components.setToEntity(self.session.player, gm.Speed{ .move_points = 10 });
 }
 
 fn addEntrance(self: *Level, rand: std.Random, upper_level_exit: gm.Entity) !void {
     const entrance = try self.session.newEntity();
     try self.entities.append(entrance);
-    try self.session.components.setToEntity(entrance, gm.Ladder{ .up = upper_level_exit });
-    try self.session.components.setToEntity(entrance, gm.Description{ .name = "Ladder up" });
-    try self.session.components.setToEntity(entrance, gm.Sprite{ .codepoint = '<', .z_order = 2 });
-    try self.session.components.setToEntity(entrance, gm.Position{ .point = self.randomEmptyPlace(rand).? });
+    try self.components.setToEntity(entrance, gm.Ladder{ .up = upper_level_exit });
+    try self.components.setToEntity(entrance, gm.Description{ .name = "Ladder up" });
+    try self.components.setToEntity(entrance, gm.Sprite{ .codepoint = '<', .z_order = 2 });
+    try self.components.setToEntity(entrance, gm.Position{ .point = self.randomEmptyPlace(rand).? });
 }
 
 fn addExit(self: *Level, rand: std.Random) !void {
     const exit = try self.session.newEntity();
     try self.entities.append(exit);
-    try self.session.components.setToEntity(exit, gm.Ladder{ .down = null });
-    try self.session.components.setToEntity(exit, gm.Description{ .name = "Ladder down" });
-    try self.session.components.setToEntity(exit, gm.Sprite{ .codepoint = '>', .z_order = 2 });
-    try self.session.components.setToEntity(exit, gm.Position{ .point = self.randomEmptyPlace(rand).? });
+    try self.components.setToEntity(exit, gm.Ladder{ .down = null });
+    try self.components.setToEntity(exit, gm.Description{ .name = "Ladder down" });
+    try self.components.setToEntity(exit, gm.Sprite{ .codepoint = '>', .z_order = 2 });
+    try self.components.setToEntity(exit, gm.Position{ .point = self.randomEmptyPlace(rand).? });
 }
 
 fn addClosedDoor(self: *Level, door_at: p.Point) !void {
     const door = try self.session.newEntity();
     try self.entities.append(door);
-    try self.session.components.setToEntity(door, gm.Door.closed);
-    try self.session.components.setToEntity(door, gm.Position{ .point = door_at });
-    try self.session.components.setToEntity(door, gm.Sprite{ .codepoint = '+' });
-    try self.session.components.setToEntity(door, gm.Description{ .name = "Door" });
+    try self.components.setToEntity(door, gm.Door.closed);
+    try self.components.setToEntity(door, gm.Position{ .point = door_at });
+    try self.components.setToEntity(door, gm.Sprite{ .codepoint = '+' });
+    try self.components.setToEntity(door, gm.Description{ .name = "Door" });
 }
 
 fn addRat(self: *Level, rand: std.Random) !void {
     if (self.randomEmptyPlace(rand)) |position| {
         const rat = try self.session.newEntity();
         try self.entities.append(rat);
-        try self.session.components.setToEntity(rat, gm.NPC{ .type = .melee });
-        try self.session.components.setToEntity(rat, gm.Position{ .point = position });
-        try self.session.components.setToEntity(rat, gm.Sprite{ .codepoint = 'r', .z_order = 3 });
-        try self.session.components.setToEntity(rat, gm.Description{ .name = "Rat" });
-        try self.session.components.setToEntity(rat, gm.Health{ .max = 10, .current = 10 });
-        try self.session.components.setToEntity(rat, gm.MeleeWeapon{ .max_damage = 3, .move_points = 5 });
-        try self.session.components.setToEntity(rat, gm.Speed{ .move_points = 10 });
+        try self.components.setToEntity(rat, gm.NPC{ .type = .melee });
+        try self.components.setToEntity(rat, gm.Position{ .point = position });
+        try self.components.setToEntity(rat, gm.Sprite{ .codepoint = 'r', .z_order = 3 });
+        try self.components.setToEntity(rat, gm.Description{ .name = "Rat" });
+        try self.components.setToEntity(rat, gm.Health{ .max = 10, .current = 10 });
+        try self.components.setToEntity(rat, gm.MeleeWeapon{ .max_damage = 3, .move_points = 5 });
+        try self.components.setToEntity(rat, gm.Speed{ .move_points = 10 });
     }
 }
 

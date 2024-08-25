@@ -68,15 +68,30 @@ pub fn ArraySet(comptime C: anytype) type {
             }
         }
 
-        /// Deletes the components of the entity from the all inner stores,
-        /// if they was added before, or does nothing.
+        /// Deletes the components of the entity from the all inner stores
+        /// if they was added before, and invoke the `deinit` on the component, or does nothing.
         pub fn removeFromEntity(self: *Self, entity: Entity) !void {
+            try self.removeOrDetachFromEntity(entity, true);
+        }
+
+        /// Deletes and returns the component for the entity if it is presented,
+        /// but doesn't invoke `deinit` on the component.
+        pub fn detachFromEntity(self: *Self, entity: Entity) !?C {
+            if (self.entity_index.get(entity)) |idx| {
+                const c = self.components.items[idx];
+                try self.removeOrDetachFromEntity(entity, false);
+                return c;
+            }
+            return null;
+        }
+
+        fn removeOrDetachFromEntity(self: *Self, entity: Entity, should_deinit: bool) !void {
             if (self.entity_index.get(entity)) |idx| {
                 _ = self.index_entity.remove(idx);
                 _ = self.entity_index.remove(entity);
 
-                // deinit the component before removing
-                self.components.items[idx].deinit();
+                if (should_deinit)
+                    self.components.items[idx].deinit();
 
                 const last_idx: u8 = @intCast(self.components.items.len - 1);
                 if (idx == last_idx) {
@@ -90,6 +105,35 @@ pub fn ArraySet(comptime C: anytype) type {
             }
         }
     };
+}
+
+test "The component should be initialized after detach" {
+    const TestComponent = struct {
+        const Self = @This();
+        state: std.ArrayList(u8),
+        fn init(value: u8) !Self {
+            var instance: Self = .{ .state = try std.ArrayList(u8).initCapacity(std.testing.allocator, 1) };
+            try instance.state.append(value);
+            return instance;
+        }
+
+        fn deinit(self: *Self) void {
+            self.state.deinit();
+        }
+    };
+    // given:
+    var array_set = ArraySet(TestComponent).init(std.testing.allocator);
+    errdefer array_set.deinit();
+    var c = try TestComponent.init(123);
+    defer c.deinit();
+    try array_set.setToEntity(0, c);
+
+    // when:
+    const result = try array_set.detachFromEntity(0);
+    array_set.deinit();
+
+    // then:
+    try std.testing.expectEqual(123, result.?.state.getLast());
 }
 
 /// Generated in compile time structure,

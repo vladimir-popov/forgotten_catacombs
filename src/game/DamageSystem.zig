@@ -10,8 +10,8 @@ pub fn handleDamage(session: *gm.GameSession) anyerror!void {
     while (itr.next()) |components| {
         log.debug("The entity {d} received damage {d}", .{ components[0], components[1].amount });
         components[2].current -= @as(i16, @intCast(components[1].amount));
-        try session.components.removeFromEntity(components[0], gm.Damage);
-        try session.components.setToEntity(
+        try session.level.components.removeFromEntity(components[0], gm.Damage);
+        try session.level.components.setToEntity(
             components[0],
             gm.Animation{ .frames = &gm.Animation.Presets.hit },
         );

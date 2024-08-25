@@ -63,7 +63,7 @@ pub fn tick(self: *ExploreMode) anyerror!void {
 fn chooseNextEntity(self: *ExploreMode, direction: p.Direction) void {
     const target_entity = self.entity_in_focus orelse self.session.player;
     const target_point = self.session.game.render.screen.relative(
-        self.session.components.getForEntityUnsafe(target_entity, gm.Position).point,
+        self.session.level.components.getForEntityUnsafe(target_entity, gm.Position).point,
     );
     var min_distance: u8 = 255;
     for (self.entities_on_screen.items) |tuple| {

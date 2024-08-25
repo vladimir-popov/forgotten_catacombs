@@ -17,22 +17,22 @@ pub fn doActions(session: *game.GameSession) !void {
                 _ = try handleMoveAction(session, entity, position, move);
             },
             .open => |door| {
-                try session.components.setToEntity(door, game.Door.opened);
-                try session.components.setToEntity(
+                try session.level.components.setToEntity(door, game.Door.opened);
+                try session.level.components.setToEntity(
                     door,
                     game.Sprite{ .codepoint = '\'' },
                 );
             },
             .close => |door| {
-                try session.components.setToEntity(door, game.Door.closed);
-                try session.components.setToEntity(
+                try session.level.components.setToEntity(door, game.Door.closed);
+                try session.level.components.setToEntity(
                     door,
                     game.Sprite{ .codepoint = '+' },
                 );
             },
             .hit => |enemy| {
-                if (session.components.getForEntity(entity, game.MeleeWeapon)) |weapon| {
-                    try session.components.setToEntity(
+                if (session.level.components.getForEntity(entity, game.MeleeWeapon)) |weapon| {
+                    try session.level.components.setToEntity(
                         enemy,
                         weapon.damage(session.prng.random()),
                     );
@@ -41,7 +41,7 @@ pub fn doActions(session: *game.GameSession) !void {
             .move_down_to_level => |maybe_ladder| try session.moveDownTo(entity, maybe_ladder),
             else => {},
         }
-        try session.components.removeFromEntity(entity, game.Action);
+        try session.level.components.removeFromEntity(entity, game.Action);
     }
 }
 
@@ -53,7 +53,7 @@ fn handleMoveAction(
 ) !bool {
     const new_position = position.point.movedTo(move.direction);
     if (checkCollision(session, new_position)) |obstacle| {
-        try session.components.setToEntity(
+        try session.level.components.setToEntity(
             entity,
             game.Collision{ .entity = entity, .obstacle = obstacle, .at = new_position },
         );
@@ -81,7 +81,7 @@ fn checkCollision(session: *game.GameSession, position: p.Point) ?game.Collision
         switch (cell) {
             .nothing, .wall => return .wall,
             .door => if (session.level.entityAt(position)) |entity| {
-                if (session.components.getForEntity(entity, game.Door)) |door|
+                if (session.level.components.getForEntity(entity, game.Door)) |door|
                     if (door.* == .closed)
                         return .{ .door = .{ .entity = entity, .state = .closed } }
                     else
@@ -90,10 +90,10 @@ fn checkCollision(session: *game.GameSession, position: p.Point) ?game.Collision
                 return null;
             },
             .floor => if (session.level.entityAt(position)) |entity| {
-                if (session.components.getForEntity(entity, game.Health)) |_|
+                if (session.level.components.getForEntity(entity, game.Health)) |_|
                     return .{ .enemy = entity };
 
-                if (session.components.getForEntity(entity, game.Ladder)) |_|
+                if (session.level.components.getForEntity(entity, game.Ladder)) |_|
                     return null;
 
                 return .{ .item = entity };

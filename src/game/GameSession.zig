@@ -28,8 +28,6 @@ seed: u64,
 prng: std.Random.DefaultPrng,
 /// The current level
 level: gm.Level,
-/// Collection of the components of the entities
-components: ecs.ComponentsManager(gm.Components),
 /// The current mode of the game
 mode: Mode,
 // stateful modes:
@@ -47,7 +45,6 @@ pub fn createNew(game: *gm.Game, seed: u64) !*GameSession {
         .game = game,
         .seed = seed,
         .prng = std.Random.DefaultPrng.init(seed),
-        .components = try ecs.ComponentsManager(gm.Components).init(game.runtime.alloc),
         .mode = .play,
         .play_mode = try PlayMode.init(session),
         .explore_mode = try ExploreMode.init(session),
@@ -55,11 +52,11 @@ pub fn createNew(game: *gm.Game, seed: u64) !*GameSession {
     };
     session.player = try session.newEntity();
     session.level = try gm.Level.generate(session, 0, null);
+    session.game.render.screen.centeredAround(session.level.playerPosition().point);
     return session;
 }
 
 pub fn destroy(self: *GameSession) void {
-    self.components.deinit();
     self.level.deinit();
     self.play_mode.deinit();
     self.explore_mode.deinit();
@@ -74,10 +71,6 @@ pub fn newEntity(self: *GameSession) !gm.Entity {
     const entity = self.next_entity;
     self.next_entity += 1;
     return entity;
-}
-
-pub fn playerPosition(self: *const GameSession) p.Point {
-    return self.components.getForEntityUnsafe(self.player, gm.Position).point;
 }
 
 pub fn play(self: *GameSession, entity_in_focus: ?gm.Entity) !void {
@@ -99,10 +92,10 @@ pub inline fn tick(self: *GameSession) !void {
 
 pub fn moveDownTo(self: *GameSession, from_ladder: gm.Entity, under_ladder: ?gm.Entity) !void {
     if (under_ladder == null) {
-        const new_level = try gm.Level.generate(self, self.level.depth + 1, from_ladder);
-        // TODO move components to the level
+        const new_depth = self.level.depth + 1;
         self.level.deinit();
-        self.level = new_level;
-        self.game.render.screen.centeredAround(self.playerPosition());
+        // TODO move components to the level
+        self.level = try gm.Level.generate(self, new_depth, from_ladder);
+        self.game.render.screen.centeredAround(self.level.playerPosition().point);
     }
 }
