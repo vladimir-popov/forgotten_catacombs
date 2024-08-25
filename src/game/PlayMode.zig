@@ -74,7 +74,7 @@ fn handleInput(self: PlayMode, buttons: gm.Buttons) !void {
             try self.session.components.setToEntity(self.session.player, quick_action);
         },
         gm.Buttons.B => {
-            try self.session.pause();
+            try self.session.explore();
         },
         gm.Buttons.Left, gm.Buttons.Right, gm.Buttons.Up, gm.Buttons.Down => {
             const speed = self.session.components.getForEntityUnsafe(self.session.player, gm.Speed);

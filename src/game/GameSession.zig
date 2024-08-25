@@ -85,7 +85,7 @@ pub fn play(self: *GameSession, entity_in_focus: ?gm.Entity) !void {
     try self.play_mode.refresh(entity_in_focus);
 }
 
-pub fn pause(self: *GameSession) !void {
+pub fn explore(self: *GameSession) !void {
     self.mode = .explore;
     try self.explore_mode.refresh();
 }
