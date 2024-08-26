@@ -91,7 +91,7 @@ pub const Action = struct {
         take: gm.Entity,
         /// The entity id of the connected ladder on the upper level
         move_up_to_level: gm.Entity,
-        /// The entity id of the connected ladder on the under level 
+        /// The entity id of the connected ladder on the under level
         move_down_to_level: ?gm.Entity,
     };
 

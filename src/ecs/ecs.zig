@@ -330,17 +330,36 @@ test "ComponentsManager movesAllForEntity" {
         }
     };
     const TestComponent2 = struct {
-        state: bool,
+        state: u8,
         fn deinit(_: *@This()) void {}
     };
 
     const TestComponents = union { foo: TestComponent1, bar: TestComponent2 };
 
+    // given:
+    var cm1 = try ComponentsManager(TestComponents).init(std.testing.allocator);
+    defer cm1.deinit();
+    var tc1 = try TestComponent1.init(42);
+    try cm1.setToEntity(1, tc1);
+    try cm1.setToEntity(1, TestComponent2{ .state = 3 });
+    try cm1.setToEntity(2, TestComponent2{ .state = 5 });
+    var cm2 = try ComponentsManager(TestComponents).init(std.testing.allocator);
+    defer cm2.deinit();
+
+    // when:
+    try cm1.movesAllForEntity(1, &cm2);
 
     // then:
     // 1. TC1 should not be deinited
-    // 2. TC1 should not be available in the CM1
-    // 2. TC1 should be available in the CM2
+    try std.testing.expectEqual(42, tc1.state.getLast());
+    // 2. The TC1 and TC2 should not be available in the CM1 for the entity 1
+    try std.testing.expectEqual(null, cm1.getForEntity(1, TestComponent1));
+    try std.testing.expectEqual(null, cm1.getForEntity(1, TestComponent2));
+    // TC2 should be available in the CM1 for the entity 2
+    try std.testing.expectEqual(5, cm1.getForEntityUnsafe(2, TestComponent2).state);
+    // 3. TC1 and TC2 should be available in the CM2 for the entity 1
+    try std.testing.expectEqual(42, cm2.getForEntityUnsafe(1, TestComponent1).state.getLast());
+    try std.testing.expectEqual(3, cm2.getForEntityUnsafe(1, TestComponent2).state);
 }
 
 pub fn ComponentsQuery(comptime ComponentsUnion: type) type {
