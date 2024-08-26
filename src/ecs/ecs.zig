@@ -266,7 +266,7 @@ pub fn ComponentsManager(comptime ComponentsUnion: type) type {
 
         /// Moves all components defined for the entity to target entity
         /// manager
-        pub fn movesAllForEntity(self: *const Self, entity: Entity, target: *Self) !void {
+        pub fn moveAllForEntity(self: *const Self, entity: Entity, target: *Self) !void {
             // TODO implement
             inline for (@typeInfo(ComponentsMap(ComponentsUnion)).Struct.fields) |field| {
                 if (try @field(self.inner_state.components_map, field.name).detachFromEntity(entity)) |c|
@@ -347,7 +347,7 @@ test "ComponentsManager movesAllForEntity" {
     defer cm2.deinit();
 
     // when:
-    try cm1.movesAllForEntity(1, &cm2);
+    try cm1.moveAllForEntity(1, &cm2);
 
     // then:
     // 1. TC1 should not be deinited

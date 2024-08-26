@@ -28,22 +28,6 @@ pub const Description = struct {
     pub fn deinit(_: *@This()) void {}
 };
 
-pub const Door = enum {
-    opened,
-    closed,
-    pub fn deinit(_: *@This()) void {}
-};
-
-/// The ladder to the upper or under level from the current one
-pub const Ladder = union(enum) {
-    /// The id of the upper level
-    up: gm.Entity,
-    /// The id of the under level, which should be defined right after
-    /// generating the under level
-    down: ?gm.Entity,
-    pub fn deinit(_: *@This()) void {}
-};
-
 pub const Animation = struct {
     pub const Presets = struct {
         pub const hit: [3]Codepoint = [_]Codepoint{ 0, 'X', 0 };
@@ -69,6 +53,24 @@ pub const Animation = struct {
     pub fn deinit(_: *@This()) void {}
 };
 
+pub const Door = enum {
+    opened,
+    closed,
+    pub fn deinit(_: *@This()) void {}
+};
+
+/// The ladder to the upper or under level from the current one
+pub const Ladder = struct {
+    pub const Direction = enum { up, down };
+    /// Direction of the ladder
+    direction: Direction,
+    /// The id of the ladder on this level.
+    this_ladder: gm.Entity,
+    /// The id of the ladder on that level.
+    that_ladder: ?gm.Entity,
+    pub fn deinit(_: *@This()) void {}
+};
+
 /// The intension to perform an action.
 /// Describes what some entity is going to do.
 pub const Action = struct {
@@ -89,10 +91,8 @@ pub const Action = struct {
         hit: gm.Entity,
         /// An entity is going to take the item
         take: gm.Entity,
-        /// The entity id of the connected ladder on the upper level
-        move_up_to_level: gm.Entity,
-        /// The entity id of the connected ladder on the under level
-        move_down_to_level: ?gm.Entity,
+        /// The player moves from the level to another level
+        move_to_level: Ladder,
     };
 
     type: Type,

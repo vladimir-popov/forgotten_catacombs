@@ -166,8 +166,10 @@ pub fn drawQuickActionButton(self: Render, quick_action: ?gm.Action) !void {
             .open => try self.drawZone(2, "Open", .inverted, .center),
             .close => try self.drawZone(2, "Close", .inverted, .center),
             .hit => try self.drawZone(2, "Attack", .inverted, .center),
-            .move_up_to_level => try self.drawZone(2, "Go up", .inverted, .center),
-            .move_down_to_level => try self.drawZone(2, "Go down", .inverted, .center),
+            .move_to_level => |ladder| switch (ladder.direction) {
+                .up => try self.drawZone(2, "Go up", .inverted, .center),
+                .down => try self.drawZone(2, "Go down", .inverted, .center),
+            },
             else => try self.cleanZone(2),
         }
     } else {

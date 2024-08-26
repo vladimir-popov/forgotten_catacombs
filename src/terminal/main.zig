@@ -18,7 +18,7 @@ pub fn main() !void {
         try std.fmt.parseInt(u64, arg, 10)
     else
         std.crypto.random.int(u64);
-    log.info("Seed of the game is {d}", .{seed});
+    log.info("Seed of the game is {d}\n====================", .{seed});
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const alloc = gpa.allocator();

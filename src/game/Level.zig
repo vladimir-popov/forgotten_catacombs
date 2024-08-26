@@ -16,7 +16,17 @@ dungeon: *gm.Dungeon,
 /// The depth of the current level. The session.seed + depth is unique seed for the level.
 depth: u8,
 
-pub fn generate(session: *gm.GameSession, depth: u8, from_ladder: ?gm.Entity) !Level {
+pub fn generate(
+    session: *gm.GameSession,
+    depth: u8,
+    this_ladder: gm.Entity,
+    from_ladder: ?gm.Entity,
+    direction: gm.Ladder.Direction,
+) !Level {
+    log.debug(
+        "Generate level {s} on depth {d} with seed {d} from ladder {any} to the ladder {d} on this level",
+        .{ @tagName(direction), depth, session.seed + depth, from_ladder, this_ladder },
+    );
     // This prng is used to generate entity on this level. But the dungeon should have its own prng
     // to be able to be regenerated when the player travels from level to level.
     var prng = std.Random.DefaultPrng.init(session.seed + depth);
@@ -28,6 +38,8 @@ pub fn generate(session: *gm.GameSession, depth: u8, from_ladder: ?gm.Entity) !L
         .components = try ecs.ComponentsManager(gm.Components).init(session.game.runtime.alloc),
     };
 
+    try self.entities.append(self.session.player);
+
     var doors = self.dungeon.doors.keyIterator();
     while (doors.next()) |at| {
         try self.addClosedDoor(at.*);
@@ -37,11 +49,17 @@ pub fn generate(session: *gm.GameSession, depth: u8, from_ladder: ?gm.Entity) !L
         try self.addRat(prng.random());
     }
 
-    try self.addExit(prng.random());
-    if (from_ladder) |ladder|
-        try self.addEntrance(prng.random(), ladder)
-    else
-        try self.initPlayer(prng.random());
+    switch (direction) {
+        .up => {
+            try self.addEntrance(prng.random(), try self.session.newEntity(), try self.session.newEntity());
+            try self.addExit(prng.random(), this_ladder, from_ladder);
+        },
+        .down => {
+            try self.addEntrance(prng.random(), this_ladder, from_ladder);
+            if (depth == 0) try self.initPlayer();
+            try self.addExit(prng.random(), try self.session.newEntity(), try self.session.newEntity());
+        },
+    }
     return self;
 }
 
@@ -60,6 +78,15 @@ pub fn playerPosition(self: *const Level) *gm.Position {
     return self.components.getForEntityUnsafe(self.session.player, gm.Position);
 }
 
+pub fn movePlayerToLadder(self: *Level, ladder: gm.Entity) !void {
+    log.debug("Move player to the ladder {d}", .{ladder});
+    var itr = self.query().get2(gm.Ladder, gm.Position);
+    while (itr.next()) |tuple| {
+        if (tuple[1].this_ladder == ladder)
+            try self.components.setToEntity(self.session.player, tuple[2].*);
+    }
+}
+
 pub fn entityAt(self: Level, place: p.Point) ?gm.Entity {
     for (self.components.arrayOf(gm.Position).components.items, 0..) |position, idx| {
         if (position.point.eql(place)) {
@@ -74,15 +101,12 @@ pub fn removeEntity(self: *Level, entity: gm.Entity) !void {
     _ = self.entities.swapRemove(entity);
 }
 
-fn initPlayer(self: *Level, rand: std.Random) !void {
-    try self.entities.append(self.session.player);
-    log.debug("Player entity is {d}", .{self.session.player});
-    _ = rand;
-    // try self.components.setToEntity(self.session.player, gm.Position{ .point = self.randomEmptyPlace(rand).? });
+fn initPlayer(self: *Level) !void {
+    log.debug("Init player {d}", .{self.session.player});
     var itr = self.query().get2(gm.Position, gm.Ladder);
     while (itr.next()) |tuple| {
-        switch (tuple[2].*) {
-            .down => {
+        switch (tuple[2].direction) {
+            .up => {
                 try self.components.setToEntity(self.session.player, tuple[1].*);
                 break;
             },
@@ -96,22 +120,32 @@ fn initPlayer(self: *Level, rand: std.Random) !void {
     try self.components.setToEntity(self.session.player, gm.Speed{ .move_points = 10 });
 }
 
-fn addEntrance(self: *Level, rand: std.Random, upper_level_exit: gm.Entity) !void {
-    const entrance = try self.session.newEntity();
-    try self.entities.append(entrance);
-    try self.components.setToEntity(entrance, gm.Ladder{ .up = upper_level_exit });
-    try self.components.setToEntity(entrance, gm.Description{ .name = "Ladder up" });
-    try self.components.setToEntity(entrance, gm.Sprite{ .codepoint = '<', .z_order = 2 });
-    try self.components.setToEntity(entrance, gm.Position{ .point = self.randomEmptyPlace(rand).? });
+fn addEntrance(self: *Level, rand: std.Random, this_ladder: gm.Entity, that_ladder: ?gm.Entity) !void {
+    try self.entities.append(this_ladder);
+    const ladder = gm.Ladder{ .this_ladder = this_ladder, .that_ladder = that_ladder, .direction = .up };
+    try self.components.setToEntity(this_ladder, ladder);
+    try self.components.setToEntity(this_ladder, gm.Description{ .name = "Ladder up" });
+    try self.components.setToEntity(this_ladder, gm.Sprite{ .codepoint = '<', .z_order = 2 });
+    const position = gm.Position{ .point = self.randomEmptyPlace(rand).? };
+    try self.components.setToEntity(this_ladder, position);
+    std.log.debug("Created entrance {any} at {any}", .{ ladder, position });
 }
 
-fn addExit(self: *Level, rand: std.Random) !void {
-    const exit = try self.session.newEntity();
-    try self.entities.append(exit);
-    try self.components.setToEntity(exit, gm.Ladder{ .down = null });
-    try self.components.setToEntity(exit, gm.Description{ .name = "Ladder down" });
-    try self.components.setToEntity(exit, gm.Sprite{ .codepoint = '>', .z_order = 2 });
-    try self.components.setToEntity(exit, gm.Position{ .point = self.randomEmptyPlace(rand).? });
+fn addExit(self: *Level, _: std.Random, this_ladder: gm.Entity, that_ladder: ?gm.Entity) !void {
+    try self.entities.append(this_ladder);
+    const ladder = gm.Ladder{ .this_ladder = this_ladder, .that_ladder = that_ladder, .direction = .down };
+    try self.components.setToEntity(this_ladder, ladder);
+    try self.components.setToEntity(this_ladder, gm.Description{ .name = "Ladder down" });
+    try self.components.setToEntity(this_ladder, gm.Sprite{ .codepoint = '>', .z_order = 2 });
+    // try self.components.setToEntity(this_ladder, gm.Position{ .point = self.randomEmptyPlace(rand).? });
+    var itr = self.query().get2(gm.Ladder, gm.Position);
+    while (itr.next()) |tuple| {
+        if (tuple[1].direction == .up) {
+            const position = gm.Position{ .point = tuple[2].point.movedTo(.right) };
+            try self.components.setToEntity(this_ladder, position);
+            std.log.debug("Created exit {any} at {any}", .{ ladder, position });
+        }
+    }
 }
 
 fn addClosedDoor(self: *Level, door_at: p.Point) !void {

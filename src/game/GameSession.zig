@@ -51,7 +51,10 @@ pub fn createNew(game: *gm.Game, seed: u64) !*GameSession {
         .level = undefined,
     };
     session.player = try session.newEntity();
-    session.level = try gm.Level.generate(session, 0, null);
+    log.debug("Player entity is {d}", .{session.player});
+    const entrance = try session.newEntity();
+    session.level = try gm.Level.generate(session, 0, entrance, null, .down);
+    try session.level.movePlayerToLadder(entrance);
     session.game.render.screen.centeredAround(session.level.playerPosition().point);
     return session;
 }
@@ -90,12 +93,37 @@ pub inline fn tick(self: *GameSession) !void {
     }
 }
 
-pub fn moveDownTo(self: *GameSession, from_ladder: gm.Entity, under_ladder: ?gm.Entity) !void {
-    if (under_ladder == null) {
-        const new_depth = self.level.depth + 1;
-        self.level.deinit();
-        // TODO move components to the level
-        self.level = try gm.Level.generate(self, new_depth, from_ladder);
-        self.game.render.screen.centeredAround(self.level.playerPosition().point);
+pub fn moveToLevel(self: *GameSession, ladder: gm.Ladder) !void {
+    var this_ladder: gm.Entity = undefined;
+    var that_ladder: ?gm.Entity = undefined;
+    var new_depth: u8 = undefined;
+    switch (ladder.direction) {
+        .up => {
+            this_ladder = ladder.that_ladder orelse
+                std.debug.panic("Attempt to move up from the level {d}", .{self.level.depth});
+            that_ladder = ladder.this_ladder;
+            new_depth = self.level.depth - 1;
+        },
+        .down => {
+            this_ladder = ladder.this_ladder;
+            that_ladder = ladder.that_ladder;
+            new_depth = self.level.depth + 1;
+        },
     }
+    std.log.debug(
+        "Move {s} from the level {d} to {d}\n--------------------",
+        .{ @tagName(ladder.direction), self.level.depth, new_depth },
+    );
+    var new_level = try gm.Level.generate(
+        self,
+        new_depth,
+        this_ladder,
+        that_ladder,
+        ladder.direction,
+    );
+    try self.level.components.moveAllForEntity(self.player, &new_level.components);
+    self.level.deinit();
+    self.level = new_level;
+    try self.level.movePlayerToLadder(this_ladder);
+    self.game.render.screen.centeredAround(self.level.playerPosition().point);
 }

@@ -218,15 +218,13 @@ fn calculateQuickActionForTarget(
     if (player_position.point.near(target_position.point)) {
         if (self.session.level.components.getForEntity(target, gm.Ladder)) |ladder| {
             // the player should be able to go between levels only from the
-            // place with gate
-            if (!player_position.point.eql(target_position.point)) {
-                return null;
-            }
-            const player_speed = self.session.level.components.getForEntityUnsafe(self.session.player, gm.Speed).move_points;
-            return switch (ladder.*) {
-                .up => |upper_ladder| .{ .type = .{ .move_up_to_level = upper_ladder }, .move_points = player_speed },
-                .down => |maybe_ladder| .{ .type = .{ .move_down_to_level = maybe_ladder }, .move_points = player_speed },
-            };
+            // place with the ladder
+            if (!player_position.point.eql(target_position.point)) return null;
+            // It's impossible to go upper the first level
+            if (ladder.direction == .up and self.session.level.depth == 0) return null;
+
+            const player_speed = self.session.level.components.getForEntityUnsafe(self.session.player, gm.Speed);
+            return .{ .type = .{ .move_to_level = ladder.* }, .move_points = player_speed.move_points };
         }
         if (self.session.level.components.getForEntity(target, gm.Health)) |_| {
             const weapon = self.session.level.components.getForEntityUnsafe(self.session.player, gm.MeleeWeapon);
@@ -241,10 +239,10 @@ fn calculateQuickActionForTarget(
                 return null;
             }
             const player_speed =
-                self.session.level.components.getForEntityUnsafe(self.session.player, gm.Speed).move_points;
+                self.session.level.components.getForEntityUnsafe(self.session.player, gm.Speed);
             return switch (door.*) {
-                .opened => .{ .type = .{ .close = target }, .move_points = player_speed },
-                .closed => .{ .type = .{ .open = target }, .move_points = player_speed },
+                .opened => .{ .type = .{ .close = target }, .move_points = player_speed.move_points },
+                .closed => .{ .type = .{ .open = target }, .move_points = player_speed.move_points },
             };
         }
     }

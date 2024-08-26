@@ -38,7 +38,13 @@ pub fn doActions(session: *game.GameSession) !void {
                     );
                 }
             },
-            .move_down_to_level => |maybe_ladder| try session.moveDownTo(entity, maybe_ladder),
+            .move_to_level => |ladder| {
+                try session.level.components.removeFromEntity(entity, game.Action);
+                try session.moveToLevel(ladder);
+                // we have to break the function here, because of iterator is
+                // invalid now.
+                return;
+            },
             else => {},
         }
         try session.level.components.removeFromEntity(entity, game.Action);
