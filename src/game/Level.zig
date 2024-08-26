@@ -98,7 +98,10 @@ pub fn entityAt(self: Level, place: p.Point) ?gm.Entity {
 
 pub fn removeEntity(self: *Level, entity: gm.Entity) !void {
     try self.components.removeAllForEntity(entity);
-    _ = self.entities.swapRemove(entity);
+    // this is rare operation, and O(n) here is not as bad, as good the iteration over elements
+    // in array in all other cases
+    if (std.mem.indexOfScalar(gm.Entity, self.entities.items, entity)) |idx|
+        _ = self.entities.swapRemove(idx);
 }
 
 fn initPlayer(self: *Level) !void {
