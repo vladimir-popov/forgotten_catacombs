@@ -11,6 +11,7 @@ pub const State = enum { pushed, hold, double_pushed };
 code: Code,
 state: State,
 
+pub const Cheat: Code = 0;
 pub const Left: Code = (1 << 0);
 pub const Right: Code = (1 << 1);
 pub const Up: Code = (1 << 2);

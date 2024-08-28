@@ -1,7 +1,7 @@
 const std = @import("std");
 const algs_and_types = @import("algs_and_types");
 const p = algs_and_types.primitives;
-const game = @import("game");
+const gm = @import("game");
 const tty = @import("tty.zig");
 const utf8 = @import("utf8");
 
@@ -13,8 +13,8 @@ var window_size: tty.Display.RowsCols = undefined;
 var act: std.posix.Sigaction = undefined;
 /// true if game should be rendered in the center of the terminal window:
 var should_render_in_center: bool = true;
-var rows_pad: u16 = 0;
-var cols_pad: u16 = 0;
+var rows_pad: u8 = 0;
+var cols_pad: u8 = 0;
 
 alloc: std.mem.Allocator,
 // used to accumulate the buffer every run-loop circle
@@ -25,6 +25,7 @@ termios: std.c.termios,
 // it is used as a buffer to check ESC outside the readButton function
 prev_key: ?tty.KeyboardAndMouse.Button = null,
 pressed_at: i64 = 0,
+cheat: ?gm.Cheat = null,
 
 pub fn enableGameMode(use_mouse: bool) !void {
     try tty.Display.hideCursor();
@@ -56,10 +57,10 @@ pub fn deinit(self: *TtyRuntime) void {
 }
 
 /// Run the main loop of the game
-pub fn run(self: *TtyRuntime, gm: anytype) !void {
+pub fn run(self: *TtyRuntime, game: anytype) !void {
     handleWindowResize(0);
     while (!self.isExit()) {
-        try gm.tick();
+        try game.tick();
         try self.writeBuffer(tty.stdout_writer);
     }
 }
@@ -68,8 +69,8 @@ fn handleWindowResize(_: i32) callconv(.C) void {
     window_size = tty.Display.getWindowSize() catch unreachable;
     tty.Display.clearScreen() catch unreachable;
     if (should_render_in_center) {
-        rows_pad = (window_size.rows - game.DISPLAY_ROWS) / 2;
-        cols_pad = (window_size.cols - game.DISPLAY_COLS) / 2;
+        rows_pad = (@min(window_size.rows, std.math.maxInt(u8)) - gm.DISPLAY_ROWS) / 2;
+        cols_pad = (@min(window_size.cols, std.math.maxInt(u8)) - gm.DISPLAY_COLS) / 2;
     }
 }
 
@@ -91,11 +92,12 @@ fn writeBuffer(self: TtyRuntime, writer: std.io.AnyWriter) !void {
     }
 }
 
-pub fn any(self: *TtyRuntime) game.AnyRuntime {
+pub fn any(self: *TtyRuntime) gm.AnyRuntime {
     return .{
         .context = self,
         .alloc = self.alloc,
         .vtable = &.{
+            .getCheat = getCheat,
             .currentMillis = currentMillis,
             .readPushedButtons = readPushedButtons,
             .clearDisplay = clearDisplay,
@@ -111,28 +113,43 @@ fn currentMillis(_: *anyopaque) c_uint {
     return @truncate(@as(u64, @intCast(std.time.milliTimestamp())));
 }
 
-fn readPushedButtons(ptr: *anyopaque) anyerror!?game.Buttons {
+fn readPushedButtons(ptr: *anyopaque) anyerror!?gm.Buttons {
     var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     const prev_key = self.prev_key;
     if (tty.KeyboardAndMouse.readPressedButton()) |key| {
         self.prev_key = key;
-        const known_key_code: ?game.Buttons.Code = switch (key) {
+        const known_key_code: ?gm.Buttons.Code = switch (key) {
             .char => switch (key.char.char) {
                 // (B) (A)
-                ' ', 's', 'i' => game.Buttons.A,
-                'b', 'a', 'u' => game.Buttons.B,
-                'h' => game.Buttons.Left,
-                'j' => game.Buttons.Down,
-                'k' => game.Buttons.Up,
-                'l' => game.Buttons.Right,
+                ' ', 's', 'i' => gm.Buttons.A,
+                'b', 'a', 'u' => gm.Buttons.B,
+                'h' => gm.Buttons.Left,
+                'j' => gm.Buttons.Down,
+                'k' => gm.Buttons.Up,
+                'l' => gm.Buttons.Right,
                 else => null,
             },
             .control => switch (key.control) {
-                .LEFT => game.Buttons.Left,
-                .DOWN => game.Buttons.Down,
-                .UP => game.Buttons.Up,
-                .RIGHT => game.Buttons.Right,
+                .LEFT => gm.Buttons.Left,
+                .DOWN => gm.Buttons.Down,
+                .UP => gm.Buttons.Up,
+                .RIGHT => gm.Buttons.Right,
                 else => null,
+            },
+            .mouse => |m| cheat: {
+                // handle mouse buttons only on press
+                if (m.is_released) return null;
+                switch (m.button) {
+                    .RIGHT => self.cheat = .refresh_screen,
+                    .LEFT => {
+                        // -1 for border
+                        self.cheat = .{ .move_player = .{ .row = m.row - rows_pad - 1, .col = m.col - cols_pad - 1 } };
+                    },
+                    .WHEEL_UP => self.cheat = .move_player_to_entrance,
+                    .WHEEL_DOWN => self.cheat = .move_player_to_exit,
+                    else => return null,
+                }
+                break :cheat gm.Buttons.Cheat;
             },
             else => null,
         };
@@ -140,11 +157,11 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?game.Buttons {
             const now = std.time.milliTimestamp();
             const delay = now - self.pressed_at;
             self.pressed_at = now;
-            var state: game.Buttons.State = .pushed;
+            var state: gm.Buttons.State = .pushed;
             if (key.eql(prev_key)) {
-                if (delay < game.DOUBLE_PUSH_DELAY_MS)
+                if (delay < gm.DOUBLE_PUSH_DELAY_MS)
                     state = .double_pushed
-                else if (delay > game.HOLD_DELAY_MS)
+                else if (delay > gm.HOLD_DELAY_MS)
                     state = .hold;
             }
             return .{ .code = code, .state = state };
@@ -156,23 +173,28 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?game.Buttons {
     return null;
 }
 
+fn getCheat(ptr: *anyopaque) ?gm.Cheat {
+    const self: *TtyRuntime = @ptrCast(@alignCast(ptr));
+    return self.cheat;
+}
+
 fn clearDisplay(ptr: *anyopaque) !void {
     var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     _ = self.arena.reset(.retain_capacity);
     self.buffer = utf8.Buffer.init(self.arena.allocator());
-    try self.buffer.addLine("╔" ++ "═" ** game.DISPLAY_COLS ++ "╗");
-    for (0..(game.DISPLAY_ROWS + 1)) |_| {
-        try self.buffer.addLine("║" ++ " " ** game.DISPLAY_COLS ++ "║");
+    try self.buffer.addLine("╔" ++ "═" ** gm.DISPLAY_COLS ++ "╗");
+    for (0..(gm.DISPLAY_ROWS + 1)) |_| {
+        try self.buffer.addLine("║" ++ " " ** gm.DISPLAY_COLS ++ "║");
     }
-    try self.buffer.addLine("╚" ++ "═" ** game.DISPLAY_COLS ++ "╝");
+    try self.buffer.addLine("╚" ++ "═" ** gm.DISPLAY_COLS ++ "╝");
 }
 
 fn drawUI(ptr: *anyopaque) !void {
     var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
-    try self.buffer.mergeLine("║" ++ "═" ** game.DISPLAY_COLS ++ "║", game.DISPLAY_ROWS, 0);
+    try self.buffer.mergeLine("║" ++ "═" ** gm.DISPLAY_COLS ++ "║", gm.DISPLAY_ROWS, 0);
 }
 
-fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game.Dungeon) anyerror!void {
+fn drawDungeon(ptr: *anyopaque, screen: *const gm.Screen, dungeon: *const gm.Dungeon) anyerror!void {
     var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     const buffer = &self.buffer;
     var itr = dungeon.cellsInRegion(screen.region) orelse return;
@@ -199,10 +221,10 @@ fn drawDungeon(ptr: *anyopaque, screen: *const game.Screen, dungeon: *const game
 
 fn drawSprite(
     ptr: *anyopaque,
-    screen: *const game.Screen,
-    sprite: *const game.Sprite,
-    position: *const game.Position,
-    mode: game.AnyRuntime.DrawingMode,
+    screen: *const gm.Screen,
+    sprite: *const gm.Sprite,
+    position: *const gm.Position,
+    mode: gm.AnyRuntime.DrawingMode,
 ) anyerror!void {
     if (screen.region.containsPoint(position.point)) {
         var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
@@ -228,11 +250,11 @@ fn drawText(
     ptr: *anyopaque,
     text: []const u8,
     absolute_position: p.Point,
-    mode: game.AnyRuntime.DrawingMode,
+    mode: gm.AnyRuntime.DrawingMode,
 ) !void {
     const self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     // skip horizontal UI separator
-    const r = if (absolute_position.row == game.DISPLAY_ROWS) game.DISPLAY_ROWS + 1 else absolute_position.row;
+    const r = if (absolute_position.row == gm.DISPLAY_ROWS) gm.DISPLAY_ROWS + 1 else absolute_position.row;
     const c = absolute_position.col;
     var buf: [50]u8 = undefined;
     if (mode == .inverted) {

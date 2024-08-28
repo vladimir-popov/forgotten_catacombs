@@ -40,7 +40,7 @@ screen: gm.Screen,
 pub fn init(runtime: gm.AnyRuntime) Render {
     return .{
         .runtime = runtime,
-        .screen = gm.Screen.init(gm.DISPLAY_ROWS - 1, gm.DISPLAY_COLS, gm.Dungeon.Region),
+        .screen = gm.Screen.init(gm.DISPLAY_ROWS - 1, gm.DISPLAY_COLS),
     };
 }
 

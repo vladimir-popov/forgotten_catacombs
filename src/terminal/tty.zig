@@ -338,11 +338,8 @@ pub const KeyboardAndMouse = struct {
         var buffer: [11]u8 = undefined;
         const len: usize = @intCast(c.read(c.STDIN_FILENO, &buffer, buffer.len));
         if (len > 0) {
-            log.debug("Read {d} bytes [{any}]", .{ len, buffer[0..len] });
             const pbtn = PressedButton{ .bytes = buffer, .len = len };
-            const btn = pbtn.button();
-            log.debug("Pressed {any}", .{btn});
-            return btn;
+            return pbtn.button();
         } else {
             return null;
         }

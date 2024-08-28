@@ -68,7 +68,7 @@ pub fn refresh(self: *PlayMode, entity_in_focus: ?gm.Entity) !void {
     try self.session.game.render.redraw(self.session, self.entity_in_focus);
 }
 
-fn handleInput(self: PlayMode, buttons: gm.Buttons) !void {
+fn handleInput(self: *PlayMode, buttons: gm.Buttons) !void {
     switch (buttons.code) {
         gm.Buttons.A => if (self.quick_action) |quick_action| {
             try self.session.level.components.setToEntity(self.session.player, quick_action);
@@ -88,8 +88,53 @@ fn handleInput(self: PlayMode, buttons: gm.Buttons) !void {
                 .move_points = speed.move_points,
             });
         },
+        gm.Buttons.Cheat => {
+            if (self.session.game.runtime.getCheat()) |cheat| {
+                log.debug("Cheat {any}", .{cheat});
+                switch (cheat) {
+                    .refresh_screen => {
+                        self.session.game.render.screen.centeredAround(self.session.level.playerPosition().point);
+                        try self.session.game.render.redraw(self.session, self.entity_in_focus);
+                    },
+                    .move_player_to_entrance => {
+                        var itr = self.session.level.query().get2(gm.Ladder, gm.Position);
+                        while (itr.next()) |tuple| {
+                            if (tuple[1].direction == .up) {
+                                try self.movePlayerToPoint(tuple[2].point);
+                            }
+                        }
+                    },
+                    .move_player_to_exit => {
+                        var itr = self.session.level.query().get2(gm.Ladder, gm.Position);
+                        while (itr.next()) |tuple| {
+                            if (tuple[1].direction == .down) {
+                                try self.movePlayerToPoint(tuple[2].point);
+                            }
+                        }
+                    },
+                    .move_player => |point_on_screen| {
+                        const screen_corner = self.session.game.render.screen.region.top_left;
+                        try self.movePlayerToPoint(.{
+                            .row = point_on_screen.row + screen_corner.row,
+                            .col = point_on_screen.col + screen_corner.col,
+                        });
+                    },
+                }
+            }
+        },
         else => {},
     }
+}
+
+fn movePlayerToPoint(self: *PlayMode, point: p.Point) !void {
+    std.log.debug("Move player to {any}", .{point});
+    try self.session.level.components.setToEntity(
+        self.session.player,
+        gm.Position{ .point = point },
+    );
+    try self.updateTarget();
+    self.session.game.render.screen.centeredAround(point);
+    try self.session.game.render.redraw(self.session, self.entity_in_focus);
 }
 
 pub fn tick(self: *PlayMode) anyerror!void {

@@ -16,6 +16,8 @@ const ButtonsLog = struct {
     release_count: u16 = 0,
 };
 
+var cheat: ?game.Cheat = null;
+
 playdate: *api.PlaydateAPI,
 alloc: std.mem.Allocator,
 text_font: ?*api.LCDFont,
@@ -39,6 +41,7 @@ pub fn init(playdate: *api.PlaydateAPI) !Self {
 
     playdate.graphics.setFont(sprites_font);
     playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeCopy);
+    playdate.system.setSerialMessageCallback(serialMessageCallback);
 
     var millis: c_uint = undefined;
     _ = playdate.system.getSecondsSinceEpoch(&millis);
@@ -62,6 +65,7 @@ pub fn any(self: *Self) game.AnyRuntime {
         .context = self,
         .alloc = self.alloc,
         .vtable = &.{
+            .getCheat = getCheat,
             .currentMillis = currentMillis,
             .readPushedButtons = readPushedButtons,
             .clearDisplay = clearDisplay,
@@ -82,6 +86,7 @@ fn currentMillis(ptr: *anyopaque) c_uint {
 
 fn readPushedButtons(ptr: *anyopaque) anyerror!?game.Buttons {
     const self: *Self = @ptrCast(@alignCast(ptr));
+    if (cheat) |_| return .{ .code = game.Buttons.Cheat, .state = .pushed };
 
     var current_buttons: api.PDButtons = 0;
     var pressed_buttons: api.PDButtons = 0;
@@ -187,4 +192,14 @@ inline fn drawTextWithMode(
     } else {
         _ = self.playdate.graphics.drawText(text.ptr, text.len, .UTF8Encoding, x, y);
     }
+}
+
+fn getCheat(_: *anyopaque) ?game.Cheat {
+    const result = cheat;
+    cheat = null;
+    return result;
+}
+
+fn serialMessageCallback(data: [*c]const u8) callconv(.C) void {
+    cheat = game.Cheat.parse(std.mem.span(data));
 }

@@ -6,6 +6,7 @@ pub usingnamespace @import("components.zig");
 pub const AnyRuntime = @import("AnyRuntime.zig");
 pub const Render = @import("Render.zig");
 pub const Buttons = @import("Buttons.zig");
+pub const Cheat = @import("cheats.zig").Cheat;
 
 pub const Entity = ecs.Entity;
 pub const Screen = @import("Screen.zig");
