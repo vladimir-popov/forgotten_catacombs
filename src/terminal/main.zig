@@ -11,6 +11,15 @@ pub const std_options = .{
 
 const log = std.log.scoped(.main);
 
+pub fn panic(
+    msg: []const u8,
+    error_return_trace: ?*std.builtin.StackTrace,
+    return_address: ?usize,
+) noreturn {
+    TtyRuntime.disableGameMode() catch unreachable;
+    std.debug.panicImpl(error_return_trace, return_address, msg);
+}
+
 pub fn main() !void {
     var args = std.process.args();
     _ = args.next();

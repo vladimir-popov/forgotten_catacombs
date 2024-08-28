@@ -2,6 +2,8 @@ const std = @import("std");
 const fmt = std.fmt;
 const c = std.c;
 
+const log = std.log.scoped(.TTY);
+
 pub var original_termios: c.termios = undefined;
 
 /// Functions and constants for format text and produce special sequences.
@@ -32,6 +34,17 @@ pub const Text = struct {
     const SGR_ITALIC = csi("3m");
     const SGR_UNDERLINE = csi("4m");
     const SGR_INVERT_COLORS = csi("7m");
+
+    // MOUSE MODES
+    const MOUSE_TRACK_ON = csi("?1000;1006;1015h");
+    const MOUSE_TRACK_OFF = csi("?1000;1006;1015l");
+
+    /// Control Sequence Introducer
+    inline fn csi(comptime sfx: []const u8) *const [2 + sfx.len:0]u8 {
+        comptime {
+            return fmt.comptimePrint("\x1b[{s}", .{sfx});
+        }
+    }
 
     pub inline fn cursorRight(comptime count: u16) *const [fmt.count("\x1b[{d}C", .{count}):0]u8 {
         comptime {
@@ -81,15 +94,8 @@ pub const Text = struct {
         }
     }
 
-    /// Control Sequence Introducer
-    inline fn csi(comptime sfx: []const u8) *const [2 + sfx.len:0]u8 {
-        comptime {
-            return fmt.comptimePrint("\x1b[{s}", .{sfx});
-        }
-    }
-
-    pub fn writeSetCursorPosition(writer: std.io.AnyWriter, row: u16, col: u16) !void {
-        try std.fmt.format(writer, "\x1b[{d};{d}H", .{ row, col });
+    pub fn writeSetCursorPosition(wr: std.io.AnyWriter, row: u16, col: u16) !void {
+        try std.fmt.format(wr, "\x1b[{d};{d}H", .{ row, col });
     }
 };
 
@@ -163,16 +169,6 @@ pub const Display = struct {
         _ = c.tcsetattr(c.STDIN_FILENO, .FLUSH, &original_termios);
     }
 
-    pub inline fn write(str: []const u8) !void {
-        if (c.write(c.STDOUT_FILENO, str.ptr, str.len) != str.len)
-            return error.WritenNotAllBytes;
-    }
-
-    pub const writer = std.io.AnyWriter{ .context = undefined, .writeFn = writeFn };
-    fn writeFn(_: *const anyopaque, bytes: []const u8) anyerror!usize {
-        return @intCast(c.write(c.STDOUT_FILENO, bytes.ptr, bytes.len));
-    }
-
     pub fn clearScreen() !void {
         // Put cursor to the left upper corner
         try write(Text.CUP);
@@ -236,7 +232,10 @@ pub const Display = struct {
     }
 };
 
-pub const Keyboard = struct {
+pub const KeyboardAndMouse = struct {
+    /// A keyboard buttons with printable character
+    pub const CharButton = struct { char: u8 };
+
     /// The not printable control buttons
     pub const ControlButton = enum(u8) {
         ENTER = 13,
@@ -252,12 +251,16 @@ pub const Keyboard = struct {
         }
     };
 
-    /// A keyboard buttons with printable character
-    pub const CharButton = struct { char: u8 };
+    pub const MouseButton = struct {
+        button: enum { LEFT, MIDDLE, RIGHT, WHEEL_UP, WHEEL_DOWN },
+        row: u8,
+        col: u8,
+        is_released: bool,
+    };
 
-    /// Read code of a pressed keyboard button
+    /// Read code
     pub const PressedButton = struct {
-        bytes: [3]u8,
+        bytes: [11]u8,
         len: usize,
 
         pub fn button(self: @This()) Button {
@@ -279,16 +282,40 @@ pub const Keyboard = struct {
                     else => return Button{ .unknown = self },
                 }
             }
+            if (std.mem.indexOfScalar(u8, &self.bytes, '<') == 2) {
+                var ns: [3]u8 = undefined;
+                var start: usize = 3;
+                var i: u8 = 0;
+                while (std.mem.indexOfAny(u8, self.bytes[start..], ";Mm")) |end| {
+                    ns[i] = std.fmt.parseInt(u8, self.bytes[start..(start + end)], 10) catch
+                        std.debug.panic(
+                        "Error on parsing [{any}] from {d} to {d} (end == {d})",
+                        .{ self.bytes, start, start + end, end },
+                    );
+                    i += 1;
+                    start += end + 1;
+                }
+                const isr = self.bytes[self.bytes.len - 1] == 'm';
+                switch (ns[0]) {
+                    0 => return Button{ .mouse = .{ .button = .LEFT, .row = ns[2], .col = ns[1], .is_released = isr } },
+                    1 => return Button{ .mouse = .{ .button = .MIDDLE, .row = ns[2], .col = ns[1], .is_released = isr } },
+                    2 => return Button{ .mouse = .{ .button = .RIGHT, .row = ns[2], .col = ns[1], .is_released = isr } },
+                    64 => return Button{ .mouse = .{ .button = .WHEEL_UP, .row = ns[2], .col = ns[1], .is_released = isr } },
+                    65 => return Button{ .mouse = .{ .button = .WHEEL_DOWN, .row = ns[2], .col = ns[1], .is_released = isr } },
+                    else => return Button{ .unknown = self },
+                }
+            }
             return Button{ .unknown = self };
         }
     };
 
-    pub const ButtonTag = enum { control, char, unknown };
+    const ButtonTag = enum { control, char, mouse, unknown };
 
     /// Keyboard buttons
     pub const Button = union(ButtonTag) {
         control: ControlButton,
         char: CharButton,
+        mouse: MouseButton,
         unknown: PressedButton,
 
         pub fn eql(self: Button, maybe_other: ?Button) bool {
@@ -299,6 +326,7 @@ pub const Keyboard = struct {
                 return switch (self) {
                     .control => self.control.code() == other.control.code(),
                     .char => self.char.char == other.char.char,
+                    .mouse => @intFromEnum(self.mouse.button) == @intFromEnum(other.mouse.button),
                     .unknown => std.mem.eql(u8, &self.unknown.bytes, &other.unknown.bytes),
                 };
             }
@@ -307,11 +335,14 @@ pub const Keyboard = struct {
     };
 
     pub fn readPressedButton() ?Button {
-        var buffer: [3]u8 = undefined;
-        const len = c.read(c.STDIN_FILENO, &buffer, buffer.len);
+        var buffer: [11]u8 = undefined;
+        const len: usize = @intCast(c.read(c.STDIN_FILENO, &buffer, buffer.len));
         if (len > 0) {
-            const btn = PressedButton{ .bytes = buffer, .len = @intCast(len) };
-            return btn.button();
+            log.debug("Read {d} bytes [{any}]", .{ len, buffer[0..len] });
+            const pbtn = PressedButton{ .bytes = buffer, .len = len };
+            const btn = pbtn.button();
+            log.debug("Pressed {any}", .{btn});
+            return btn;
         } else {
             return null;
         }
@@ -332,4 +363,22 @@ pub const Keyboard = struct {
             return false;
         }
     }
+
+    pub inline fn enableMouseEvents() !void {
+        try write(Text.MOUSE_TRACK_ON);
+    }
+
+    pub inline fn disableMouseEvents() !void {
+        try write(Text.MOUSE_TRACK_OFF);
+    }
 };
+
+pub inline fn write(str: []const u8) !void {
+    if (c.write(c.STDOUT_FILENO, str.ptr, str.len) != str.len)
+        return error.WritenNotAllBytes;
+}
+
+pub const stdout_writer = std.io.AnyWriter{ .context = undefined, .writeFn = writeStdoutFn };
+fn writeStdoutFn(_: *const anyopaque, bytes: []const u8) anyerror!usize {
+    return @intCast(c.write(c.STDOUT_FILENO, bytes.ptr, bytes.len));
+}

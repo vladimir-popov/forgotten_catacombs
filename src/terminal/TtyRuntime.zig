@@ -23,8 +23,20 @@ buffer: utf8.Buffer,
 termios: std.c.termios,
 // the last read button through readButton function.
 // it is used as a buffer to check ESC outside the readButton function
-prev_key: ?tty.Keyboard.Button = null,
+prev_key: ?tty.KeyboardAndMouse.Button = null,
 pressed_at: i64 = 0,
+
+pub fn enableGameMode() !void {
+    try tty.Display.hideCursor();
+    try tty.KeyboardAndMouse.enableMouseEvents();
+    try tty.Display.handleWindowResize(&act, handleWindowResize);
+}
+
+pub fn disableGameMode() !void {
+    try tty.KeyboardAndMouse.disableMouseEvents();
+    try tty.Display.exitFromRawMode();
+    try tty.Display.showCursor();
+}
 
 pub fn init(alloc: std.mem.Allocator, render_in_center: bool) !TtyRuntime {
     const instance = TtyRuntime{
@@ -33,16 +45,14 @@ pub fn init(alloc: std.mem.Allocator, render_in_center: bool) !TtyRuntime {
         .buffer = undefined,
         .termios = tty.Display.enterRawMode(),
     };
-    try tty.Display.hideCursor();
-    try tty.Display.handleWindowResize(&act, handleWindowResize);
+    try enableGameMode();
     should_render_in_center = render_in_center;
     return instance;
 }
 
 pub fn deinit(self: *TtyRuntime) void {
-    tty.Display.exitFromRawMode() catch unreachable;
-    tty.Display.showCursor() catch unreachable;
     _ = self.arena.reset(.free_all);
+    disableGameMode() catch unreachable;
 }
 
 /// Run the main loop of the game
@@ -50,7 +60,7 @@ pub fn run(self: *TtyRuntime, gm: anytype) !void {
     handleWindowResize(0);
     while (!self.isExit()) {
         try gm.tick();
-        try self.writeBuffer(tty.Display.writer);
+        try self.writeBuffer(tty.stdout_writer);
     }
 }
 
@@ -66,7 +76,7 @@ fn handleWindowResize(_: i32) callconv(.C) void {
 fn isExit(self: TtyRuntime) bool {
     if (self.prev_key) |btn| {
         switch (btn) {
-            .control => return btn.control == tty.Keyboard.ControlButton.ESC,
+            .control => return btn.control == tty.KeyboardAndMouse.ControlButton.ESC,
             else => return false,
         }
     } else {
@@ -104,7 +114,7 @@ fn currentMillis(_: *anyopaque) c_uint {
 fn readPushedButtons(ptr: *anyopaque) anyerror!?game.Buttons {
     var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     const prev_key = self.prev_key;
-    if (tty.Keyboard.readPressedButton()) |key| {
+    if (tty.KeyboardAndMouse.readPressedButton()) |key| {
         self.prev_key = key;
         const known_key_code: ?game.Buttons.Code = switch (key) {
             .char => switch (key.char.char) {
