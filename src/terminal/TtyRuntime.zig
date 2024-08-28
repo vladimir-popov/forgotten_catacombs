@@ -26,10 +26,10 @@ termios: std.c.termios,
 prev_key: ?tty.KeyboardAndMouse.Button = null,
 pressed_at: i64 = 0,
 
-pub fn enableGameMode() !void {
+pub fn enableGameMode(use_mouse: bool) !void {
     try tty.Display.hideCursor();
-    try tty.KeyboardAndMouse.enableMouseEvents();
     try tty.Display.handleWindowResize(&act, handleWindowResize);
+    if (use_mouse) try tty.KeyboardAndMouse.enableMouseEvents();
 }
 
 pub fn disableGameMode() !void {
@@ -38,14 +38,14 @@ pub fn disableGameMode() !void {
     try tty.Display.showCursor();
 }
 
-pub fn init(alloc: std.mem.Allocator, render_in_center: bool) !TtyRuntime {
+pub fn init(alloc: std.mem.Allocator, render_in_center: bool, use_cheats: bool) !TtyRuntime {
     const instance = TtyRuntime{
         .alloc = alloc,
         .arena = std.heap.ArenaAllocator.init(alloc),
         .buffer = undefined,
         .termios = tty.Display.enterRawMode(),
     };
-    try enableGameMode();
+    try enableGameMode(use_cheats);
     should_render_in_center = render_in_center;
     return instance;
 }
