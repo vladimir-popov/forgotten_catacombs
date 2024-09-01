@@ -1,13 +1,12 @@
 const std = @import("std");
-const algs_and_types = @import("algs_and_types");
-const p = algs_and_types.primitives;
+const b = @import("base");
 
 pub const Cheat = union(enum) {
     refresh_screen,
     move_player_to_entrance,
     move_player_to_exit,
     // Moves the player to the point on the screen
-    move_player: p.Point,
+    move_player: b.Point,
 
     pub fn parse(str: []const u8) ?Cheat {
         if (std.mem.eql(u8, "refresh", str)) {

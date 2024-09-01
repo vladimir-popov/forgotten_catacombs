@@ -1,6 +1,5 @@
 const std = @import("std");
-const ecs = @import("ecs");
-const gm = @import("game");
+const g = @import("game");
 const tty = @import("tty.zig");
 
 const Logger = @import("Logger.zig");
@@ -35,15 +34,15 @@ pub fn main() !void {
 }
 
 const DungeonsGenerator = struct {
-    entities_provider: ecs.EntitiesProvider,
-    runtime: gm.AnyRuntime,
-    render: gm.Render,
-    level: gm.Level,
+    entities_provider: g.EntitiesProvider,
+    runtime: g.AnyRuntime,
+    render: g.Render,
+    level: g.Level,
 
-    pub fn init(runtime: gm.AnyRuntime) DungeonsGenerator {
+    pub fn init(runtime: g.AnyRuntime) DungeonsGenerator {
         return .{
             .runtime = runtime,
-            .render = gm.Render.init(runtime, gm.WHOLE_DUNG_ROWS, gm.WHOLE_DUNG_COLS),
+            .render = g.Render.init(runtime, g.Dungeon.Rows, g.Dungeon.Cols),
             .entities_provider = .{},
             .level = undefined,
         };
@@ -56,7 +55,7 @@ const DungeonsGenerator = struct {
     fn generate(self: *DungeonsGenerator, seed: u64) !void {
         log.info("\n====================\nGenerate level with seed {d}\n====================\n", .{seed});
         const entrance = self.entities_provider.newEntity();
-        self.level = try gm.Level.generate(
+        self.level = try g.Level.generate(
             self.runtime.alloc,
             seed,
             self.entities_provider.newEntity(),
@@ -78,7 +77,7 @@ const DungeonsGenerator = struct {
 
     fn handleInput(self: *DungeonsGenerator) anyerror!void {
         const btn = try self.runtime.readPushedButtons() orelse return;
-        if (btn.code & gm.Buttons.A > 0) {
+        if (btn.code & g.Buttons.A > 0) {
             const seed = std.crypto.random.int(u64);
             self.level.deinit();
             self.entities_provider = .{};

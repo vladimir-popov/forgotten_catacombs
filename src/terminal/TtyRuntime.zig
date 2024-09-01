@@ -1,9 +1,8 @@
 const std = @import("std");
-const algs_and_types = @import("algs_and_types");
-const p = algs_and_types.primitives;
-const gm = @import("game");
+const g = @import("game.zig");
+const p = g.primitives;
 const tty = @import("tty.zig");
-const utf8 = @import("utf8");
+const utf8 = @import("utf8.zig");
 
 const log = std.log.scoped(.runtime);
 
@@ -25,7 +24,7 @@ termios: std.c.termios,
 // it is used as a buffer to check ESC outside the readButton function
 prev_key: ?tty.KeyboardAndMouse.Button = null,
 pressed_at: i64 = 0,
-cheat: ?gm.Cheat = null,
+cheat: ?g.Cheat = null,
 
 pub fn enableGameMode(use_mouse: bool) !void {
     try tty.Display.hideCursor();
@@ -69,8 +68,8 @@ fn handleWindowResize(_: i32) callconv(.C) void {
     window_size = tty.Display.getWindowSize() catch unreachable;
     tty.Display.clearScreen() catch unreachable;
     if (should_render_in_center) {
-        rows_pad = (@min(window_size.rows, std.math.maxInt(u8)) - gm.DISPLAY_ROWS) / 2;
-        cols_pad = (@min(window_size.cols, std.math.maxInt(u8)) - gm.DISPLAY_COLS) / 2;
+        rows_pad = (@min(window_size.rows, std.math.maxInt(u8)) - g.DISPLAY_ROWS) / 2;
+        cols_pad = (@min(window_size.cols, std.math.maxInt(u8)) - g.DISPLAY_COLS) / 2;
     }
 }
 
@@ -92,7 +91,7 @@ fn writeBuffer(self: TtyRuntime, writer: std.io.AnyWriter) !void {
     }
 }
 
-pub fn any(self: *TtyRuntime) gm.AnyRuntime {
+pub fn any(self: *TtyRuntime) g.AnyRuntime {
     return .{
         .context = self,
         .alloc = self.alloc,
@@ -114,27 +113,27 @@ fn currentMillis(_: *anyopaque) c_uint {
     return @truncate(@as(u64, @intCast(std.time.milliTimestamp())));
 }
 
-fn readPushedButtons(ptr: *anyopaque) anyerror!?gm.Buttons {
+fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Buttons {
     var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     const prev_key = self.prev_key;
     if (tty.KeyboardAndMouse.readPressedButton()) |key| {
         self.prev_key = key;
-        const known_key_code: ?gm.Buttons.Code = switch (key) {
+        const known_key_code: ?g.Buttons.Code = switch (key) {
             .char => switch (key.char.char) {
                 // (B) (A)
-                ' ', 's', 'i' => gm.Buttons.A,
-                'b', 'a', 'u' => gm.Buttons.B,
-                'h' => gm.Buttons.Left,
-                'j' => gm.Buttons.Down,
-                'k' => gm.Buttons.Up,
-                'l' => gm.Buttons.Right,
+                ' ', 's', 'i' => g.Buttons.A,
+                'b', 'a', 'u' => g.Buttons.B,
+                'h' => g.Buttons.Left,
+                'j' => g.Buttons.Down,
+                'k' => g.Buttons.Up,
+                'l' => g.Buttons.Right,
                 else => null,
             },
             .control => switch (key.control) {
-                .LEFT => gm.Buttons.Left,
-                .DOWN => gm.Buttons.Down,
-                .UP => gm.Buttons.Up,
-                .RIGHT => gm.Buttons.Right,
+                .LEFT => g.Buttons.Left,
+                .DOWN => g.Buttons.Down,
+                .UP => g.Buttons.Up,
+                .RIGHT => g.Buttons.Right,
                 else => null,
             },
             .mouse => |m| cheat: {
@@ -150,7 +149,7 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?gm.Buttons {
                     .WHEEL_DOWN => self.cheat = .move_player_to_exit,
                     else => return null,
                 }
-                break :cheat gm.Buttons.Cheat;
+                break :cheat g.Buttons.Cheat;
             },
             else => null,
         };
@@ -158,11 +157,11 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?gm.Buttons {
             const now = std.time.milliTimestamp();
             const delay = now - self.pressed_at;
             self.pressed_at = now;
-            var state: gm.Buttons.State = .pushed;
+            var state: g.Buttons.State = .pushed;
             if (key.eql(prev_key)) {
-                if (delay < gm.DOUBLE_PUSH_DELAY_MS)
+                if (delay < g.DOUBLE_PUSH_DELAY_MS)
                     state = .double_pushed
-                else if (delay > gm.HOLD_DELAY_MS)
+                else if (delay > g.HOLD_DELAY_MS)
                     state = .hold;
             }
             return .{ .code = code, .state = state };
@@ -174,7 +173,7 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?gm.Buttons {
     return null;
 }
 
-fn getCheat(ptr: *anyopaque) ?gm.Cheat {
+fn getCheat(ptr: *anyopaque) ?g.Cheat {
     const self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     return self.cheat;
 }
@@ -187,19 +186,19 @@ fn clearDisplay(ptr: *anyopaque) !void {
 
 fn drawScreenBorder(ptr: *anyopaque) !void {
     var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
-    try self.buffer.addLine("╔" ++ "═" ** gm.DISPLAY_COLS ++ "╗");
-    for (0..(gm.DISPLAY_ROWS + 1)) |_| {
-        try self.buffer.addLine("║" ++ " " ** gm.DISPLAY_COLS ++ "║");
+    try self.buffer.addLine("╔" ++ "═" ** g.DISPLAY_COLS ++ "╗");
+    for (0..(g.DISPLAY_ROWS + 1)) |_| {
+        try self.buffer.addLine("║" ++ " " ** g.DISPLAY_COLS ++ "║");
     }
-    try self.buffer.addLine("╚" ++ "═" ** gm.DISPLAY_COLS ++ "╝");
+    try self.buffer.addLine("╚" ++ "═" ** g.DISPLAY_COLS ++ "╝");
 }
 
 fn drawHorizontalBorder(ptr: *anyopaque) !void {
     var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
-    try self.buffer.mergeLine("║" ++ "═" ** gm.DISPLAY_COLS ++ "║", gm.DISPLAY_ROWS, 0);
+    try self.buffer.mergeLine("║" ++ "═" ** g.DISPLAY_COLS ++ "║", g.DISPLAY_ROWS, 0);
 }
 
-fn drawDungeon(ptr: *anyopaque, screen: *const gm.Screen, dungeon: *const gm.Dungeon) anyerror!void {
+fn drawDungeon(ptr: *anyopaque, screen: *const g.Screen, dungeon: *const g.Dungeon) anyerror!void {
     var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     const buffer = &self.buffer;
     var itr = dungeon.cellsInRegion(screen.region) orelse return;
@@ -226,10 +225,10 @@ fn drawDungeon(ptr: *anyopaque, screen: *const gm.Screen, dungeon: *const gm.Dun
 
 fn drawSprite(
     ptr: *anyopaque,
-    screen: *const gm.Screen,
-    sprite: *const gm.Sprite,
-    position: *const gm.Position,
-    mode: gm.AnyRuntime.DrawingMode,
+    screen: *const g.Screen,
+    sprite: *const g.Sprite,
+    position: *const g.Position,
+    mode: g.AnyRuntime.DrawingMode,
 ) anyerror!void {
     if (screen.region.containsPoint(position.point)) {
         var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
@@ -255,11 +254,11 @@ fn drawText(
     ptr: *anyopaque,
     text: []const u8,
     absolute_position: p.Point,
-    mode: gm.AnyRuntime.DrawingMode,
+    mode: g.AnyRuntime.DrawingMode,
 ) !void {
     const self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     // skip horizontal UI separator
-    const r = if (absolute_position.row == gm.DISPLAY_ROWS) gm.DISPLAY_ROWS + 1 else absolute_position.row;
+    const r = if (absolute_position.row == g.DISPLAY_ROWS) g.DISPLAY_ROWS + 1 else absolute_position.row;
     const c = absolute_position.col;
     var buf: [50]u8 = undefined;
     if (mode == .inverted) {

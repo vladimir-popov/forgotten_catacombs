@@ -1,7 +1,6 @@
 const std = @import("std");
-const game = @import("game");
 const api = @import("api.zig");
-const tools = @import("tools");
+const g = @import("game");
 
 const PlaydateRuntime = @import("PlaydateRuntime.zig");
 
@@ -38,7 +37,7 @@ var playdate_log_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) voi
 
 pub const GlobalState = struct {
     runtime: PlaydateRuntime,
-    game: game.Game,
+    game: g.Game,
 };
 
 pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent, arg: u32) callconv(.C) c_int {
@@ -51,7 +50,7 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
             var state: *GlobalState = @ptrCast(@alignCast(playdate.system.realloc(null, @sizeOf(GlobalState))));
             state.runtime = PlaydateRuntime.init(playdate) catch
                 @panic("Error on creating Runtime");
-            state.game = game.Game.init(state.runtime.any(), playdate.system.getCurrentTimeMilliseconds()) catch
+            state.game = g.Game.init(state.runtime.any(), playdate.system.getCurrentTimeMilliseconds()) catch
                 @panic("Error on creating game session");
 
             playdate.display.setRefreshRate(0);

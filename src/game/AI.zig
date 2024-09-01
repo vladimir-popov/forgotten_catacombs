@@ -1,13 +1,12 @@
 const std = @import("std");
-const algs = @import("algs_and_types");
-const p = algs.primitives;
-const game = @import("game.zig");
+const g = @import("game.zig");
+const p = g.primitives;
 
 const log = std.log.scoped(.ai);
 
-pub fn meleeMove(session: *game.GameSession, entity: game.Entity, available_move_points: u8) anyerror!u8 {
+pub fn meleeMove(session: *g.GameSession, entity: g.Entity, available_move_points: u8) anyerror!u8 {
     // here check if the entity still exists
-    if (session.level.components.getForEntity(entity, game.Position)) |position| {
+    if (session.level.components.getForEntity(entity, g.Position)) |position| {
         const action = nextAction(session, entity, position, available_move_points);
         try session.level.components.setToEntity(entity, action);
         return action.move_points;
@@ -17,14 +16,14 @@ pub fn meleeMove(session: *game.GameSession, entity: game.Entity, available_move
 }
 
 fn nextAction(
-    session: *game.GameSession,
-    entity: game.Entity,
-    entity_position: *const game.Position,
+    session: *g.GameSession,
+    entity: g.Entity,
+    entity_position: *const g.Position,
     available_move_points: u8,
-) game.Action {
-    const player_position = session.level.components.getForEntityUnsafe(session.player, game.Position);
+) g.Action {
+    const player_position = session.level.components.getForEntityUnsafe(session.player, g.Position);
     if (entity_position.point.near(player_position.point)) {
-        const weapon = session.level.components.getForEntityUnsafe(entity, game.MeleeWeapon);
+        const weapon = session.level.components.getForEntityUnsafe(entity, g.MeleeWeapon);
         if (available_move_points >= weapon.move_points) {
             return .{ .type = .{ .hit = session.player }, .move_points = weapon.move_points };
         }

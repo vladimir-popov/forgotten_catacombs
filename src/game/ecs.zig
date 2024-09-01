@@ -1,5 +1,5 @@
-// This is an implementation of the Entity Component System pattern,
-// which is a core of the game.
+//! This is an implementation of the Entity Component System pattern,
+//! which is a core of the game.
 
 const std = @import("std");
 

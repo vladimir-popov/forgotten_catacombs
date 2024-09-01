@@ -1,7 +1,151 @@
 const std = @import("std");
+const g = @import("game.zig");
+const p = g.primitives;
 
-/// The Node of the BinaryTree.
-pub fn Node(comptime V: type) type {
+const Dungeon = @import("Dungeon.zig");
+const Tree = Node(p.Region);
+
+
+/// Basic BSP Dungeon generation
+/// https://www.roguebasin.com/index.php?title=Basic_BSP_Dungeon_generation
+pub fn generateDungeon(alloc: std.mem.Allocator, seed: u64) !*Dungeon {
+    var prng = std.Random.DefaultPrng.init(seed);
+    // this arena is used to build a BSP tree, which can be destroyed
+    // right after completing the dungeon.
+    var bsp_arena = std.heap.ArenaAllocator.init(alloc);
+    defer _ = bsp_arena.deinit();
+
+    const dungeon = try alloc.create(Dungeon);
+    dungeon.* = try Dungeon.init(alloc, seed);
+
+    // BSP helps to mark regions for rooms without intersections
+    const root = try buildTree(&bsp_arena, prng.random(), Dungeon.Rows, Dungeon.Cols, .{});
+
+    // visit every BSP node and generate rooms in the leafs
+    var createRooms: TraverseAndCreateRooms = .{ .dungeon = dungeon, .rand = prng.random() };
+    try root.traverse(bsp_arena.allocator(), createRooms.handler());
+
+    // fold the BSP tree and binds nodes with the same parent:
+    var createPassages: CreatePassageBetweenRegions = .{ .dungeon = dungeon, .rand = prng.random() };
+    _ = try root.foldModify(alloc, createPassages.handler());
+
+    return dungeon;
+}
+
+
+const TraverseAndCreateRooms = struct {
+    dungeon: *Dungeon,
+    rand: std.Random,
+
+    fn handler(dungeon: *TraverseAndCreateRooms) Tree.TraverseHandler {
+        return .{ .ptr = dungeon, .handle = TraverseAndCreateRooms.createRoom };
+    }
+
+    fn createRoom(ptr: *anyopaque, node: *Tree) anyerror!void {
+        if (!node.isLeaf()) return;
+        const dungeon: *TraverseAndCreateRooms = @ptrCast(@alignCast(ptr));
+        try dungeon.dungeon.generateAndAddRoom(dungeon.rand, node.value);
+    }
+};
+
+const CreatePassageBetweenRegions = struct {
+    dungeon: *Dungeon,
+    rand: std.Random,
+
+    fn handler(dungeon: *CreatePassageBetweenRegions) Tree.FoldHandler {
+        return .{ .ptr = dungeon, .combine = combine };
+    }
+
+    fn combine(ptr: *anyopaque, left: *p.Region, right: *p.Region) !p.Region {
+        const dungeon: *CreatePassageBetweenRegions = @ptrCast(@alignCast(ptr));
+        return try dungeon.dungeon.createAndAddPassageBetweenRegions(dungeon.rand, left, right);
+    }
+};
+
+const MinRegionSettings = struct {
+    min_rows: u8 = 10,
+    min_cols: u8 = 24,
+    /// rows / cols ratio:
+    square_ratio: f16 = 0.3,
+
+    fn validateRegion(self: MinRegionSettings, region: p.Region) void {
+        if (region.rows < self.min_rows) {
+            std.debug.panic("The {any} has less than {d} min rows.\n", .{
+                region,
+                self.min_rows,
+            });
+        }
+        if (region.cols < self.min_cols) {
+            std.debug.panic("The {any} has less than {d} min cols.\n", .{
+                region,
+                self.min_cols,
+            });
+        }
+    }
+};
+
+/// Builds graph of regions splitting the original region with `rows` and `cols`
+/// on smaller regions with minimum `min_rows` or `min_cols`. A region from any
+/// node contains regions of its children.
+///
+/// To free memory with returned graph, the arena should be freed.
+fn buildTree(
+    arena: *std.heap.ArenaAllocator,
+    rand: std.Random,
+    rows: u8,
+    cols: u8,
+    opts: MinRegionSettings,
+) !*Tree {
+    const region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = rows, .cols = cols };
+    opts.validateRegion(region);
+
+    var splitter = Splitter{ .rand = rand, .opts = opts };
+    var root: *Tree = try Tree.root(arena, region);
+    try root.split(arena, splitter.handler());
+
+    return root;
+}
+
+const Splitter = struct {
+    rand: std.Random,
+    opts: MinRegionSettings,
+
+    fn handler(self: *Splitter) Tree.SplitHandler {
+        return .{ .ptr = self, .split = split };
+    }
+
+    fn split(ptr: *anyopaque, node: *Tree) anyerror!?struct { p.Region, p.Region } {
+        const self: *Splitter = @ptrCast(@alignCast(ptr));
+        const region: p.Region = node.value;
+
+        const split_vertical = region.ratio() < self.opts.square_ratio;
+
+        if (split_vertical) {
+            if (divideRnd(self.rand, region.cols, self.opts.min_cols)) |cols| {
+                return region.splitVertically(cols);
+            }
+        } else {
+            if (divideRnd(self.rand, region.rows, self.opts.min_rows)) |rows| {
+                return region.splitHorizontally(rows);
+            }
+        }
+        return null;
+    }
+
+    /// Randomly divides the `value` to two parts which are not less than `min`,
+    /// or return null if it is impossible.
+    inline fn divideRnd(rand: std.Random, value: u8, min: u8) ?u8 {
+        return if (value > min * 2)
+            min + rand.uintLessThan(u8, value - min * 2)
+        else if (value == 2 * min)
+            min
+        else
+            null;
+    }
+};
+
+/// The Node of the Tree.
+fn Node(comptime V: type) type {
     return struct {
         const NodeV = @This();
 
@@ -9,16 +153,14 @@ pub fn Node(comptime V: type) type {
         left: ?*NodeV = null,
         right: ?*NodeV = null,
         value: V,
-        lessThan: *const fn (x: V, y: V) bool,
 
         /// Creates a single root node of the binary tree.
         pub fn root(
             arena: *std.heap.ArenaAllocator,
             value: V,
-            lessThan: *const fn (x: V, y: V) bool,
         ) !*Node(V) {
             const node = try arena.allocator().create(NodeV);
-            node.* = .{ .value = value, .lessThan = lessThan };
+            node.* = .{ .value = value };
             return node;
         }
 
@@ -186,6 +328,85 @@ pub fn Node(comptime V: type) type {
         };
     };
 }
+
+test "build tree" {
+    // given:
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer _ = arena.reset(.free_all);
+    var rand = std.Random.DefaultPrng.init(0);
+    const opts: MinRegionSettings = .{ .min_rows = 2, .min_cols = 2 };
+
+    // when:
+    const root = try buildTree(&arena, rand.random(), 9, 7, opts);
+
+    // then:
+    var validate = ValidateNodes{ .opts = opts };
+    try root.traverse(arena.allocator(), validate.bspNodeHandler());
+}
+
+/// Utility for test
+const ValidateNodes = struct {
+    opts: MinRegionSettings,
+    min_ratio: f16 = 0.2,
+
+    fn bspNodeHandler(self: *ValidateNodes) Tree.TraverseHandler {
+        return .{ .ptr = self, .handle = validate };
+    }
+
+    fn validate(ptr: *anyopaque, node: *Tree) anyerror!void {
+        const self: *ValidateNodes = @ptrCast(@alignCast(ptr));
+
+        try self.validateNode("root", null, node);
+        if (node.left) |left| {
+            try self.validateNode("left", node, left);
+        }
+        if (node.right) |right| {
+            try self.validateNode("right", node, right);
+        }
+    }
+
+    fn validateNode(
+        self: *ValidateNodes,
+        name: []const u8,
+        root: ?*Tree,
+        node: *Tree,
+    ) !void {
+        if (root) |rt| {
+            std.testing.expect(rt.value.containsRegion(node.value)) catch |err| {
+                std.debug.print(
+                    "The {s} region {any} doesn't contained in the root {any}\n",
+                    .{ name, node.value, rt.value },
+                );
+                return err;
+            };
+        }
+        if (node.value.rows < self.opts.min_rows) {
+            std.debug.print("The {s} {any} has less than {d} min rows.\n", .{
+                name,
+                node.value,
+                self.opts.min_rows,
+            });
+            return error.TestUnexpectedResult;
+        }
+        if (node.value.cols < self.opts.min_cols) {
+            std.debug.print("The {s} {any} has less than {d} min cols.\n", .{
+                name,
+                node.value,
+                self.opts.min_cols,
+            });
+            return error.TestUnexpectedResult;
+        }
+        if (node.value.ratio() < self.min_ratio) {
+            std.debug.print("The {s} {any} has lower ratio {d} than {d}.\n", .{
+                name,
+                node.value,
+                node.value.ratio(),
+                self.min_ratio,
+            });
+            return error.TestUnexpectedResult;
+        }
+    }
+};
 
 test "split/fold" {
     // given:

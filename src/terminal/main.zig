@@ -1,5 +1,5 @@
 const std = @import("std");
-const gm = @import("game");
+const g = @import("game");
 const tty = @import("tty.zig");
 
 const Args = @import("Args.zig");
@@ -39,7 +39,7 @@ pub fn main() !void {
 
     var runtime = try TtyRuntime.init(alloc, true, use_cheats);
     defer runtime.deinit();
-    var game = try gm.Game.init(runtime.any(), seed);
+    var game = try g.Game.init(runtime.any(), seed);
     defer game.deinit();
     try runtime.run(&game);
 }

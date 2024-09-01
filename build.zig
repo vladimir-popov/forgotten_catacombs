@@ -29,22 +29,8 @@ pub fn build(b: *std.Build) !void {
     //                    Modules:
     // ============================================================
 
-    const ecs_module = b.createModule(.{
-        .root_source_file = b.path("src/ecs/ecs.zig"),
-    });
-
-    const algs_and_types_module = b.createModule(.{
-        .root_source_file = b.path("src/algs_and_types/algs_and_types.zig"),
-    });
-
     const game_module = b.createModule(.{
-        .root_source_file = b.path("src/game/game.zig"),
-    });
-    game_module.addImport("ecs", ecs_module);
-    game_module.addImport("algs_and_types", algs_and_types_module);
-
-    const utf8_module = b.createModule(.{
-        .root_source_file = b.path("src/utf8/utf8.zig"),
+        .root_source_file = b.path("src/game/init.zig"),
     });
 
     // ============================================================
@@ -60,10 +46,7 @@ pub fn build(b: *std.Build) !void {
         .target = desktop_target,
         .optimize = optimize,
     });
-    terminal_game_exe.root_module.addImport("ecs", ecs_module);
-    terminal_game_exe.root_module.addImport("algs_and_types", algs_and_types_module);
     terminal_game_exe.root_module.addImport("game", game_module);
-    terminal_game_exe.root_module.addImport("utf8", utf8_module);
     b.installArtifact(terminal_game_exe);
 
     // Step to build and run the game in terminal
@@ -83,10 +66,7 @@ pub fn build(b: *std.Build) !void {
         .target = desktop_target,
         .optimize = optimize,
     });
-    dungeons_exe.root_module.addImport("ecs", ecs_module);
-    dungeons_exe.root_module.addImport("algs_and_types", algs_and_types_module);
     dungeons_exe.root_module.addImport("game", game_module);
-    dungeons_exe.root_module.addImport("utf8", utf8_module);
     b.installArtifact(dungeons_exe);
 
     // Step to build and run the game in terminal
@@ -107,9 +87,7 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
         .target = b.host,
     });
-    lib.root_module.addImport("ecs", ecs_module);
     lib.root_module.addImport("game", game_module);
-    lib.root_module.addImport("algs_and_types", algs_and_types_module);
     _ = writer.addCopyFile(lib.getEmittedBin(), "pdex" ++ switch (os_tag) {
         .windows => ".dll",
         .macos => ".dylib",
@@ -127,9 +105,7 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
         .pic = true,
     });
-    elf.root_module.addImport("ecs", ecs_module);
     elf.root_module.addImport("game", game_module);
-    elf.root_module.addImport("algs_and_types", algs_and_types_module);
     elf.link_emit_relocs = true;
     elf.entry = .{ .symbol_name = "eventHandler" };
 
@@ -188,44 +164,14 @@ pub fn build(b: *std.Build) !void {
         "Skip tests that do not match any filter",
     ) orelse &[0][]const u8{};
 
-    const ut_algs_and_types = b.addTest(.{
-        .root_source_file = b.path("src/algs_and_types/algs_and_types.zig"),
-        .test_runner = b.path("src/test_runner.zig"),
-        .target = desktop_target,
-        .optimize = optimize,
-        .filters = test_filter,
-    });
-    const run_ut_algs_and_types = b.addRunArtifact(ut_algs_and_types);
-
-    const ut_ecs = b.addTest(.{
-        .root_source_file = b.path("src/ecs/ecs.zig"),
-        .test_runner = b.path("src/test_runner.zig"),
-        .target = desktop_target,
-        .optimize = optimize,
-        .filters = test_filter,
-    });
-    const run_ut_ecs = b.addRunArtifact(ut_ecs);
-
     const ut_game = b.addTest(.{
-        .root_source_file = b.path("src/game/game.zig"),
+        .root_source_file = b.path("src/game/init.zig"),
         .test_runner = b.path("src/test_runner.zig"),
         .target = desktop_target,
         .optimize = optimize,
         .filters = test_filter,
     });
-    ut_game.root_module.addImport("algs_and_types", algs_and_types_module);
-    ut_game.root_module.addImport("ecs", ecs_module);
-
     const run_ut_game = b.addRunArtifact(ut_game);
-
-    const ut_utf8 = b.addTest(.{
-        .root_source_file = b.path("src/utf8/utf8.zig"),
-        .test_runner = b.path("src/test_runner.zig"),
-        .target = desktop_target,
-        .optimize = optimize,
-        .filters = test_filter,
-    });
-    const run_ut_utf8 = b.addRunArtifact(ut_utf8);
 
     const ut_terminal = b.addTest(.{
         .root_source_file = b.path("src/terminal/main.zig"),
@@ -234,10 +180,7 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
         .filters = test_filter,
     });
-    ut_terminal.root_module.addImport("algs_and_types", algs_and_types_module);
-    ut_terminal.root_module.addImport("ecs", ecs_module);
     ut_terminal.root_module.addImport("game", game_module);
-    ut_terminal.root_module.addImport("utf8", utf8_module);
 
     b.installArtifact(ut_terminal);
     const run_ut_terminal = b.addRunArtifact(ut_terminal);
@@ -247,22 +190,13 @@ pub fn build(b: *std.Build) !void {
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
     if (b.args) |args| {
-        run_ut_ecs.addArgs(args);
-        run_ut_algs_and_types.addArgs(args);
-        run_ut_utf8.addArgs(args);
         run_ut_game.addArgs(args);
         run_ut_terminal.addArgs(args);
     }
-    run_ut_ecs.has_side_effects = true;
-    run_ut_algs_and_types.has_side_effects = true;
-    run_ut_utf8.has_side_effects = true;
     run_ut_game.has_side_effects = true;
     run_ut_terminal.has_side_effects = true;
 
-    test_step.dependOn(&run_ut_ecs.step);
-    test_step.dependOn(&run_ut_algs_and_types.step);
     test_step.dependOn(&run_ut_game.step);
-    test_step.dependOn(&run_ut_utf8.step);
     test_step.dependOn(&run_ut_terminal.step);
 }
 

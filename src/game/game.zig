@@ -1,114 +1,71 @@
 const std = @import("std");
-const ecs = @import("ecs");
+const g = @import("init.zig");
 
-pub usingnamespace @import("components.zig");
+const log = std.log.scoped(.Game);
 
-pub const AnyRuntime = @import("AnyRuntime.zig");
-pub const Render = @import("Render.zig");
-pub const Screen = @import("Screen.zig");
-pub const Buttons = @import("Buttons.zig");
-pub const Cheat = @import("cheats.zig").Cheat;
+const Game = @This();
 
-pub const Entity = ecs.Entity;
-pub const Dungeon = @import("BspDungeon.zig").BspDungeon(WHOLE_DUNG_ROWS, WHOLE_DUNG_COLS);
-// pub const Dungeon = @import("BspDungeon.zig").BspDungeon(DISPLPAY_ROWS, DISPLPAY_COLS);
-pub const Level = @import("Level.zig");
-pub const GameSession = @import("GameSession.zig");
+pub const State = enum { welcome, game_over, game };
 
-/// The maximum rows count in the whole dungeon
-pub const WHOLE_DUNG_ROWS: u8 = 40;
-/// The maximum columns count in the whole dungeon
-pub const WHOLE_DUNG_COLS: u8 = 100;
+/// Playdate or terminal
+runtime: g.AnyRuntime,
+/// Module to draw the game
+render: g.Render,
+/// The seed is used to generate a new game session.
+/// This seed can be used to pass the value from the user.
+seed: u64,
+/// The current state of the game
+state: State,
+/// The current game session
+game_session: ?*g.GameSession,
 
-pub const RENDER_DELAY_MS = 150;
+pub fn init(runtime: g.AnyRuntime, seed: u64) !Game {
+    var gm = Game{
+        .runtime = runtime,
+        .render = g.Render.init(runtime, g.DISPLAY_ROWS - 1, g.DISPLAY_COLS),
+        .seed = seed,
+        .state = .welcome,
+        .game_session = null,
+    };
+    try gm.welcome();
+    return gm;
+}
 
-// Playdate display resolution px:
-pub const DISPLAY_HEIGHT = 240;
-pub const DISPLAY_WIDHT = 400;
+pub fn deinit(self: Game) void {
+    if (self.game_session) |session| session.destroy();
+}
 
-// The size of the font to draw sprites in pixels:
-pub const SPRITE_HEIGHT = 20;
-pub const SPRITE_WIDTH = 10;
-
-// The size of the font for text in pixels:
-pub const FONT_HEIGHT = 16;
-pub const FONT_WIDTH = 8;
-
-pub const DISPLAY_ROWS = DISPLAY_HEIGHT / SPRITE_HEIGHT - 1;
-pub const DISPLAY_COLS = DISPLAY_WIDHT / SPRITE_WIDTH - 1;
-
-pub const DOUBLE_PUSH_DELAY_MS = 250;
-pub const HOLD_DELAY_MS = 500;
-
-pub const Game = struct {
-    const log = std.log.scoped(.Game);
-
-    pub const State = enum { welcome, game_over, game };
-
-    /// Playdate or terminal
-    runtime: AnyRuntime,
-    /// Module to draw the game
-    render: Render,
-    /// The seed is used to generate a new game session.
-    /// This seed can be used to pass the value from the user.
-    seed: u64,
-    /// The current state of the game
-    state: State,
-    /// The current game session
-    game_session: ?*GameSession,
-
-    pub fn init(runtime: AnyRuntime, seed: u64) !Game {
-        var gm = Game{
-            .runtime = runtime,
-            .render = Render.init(runtime, DISPLAY_ROWS - 1, DISPLAY_COLS),
-            .seed = seed,
-            .state = .welcome,
-            .game_session = null,
-        };
-        try gm.welcome();
-        return gm;
+pub fn tick(self: *Game) !void {
+    switch (self.state) {
+        .welcome => if (try self.runtime.readPushedButtons()) |btn| {
+            switch (btn.code) {
+                g.Buttons.A => try self.newGame(),
+                else => {},
+            }
+        },
+        .game_over => if (try self.runtime.readPushedButtons()) |btn| {
+            switch (btn.code) {
+                g.Buttons.A => try self.welcome(),
+                else => {},
+            }
+        },
+        .game => if (self.game_session) |session| try session.tick(),
     }
+}
 
-    pub fn deinit(self: Game) void {
-        if (self.game_session) |session| session.destroy();
-    }
+inline fn welcome(self: *Game) !void {
+    self.state = .welcome;
+    try self.render.drawWelcomeScreen();
+}
 
-    pub fn tick(self: *Game) !void {
-        switch (self.state) {
-            .welcome => if (try self.runtime.readPushedButtons()) |btn| {
-                switch (btn.code) {
-                    Buttons.A => try self.newGame(),
-                    else => {},
-                }
-            },
-            .game_over => if (try self.runtime.readPushedButtons()) |btn| {
-                switch (btn.code) {
-                    Buttons.A => try self.welcome(),
-                    else => {},
-                }
-            },
-            .game => if (self.game_session) |session| try session.tick(),
-        }
-    }
+pub fn gameOver(self: *Game) !void {
+    self.state = .game_over;
+    try self.render.drawGameOverScreen();
+}
 
-    inline fn welcome(self: *Game) !void {
-        self.state = .welcome;
-        try self.render.drawWelcomeScreen();
-    }
-
-    pub fn gameOver(self: *Game) !void {
-        self.state = .game_over;
-        try self.render.drawGameOverScreen();
-    }
-
-    inline fn newGame(self: *Game) !void {
-        self.state = .game;
-        if (self.game_session) |session| session.destroy();
-        self.game_session = try GameSession.createNew(self, self.seed);
-        try self.game_session.?.play(null);
-    }
-};
-
-test {
-    std.testing.refAllDecls(@This());
+inline fn newGame(self: *Game) !void {
+    self.state = .game;
+    if (self.game_session) |session| session.destroy();
+    self.game_session = try g.GameSession.createNew(self, self.seed);
+    try self.game_session.?.play(null);
 }
