@@ -69,7 +69,8 @@ pub fn any(self: *Self) game.AnyRuntime {
             .currentMillis = currentMillis,
             .readPushedButtons = readPushedButtons,
             .clearDisplay = clearDisplay,
-            .drawUI = drawUI,
+            .drawScreenBorder = drawScreenBorder,
+            .drawHorizontalBorder = drawHorizontalBorder,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
             .drawText = drawText,
@@ -122,7 +123,9 @@ fn clearDisplay(ptr: *anyopaque) anyerror!void {
     self.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
 }
 
-fn drawUI(ptr: *anyopaque) anyerror!void {
+fn drawScreenBorder(_: *anyopaque) anyerror!void {}
+
+fn drawHorizontalBorder(ptr: *anyopaque) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     // separate dung and stats:
     const y = game.DISPLAY_HEIGHT - game.FONT_HEIGHT * 2;

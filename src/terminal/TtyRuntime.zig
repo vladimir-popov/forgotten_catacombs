@@ -101,7 +101,8 @@ pub fn any(self: *TtyRuntime) gm.AnyRuntime {
             .currentMillis = currentMillis,
             .readPushedButtons = readPushedButtons,
             .clearDisplay = clearDisplay,
-            .drawUI = drawUI,
+            .drawScreenBorder = drawScreenBorder,
+            .drawHorizontalBorder = drawHorizontalBorder,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
             .drawText = drawText,
@@ -182,6 +183,10 @@ fn clearDisplay(ptr: *anyopaque) !void {
     var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     _ = self.arena.reset(.retain_capacity);
     self.buffer = utf8.Buffer.init(self.arena.allocator());
+}
+
+fn drawScreenBorder(ptr: *anyopaque) !void {
+    var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     try self.buffer.addLine("╔" ++ "═" ** gm.DISPLAY_COLS ++ "╗");
     for (0..(gm.DISPLAY_ROWS + 1)) |_| {
         try self.buffer.addLine("║" ++ " " ** gm.DISPLAY_COLS ++ "║");
@@ -189,7 +194,7 @@ fn clearDisplay(ptr: *anyopaque) !void {
     try self.buffer.addLine("╚" ++ "═" ** gm.DISPLAY_COLS ++ "╝");
 }
 
-fn drawUI(ptr: *anyopaque) !void {
+fn drawHorizontalBorder(ptr: *anyopaque) !void {
     var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     try self.buffer.mergeLine("║" ++ "═" ** gm.DISPLAY_COLS ++ "║", gm.DISPLAY_ROWS, 0);
 }

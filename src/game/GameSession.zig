@@ -33,8 +33,9 @@ mode: Mode,
 // stateful modes:
 play_mode: PlayMode,
 explore_mode: ExploreMode,
-/// Id for the next generate entity
-next_entity: gm.Entity = 0,
+/// Generate id for new entities.
+/// The ids should be unique for whole life circle of this session.
+entities_provider: ecs.EntitiesProvider,
 /// Entity of the player
 player: gm.Entity = undefined,
 
@@ -45,15 +46,25 @@ pub fn createNew(game: *gm.Game, seed: u64) !*GameSession {
         .game = game,
         .seed = seed,
         .prng = std.Random.DefaultPrng.init(seed),
+        .entities_provider = .{},
         .mode = .play,
         .play_mode = try PlayMode.init(session),
         .explore_mode = try ExploreMode.init(session),
         .level = undefined,
     };
-    session.player = try session.newEntity();
+    session.player = session.newEntity();
     log.debug("Player entity is {d}", .{session.player});
-    const entrance = try session.newEntity();
-    session.level = try gm.Level.generate(session, 0, entrance, null, .down);
+    const entrance = session.newEntity();
+    session.level = try gm.Level.generate(
+        game.runtime.alloc,
+        seed,
+        session.player,
+        session.entities_provider,
+        0,
+        entrance,
+        null,
+        .down,
+    );
     try session.level.movePlayerToLadder(entrance);
     session.game.render.screen.centeredAround(session.level.playerPosition().point);
     return session;
@@ -66,15 +77,11 @@ pub fn destroy(self: *GameSession) void {
     self.game.runtime.alloc.destroy(self);
 }
 
-// TODO: Load session from file
-
-/// Generates an unique id for the new entity.
-/// The id is unique for whole life circle of this session.
-pub fn newEntity(self: *GameSession) !gm.Entity {
-    const entity = self.next_entity;
-    self.next_entity += 1;
-    return entity;
+inline fn newEntity(self: *GameSession) gm.Entity {
+    return self.entities_provider.newEntity();
 }
+
+// TODO: Load session from file
 
 pub fn play(self: *GameSession, entity_in_focus: ?gm.Entity) !void {
     self.mode = .play;
@@ -115,7 +122,10 @@ pub fn moveToLevel(self: *GameSession, ladder: gm.Ladder) !void {
         .{ @tagName(ladder.direction), self.level.depth, new_depth },
     );
     var new_level = try gm.Level.generate(
-        self,
+        self.game.runtime.alloc,
+        self.seed,
+        self.player,
+        self.entities_provider,
         new_depth,
         this_ladder,
         that_ladder,

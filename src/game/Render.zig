@@ -37,38 +37,38 @@ runtime: gm.AnyRuntime,
 /// Visible area
 screen: gm.Screen,
 
-pub fn init(runtime: gm.AnyRuntime) Render {
+pub fn init(runtime: gm.AnyRuntime, rows: u8, cols: u8) Render {
     return .{
         .runtime = runtime,
-        .screen = gm.Screen.init(gm.DISPLAY_ROWS - 1, gm.DISPLAY_COLS),
+        .screen = gm.Screen.init(rows, cols),
     };
 }
 
 /// Clears the screen and draw all from scratch.
 /// Removes completed animations.
 pub fn redraw(self: Render, session: *gm.GameSession, entity_in_focus: ?gm.Entity) !void {
-    try self.runtime.clearDisplay();
-    try self.runtime.drawUI();
+    try self.clearDisplay();
+    try self.runtime.drawScreenBorder();
+    try self.runtime.drawHorizontalBorder();
     try self.drawScene(session, entity_in_focus);
 }
 
-/// Draws dungeon, sprites, animations, and stats on the screen.
-/// Removes completed animations.
-pub fn drawScene(self: Render, session: *gm.GameSession, entity_in_focus: ?gm.Entity) !void {
+pub inline fn clearDisplay(self: Render) !void {
+    try self.runtime.clearDisplay();
+}
+
+pub inline fn drawDungeon(self: Render, dungeon: *const gm.Dungeon) !void {
     // any runtime can have its own implementation of drawing the dungeon
     // in performance purposes
-    try self.runtime.drawDungeon(&self.screen, session.level.dungeon);
-    try self.drawSprites(session, entity_in_focus);
-    try self.drawAnimationsFrame(session, entity_in_focus);
-    try self.drawStats(session, entity_in_focus);
+    try self.runtime.drawDungeon(&self.screen, dungeon);
 }
 
 /// Draw sprites inside the screen and highlights the sprite of the entity in focus.
-fn drawSprites(self: Render, session: *const gm.GameSession, entity_in_focus: ?gm.Entity) !void {
+pub fn drawSprites(self: Render, level: gm.Level, entity_in_focus: ?gm.Entity) !void {
     var visible = std.PriorityQueue(ZOrderedSprites, void, compareZOrder).init(self.runtime.alloc, {});
     defer visible.deinit();
 
-    var itr = session.level.query().get2(gm.Position, gm.Sprite);
+    var itr = level.query().get2(gm.Position, gm.Sprite);
     while (itr.next()) |tuple| {
         if (self.screen.region.containsPoint(tuple[1].point)) {
             try visible.add(tuple);
@@ -88,6 +88,15 @@ fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order
         return .lt
     else
         return .gt;
+}
+
+/// Draws dungeon, sprites, animations, and stats on the screen.
+/// Removes completed animations.
+pub fn drawScene(self: Render, session: *gm.GameSession, entity_in_focus: ?gm.Entity) !void {
+    try self.drawDungeon(session.level.dungeon);
+    try self.drawSprites(session.level, entity_in_focus);
+    try self.drawAnimationsFrame(session, entity_in_focus);
+    try self.drawStats(session, entity_in_focus);
 }
 
 /// Draws a single frame from every animation.
@@ -179,6 +188,7 @@ pub fn drawQuickActionButton(self: Render, quick_action: ?gm.Action) !void {
 
 pub fn drawWelcomeScreen(self: Render) !void {
     try self.runtime.clearDisplay();
+    try self.runtime.drawScreenBorder();
     const middle = gm.DISPLAY_ROWS / 2 + 1;
     try self.drawText(gm.DISPLAY_COLS, "Welcome", .{ .row = middle - 1, .col = 1 }, .normal, .center);
     try self.drawText(gm.DISPLAY_COLS, "to", .{ .row = middle, .col = 1 }, .normal, .center);
@@ -187,6 +197,7 @@ pub fn drawWelcomeScreen(self: Render) !void {
 
 pub fn drawGameOverScreen(self: Render) !void {
     try self.runtime.clearDisplay();
+    try self.runtime.drawScreenBorder();
     try self.drawText(gm.DISPLAY_COLS, "You are dead", .{ .row = 1 + gm.DISPLAY_ROWS / 2, .col = 1 }, .normal, .center);
 }
 

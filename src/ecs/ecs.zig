@@ -6,6 +6,17 @@ const std = @import("std");
 /// The id of an entity.
 pub const Entity = u32;
 
+pub const EntitiesProvider = struct {
+    next_entity: Entity = 0,
+
+    /// Generates an unique id for the new entity.
+    pub fn newEntity(self: *EntitiesProvider) Entity {
+        const entity = self.next_entity;
+        self.next_entity += 1;
+        return entity;
+    }
+};
+
 /// The container of the components of the type `C`.
 /// The type `C` should have a function `fn deinit(component: *C) void` for invalidation the component.
 ///

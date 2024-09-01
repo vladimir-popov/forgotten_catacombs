@@ -1,6 +1,6 @@
 const std = @import("std");
 const ecs = @import("ecs");
-const game = @import("game");
+const gm = @import("game");
 const tty = @import("tty.zig");
 
 const Logger = @import("Logger.zig");
@@ -19,96 +19,70 @@ pub fn main() !void {
         try std.fmt.parseInt(u64, arg, 10)
     else
         std.crypto.random.int(u64);
-    log.info("The random seed is {d}", .{seed});
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK DETECTED!");
     const alloc = gpa.allocator();
 
-    var runtime = try Runtime.init(alloc, false);
+    var runtime = try Runtime.init(alloc, false, false);
     defer runtime.deinit();
 
-    var generator = try DungeonsGenerator.create(runtime.any());
-    defer generator.destroy();
+    var generator = DungeonsGenerator.init(runtime.any());
+    defer generator.deinit();
 
-    try runtime.run(generator);
+    try generator.generate(seed);
+    try runtime.run(&generator);
 }
 
 const DungeonsGenerator = struct {
-    runtime: game.AnyRuntime,
-    entities: ecs.EntitiesManager,
-    components: ecs.ComponentsManager(game.Components),
-    screen: game.Screen,
-    dungeon: *game.Dungeon,
-    query: ecs.ComponentsQuery(game.Components) = undefined,
+    entities_provider: ecs.EntitiesProvider,
+    runtime: gm.AnyRuntime,
+    render: gm.Render,
+    level: gm.Level,
 
-    pub fn create(runtime: game.AnyRuntime) !*DungeonsGenerator {
-        const self = try runtime.alloc.create(DungeonsGenerator);
-        self.* = .{
+    pub fn init(runtime: gm.AnyRuntime) DungeonsGenerator {
+        return .{
             .runtime = runtime,
-            // The screen to see whole dungeon:
-            .screen = game.Screen.init(
-                game.Dungeon.Region.rows,
-                game.Dungeon.Region.cols,
-                game.Dungeon.Region,
-            ),
-            .entities = undefined,
-            .components = undefined,
-            .dungeon = undefined,
+            .render = gm.Render.init(runtime, gm.WHOLE_DUNG_ROWS, gm.WHOLE_DUNG_COLS),
+            .entities_provider = .{},
+            .level = undefined,
         };
-        self.query = .{ .entities = &self.entities, .components = &self.components };
-        try self.generate(runtime.rand);
-        return self;
     }
 
-    pub fn destroy(self: *DungeonsGenerator) void {
-        self.dungeon.destroy();
-        self.components.deinit();
-        self.entities.deinit();
-        self.screen.deinit();
-        self.runtime.alloc.destroy(self);
+    pub fn deinit(self: *DungeonsGenerator) void {
+        self.level.deinit();
     }
 
-    // we use custom rand here to be able to predict the seed
-    fn generate(self: *DungeonsGenerator, rand: std.Random) !void {
-        self.entities = try ecs.EntitiesManager.init(self.runtime.alloc);
-        self.components = try ecs.ComponentsManager(game.Components).init(self.runtime.alloc);
-        self.dungeon = try game.Dungeon.createRandom(self.runtime.alloc, rand);
-        _ = try game.GameSession.initLevel(self.dungeon, &self.entities, &self.components);
-    }
-
-    fn regenerate(self: *DungeonsGenerator, rand: std.Random) !void {
-        self.dungeon.destroy();
-        self.entities.deinit();
-        self.components.deinit();
-        try self.generate(rand);
+    fn generate(self: *DungeonsGenerator, seed: u64) !void {
+        log.info("\n====================\nGenerate level with seed {d}\n====================\n", .{seed});
+        const entrance = self.entities_provider.newEntity();
+        self.level = try gm.Level.generate(
+            self.runtime.alloc,
+            seed,
+            self.entities_provider.newEntity(),
+            self.entities_provider,
+            0,
+            entrance,
+            null,
+            .down,
+        );
+        try self.level.movePlayerToLadder(entrance);
+        try self.render.clearDisplay();
     }
 
     pub fn tick(self: *DungeonsGenerator) !void {
         try self.handleInput();
-        try self.render();
+        try self.render.drawDungeon(self.level.dungeon);
+        try self.render.drawSprites(self.level, null);
     }
 
     fn handleInput(self: *DungeonsGenerator) anyerror!void {
         const btn = try self.runtime.readPushedButtons() orelse return;
-        if (btn.code & game.Buttons.A > 0) {
-            const seed = self.runtime.rand.int(u64);
-            log.info("The random seed is {d}", .{seed});
-            var rnd = std.Random.DefaultPrng.init(seed);
-            try self.regenerate(rnd.random());
-        }
-    }
-
-    fn render(self: *DungeonsGenerator) anyerror!void {
-        try self.runtime.clearDisplay();
-        try self.runtime.drawDungeon(&self.screen, self.dungeon);
-        var itr = self.query.get2(game.Position, game.Sprite);
-        while (itr.next()) |tuple| {
-            const position = tuple[1];
-            const sprite = tuple[2];
-            if (self.screen.region.containsPoint(position.point)) {
-                try self.runtime.drawSprite(&self.screen, sprite, position, .normal);
-            }
+        if (btn.code & gm.Buttons.A > 0) {
+            const seed = std.crypto.random.int(u64);
+            self.level.deinit();
+            self.entities_provider = .{};
+            try self.generate(seed);
         }
     }
 };

@@ -5,11 +5,11 @@ pub usingnamespace @import("components.zig");
 
 pub const AnyRuntime = @import("AnyRuntime.zig");
 pub const Render = @import("Render.zig");
+pub const Screen = @import("Screen.zig");
 pub const Buttons = @import("Buttons.zig");
 pub const Cheat = @import("cheats.zig").Cheat;
 
 pub const Entity = ecs.Entity;
-pub const Screen = @import("Screen.zig");
 pub const Dungeon = @import("BspDungeon.zig").BspDungeon(WHOLE_DUNG_ROWS, WHOLE_DUNG_COLS);
 // pub const Dungeon = @import("BspDungeon.zig").BspDungeon(DISPLPAY_ROWS, DISPLPAY_COLS);
 pub const Level = @import("Level.zig");
@@ -60,7 +60,7 @@ pub const Game = struct {
     pub fn init(runtime: AnyRuntime, seed: u64) !Game {
         var gm = Game{
             .runtime = runtime,
-            .render = Render.init(runtime),
+            .render = Render.init(runtime, DISPLAY_ROWS - 1, DISPLAY_COLS),
             .seed = seed,
             .state = .welcome,
             .game_session = null,
