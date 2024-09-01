@@ -138,26 +138,25 @@ fn addEntrance(self: *Level, rand: std.Random, this_ladder: gm.Entity, that_ladd
     try self.components.setToEntity(this_ladder, ladder);
     try self.components.setToEntity(this_ladder, gm.Description{ .name = "Ladder up" });
     try self.components.setToEntity(this_ladder, gm.Sprite{ .codepoint = '<', .z_order = 2 });
-    const position = gm.Position{ .point = self.randomEmptyPlace(rand).? };
+    const position = gm.Position{
+        .point = self.randomEmptyPlace(rand, .{ .room = self.dungeon.rooms.items[0] }) orelse
+            std.debug.panic("No empty space in the first room {any}", .{self.dungeon.rooms.items[0]}),
+    };
     try self.components.setToEntity(this_ladder, position);
     std.log.debug("Created entrance {any} at {any}", .{ ladder, position });
 }
 
-fn addExit(self: *Level, _: std.Random, this_ladder: gm.Entity, that_ladder: ?gm.Entity) !void {
+fn addExit(self: *Level, rand: std.Random, this_ladder: gm.Entity, that_ladder: ?gm.Entity) !void {
     try self.entities.append(this_ladder);
     const ladder = gm.Ladder{ .this_ladder = this_ladder, .that_ladder = that_ladder, .direction = .down };
     try self.components.setToEntity(this_ladder, ladder);
     try self.components.setToEntity(this_ladder, gm.Description{ .name = "Ladder down" });
     try self.components.setToEntity(this_ladder, gm.Sprite{ .codepoint = '>', .z_order = 2 });
-    // try self.components.setToEntity(this_ladder, gm.Position{ .point = self.randomEmptyPlace(rand).? });
-    var itr = self.query().get2(gm.Ladder, gm.Position);
-    while (itr.next()) |tuple| {
-        if (tuple[1].direction == .up) {
-            const position = gm.Position{ .point = tuple[2].point.movedTo(.right) };
-            try self.components.setToEntity(this_ladder, position);
-            std.log.debug("Created exit {any} at {any}", .{ ladder, position });
-        }
-    }
+    const position = gm.Position{
+        .point = self.randomEmptyPlace(rand, .{ .room = self.dungeon.rooms.getLast() }) orelse
+            std.debug.panic("No empty space in the last room {any}", .{self.dungeon.rooms.getLast()}),
+    };
+    try self.components.setToEntity(this_ladder, position);
 }
 
 fn addClosedDoor(self: *Level, door_at: p.Point) !void {
@@ -170,7 +169,7 @@ fn addClosedDoor(self: *Level, door_at: p.Point) !void {
 }
 
 fn addRat(self: *Level, rand: std.Random) !void {
-    if (self.randomEmptyPlace(rand)) |position| {
+    if (self.randomEmptyPlace(rand, .anywhere)) |position| {
         const rat = self.newEntity();
         try self.entities.append(rat);
         try self.components.setToEntity(rat, gm.NPC{ .type = .melee });
@@ -183,10 +182,18 @@ fn addRat(self: *Level, rand: std.Random) !void {
     }
 }
 
-fn randomEmptyPlace(self: *Level, rand: std.Random) ?p.Point {
+const PlaceClarification = union(enum) {
+    anywhere,
+    room: p.Region,
+};
+
+fn randomEmptyPlace(self: *Level, rand: std.Random, clarification: PlaceClarification) ?p.Point {
     var attempt: u8 = 10;
     while (attempt > 0) : (attempt -= 1) {
-        const place = self.dungeon.randomPlace(rand);
+        const place = switch (clarification) {
+            .anywhere => self.randomPlace(rand),
+            .room => |room| randomPlaceInRoom(room, rand),
+        };
         var is_empty = true;
         var itr = self.query().get(gm.Position);
         while (itr.next()) |tuple| {
@@ -197,4 +204,21 @@ fn randomEmptyPlace(self: *Level, rand: std.Random) ?p.Point {
         if (is_empty) return place;
     }
     return null;
+}
+
+fn randomPlace(self: *Level, rand: std.Random) p.Point {
+    if (rand.uintLessThan(u8, 5) > 3 and self.dungeon.passages.items.len > 0) {
+        const passage = self.dungeon.passages.items[rand.uintLessThan(usize, self.dungeon.passages.items.len)];
+        return passage.randomPlace(rand);
+    } else {
+        const room = self.dungeon.rooms.items[rand.uintLessThan(usize, self.dungeon.rooms.items.len)];
+        return randomPlaceInRoom(room, rand);
+    }
+}
+
+fn randomPlaceInRoom(room: p.Region, rand: std.Random) p.Point {
+    return .{
+        .row = room.top_left.row + rand.uintLessThan(u8, room.rows - 2) + 1,
+        .col = room.top_left.col + rand.uintLessThan(u8, room.cols - 2) + 1,
+    };
 }

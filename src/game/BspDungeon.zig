@@ -62,6 +62,31 @@ pub const Passage = struct {
         else if (at.row < to.row) .down else .up;
         return try self.turnAt(at, direction);
     }
+
+    pub fn randomPlace(passage: Passage, rand: std.Random) p.Point {
+        const from_idx = rand.uintLessThan(usize, passage.turns.items.len - 1);
+        const from_turn = passage.turns.items[from_idx];
+        const to_turn = passage.turns.items[from_idx + 1];
+        if (from_turn.to_direction == .left or from_turn.to_direction == .right) {
+            return .{
+                .row = from_turn.place.row,
+                .col = rand.intRangeAtMost(
+                    u8,
+                    @min(from_turn.place.col, to_turn.place.col),
+                    @max(from_turn.place.col, to_turn.place.col),
+                ),
+            };
+        } else {
+            return .{
+                .row = rand.intRangeAtMost(
+                    u8,
+                    @min(from_turn.place.row, to_turn.place.row),
+                    @max(from_turn.place.row, to_turn.place.row),
+                ),
+                .col = from_turn.place.col,
+            };
+        }
+    }
 };
 
 pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
@@ -149,47 +174,6 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             _ = try root.foldModify(alloc, createPassages.handler());
 
             return dungeon;
-        }
-
-        pub inline fn randomPlace(self: *Self, rand: std.Random) p.Point {
-            return if (rand.uintLessThan(u8, 5) > 3 and self.passages.items.len > 0)
-                self.randomPlaceInPassage(rand)
-            else
-                self.randomPlaceInRoom(rand);
-        }
-
-        fn randomPlaceInRoom(self: *Self, rand: std.Random) p.Point {
-            const room = self.rooms.items[rand.uintLessThan(usize, self.rooms.items.len)];
-            return .{
-                .row = room.top_left.row + rand.uintLessThan(u8, room.rows - 2) + 1,
-                .col = room.top_left.col + rand.uintLessThan(u8, room.cols - 2) + 1,
-            };
-        }
-
-        fn randomPlaceInPassage(self: *Self, rand: std.Random) p.Point {
-            const passage = self.passages.items[rand.uintLessThan(usize, self.passages.items.len)];
-            const from_idx = rand.uintLessThan(usize, passage.turns.items.len - 1);
-            const from_turn = passage.turns.items[from_idx];
-            const to_turn = passage.turns.items[from_idx + 1];
-            if (from_turn.to_direction == .left or from_turn.to_direction == .right) {
-                return .{
-                    .row = from_turn.place.row,
-                    .col = rand.intRangeAtMost(
-                        u8,
-                        @min(from_turn.place.col, to_turn.place.col),
-                        @max(from_turn.place.col, to_turn.place.col),
-                    ),
-                };
-            } else {
-                return .{
-                    .row = rand.intRangeAtMost(
-                        u8,
-                        @min(from_turn.place.row, to_turn.place.row),
-                        @max(from_turn.place.row, to_turn.place.row),
-                    ),
-                    .col = from_turn.place.col,
-                };
-            }
         }
 
         /// For tests only
