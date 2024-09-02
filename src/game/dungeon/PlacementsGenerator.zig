@@ -1,5 +1,5 @@
-//! Set of methods to modify a dungeon.
-//! These methods are used to create dungeon from scratch.
+//! Set of methods to create in the dungeon passages, rooms, and doors between them.
+//! This module doesn't mark up the dungeon, and doesn't choose places for the rooms.
 const std = @import("std");
 const g = @import("game.zig");
 const p = g.primitives;
@@ -9,7 +9,7 @@ const Room = g.Dungeon.Room;
 const Passage = g.Dungeon.Passage;
 const Cell = g.Dungeon.Cell;
 
-const log = std.log.scoped(.dungeon_generator);
+const log = std.log.scoped(.placements_generator);
 
 const DungeonGenerator = @This();
 
@@ -17,14 +17,6 @@ pub const Error = error{
     NoSpaceForDoor,
     PassageCantBeCreated,
 };
-
-/// The pointer to the initially empty dungeon
-dungeon: *Dungeon,
-
-pub fn generateAndAddRoom(generator: DungeonGenerator, rand: std.Random, region: p.Region) !void {
-    const room = try generator.dungeon.generateSimpleRoom(region, rand, .{});
-    try generator.dungeon.rooms.append(room);
-}
 
 /// Configuration of the simple rooms.
 const SimpleRoomOpts = struct {
@@ -43,6 +35,14 @@ const SimpleRoomOpts = struct {
         return generator.dungeon.min_rows * generator.dungeon.min_cols;
     }
 };
+
+/// The pointer to the initially empty dungeon
+dungeon: *Dungeon,
+
+pub fn generateAndAddRoom(generator: DungeonGenerator, rand: std.Random, region: p.Region) !void {
+    const room = try generator.dungeon.generateSimpleRoom(region, rand, .{});
+    try generator.dungeon.rooms.append(room);
+}
 
 /// Creates floor and walls inside the region with random padding.
 /// Also, the count of rows and columns can be randomly reduced too.
@@ -78,10 +78,7 @@ fn generateSimpleRoom(generator: DungeonGenerator, region: p.Region, rand: std.R
     var scale: f16 = @floatFromInt(1 + rand.uintLessThan(u16, room.area() - opts.minArea()));
     scale = scale / @as(f16, @floatFromInt(room.area()));
     room.scale(@max(opts.min_scale, scale));
-    return generator.dungeon.createSimpleRoom(room);
-}
 
-fn createSimpleRoom(generator: DungeonGenerator, room: p.Region) Room {
     // generate walls:
     for (room.top_left.row..(room.top_left.row + room.rows)) |r| {
         if (r == room.top_left.row or r == room.bottomRightRow()) {
@@ -102,7 +99,7 @@ fn createSimpleRoom(generator: DungeonGenerator, room: p.Region) Room {
     return room;
 }
 
-fn createAndAddPassageBetweenRegions(
+pub fn createAndAddPassageBetweenRegions(
     generator: DungeonGenerator,
     rand: std.Random,
     r1: *const p.Region,
@@ -351,21 +348,19 @@ fn findPlaceForDoor(generator: Dungeon, direction: p.Direction, start: p.Point, 
     return null;
 }
 
-inline fn contains(generator: Dungeon, point: p.Point) bool {
-    return point.row > 0 and point.row <= generator.dungeon.rows and point.col > 0 and point.col <= generator.dungeon.cols;
-}
-
 test "generate a simple room" {
     // given:
     const Rows = 12;
     const Cols = 12;
-    var dungeon = try generateRandom(std.testing.allocator, std.testing.random_seed);
-    defer generator.dungeon.destroy();
-
     const region = p.Region{ .top_left = .{ .row = 2, .col = 2 }, .rows = 8, .cols = 8 };
 
+    var dungeon = try Dungeon.init(std.testing.allocator);
+    defer dungeon.deinit();
+
+    const generator = DungeonGenerator{ .dungeon = &dungeon };
+
     // when:
-    const room = try generateSimpleRoom(dungeon, region, std.crypto.random, .{});
+    const room = try generator.generateSimpleRoom(region, std.crypto.random, .{});
 
     // then:
     try std.testing.expect(region.containsRegion(room));
@@ -400,19 +395,18 @@ test "find a place for door inside the room starting outside" {
         \\ #..#
         \\ ####
     ;
-    var dungeon = try generator.dungeon.parse(std.testing.allocator, str);
-    defer generator.dungeon.destroy();
+    var dungeon = try Dungeon.parse(std.testing.allocator, str);
+    defer dungeon.deinit();
+    const generator = DungeonGenerator{ .dungeon = &dungeon };
     const region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 4, .cols = 5 };
 
     // when:
-    const expected = findPlaceForDoor(
-        dungeon,
+    const expected = generator.findPlaceForDoor(
         .right,
         p.Point{ .row = 2, .col = 1 },
         region,
     );
-    const unexpected = findPlaceForDoor(
-        dungeon,
+    const unexpected = generator.findPlaceForDoor(
         .right,
         p.Point{ .row = 1, .col = 1 },
         region,
@@ -431,17 +425,18 @@ test "find a place for door inside the room starting on the wall" {
         \\ #..#
         \\ ####
     ;
-    var dungeon = try generator.dungeon.parse(std.testing.allocator, str);
-    defer generator.dungeon.destroy();
+    var dungeon = try Dungeon.parse(std.testing.allocator, str);
+    defer dungeon.deinit();
+    const generator = DungeonGenerator{ .dungeon = &dungeon };
     const region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 4, .cols = 5 };
 
     // when:
-    const expected = generator.dungeon.findPlaceForDoor(
+    const expected = generator.findPlaceForDoor(
         .down,
         p.Point{ .row = 1, .col = 3 },
         region,
     );
-    const unexpected = generator.dungeon.findPlaceForDoor(
+    const unexpected = generator.findPlaceForDoor(
         .down,
         p.Point{ .row = 1, .col = 1 },
         region,
@@ -460,12 +455,13 @@ test "find a random place for the door on the left side" {
         \\ ####
     ;
     errdefer std.debug.print("{s}\n", .{str});
-    var dungeon = try generator.dungeon.parse(std.testing.allocator, str);
-    defer generator.dungeon.destroy();
+    var dungeon = try Dungeon.parse(std.testing.allocator, str);
+    defer dungeon.deinit();
+    const generator = DungeonGenerator{ .dungeon = &dungeon };
     const region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 4, .cols = 5 };
 
     // when:
-    const place_left = try findPlaceForDoorInRegionRnd(dungeon, std.crypto.random, &region, .left);
+    const place_left = try generator.findPlaceForDoorInRegionRnd(std.crypto.random, &region, .left);
 
     // then:
     errdefer std.debug.print("place left {any}\n", .{place_left});
@@ -482,12 +478,13 @@ test "find a random place for the door on the bottom side" {
         \\ ####
     ;
     errdefer std.debug.print("{s}\n", .{str});
-    var dungeon = try generator.dungeon.parse(std.testing.allocator, str);
-    defer generator.dungeon.destroy();
+    var dungeon = try Dungeon.parse(std.testing.allocator, str);
+    defer dungeon.deinit();
+    const generator = DungeonGenerator{ .dungeon = &dungeon };
     const region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 4, .cols = 5 };
 
     // when:
-    const place_bottom = try generator.dungeon.findPlaceForDoorInRegionRnd(std.crypto.random, &region, .down);
+    const place_bottom = try generator.findPlaceForDoorInRegionRnd(std.crypto.random, &region, .down);
 
     // then:
     errdefer std.debug.print("place bottom {any}\n", .{place_bottom});
@@ -506,22 +503,19 @@ test "create passage between two rooms" {
         \\ ####   ####
     ;
     errdefer std.debug.print("{s}\n", .{str});
-    const dungeon = try generator.dungeon.parse(std.testing.allocator, str);
-    defer generator.dungeon.destroy();
+    var dungeon = try Dungeon.parse(std.testing.allocator, str);
+    defer dungeon.deinit();
+    const generator = DungeonGenerator{ .dungeon = &dungeon };
     const expected_region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = Rows, .cols = Cols };
     const r1 = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = Rows, .cols = 6 };
     const r2 = p.Region{ .top_left = .{ .row = 1, .col = 7 }, .rows = Rows, .cols = Cols - 6 };
 
     // when:
-    const region = try createAndAddPassageBetweenRegions(dungeon, std.crypto.random, &r1, &r2);
+    const region = try generator.createAndAddPassageBetweenRegions(std.crypto.random, &r1, &r2);
 
     // then:
     try std.testing.expectEqualDeep(expected_region, region);
     const passage: Passage = generator.dungeon.passages.items[0];
     errdefer std.debug.print("Passage: {any}\n", .{passage.turns.items});
     try std.testing.expect(passage.turns.items.len >= 2);
-}
-
-test {
-    std.testing.refAllDecls(@This());
 }

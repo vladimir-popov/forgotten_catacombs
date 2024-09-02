@@ -43,8 +43,8 @@ const TraverseAndCreateRooms = struct {
 
     fn createRoom(ptr: *anyopaque, node: *Tree) anyerror!void {
         if (!node.isLeaf()) return;
-        const dungeon: *TraverseAndCreateRooms = @ptrCast(@alignCast(ptr));
-        try dungeon.dungeon.generateAndAddRoom(dungeon.rand, node.value);
+        const self: *TraverseAndCreateRooms = @ptrCast(@alignCast(ptr));
+        try self.dungeon.generateAndAddRoom(self.rand, node.value);
     }
 };
 
@@ -57,8 +57,8 @@ const CreatePassageBetweenRegions = struct {
     }
 
     fn combine(ptr: *anyopaque, left: *p.Region, right: *p.Region) !p.Region {
-        const dungeon: *CreatePassageBetweenRegions = @ptrCast(@alignCast(ptr));
-        return try dungeon.dungeon.createAndAddPassageBetweenRegions(dungeon.rand, left, right);
+        const self: *CreatePassageBetweenRegions = @ptrCast(@alignCast(ptr));
+        return try self.dungeon.createAndAddPassageBetweenRegions(self.rand, left, right);
     }
 };
 
