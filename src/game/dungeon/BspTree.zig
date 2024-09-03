@@ -2,67 +2,10 @@ const std = @import("std");
 const g = @import("game.zig");
 const p = g.primitives;
 
-const Dungeon = @import("Dungeon.zig");
-const Tree = Node(p.Region);
 
+pub const Node = GenericNode(p.Region);
 
-/// Basic BSP Dungeon generation
-/// https://www.roguebasin.com/index.php?title=Basic_BSP_Dungeon_generation
-pub fn generateDungeon(alloc: std.mem.Allocator, seed: u64) !*Dungeon {
-    var prng = std.Random.DefaultPrng.init(seed);
-    // this arena is used to build a BSP tree, which can be destroyed
-    // right after completing the dungeon.
-    var bsp_arena = std.heap.ArenaAllocator.init(alloc);
-    defer _ = bsp_arena.deinit();
-
-    const dungeon = try alloc.create(Dungeon);
-    dungeon.* = try Dungeon.init(alloc, seed);
-
-    // BSP helps to mark regions for rooms without intersections
-    const root = try buildTree(&bsp_arena, prng.random(), Dungeon.Rows, Dungeon.Cols, .{});
-
-    // visit every BSP node and generate rooms in the leafs
-    var createRooms: TraverseAndCreateRooms = .{ .dungeon = dungeon, .rand = prng.random() };
-    try root.traverse(bsp_arena.allocator(), createRooms.handler());
-
-    // fold the BSP tree and binds nodes with the same parent:
-    var createPassages: CreatePassageBetweenRegions = .{ .dungeon = dungeon, .rand = prng.random() };
-    _ = try root.foldModify(alloc, createPassages.handler());
-
-    return dungeon;
-}
-
-
-const TraverseAndCreateRooms = struct {
-    dungeon: *Dungeon,
-    rand: std.Random,
-
-    fn handler(dungeon: *TraverseAndCreateRooms) Tree.TraverseHandler {
-        return .{ .ptr = dungeon, .handle = TraverseAndCreateRooms.createRoom };
-    }
-
-    fn createRoom(ptr: *anyopaque, node: *Tree) anyerror!void {
-        if (!node.isLeaf()) return;
-        const self: *TraverseAndCreateRooms = @ptrCast(@alignCast(ptr));
-        try self.dungeon.generateAndAddRoom(self.rand, node.value);
-    }
-};
-
-const CreatePassageBetweenRegions = struct {
-    dungeon: *Dungeon,
-    rand: std.Random,
-
-    fn handler(dungeon: *CreatePassageBetweenRegions) Tree.FoldHandler {
-        return .{ .ptr = dungeon, .combine = combine };
-    }
-
-    fn combine(ptr: *anyopaque, left: *p.Region, right: *p.Region) !p.Region {
-        const self: *CreatePassageBetweenRegions = @ptrCast(@alignCast(ptr));
-        return try self.dungeon.createAndAddPassageBetweenRegions(self.rand, left, right);
-    }
-};
-
-const MinRegionSettings = struct {
+pub const MinRegionSettings = struct {
     min_rows: u8 = 10,
     min_cols: u8 = 24,
     /// rows / cols ratio:
@@ -89,18 +32,18 @@ const MinRegionSettings = struct {
 /// node contains regions of its children.
 ///
 /// To free memory with returned graph, the arena should be freed.
-fn buildTree(
+fn build(
     arena: *std.heap.ArenaAllocator,
     rand: std.Random,
     rows: u8,
     cols: u8,
     opts: MinRegionSettings,
-) !*Tree {
+) !*Node {
     const region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = rows, .cols = cols };
     opts.validateRegion(region);
 
     var splitter = Splitter{ .rand = rand, .opts = opts };
-    var root: *Tree = try Tree.root(arena, region);
+    var root: *Node = try Node.root(arena, region);
     try root.split(arena, splitter.handler());
 
     return root;
@@ -110,11 +53,11 @@ const Splitter = struct {
     rand: std.Random,
     opts: MinRegionSettings,
 
-    fn handler(self: *Splitter) Tree.SplitHandler {
+    fn handler(self: *Splitter) Node.SplitHandler {
         return .{ .ptr = self, .split = split };
     }
 
-    fn split(ptr: *anyopaque, node: *Tree) anyerror!?struct { p.Region, p.Region } {
+    fn split(ptr: *anyopaque, node: *GenericNode(p.Region)) anyerror!?struct { p.Region, p.Region } {
         const self: *Splitter = @ptrCast(@alignCast(ptr));
         const region: p.Region = node.value;
 
@@ -145,7 +88,7 @@ const Splitter = struct {
 };
 
 /// The Node of the Tree.
-fn Node(comptime V: type) type {
+fn GenericNode(comptime V: type) type {
     return struct {
         const NodeV = @This();
 
@@ -158,7 +101,7 @@ fn Node(comptime V: type) type {
         pub fn root(
             arena: *std.heap.ArenaAllocator,
             value: V,
-        ) !*Node(V) {
+        ) !*GenericNode(V) {
             const node = try arena.allocator().create(NodeV);
             node.* = .{ .value = value };
             return node;
@@ -337,7 +280,7 @@ test "build tree" {
     const opts: MinRegionSettings = .{ .min_rows = 2, .min_cols = 2 };
 
     // when:
-    const root = try buildTree(&arena, rand.random(), 9, 7, opts);
+    const root = try build(&arena, rand.random(), 9, 7, opts);
 
     // then:
     var validate = ValidateNodes{ .opts = opts };
@@ -349,11 +292,11 @@ const ValidateNodes = struct {
     opts: MinRegionSettings,
     min_ratio: f16 = 0.2,
 
-    fn bspNodeHandler(self: *ValidateNodes) Tree.TraverseHandler {
+    fn bspNodeHandler(self: *ValidateNodes) Node.TraverseHandler {
         return .{ .ptr = self, .handle = validate };
     }
 
-    fn validate(ptr: *anyopaque, node: *Tree) anyerror!void {
+    fn validate(ptr: *anyopaque, node: *Node) anyerror!void {
         const self: *ValidateNodes = @ptrCast(@alignCast(ptr));
 
         try self.validateNode("root", null, node);
@@ -368,8 +311,8 @@ const ValidateNodes = struct {
     fn validateNode(
         self: *ValidateNodes,
         name: []const u8,
-        root: ?*Tree,
-        node: *Tree,
+        root: ?*Node,
+        node: *Node,
     ) !void {
         if (root) |rt| {
             std.testing.expect(rt.value.containsRegion(node.value)) catch |err| {
@@ -414,9 +357,9 @@ test "split/fold" {
     defer _ = arena.reset(.free_all);
     const alloc = arena.allocator();
 
-    const divider = Node(u8).SplitHandler{ .ptr = undefined, .split = divide };
-    const summator = Node(u8).FoldHandler{ .ptr = undefined, .combine = sum };
-    var tree = try Node(u8).root(&arena, 8, compareU8);
+    const divider = GenericNode(u8).SplitHandler{ .ptr = undefined, .split = divide };
+    const summator = GenericNode(u8).FoldHandler{ .ptr = undefined, .combine = sum };
+    var tree = try GenericNode(u8).root(&arena, 8, compareU8);
 
     // when:
     try tree.split(&arena, divider);
@@ -434,11 +377,11 @@ test "add/traverse" {
         actual_values: []u8,
         idx: u8,
 
-        fn handler(self: *Self) Node(u8).TraverseHandler {
+        fn handler(self: *Self) GenericNode(u8).TraverseHandler {
             return .{ .ptr = self, .handle = accumulate_actual };
         }
 
-        fn accumulate_actual(ptr: *anyopaque, node: *Node(u8)) !void {
+        fn accumulate_actual(ptr: *anyopaque, node: *GenericNode(u8)) !void {
             const self: *Self = @ptrCast(@alignCast(ptr));
             // then:
             self.actual_values[self.idx] = node.value;
@@ -451,7 +394,7 @@ test "add/traverse" {
     //          3
     //      1       5
     //        2   4   6
-    var tree = try Node(u8).root(&arena, 3, compareU8);
+    var tree = try GenericNode(u8).root(&arena, 3, compareU8);
     try tree.add(&arena, 1);
     try tree.add(&arena, 2);
     try tree.add(&arena, 5);
@@ -485,7 +428,7 @@ fn compareU8(x: u8, y: u8) bool {
     return x < y;
 }
 
-fn divide(_: *anyopaque, node: *Node(u8)) anyerror!?struct { u8, u8 } {
+fn divide(_: *anyopaque, node: *GenericNode(u8)) anyerror!?struct { u8, u8 } {
     const half: u8 = node.value / 2;
     return if (half > 0) .{ half, half } else null;
 }

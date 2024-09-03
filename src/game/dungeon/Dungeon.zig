@@ -64,7 +64,7 @@ pub fn deinit(self: *Dungeon) void {
 }
 
 pub inline fn containsPlace(self: Dungeon, place: p.Point) bool {
-    return self.Region.containsPoint(place);
+    return self.REGION.containsPoint(place);
 }
 
 pub inline fn cellAt(self: Dungeon, place: p.Point) ?Cell {
@@ -145,61 +145,4 @@ pub fn parse(alloc: std.mem.Allocator, str: []const u8) !Dungeon {
     try dungeon.floor.parse('.', str);
     try dungeon.walls.parse('#', str);
     return dungeon;
-}
-
-/// Removes doors, floor and walls on the passed place.
-pub fn cleanAt(dungeon: *Dungeon, place: p.Point) void {
-    if (!dungeon.containsPlace(place)) {
-        return;
-    }
-    dungeon.floor.unsetAt(place);
-    dungeon.walls.unsetAt(place);
-    _ = dungeon.doors.remove(place);
-}
-
-/// Removes doors, floor and walls on the passed place, and create a new door.
-pub fn forceCreateFloorAt(dungeon: *Dungeon, place: p.Point) !void {
-    if (!dungeon.containsPlace(place)) {
-        return;
-    }
-    dungeon.cleanAt(place);
-    dungeon.floor.setAt(place);
-}
-
-/// Removes doors, floor and walls on the passed place, and create a new wall.
-pub fn forceCreateWallAt(dungeon: *Dungeon, place: p.Point) !void {
-    if (!dungeon.containsPlace(place)) {
-        return;
-    }
-    dungeon.cleanAt(place);
-    dungeon.walls.setAt(place);
-}
-
-/// Removes doors, floor and walls on the passed place, and create a cell with floor.
-pub fn forceCreateDoorAt(dungeon: *Dungeon, place: p.Point) !void {
-    if (!dungeon.containsPlace(place)) {
-        return;
-    }
-    dungeon.cleanAt(place);
-    try dungeon.doors.put(place, {});
-}
-
-/// Creates the cell with wall only if nothing exists on the passed place.
-fn createWallAt(dungeon: *Dungeon, place: p.Point) void {
-    if (!dungeon.containsPlace(place)) {
-        return;
-    }
-    if (dungeon.isCellAt(place, .nothing)) {
-        dungeon.walls.setAt(place);
-    }
-}
-
-/// Creates the cell with floor only if nothing exists on the passed place.
-pub fn createFloorAt(dungeon: *Dungeon, place: p.Point) void {
-    if (!dungeon.containsPlace(place)) {
-        return;
-    }
-    if (dungeon.isCellAt(place, .nothing)) {
-        dungeon.floor.setAt(place);
-    }
 }
