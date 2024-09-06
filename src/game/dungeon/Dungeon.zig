@@ -1,5 +1,5 @@
 const std = @import("std");
-const g = @import("game.zig");
+const g = @import("../game_pkg.zig");
 const p = g.primitives;
 
 pub const Passage = @import("Passage.zig");
@@ -22,7 +22,6 @@ pub const REGION: p.Region = .{
     .cols = COLS,
 };
 
-
 const BitMap = p.BitMap(ROWS, COLS);
 
 const Dungeon = @This();
@@ -43,7 +42,6 @@ walls: BitMap,
 /// Creates an empty dungeon.
 pub fn init(alloc: std.mem.Allocator) !Dungeon {
     return .{
-        .alloc = alloc,
         .floor = try BitMap.initEmpty(alloc),
         .walls = try BitMap.initEmpty(alloc),
         .doors = std.AutoHashMap(p.Point, void).init(alloc),
@@ -63,8 +61,8 @@ pub fn deinit(self: *Dungeon) void {
     self.rooms.deinit();
 }
 
-pub inline fn containsPlace(self: Dungeon, place: p.Point) bool {
-    return self.REGION.containsPoint(place);
+pub inline fn containsPlace(_: Dungeon, place: p.Point) bool {
+    return REGION.containsPoint(place);
 }
 
 pub inline fn cellAt(self: Dungeon, place: p.Point) ?Cell {
@@ -113,7 +111,7 @@ pub const CellsIterator = struct {
     }
 };
 
-pub fn cellsInRegion(self: Dungeon, region: p.Region) ?CellsIterator {
+pub fn cellsInRegion(self: *const Dungeon, region: p.Region) ?CellsIterator {
     if (REGION.intersect(region)) |reg| {
         return .{
             .dungeon = self,
@@ -141,7 +139,7 @@ pub fn parse(alloc: std.mem.Allocator, str: []const u8) !Dungeon {
     if (!@import("builtin").is_test) {
         @compileError("The function `parse` is for test purpose only");
     }
-    const dungeon = try Dungeon.init(alloc);
+    var dungeon = try Dungeon.init(alloc);
     try dungeon.floor.parse('.', str);
     try dungeon.walls.parse('#', str);
     return dungeon;

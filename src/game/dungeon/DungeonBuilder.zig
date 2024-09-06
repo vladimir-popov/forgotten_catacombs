@@ -1,7 +1,7 @@
 //! Set of methods to create passages, rooms, and doors between them in the dungeon.
 //! This module doesn't mark up the dungeon, and doesn't choose places for the rooms.
 const std = @import("std");
-const g = @import("game.zig");
+const g = @import("../game_pkg.zig");
 const p = g.primitives;
 const rooms = @import("rooms.zig");
 
@@ -22,25 +22,30 @@ pub const Error = error{
 /// The pointer to the initially empty dungeon
 dungeon: *Dungeon,
 
-pub fn generateAndAddRoom(self: DungeonBuilder, _: std.Random, region: p.Region) !void {
-    const room = try rooms.createEmptyRoom(self.dungeon, region);
+pub fn generateAndAddRoom(self: DungeonBuilder, rand: std.Random, region: p.Region) !void {
+    const room = try rooms.createRoom(self, rand, region);
     try self.dungeon.rooms.append(room);
 }
 
 pub fn createAndAddPassageBetweenRegions(
     self: DungeonBuilder,
+    // alloc is used here to run recursions on the heap
+    alloc: std.mem.Allocator,
     rand: std.Random,
     r1: p.Region,
     r2: p.Region,
 ) !p.Region {
+    var stack_arena = std.heap.ArenaAllocator.init(alloc);
+    defer _ = stack_arena.deinit();
+
     const direction: p.Direction = if (r1.top_left.row == r2.top_left.row) .right else .down;
-    const door1 = try self.dungeon.findPlaceForDoorInRegionRnd(rand, r1, direction) orelse
+    const door1 = try self.findPlaceForDoorInRegionRnd(&stack_arena, rand, r1, direction) orelse
         return Error.NoSpaceForDoor;
-    const door2 = try self.dungeon.findPlaceForDoorInRegionRnd(rand, r2, direction.opposite()) orelse
+    const door2 = try self.findPlaceForDoorInRegionRnd(&stack_arena, rand, r2, direction.opposite()) orelse
         return Error.NoSpaceForDoor;
 
     const passage = try self.dungeon.passages.addOne();
-    passage.turns = std.ArrayList(Passage.Turn).init(self.dungeon.alloc);
+    passage.turns = std.ArrayList(Passage.Turn).init(alloc);
     _ = try passage.turnAt(door1, direction);
     if (door1.row != door2.row and door1.col != door2.col) {
         // intersection of the passage from the door 1 and region 1
@@ -60,7 +65,8 @@ pub fn createAndAddPassageBetweenRegions(
             .{ .row = r1.bottomRightRow(), .col = door2.col };
 
         // try to find better places for turn:
-        if (try self.dungeon.findPlaceForPassageTurn(door1, door2, direction == .left or direction == .right, 0)) |places| {
+        const is_horizontal: bool = direction == .left or direction == .right;
+        if (try self.findPlaceForPassageTurn(&stack_arena, door1, door2, is_horizontal, 0)) |places| {
             middle1 = places[0];
             middle2 = places[1];
         }
@@ -71,9 +77,9 @@ pub fn createAndAddPassageBetweenRegions(
     }
     _ = try passage.turnAt(door2, direction);
 
-    try self.dungeon.digPassage(passage);
-    try self.dungeon.forceCreateDoorAt(door1);
-    try self.dungeon.forceCreateDoorAt(door2);
+    try self.digPassage(passage);
+    try self.forceCreateDoorAt(door1);
+    try self.forceCreateDoorAt(door2);
 
     return r1.unionWith(r2);
 }
@@ -93,7 +99,7 @@ pub fn forceCreateFloorAt(self: DungeonBuilder, place: p.Point) !void {
     if (!self.dungeon.containsPlace(place)) {
         return;
     }
-    self.dungeon.cleanAt(place);
+    self.cleanAt(place);
     self.dungeon.floor.setAt(place);
 }
 
@@ -111,7 +117,7 @@ pub fn forceCreateDoorAt(self: DungeonBuilder, place: p.Point) !void {
     if (!self.dungeon.containsPlace(place)) {
         return;
     }
-    self.dungeon.cleanAt(place);
+    self.cleanAt(place);
     try self.dungeon.doors.put(place, {});
 }
 
@@ -139,14 +145,14 @@ pub fn createFloorAt(self: DungeonBuilder, place: p.Point) void {
 /// Gives up after N attempts to prevent long search.
 fn findPlaceForPassageTurn(
     self: DungeonBuilder,
+    stack_arena: *std.heap.ArenaAllocator,
     init_from: p.Point,
     init_to: p.Point,
     is_horizontal: bool,
     attempt: u8,
 ) !?struct { p.Point, p.Point } {
     var current_attempt = attempt;
-    var stack = std.ArrayList(struct { p.Point, p.Point }).init(self.dungeon.alloc);
-    defer stack.deinit();
+    var stack = std.ArrayList(struct { p.Point, p.Point }).init(stack_arena.allocator());
     try stack.append(.{ init_from, init_to });
     var middle1: p.Point = undefined;
     var middle2: p.Point = undefined;
@@ -170,7 +176,7 @@ fn findPlaceForPassageTurn(
                 middle2.row = middle1.row;
                 middle2.col = to.col;
             }
-            if (self.dungeon.isFreeLine(middle1, middle2)) {
+            if (self.isFreeLine(middle1, middle2)) {
                 return .{ middle1, middle2 };
             }
             current_attempt += 1;
@@ -205,19 +211,19 @@ fn isFreeLine(self: DungeonBuilder, from: p.Point, to: p.Point) bool {
 fn digPassage(self: DungeonBuilder, passage: *const Passage) !void {
     var prev: Passage.Turn = passage.turns.items[0];
     for (passage.turns.items[1 .. passage.turns.items.len - 1]) |turn| {
-        try self.dungeon.dig(prev.place, turn.place, prev.to_direction);
-        try self.dungeon.digTurn(turn.place, prev.to_direction, turn.to_direction);
+        try self.dig(prev.place, turn.place, prev.to_direction);
+        try self.digTurn(turn.place, prev.to_direction, turn.to_direction);
         prev = turn;
     }
-    try self.dungeon.dig(prev.place, passage.turns.getLast().place, prev.to_direction);
+    try self.dig(prev.place, passage.turns.getLast().place, prev.to_direction);
 }
 
 fn dig(self: DungeonBuilder, from: p.Point, to: p.Point, direction: p.Direction) !void {
     var point = from;
     while (true) {
-        self.dungeon.createWallAt(point.movedTo(direction.rotatedClockwise(false)));
-        self.dungeon.createWallAt(point.movedTo(direction.rotatedClockwise(true)));
-        self.dungeon.createFloorAt(point);
+        self.createWallAt(point.movedTo(direction.rotatedClockwise(false)));
+        self.createWallAt(point.movedTo(direction.rotatedClockwise(true)));
+        self.createFloorAt(point);
         if (std.meta.eql(point, to))
             break;
         point.move(direction);
@@ -229,23 +235,23 @@ fn digTurn(self: DungeonBuilder, at: p.Point, from: p.Direction, to: p.Direction
     const reg: p.Region = .{ .top_left = at.movedTo(.up).movedTo(.left), .rows = 3, .cols = 3 };
     var itr = reg.cells();
     while (itr.next()) |cl| {
-        self.dungeon.createWallAt(cl);
+        self.createWallAt(cl);
     }
     // create the floor in the turn
-    try self.dungeon.forceCreateFloorAt(at);
-    try self.dungeon.forceCreateFloorAt(at.movedTo(from.opposite()));
-    try self.dungeon.forceCreateFloorAt(at.movedTo(to));
+    try self.forceCreateFloorAt(at);
+    try self.forceCreateFloorAt(at.movedTo(from.opposite()));
+    try self.forceCreateFloorAt(at.movedTo(to));
 }
 
 fn findPlaceForDoorInRegionRnd(
     self: DungeonBuilder,
+    stack_arena: *std.heap.ArenaAllocator,
     rand: std.Random,
-    init_region: *const p.Region,
+    init_region: p.Region,
     side: p.Direction,
 ) !?p.Point {
-    var stack = std.ArrayList(p.Region).init(self.dungeon.alloc);
-    defer stack.deinit();
-    try stack.append(init_region.*);
+    var stack = std.ArrayList(p.Region).init(stack_arena.allocator());
+    try stack.append(init_region);
     while (stack.popOrNull()) |region| {
         const place = switch (side) {
             .up => p.Point{
@@ -265,7 +271,7 @@ fn findPlaceForDoorInRegionRnd(
                 .col = region.bottomRightCol(),
             },
         };
-        if (self.dungeon.findPlaceForDoor(side.opposite(), place, region)) |candidate| {
+        if (self.findPlaceForDoor(side.opposite(), place, region)) |candidate| {
             if (self.dungeon.cellAt(candidate)) |cl| {
                 switch (cl) {
                     .wall => {
@@ -331,45 +337,6 @@ fn findPlaceForDoor(self: DungeonBuilder, direction: p.Direction, start: p.Point
         place.move(direction);
     }
     return null;
-}
-
-test "generate a simple room" {
-    // given:
-    const Rows = 12;
-    const Cols = 12;
-    const region = p.Region{ .top_left = .{ .row = 2, .col = 2 }, .rows = 8, .cols = 8 };
-
-    var dungeon = try Dungeon.init(std.testing.allocator);
-    defer dungeon.deinit();
-
-    const self = DungeonBuilder{ .dungeon = &dungeon };
-
-    // when:
-    const room = try self.generateSimpleRoom(region, std.crypto.random, .{});
-
-    // then:
-    try std.testing.expect(region.containsRegion(room));
-    for (0..Rows) |r_idx| {
-        const r: u8 = @intCast(r_idx + 1);
-        for (0..Cols) |c_idx| {
-            const c: u8 = @intCast(c_idx + 1);
-            errdefer std.debug.print("r:{d} c:{d}\n", .{ r, c });
-
-            const cell = self.dungeon.cellAt(.{ .row = r, .col = c });
-            if (room.containsPoint(.{ .row = r, .col = c })) {
-                const expect_wall =
-                    (r == room.top_left.row or r == room.bottomRightRow() or
-                    c == room.top_left.col or c == room.bottomRightCol());
-                if (expect_wall) {
-                    try std.testing.expectEqual(.wall, cell);
-                } else {
-                    try std.testing.expectEqual(.floor, cell);
-                }
-            } else {
-                try std.testing.expectEqual(.nothing, cell);
-            }
-        }
-    }
 }
 
 test "find a place for door inside the room starting outside" {
@@ -440,13 +407,17 @@ test "find a random place for the door on the left side" {
         \\ ####
     ;
     errdefer std.debug.print("{s}\n", .{str});
+
+    var stack_arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer stack_arena.deinit();
+
     var dungeon = try Dungeon.parse(std.testing.allocator, str);
     defer dungeon.deinit();
     const self = DungeonBuilder{ .dungeon = &dungeon };
     const region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 4, .cols = 5 };
 
     // when:
-    const place_left = try self.findPlaceForDoorInRegionRnd(std.crypto.random, &region, .left);
+    const place_left = try self.findPlaceForDoorInRegionRnd(&stack_arena, std.crypto.random, region, .left);
 
     // then:
     errdefer std.debug.print("place left {any}\n", .{place_left});
@@ -463,13 +434,17 @@ test "find a random place for the door on the bottom side" {
         \\ ####
     ;
     errdefer std.debug.print("{s}\n", .{str});
+
+    var stack_arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer stack_arena.deinit();
+
     var dungeon = try Dungeon.parse(std.testing.allocator, str);
     defer dungeon.deinit();
     const self = DungeonBuilder{ .dungeon = &dungeon };
     const region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 4, .cols = 5 };
 
     // when:
-    const place_bottom = try self.findPlaceForDoorInRegionRnd(std.crypto.random, &region, .down);
+    const place_bottom = try self.findPlaceForDoorInRegionRnd(&stack_arena, std.crypto.random, region, .down);
 
     // then:
     errdefer std.debug.print("place bottom {any}\n", .{place_bottom});
@@ -496,7 +471,7 @@ test "create passage between two rooms" {
     const r2 = p.Region{ .top_left = .{ .row = 1, .col = 7 }, .rows = Rows, .cols = Cols - 6 };
 
     // when:
-    const region = try self.createAndAddPassageBetweenRegions(std.crypto.random, &r1, &r2);
+    const region = try self.createAndAddPassageBetweenRegions(std.testing.allocator, std.crypto.random, r1, r2);
 
     // then:
     try std.testing.expectEqualDeep(expected_region, region);

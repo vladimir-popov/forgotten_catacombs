@@ -1,7 +1,6 @@
 const std = @import("std");
-const g = @import("game.zig");
+const g = @import("../game_pkg.zig");
 const p = g.primitives;
-
 
 pub const Node = GenericNode(p.Region);
 
@@ -32,7 +31,7 @@ pub const MinRegionSettings = struct {
 /// node contains regions of its children.
 ///
 /// To free memory with returned graph, the arena should be freed.
-fn build(
+pub fn build(
     arena: *std.heap.ArenaAllocator,
     rand: std.Random,
     rows: u8,
@@ -143,13 +142,11 @@ fn GenericNode(comptime V: type) type {
                     node.left = try arena.allocator().create(NodeV);
                     node.left.?.* = NodeV{
                         .parent = node,
-                        .lessThan = node.lessThan,
                         .value = values[0],
                     };
                     node.right = try arena.allocator().create(NodeV);
                     node.right.?.* = NodeV{
                         .parent = node,
-                        .lessThan = node.lessThan,
                         .value = values[1],
                     };
 
@@ -240,7 +237,7 @@ fn GenericNode(comptime V: type) type {
                 } else {
                     _ = stack.pop();
                     stack_prev_size = if (stack.items.len > 1) stack.items.len - 2 else 0;
-                    nodes[0].parent.?.value = try handler.combine(handler.ptr, &nodes[0].value, &nodes[1].value);
+                    nodes[0].parent.?.value = try handler.combine(handler.ptr, nodes[0].value, nodes[1].value);
                     nodes[0].parent.?.left = null;
                     nodes[0].parent.?.right = null;
                 }
@@ -267,7 +264,7 @@ fn GenericNode(comptime V: type) type {
             /// ptr - pointer to the context of the handler
             /// left_value - the value of the left node
             /// right_value - the value of the right node
-            combine: *const fn (ptr: *anyopaque, left: *V, right: *V) anyerror!V,
+            combine: *const fn (ptr: *anyopaque, left: V, right: V) anyerror!V,
         };
     };
 }

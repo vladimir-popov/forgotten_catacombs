@@ -1,8 +1,7 @@
 const std = @import("std");
-const algs_and_types = @import("algs_and_types");
-const p = algs_and_types.primitives;
-const gm = @import("game.zig");
-const dung = @import("BspDungeon.zig");
+const g = @import("game_pkg.zig");
+const c = g.components;
+const p = g.primitives;
 
 // coz zig uses u21 for utf8 symbols
 pub const Codepoint = u21;
@@ -43,7 +42,7 @@ pub const Animation = struct {
     pub fn frame(self: *Animation, now: c_uint) ?Codepoint {
         self.lag += now - self.previous_render_time;
         self.previous_render_time = now;
-        if (self.lag > gm.RENDER_DELAY_MS) {
+        if (self.lag > g.RENDER_DELAY_MS) {
             self.lag = 0;
             self.current_frame += 1;
         }
@@ -65,9 +64,9 @@ pub const Ladder = struct {
     /// Direction of the ladder
     direction: Direction,
     /// The id of the ladder on this level.
-    this_ladder: gm.Entity,
+    this_ladder: g.Entity,
     /// The id of the ladder on that level.
-    that_ladder: ?gm.Entity,
+    that_ladder: ?g.Entity,
     pub fn deinit(_: *@This()) void {}
 };
 
@@ -84,13 +83,13 @@ pub const Action = struct {
         /// An entity is going to move in the direction
         move: Move,
         /// An entity is going to open a door
-        open: gm.Entity,
+        open: g.Entity,
         /// An entity is going to close a door
-        close: gm.Entity,
+        close: g.Entity,
         /// An entity which should be hit
-        hit: gm.Entity,
+        hit: g.Entity,
         /// An entity is going to take the item
-        take: gm.Entity,
+        take: g.Entity,
         /// The player moves from the level to another level
         move_to_level: Ladder,
     };
@@ -106,13 +105,13 @@ pub const Action = struct {
 pub const Collision = struct {
     pub const Obstacle = union(enum) {
         wall,
-        door: struct { entity: gm.Entity, state: gm.Door },
-        item: gm.Entity,
-        enemy: gm.Entity,
+        door: struct { entity: g.Entity, state: c.Door },
+        item: g.Entity,
+        enemy: g.Entity,
     };
 
     /// Who met obstacle
-    entity: gm.Entity,
+    entity: g.Entity,
     /// With what exactly collision happened
     obstacle: Obstacle,
     /// Where the collision happened

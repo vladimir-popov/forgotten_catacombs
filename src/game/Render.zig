@@ -19,34 +19,34 @@
 ///   | Zone 0 |        Zone 1       | Zone 2 |
 ///   |             Stats            | Button |
 const std = @import("std");
-const algs_and_types = @import("algs_and_types");
-const p = algs_and_types.primitives;
-const gm = @import("game.zig");
+const g = @import("game_pkg.zig");
+const c = g.components;
+const p = g.primitives;
 
 const OUT_ZONE_LENGTH = 8;
-const MIDDLE_ZONE_LENGTH = gm.DISPLAY_COLS - (OUT_ZONE_LENGTH + 1) * 2;
+const MIDDLE_ZONE_LENGTH = g.DISPLAY_COLS - (OUT_ZONE_LENGTH + 1) * 2;
 
 const log = std.log.scoped(.render);
 
 const Render = @This();
 
-const DrawingMode = gm.AnyRuntime.DrawingMode;
+const DrawingMode = g.AnyRuntime.DrawingMode;
 const TextAlign = enum { center, left, right };
 
-runtime: gm.AnyRuntime,
+runtime: g.AnyRuntime,
 /// Visible area
-screen: gm.Screen,
+screen: g.Screen,
 
-pub fn init(runtime: gm.AnyRuntime, rows: u8, cols: u8) Render {
+pub fn init(runtime: g.AnyRuntime, rows: u8, cols: u8) Render {
     return .{
         .runtime = runtime,
-        .screen = gm.Screen.init(rows, cols),
+        .screen = g.Screen.init(rows, cols),
     };
 }
 
 /// Clears the screen and draw all from scratch.
 /// Removes completed animations.
-pub fn redraw(self: Render, session: *gm.GameSession, entity_in_focus: ?gm.Entity) !void {
+pub fn redraw(self: Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
     try self.clearDisplay();
     try self.runtime.drawScreenBorder();
     try self.runtime.drawHorizontalBorder();
@@ -57,32 +57,32 @@ pub inline fn clearDisplay(self: Render) !void {
     try self.runtime.clearDisplay();
 }
 
-pub inline fn drawDungeon(self: Render, dungeon: *const gm.Dungeon) !void {
+pub inline fn drawDungeon(self: Render, dungeon: g.Dungeon) !void {
     // any runtime can have its own implementation of drawing the dungeon
     // in performance purposes
-    try self.runtime.drawDungeon(&self.screen, dungeon);
+    try self.runtime.drawDungeon(self.screen, dungeon);
 }
 
 /// Draw sprites inside the screen and highlights the sprite of the entity in focus.
-pub fn drawSprites(self: Render, level: gm.Level, entity_in_focus: ?gm.Entity) !void {
+pub fn drawSprites(self: Render, level: g.Level, entity_in_focus: ?g.Entity) !void {
     var visible = std.PriorityQueue(ZOrderedSprites, void, compareZOrder).init(self.runtime.alloc, {});
     defer visible.deinit();
 
-    var itr = level.query().get2(gm.Position, gm.Sprite);
+    var itr = level.query().get2(c.Position, c.Sprite);
     while (itr.next()) |tuple| {
         if (self.screen.region.containsPoint(tuple[1].point)) {
             try visible.add(tuple);
         }
     }
     while (visible.removeOrNull()) |tuple| {
-        const mode: gm.AnyRuntime.DrawingMode = if (entity_in_focus == tuple[0])
+        const mode: g.AnyRuntime.DrawingMode = if (entity_in_focus == tuple[0])
             .inverted
         else
             .normal;
-        try self.runtime.drawSprite(&self.screen, tuple[2], tuple[1], mode);
+        try self.runtime.drawSprite(self.screen, tuple[2], tuple[1], mode);
     }
 }
-const ZOrderedSprites = struct { gm.Entity, *gm.Position, *gm.Sprite };
+const ZOrderedSprites = struct { g.Entity, *c.Position, *c.Sprite };
 fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order {
     if (a[2].z_order < b[2].z_order)
         return .lt
@@ -92,7 +92,7 @@ fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order
 
 /// Draws dungeon, sprites, animations, and stats on the screen.
 /// Removes completed animations.
-pub fn drawScene(self: Render, session: *gm.GameSession, entity_in_focus: ?gm.Entity) !void {
+pub fn drawScene(self: Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
     try self.drawDungeon(session.level.dungeon);
     try self.drawSprites(session.level, entity_in_focus);
     try self.drawAnimationsFrame(session, entity_in_focus);
@@ -101,9 +101,9 @@ pub fn drawScene(self: Render, session: *gm.GameSession, entity_in_focus: ?gm.En
 
 /// Draws a single frame from every animation.
 /// Removes the animation if the last frame was drawn.
-pub fn drawAnimationsFrame(self: Render, session: *gm.GameSession, entity_in_focus: ?gm.Entity) !void {
+pub fn drawAnimationsFrame(self: Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
     const now: c_uint = self.runtime.currentMillis();
-    var itr = session.level.query().get2(gm.Position, gm.Animation);
+    var itr = session.level.query().get2(c.Position, c.Animation);
     while (itr.next()) |components| {
         const position = components[1];
         const animation = components[2];
@@ -114,24 +114,24 @@ pub fn drawAnimationsFrame(self: Render, session: *gm.GameSession, entity_in_foc
                 else
                     .normal;
                 try self.runtime.drawSprite(
-                    &self.screen,
+                    self.screen,
                     &.{ .codepoint = frame },
                     position,
                     mode,
                 );
             }
         } else {
-            try session.level.components.removeFromEntity(components[0], gm.Animation);
+            try session.level.components.removeFromEntity(components[0], c.Animation);
         }
     }
 }
 
 /// Draws the hit points of the player, and the name and hit points of the entity in focus.
-pub fn drawStats(self: Render, session: *const gm.GameSession, entity_in_focus: ?gm.Entity) !void {
+pub fn drawStats(self: Render, session: *const g.GameSession, entity_in_focus: ?g.Entity) !void {
     // Draw player's health, or pause mode indicator
     switch (session.mode) {
         .explore => try self.drawZone(0, "Pause", .normal, .center),
-        .play => if (session.level.components.getForEntity(session.player, gm.Health)) |health| {
+        .play => if (session.level.components.getForEntity(session.player, c.Health)) |health| {
             var buf = [_]u8{0} ** 8;
             const text = try std.fmt.bufPrint(&buf, "HP: {d}", .{health.current});
             try self.drawZone(0, text, .normal, .left);
@@ -143,12 +143,12 @@ pub fn drawStats(self: Render, session: *const gm.GameSession, entity_in_focus: 
         inline for (0..MIDDLE_ZONE_LENGTH) |i| buf[i] = ' ';
         var len: usize = 0;
         // Draw entity's name
-        if (session.level.components.getForEntity(entity, gm.Description)) |desc| {
+        if (session.level.components.getForEntity(entity, c.Description)) |desc| {
             len = (try std.fmt.bufPrint(&buf, "{s}", .{desc.name})).len;
         }
         // Draw enemy's health
         if (entity != session.player) {
-            if (session.level.components.getForEntity(entity, gm.Health)) |health| {
+            if (session.level.components.getForEntity(entity, c.Health)) |health| {
                 buf[len] = ':';
                 len += 1;
                 const hp = @max(health.current, 0);
@@ -167,7 +167,7 @@ pub fn drawStats(self: Render, session: *const gm.GameSession, entity_in_focus: 
 }
 
 /// Draws quick action button, or hide it if quick_action is null.
-pub fn drawQuickActionButton(self: Render, quick_action: ?gm.Action) !void {
+pub fn drawQuickActionButton(self: Render, quick_action: ?c.Action) !void {
     // Draw the quick action
     if (quick_action) |qa| {
         switch (qa.type) {
@@ -189,16 +189,16 @@ pub fn drawQuickActionButton(self: Render, quick_action: ?gm.Action) !void {
 pub fn drawWelcomeScreen(self: Render) !void {
     try self.runtime.clearDisplay();
     try self.runtime.drawScreenBorder();
-    const middle = gm.DISPLAY_ROWS / 2 + 1;
-    try self.drawText(gm.DISPLAY_COLS, "Welcome", .{ .row = middle - 1, .col = 1 }, .normal, .center);
-    try self.drawText(gm.DISPLAY_COLS, "to", .{ .row = middle, .col = 1 }, .normal, .center);
-    try self.drawText(gm.DISPLAY_COLS, "Forgotten catacomb", .{ .row = middle + 1, .col = 1 }, .normal, .center);
+    const middle = g.DISPLAY_ROWS / 2 + 1;
+    try self.drawText(g.DISPLAY_COLS, "Welcome", .{ .row = middle - 1, .col = 1 }, .normal, .center);
+    try self.drawText(g.DISPLAY_COLS, "to", .{ .row = middle, .col = 1 }, .normal, .center);
+    try self.drawText(g.DISPLAY_COLS, "Forgotten catacomb", .{ .row = middle + 1, .col = 1 }, .normal, .center);
 }
 
 pub fn drawGameOverScreen(self: Render) !void {
     try self.runtime.clearDisplay();
     try self.runtime.drawScreenBorder();
-    try self.drawText(gm.DISPLAY_COLS, "You are dead", .{ .row = 1 + gm.DISPLAY_ROWS / 2, .col = 1 }, .normal, .center);
+    try self.drawText(g.DISPLAY_COLS, "You are dead", .{ .row = 1 + g.DISPLAY_ROWS / 2, .col = 1 }, .normal, .center);
 }
 
 inline fn cleanZone(self: Render, comptime zone: u8) !void {
@@ -216,21 +216,21 @@ inline fn drawZone(
         0 => try self.drawText(
             OUT_ZONE_LENGTH,
             text,
-            .{ .row = gm.DISPLAY_ROWS, .col = 1 },
+            .{ .row = g.DISPLAY_ROWS, .col = 1 },
             mode,
             aln,
         ),
         1 => try self.drawText(
             MIDDLE_ZONE_LENGTH,
             text,
-            .{ .row = gm.DISPLAY_ROWS, .col = OUT_ZONE_LENGTH + 1 },
+            .{ .row = g.DISPLAY_ROWS, .col = OUT_ZONE_LENGTH + 1 },
             mode,
             aln,
         ),
         2 => try self.drawText(
             OUT_ZONE_LENGTH,
             text,
-            .{ .row = gm.DISPLAY_ROWS, .col = gm.DISPLAY_COLS - OUT_ZONE_LENGTH },
+            .{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS - OUT_ZONE_LENGTH },
             mode,
             aln,
         ),
@@ -243,7 +243,7 @@ fn drawText(
     comptime len: u8,
     text: []const u8,
     absolut_position: p.Point,
-    mode: gm.AnyRuntime.DrawingMode,
+    mode: g.AnyRuntime.DrawingMode,
     aln: TextAlign,
 ) !void {
     var buf: [len]u8 = undefined;

@@ -1,15 +1,25 @@
-//! Implementation of the dungeon generator with BSP algorithm.
-//! https://www.roguebasin.com/index.php?title=Basic_BSP_Dungeon_generation
+//! The implementation of the dungeon generator with BSP algorithm.
+//! It splits recurrently the dungeon region for smaller regions,
+//! than creates the region for the room inside the splitted regions,
+//! and invokes room factory to create the final room.
+//!
+//! Read more here:
+//! <a href="https://www.roguebasin.com/index.php?title=Basic_BSP_Dungeon_generation">
+//! Basic_BSP_Dungeon_generation
+//! </a>
 const std = @import("std");
-const g = @import("game.zig");
+const g = @import("../game_pkg.zig");
 const p = g.primitives;
 
 const BspTree = @import("BspTree.zig");
 const Dungeon = @import("Dungeon.zig");
 const DungeonBuilder = @import("DungeonBuilder.zig");
+const DungeonGenerator = @import("DungeonGenerator.zig");
 
 const BspDungeonGenerator = @This();
 
+/// Used to create arena for BSP tree
+alloc: std.mem.Allocator,
 /// Minimal rows count in the room
 min_rows: u8 = 5,
 /// Minimal columns count in the room
@@ -20,37 +30,40 @@ min_scale: f16 = 0.6,
 /// In case of ascii graphics it's not 1.0
 square_ratio: f16 = 0.4,
 
+pub fn generator(self: *BspDungeonGenerator) DungeonGenerator {
+    return .{ .context = self, .generateFn = generateDungeon };
+}
+
 /// Creates the dungeon with BSP algorithm.
-pub fn generateDungeon(self: BspDungeonGenerator, alloc: std.mem.Allocator, seed: u64) !*Dungeon {
-    var prng = std.Random.DefaultPrng.init(seed);
+fn generateDungeon(
+    ptr: *anyopaque,
+    rand: std.Random,
+    builder: DungeonBuilder,
+) !void {
+    const self: *BspDungeonGenerator = @ptrCast(@alignCast(ptr));
     // this arena is used to build a BSP tree, which can be destroyed
     // right after completing the dungeon.
-    var bsp_arena = std.heap.ArenaAllocator.init(alloc);
+    var bsp_arena = std.heap.ArenaAllocator.init(self.alloc);
     defer _ = bsp_arena.deinit();
 
-    const dungeon = try alloc.create(Dungeon);
-    dungeon.* = try Dungeon.init(alloc, seed);
-
     // BSP helps to mark regions for rooms without intersections
-    const root = try BspTree.build(&bsp_arena, prng.random(), Dungeon.Rows, Dungeon.Cols, .{});
+    const root = try BspTree.build(&bsp_arena, rand, Dungeon.ROWS, Dungeon.COLS, .{});
 
     // visit every BSP node and generate rooms in the leafs
     var createRooms: TraverseAndCreateRooms = .{
         .generator = self,
-        .builder = .{ .dungeon = dungeon },
-        .rand = prng.random(),
+        .builder = builder,
+        .rand = rand,
     };
     try root.traverse(bsp_arena.allocator(), createRooms.handler());
 
     // fold the BSP tree and binds nodes with the same parent:
-    var createPassages: CreatePassageBetweenRegions = .{ .dungeon = dungeon, .rand = prng.random() };
-    _ = try root.foldModify(alloc, createPassages.handler());
-
-    return dungeon;
+    var createPassages: CreatePassageBetweenRegions = .{ .builder = builder, .alloc = self.alloc, .rand = rand };
+    _ = try root.foldModify(bsp_arena.allocator(), createPassages.handler());
 }
 
 const TraverseAndCreateRooms = struct {
-    generator: BspDungeonGenerator,
+    generator: *const BspDungeonGenerator,
     builder: DungeonBuilder,
     rand: std.Random,
 
@@ -61,22 +74,23 @@ const TraverseAndCreateRooms = struct {
     fn createRoom(ptr: *anyopaque, node: *BspTree.Node) anyerror!void {
         if (!node.isLeaf()) return;
         const self: *TraverseAndCreateRooms = @ptrCast(@alignCast(ptr));
-        const region_for_room = self.generator.createRandomRegionInside(node.value);
+        const region_for_room = try self.generator.createRandomRegionInside(node.value, self.rand);
         try self.builder.generateAndAddRoom(self.rand, region_for_room);
     }
 };
 
 const CreatePassageBetweenRegions = struct {
-    builder: *DungeonBuilder,
+    builder: DungeonBuilder,
+    alloc: std.mem.Allocator,
     rand: std.Random,
 
     fn handler(self: *CreatePassageBetweenRegions) BspTree.Node.FoldHandler {
         return .{ .ptr = self, .combine = combine };
     }
 
-    fn combine(ptr: *anyopaque, left: *p.Region, right: *p.Region) !p.Region {
+    fn combine(ptr: *anyopaque, left: p.Region, right: p.Region) !p.Region {
         const self: *CreatePassageBetweenRegions = @ptrCast(@alignCast(ptr));
-        return try self.builder.createAndAddPassageBetweenRegions(self.rand, left, right);
+        return try self.builder.createAndAddPassageBetweenRegions(self.alloc, self.rand, left, right);
     }
 };
 

@@ -1,25 +1,25 @@
 const std = @import("std");
-const algs_and_types = @import("algs_and_types");
-const p = algs_and_types.primitives;
-const game = @import("game.zig");
+const g = @import("game_pkg.zig");
+const c = g.components;
+const p = g.primitives;
 
 const log = std.log.scoped(.collision_system);
 
-pub fn handleCollisions(session: *game.GameSession) anyerror!void {
-    for (session.level.components.getAll(game.Collision)) |collision| {
+pub fn handleCollisions(session: *g.GameSession) anyerror!void {
+    for (session.level.components.getAll(c.Collision)) |collision| {
         switch (collision.obstacle) {
             .wall => {},
             .door => |door| try session.level.components.setToEntity(
                 collision.entity,
-                game.Action{ .type = .{ .open = door.entity }, .move_points = 10 },
+                c.Action{ .type = .{ .open = door.entity }, .move_points = 10 },
             ),
             .enemy => |enemy| {
-                if (session.level.components.getForEntity(collision.entity, game.Health)) |_| {
-                    if (session.level.components.getForEntity(enemy, game.Health)) |_| {
-                        if (session.level.components.getForEntity(session.player, game.MeleeWeapon)) |weapon| {
+                if (session.level.components.getForEntity(collision.entity, c.Health)) |_| {
+                    if (session.level.components.getForEntity(enemy, c.Health)) |_| {
+                        if (session.level.components.getForEntity(session.player, c.MeleeWeapon)) |weapon| {
                             try session.level.components.setToEntity(
                                 collision.entity,
-                                game.Action{ .type = .{ .hit = enemy }, .move_points = weapon.move_points },
+                                c.Action{ .type = .{ .hit = enemy }, .move_points = weapon.move_points },
                             );
                         }
                     }
@@ -28,5 +28,5 @@ pub fn handleCollisions(session: *game.GameSession) anyerror!void {
             .item => {},
         }
     }
-    try session.level.components.removeAll(game.Collision);
+    try session.level.components.removeAll(c.Collision);
 }

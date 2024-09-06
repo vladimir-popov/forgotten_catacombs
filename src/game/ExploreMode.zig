@@ -1,23 +1,22 @@
 //! This is the mode in which player are able to look around, get info about
 //! entities on the screen, and change the target entity.
-
 const std = @import("std");
-const gm = @import("game.zig");
-const algs = @import("algs_and_types");
-const p = algs.primitives;
+const g = @import("game_pkg.zig");
+const c = g.components;
+const p = g.primitives;
 
 const log = std.log.scoped(.pause_mode);
 
 const ExploreMode = @This();
-const ArrayOfEntitiesOnScreen = std.ArrayList(struct { gm.Entity, p.Point });
+const ArrayOfEntitiesOnScreen = std.ArrayList(struct { g.Entity, p.Point });
 
-session: *gm.GameSession,
+session: *g.GameSession,
 /// Arrays of entities and their positions on the screen
 entities_on_screen: ArrayOfEntitiesOnScreen,
 /// Highlighted entity
-entity_in_focus: ?gm.Entity,
+entity_in_focus: ?g.Entity,
 
-pub fn init(session: *gm.GameSession) !ExploreMode {
+pub fn init(session: *g.GameSession) !ExploreMode {
     return .{
         .session = session,
         .entities_on_screen = ArrayOfEntitiesOnScreen.init(session.game.runtime.alloc),
@@ -32,7 +31,7 @@ pub fn deinit(self: *ExploreMode) void {
 pub fn refresh(self: *ExploreMode) !void {
     self.entity_in_focus = self.session.player;
     self.entities_on_screen.clearRetainingCapacity();
-    var itr = self.session.level.query().get(gm.Position);
+    var itr = self.session.level.query().get(c.Position);
     while (itr.next()) |tuple| {
         if (self.session.game.render.screen.region.containsPoint(tuple[1].point)) {
             const item = try self.entities_on_screen.addOne();
@@ -46,12 +45,12 @@ pub fn tick(self: *ExploreMode) anyerror!void {
     // Nothing should happened until the player pushes a button
     if (try self.session.game.runtime.readPushedButtons()) |btn| {
         switch (btn.code) {
-            gm.Buttons.A => {},
-            gm.Buttons.B => {
+            g.Buttons.A => {},
+            g.Buttons.B => {
                 try self.session.play(self.entity_in_focus);
                 return;
             },
-            gm.Buttons.Left, gm.Buttons.Right, gm.Buttons.Up, gm.Buttons.Down => {
+            g.Buttons.Left, g.Buttons.Right, g.Buttons.Up, g.Buttons.Down => {
                 self.chooseNextEntity(btn.toDirection().?);
                 try self.session.game.render.drawScene(self.session, self.entity_in_focus);
             },
@@ -63,7 +62,7 @@ pub fn tick(self: *ExploreMode) anyerror!void {
 fn chooseNextEntity(self: *ExploreMode, direction: p.Direction) void {
     const target_entity = self.entity_in_focus orelse self.session.player;
     const target_point = self.session.game.render.screen.relative(
-        self.session.level.components.getForEntityUnsafe(target_entity, gm.Position).point,
+        self.session.level.components.getForEntityUnsafe(target_entity, c.Position).point,
     );
     var min_distance: u8 = 255;
     for (self.entities_on_screen.items) |tuple| {

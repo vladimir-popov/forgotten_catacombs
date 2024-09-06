@@ -1,5 +1,5 @@
 const std = @import("std");
-const g = @import("game.zig");
+const g = @import("game");
 const p = g.primitives;
 const tty = @import("tty.zig");
 const utf8 = @import("utf8.zig");
@@ -198,7 +198,7 @@ fn drawHorizontalBorder(ptr: *anyopaque) !void {
     try self.buffer.mergeLine("║" ++ "═" ** g.DISPLAY_COLS ++ "║", g.DISPLAY_ROWS, 0);
 }
 
-fn drawDungeon(ptr: *anyopaque, screen: *const g.Screen, dungeon: *const g.Dungeon) anyerror!void {
+fn drawDungeon(ptr: *anyopaque, screen: g.Screen, dungeon: g.Dungeon) anyerror!void {
     var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     const buffer = &self.buffer;
     var itr = dungeon.cellsInRegion(screen.region) orelse return;
@@ -225,9 +225,9 @@ fn drawDungeon(ptr: *anyopaque, screen: *const g.Screen, dungeon: *const g.Dunge
 
 fn drawSprite(
     ptr: *anyopaque,
-    screen: *const g.Screen,
-    sprite: *const g.Sprite,
-    position: *const g.Position,
+    screen: g.Screen,
+    sprite: *const g.components.Sprite,
+    position: *const g.components.Position,
     mode: g.AnyRuntime.DrawingMode,
 ) anyerror!void {
     if (screen.region.containsPoint(position.point)) {

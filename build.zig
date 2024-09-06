@@ -30,7 +30,7 @@ pub fn build(b: *std.Build) !void {
     // ============================================================
 
     const game_module = b.createModule(.{
-        .root_source_file = b.path("src/game/init.zig"),
+        .root_source_file = b.path("src/game/game_pkg.zig"),
     });
 
     // ============================================================
@@ -165,7 +165,7 @@ pub fn build(b: *std.Build) !void {
     ) orelse &[0][]const u8{};
 
     const ut_game = b.addTest(.{
-        .root_source_file = b.path("src/game/init.zig"),
+        .root_source_file = b.path("src/game/game_pkg.zig"),
         .test_runner = b.path("src/test_runner.zig"),
         .target = desktop_target,
         .optimize = optimize,

@@ -1,5 +1,5 @@
 const std = @import("std");
-const g = @import("init.zig");
+const g = @import("game_pkg.zig");
 
 const log = std.log.scoped(.Game);
 

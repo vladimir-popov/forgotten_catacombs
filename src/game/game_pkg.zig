@@ -1,19 +1,20 @@
 const std = @import("std");
 
+pub const components = @import("components.zig");
+pub const ecs = @import("ecs.zig");
+pub const primitives = @import("primitives.zig");
+pub const dungeon = @import("dungeon/dungeon_pkg.zig");
+
+pub const Entity = ecs.Entity;
 pub const AnyRuntime = @import("AnyRuntime.zig");
 pub const Buttons = @import("Buttons.zig");
 pub const Cheat = @import("cheats.zig").Cheat;
-pub const Dungeon = @import("dungeon/Dungeon.zig");
+pub const Dungeon = dungeon.Dungeon;
 pub const Game = @import("Game.zig");
 pub const GameSession = @import("GameSession.zig");
 pub const Level = @import("Level.zig");
 pub const Render = @import("Render.zig");
 pub const Screen = @import("Screen.zig");
-
-
-pub const components = @import("components.zig");
-pub const ecs = @import("ecs.zig");
-pub const primitives = @import("primitives.zig");
 
 pub const RENDER_DELAY_MS = 150;
 

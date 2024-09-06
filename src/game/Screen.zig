@@ -1,7 +1,6 @@
 const std = @import("std");
-const algs_and_types = @import("algs_and_types");
-const p = algs_and_types.primitives;
-const gm = @import("game.zig");
+const g = @import("game_pkg.zig");
+const p = g.primitives;
 
 const Screen = @This();
 
@@ -53,7 +52,7 @@ pub fn move(self: *Screen, direction: p.Direction) void {
                 self.region.top_left.row -= 1;
         },
         .down => {
-            if (self.region.bottomRightRow() < gm.WHOLE_DUNG_ROWS)
+            if (self.region.bottomRightRow() < g.Dungeon.ROWS)
                 self.region.top_left.row += 1;
         },
         .left => {
@@ -61,7 +60,7 @@ pub fn move(self: *Screen, direction: p.Direction) void {
                 self.region.top_left.col -= 1;
         },
         .right => {
-            if (self.region.bottomRightCol() < gm.WHOLE_DUNG_COLS)
+            if (self.region.bottomRightCol() < g.Dungeon.COLS)
                 self.region.top_left.col += 1;
         },
     }

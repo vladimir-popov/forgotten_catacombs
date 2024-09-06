@@ -1,5 +1,5 @@
-const algs_and_types = @import("algs_and_types");
-const p = algs_and_types.primitives;
+const g = @import("game_pkg.zig");
+const p = g.primitives;
 
 const Buttons = @This();
 

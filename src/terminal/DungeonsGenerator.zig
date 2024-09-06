@@ -34,7 +34,7 @@ pub fn main() !void {
 }
 
 const DungeonsGenerator = struct {
-    entities_provider: g.EntitiesProvider,
+    entities_provider: g.ecs.EntitiesProvider,
     runtime: g.AnyRuntime,
     render: g.Render,
     level: g.Level,
@@ -42,7 +42,7 @@ const DungeonsGenerator = struct {
     pub fn init(runtime: g.AnyRuntime) DungeonsGenerator {
         return .{
             .runtime = runtime,
-            .render = g.Render.init(runtime, g.Dungeon.Rows, g.Dungeon.Cols),
+            .render = g.Render.init(runtime, g.Dungeon.ROWS, g.Dungeon.COLS),
             .entities_provider = .{},
             .level = undefined,
         };

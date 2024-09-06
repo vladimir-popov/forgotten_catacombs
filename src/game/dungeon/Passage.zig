@@ -1,5 +1,5 @@
 const std = @import("std");
-const g = @import("game.zig");
+const g = @import("../game_pkg.zig");
 const p = g.primitives;
 
 const Passage = @This();
@@ -75,4 +75,3 @@ pub fn randomPlace(passage: Passage, rand: std.Random) p.Point {
         };
     }
 }
-

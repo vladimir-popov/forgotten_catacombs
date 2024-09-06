@@ -1,13 +1,13 @@
 const std = @import("std");
-const algs_and_types = @import("algs_and_types");
-const p = algs_and_types.primitives;
-const game = @import("game.zig");
+const g = @import("game_pkg.zig");
+const c = g.components;
+const p = g.primitives;
 
 const log = std.log.scoped(.action_system);
 
 /// Handles intentions to do some actions
-pub fn doActions(session: *game.GameSession) !void {
-    var itr = session.level.query().get2(game.Action, game.Position);
+pub fn doActions(session: *g.GameSession) !void {
+    var itr = session.level.query().get2(c.Action, c.Position);
     while (itr.next()) |components| {
         const entity = components[0];
         const action = components[1];
@@ -17,21 +17,21 @@ pub fn doActions(session: *game.GameSession) !void {
                 _ = try handleMoveAction(session, entity, position, move);
             },
             .open => |door| {
-                try session.level.components.setToEntity(door, game.Door.opened);
+                try session.level.components.setToEntity(door, c.Door.opened);
                 try session.level.components.setToEntity(
                     door,
-                    game.Sprite{ .codepoint = '\'' },
+                    c.Sprite{ .codepoint = '\'' },
                 );
             },
             .close => |door| {
-                try session.level.components.setToEntity(door, game.Door.closed);
+                try session.level.components.setToEntity(door, c.Door.closed);
                 try session.level.components.setToEntity(
                     door,
-                    game.Sprite{ .codepoint = '+' },
+                    c.Sprite{ .codepoint = '+' },
                 );
             },
             .hit => |enemy| {
-                if (session.level.components.getForEntity(entity, game.MeleeWeapon)) |weapon| {
+                if (session.level.components.getForEntity(entity, c.MeleeWeapon)) |weapon| {
                     try session.level.components.setToEntity(
                         enemy,
                         weapon.damage(session.prng.random()),
@@ -39,7 +39,7 @@ pub fn doActions(session: *game.GameSession) !void {
                 }
             },
             .move_to_level => |ladder| {
-                try session.level.components.removeFromEntity(entity, game.Action);
+                try session.level.components.removeFromEntity(entity, c.Action);
                 try session.moveToLevel(ladder);
                 // we have to break the function here, because of iterator is
                 // invalid now.
@@ -47,21 +47,21 @@ pub fn doActions(session: *game.GameSession) !void {
             },
             else => {},
         }
-        try session.level.components.removeFromEntity(entity, game.Action);
+        try session.level.components.removeFromEntity(entity, c.Action);
     }
 }
 
 fn handleMoveAction(
-    session: *game.GameSession,
-    entity: game.Entity,
-    position: *game.Position,
-    move: *game.Action.Move,
+    session: *g.GameSession,
+    entity: g.Entity,
+    position: *c.Position,
+    move: *c.Action.Move,
 ) !bool {
     const new_position = position.point.movedTo(move.direction);
     if (checkCollision(session, new_position)) |obstacle| {
         try session.level.components.setToEntity(
             entity,
-            game.Collision{ .entity = entity, .obstacle = obstacle, .at = new_position },
+            c.Collision{ .entity = entity, .obstacle = obstacle, .at = new_position },
         );
         return false;
     }
@@ -82,12 +82,12 @@ fn handleMoveAction(
     return true;
 }
 
-fn checkCollision(session: *game.GameSession, position: p.Point) ?game.Collision.Obstacle {
+fn checkCollision(session: *g.GameSession, position: p.Point) ?c.Collision.Obstacle {
     if (session.level.dungeon.cellAt(position)) |cell| {
         switch (cell) {
             .nothing, .wall => return .wall,
             .door => if (session.level.entityAt(position)) |entity| {
-                if (session.level.components.getForEntity(entity, game.Door)) |door|
+                if (session.level.components.getForEntity(entity, c.Door)) |door|
                     if (door.* == .closed)
                         return .{ .door = .{ .entity = entity, .state = .closed } }
                     else
@@ -96,10 +96,10 @@ fn checkCollision(session: *game.GameSession, position: p.Point) ?game.Collision
                 return null;
             },
             .floor => if (session.level.entityAt(position)) |entity| {
-                if (session.level.components.getForEntity(entity, game.Health)) |_|
+                if (session.level.components.getForEntity(entity, c.Health)) |_|
                     return .{ .enemy = entity };
 
-                if (session.level.components.getForEntity(entity, game.Ladder)) |_|
+                if (session.level.components.getForEntity(entity, c.Ladder)) |_|
                     return null;
 
                 return .{ .item = entity };

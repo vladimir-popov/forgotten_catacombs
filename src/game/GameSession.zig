@@ -5,10 +5,10 @@
 //! for more details.
 
 const std = @import("std");
-const algs = @import("algs_and_types");
-const p = algs.primitives;
-const ecs = @import("ecs");
-const gm = @import("game.zig");
+const g = @import("game_pkg.zig");
+const c = g.components;
+const p = g.primitives;
+const ecs = g.ecs;
 
 const PlayMode = @import("PlayMode.zig");
 const ExploreMode = @import("ExploreMode.zig");
@@ -20,14 +20,14 @@ const GameSession = @This();
 const Mode = enum { play, explore };
 
 /// The root object of the game
-game: *gm.Game,
+game: *g.Game,
 /// This seed should help to make all levels of the single game session reproducible.
 seed: u64,
 /// The PRNG initialized by the session's seed. This prng is used to make any dynamic decision by AI, or game events,
 /// and should not be used to generate any level objects, to keep the levels reproducible.
 prng: std.Random.DefaultPrng,
 /// The current level
-level: gm.Level,
+level: g.Level,
 /// The current mode of the game
 mode: Mode,
 // stateful modes:
@@ -37,9 +37,9 @@ explore_mode: ExploreMode,
 /// The ids should be unique for whole life circle of this session.
 entities_provider: ecs.EntitiesProvider,
 /// Entity of the player
-player: gm.Entity = undefined,
+player: g.Entity = undefined,
 
-pub fn createNew(game: *gm.Game, seed: u64) !*GameSession {
+pub fn createNew(game: *g.Game, seed: u64) !*GameSession {
     log.debug("Begin the new game session with seed {d}", .{seed});
     const session = try game.runtime.alloc.create(GameSession);
     session.* = .{
@@ -55,7 +55,7 @@ pub fn createNew(game: *gm.Game, seed: u64) !*GameSession {
     session.player = session.newEntity();
     log.debug("Player entity is {d}", .{session.player});
     const entrance = session.newEntity();
-    session.level = try gm.Level.generate(
+    session.level = try g.Level.generate(
         game.runtime.alloc,
         seed,
         session.player,
@@ -77,13 +77,13 @@ pub fn destroy(self: *GameSession) void {
     self.game.runtime.alloc.destroy(self);
 }
 
-inline fn newEntity(self: *GameSession) gm.Entity {
+inline fn newEntity(self: *GameSession) g.Entity {
     return self.entities_provider.newEntity();
 }
 
 // TODO: Load session from file
 
-pub fn play(self: *GameSession, entity_in_focus: ?gm.Entity) !void {
+pub fn play(self: *GameSession, entity_in_focus: ?g.Entity) !void {
     self.mode = .play;
     try self.play_mode.refresh(entity_in_focus);
 }
@@ -100,9 +100,9 @@ pub inline fn tick(self: *GameSession) !void {
     }
 }
 
-pub fn moveToLevel(self: *GameSession, ladder: gm.Ladder) !void {
-    var this_ladder: gm.Entity = undefined;
-    var that_ladder: ?gm.Entity = undefined;
+pub fn moveToLevel(self: *GameSession, ladder: c.Ladder) !void {
+    var this_ladder: g.Entity = undefined;
+    var that_ladder: ?g.Entity = undefined;
     var new_depth: u8 = undefined;
     switch (ladder.direction) {
         .up => {
@@ -121,7 +121,7 @@ pub fn moveToLevel(self: *GameSession, ladder: gm.Ladder) !void {
         "Move {s} from the level {d} to {d}\n--------------------",
         .{ @tagName(ladder.direction), self.level.depth, new_depth },
     );
-    var new_level = try gm.Level.generate(
+    var new_level = try g.Level.generate(
         self.game.runtime.alloc,
         self.seed,
         self.player,
