@@ -86,7 +86,7 @@ pub fn createAndAddPassageBetweenRegions(
 
 /// Removes doors, floor and walls on the passed place.
 pub fn cleanAt(self: DungeonBuilder, place: p.Point) void {
-    if (!self.dungeon.containsPlace(place)) {
+    if (!Dungeon.REGION.containsPoint(place)) {
         return;
     }
     self.dungeon.floor.unsetAt(place);
@@ -96,7 +96,7 @@ pub fn cleanAt(self: DungeonBuilder, place: p.Point) void {
 
 /// Removes doors, floor and walls on the passed place, and create a new door.
 pub fn forceCreateFloorAt(self: DungeonBuilder, place: p.Point) !void {
-    if (!self.dungeon.containsPlace(place)) {
+    if (!Dungeon.REGION.containsPoint(place)) {
         return;
     }
     self.cleanAt(place);
@@ -105,7 +105,7 @@ pub fn forceCreateFloorAt(self: DungeonBuilder, place: p.Point) !void {
 
 /// Removes doors, floor and walls on the passed place, and create a new wall.
 pub fn forceCreateWallAt(self: DungeonBuilder, place: p.Point) !void {
-    if (!self.dungeon.containsPlace(place)) {
+    if (!Dungeon.REGION.containsPoint(place)) {
         return;
     }
     self.dungeon.cleanAt(place);
@@ -114,7 +114,7 @@ pub fn forceCreateWallAt(self: DungeonBuilder, place: p.Point) !void {
 
 /// Removes doors, floor and walls on the passed place, and create a cell with floor.
 pub fn forceCreateDoorAt(self: DungeonBuilder, place: p.Point) !void {
-    if (!self.dungeon.containsPlace(place)) {
+    if (!Dungeon.REGION.containsPoint(place)) {
         return;
     }
     self.cleanAt(place);
@@ -123,7 +123,7 @@ pub fn forceCreateDoorAt(self: DungeonBuilder, place: p.Point) !void {
 
 /// Creates the cell with wall only if nothing exists on the passed place.
 fn createWallAt(self: DungeonBuilder, place: p.Point) void {
-    if (!self.dungeon.containsPlace(place)) {
+    if (!Dungeon.REGION.containsPoint(place)) {
         return;
     }
     if (self.dungeon.isCellAt(place, .nothing)) {
@@ -133,7 +133,7 @@ fn createWallAt(self: DungeonBuilder, place: p.Point) void {
 
 /// Creates the cell with floor only if nothing exists on the passed place.
 pub fn createFloorAt(self: DungeonBuilder, place: p.Point) void {
-    if (!self.dungeon.containsPlace(place)) {
+    if (!Dungeon.REGION.containsPoint(place)) {
         return;
     }
     if (self.dungeon.isCellAt(place, .nothing)) {

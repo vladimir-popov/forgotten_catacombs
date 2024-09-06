@@ -134,7 +134,7 @@ fn drawHorizontalBorder(ptr: *anyopaque) anyerror!void {
     self.playdate.graphics.drawLine(0, y + 2, g.DISPLAY_WIDHT, y + 2, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
 }
 
-fn drawDungeon(ptr: *anyopaque, screen: g.Screen, dungeon:  g.Dungeon) anyerror!void {
+fn drawDungeon(ptr: *anyopaque, screen: g.Screen, dungeon: g.Dungeon) anyerror!void {
     var itr = dungeon.cellsInRegion(screen.region) orelse return;
     var position = .{ .point = screen.region.top_left };
     var sprite = c.Sprite{ .codepoint = undefined };

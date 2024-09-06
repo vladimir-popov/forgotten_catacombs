@@ -61,10 +61,6 @@ pub fn deinit(self: *Dungeon) void {
     self.rooms.deinit();
 }
 
-pub inline fn containsPlace(_: Dungeon, place: p.Point) bool {
-    return REGION.containsPoint(place);
-}
-
 pub inline fn cellAt(self: Dungeon, place: p.Point) ?Cell {
     if (place.row < 1 or place.row > ROWS) {
         return null;
@@ -96,7 +92,7 @@ pub const CellsIterator = struct {
 
     pub fn next(self: *CellsIterator) ?Cell {
         self.current_place = self.next_place;
-        if (!REGION.containsPoint(self.current_place))
+        if (!self.region.containsPoint(self.current_place))
             return null;
 
         if (self.dungeon.cellAt(self.current_place)) |cl| {

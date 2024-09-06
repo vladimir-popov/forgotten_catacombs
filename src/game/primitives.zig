@@ -539,9 +539,13 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
 
         pub fn deinit(self: *Self) void {
             self.alloc.free(self.bitsets);
+            self.bitsets = undefined;
         }
 
         pub fn parse(self: *Self, comptime symbol: u8, str: []const u8) !void {
+            if (!@import("builtin").is_test) {
+                @compileError("The function `parse` is for test purpose only");
+            }
             var r: u8 = 1;
             var c: u8 = 1;
             for (str) |char| {
@@ -565,13 +569,6 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
                     },
                 }
                 c += 1;
-            }
-            if (r < rows) {
-                log.err(
-                    "Total rows count is {d}, but found {d} lines in the parsed string\n{s}\n",
-                    .{ rows, r, str },
-                );
-                return Error.WrongRowsCountInString;
             }
         }
 

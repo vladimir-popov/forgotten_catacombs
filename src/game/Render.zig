@@ -130,7 +130,7 @@ pub fn drawAnimationsFrame(self: Render, session: *g.GameSession, entity_in_focu
 pub fn drawStats(self: Render, session: *const g.GameSession, entity_in_focus: ?g.Entity) !void {
     // Draw player's health, or pause mode indicator
     switch (session.mode) {
-        .explore => try self.drawZone(0, "Pause", .normal, .center),
+        .explore => try self.drawZone(0, "Pause", .inverted, .center),
         .play => if (session.level.components.getForEntity(session.player, c.Health)) |health| {
             var buf = [_]u8{0} ** 8;
             const text = try std.fmt.bufPrint(&buf, "HP: {d}", .{health.current});
@@ -214,7 +214,7 @@ inline fn drawZone(
 ) !void {
     switch (zone) {
         0 => try self.drawText(
-            OUT_ZONE_LENGTH,
+            OUT_ZONE_LENGTH - 1,
             text,
             .{ .row = g.DISPLAY_ROWS, .col = 1 },
             mode,
