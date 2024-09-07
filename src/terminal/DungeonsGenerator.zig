@@ -77,7 +77,7 @@ const DungeonsGenerator = struct {
 
     fn handleInput(self: *DungeonsGenerator) anyerror!void {
         const btn = try self.runtime.readPushedButtons() orelse return;
-        if (btn.code & g.Buttons.A > 0) {
+        if (btn.game_button == .a) {
             const seed = std.crypto.random.int(u64);
             self.level.deinit();
             self.entities_provider = .{};

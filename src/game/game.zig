@@ -38,14 +38,14 @@ pub fn deinit(self: Game) void {
 pub fn tick(self: *Game) !void {
     switch (self.state) {
         .welcome => if (try self.runtime.readPushedButtons()) |btn| {
-            switch (btn.code) {
-                g.Buttons.A => try self.newGame(),
+            switch (btn.game_button) {
+                .a => if (btn.state == .pressed) try self.newGame(),
                 else => {},
             }
         },
         .game_over => if (try self.runtime.readPushedButtons()) |btn| {
-            switch (btn.code) {
-                g.Buttons.A => try self.welcome(),
+            switch (btn.game_button) {
+                .a => if (btn.state == .pressed) try self.welcome(),
                 else => {},
             }
         },

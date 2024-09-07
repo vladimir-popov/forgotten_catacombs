@@ -67,27 +67,28 @@ pub fn refresh(self: *PlayMode, entity_in_focus: ?g.Entity) !void {
     try self.session.game.render.redraw(self.session, self.entity_in_focus);
 }
 
-fn handleInput(self: *PlayMode, buttons: g.Buttons) !void {
-    switch (buttons.code) {
-        g.Buttons.A => if (self.quick_action) |quick_action| {
+fn handleInput(self: *PlayMode, button: g.Button) !void {
+    if (button.state == .double_pressed) log.info("Double press of {any}", .{button});
+    switch (button.game_button) {
+        .a => if (self.quick_action) |quick_action| {
             try self.session.level.components.setToEntity(self.session.player, quick_action);
         },
-        g.Buttons.B => {
+        .b => if (button.state == .pressed) {
             try self.session.explore();
         },
-        g.Buttons.Left, g.Buttons.Right, g.Buttons.Up, g.Buttons.Down => {
+        .left, .right, .up, .down => {
             const speed = self.session.level.components.getForEntityUnsafe(self.session.player, c.Speed);
             try self.session.level.components.setToEntity(self.session.player, c.Action{
                 .type = .{
                     .move = .{
-                        .direction = buttons.toDirection().?,
+                        .direction = button.toDirection().?,
                         .keep_moving = false, // btn.state == .double_pressed,
                     },
                 },
                 .move_points = speed.move_points,
             });
         },
-        g.Buttons.Cheat => {
+        .cheat => {
             if (self.session.game.runtime.getCheat()) |cheat| {
                 log.debug("Cheat {any}", .{cheat});
                 switch (cheat) {
@@ -121,7 +122,6 @@ fn handleInput(self: *PlayMode, buttons: g.Buttons) !void {
                 }
             }
         },
-        else => {},
     }
 }
 

@@ -44,13 +44,13 @@ pub fn refresh(self: *ExploreMode) !void {
 pub fn tick(self: *ExploreMode) anyerror!void {
     // Nothing should happened until the player pushes a button
     if (try self.session.game.runtime.readPushedButtons()) |btn| {
-        switch (btn.code) {
-            g.Buttons.A => {},
-            g.Buttons.B => {
+        switch (btn.game_button) {
+            .a => {},
+            .b => if (btn.state == .pressed) {
                 try self.session.play(self.entity_in_focus);
                 return;
             },
-            g.Buttons.Left, g.Buttons.Right, g.Buttons.Up, g.Buttons.Down => {
+            .left, .right, .up, .down => {
                 self.chooseNextEntity(btn.toDirection().?);
                 try self.session.game.render.drawScene(self.session, self.entity_in_focus);
             },

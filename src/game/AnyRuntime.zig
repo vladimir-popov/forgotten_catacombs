@@ -8,7 +8,7 @@ const Self = @This();
 pub const DrawingMode = enum { normal, inverted, transparent };
 
 const VTable = struct {
-    readPushedButtons: *const fn (context: *anyopaque) anyerror!?g.Buttons,
+    readPushedButtons: *const fn (context: *anyopaque) anyerror!?g.Button,
     clearDisplay: *const fn (context: *anyopaque) anyerror!void,
     drawScreenBorder: *const fn (context: *anyopaque) anyerror!void,
     drawHorizontalBorder: *const fn (context: *anyopaque) anyerror!void,
@@ -46,7 +46,7 @@ pub inline fn currentMillis(self: Self) c_uint {
     return self.vtable.currentMillis(self.context);
 }
 
-pub inline fn readPushedButtons(self: Self) !?g.Buttons {
+pub inline fn readPushedButtons(self: Self) !?g.Button {
     return try self.vtable.readPushedButtons(self.context);
 }
 

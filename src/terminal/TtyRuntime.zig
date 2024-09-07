@@ -113,27 +113,27 @@ fn currentMillis(_: *anyopaque) c_uint {
     return @truncate(@as(u64, @intCast(std.time.milliTimestamp())));
 }
 
-fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Buttons {
+fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
     var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     const prev_key = self.prev_key;
     if (tty.KeyboardAndMouse.readPressedButton()) |key| {
         self.prev_key = key;
-        const known_key_code: ?g.Buttons.Code = switch (key) {
+        const game_button: ?g.Button.GameButton = switch (key) {
             .char => switch (key.char.char) {
                 // (B) (A)
-                ' ', 's', 'i' => g.Buttons.A,
-                'b', 'a', 'u' => g.Buttons.B,
-                'h' => g.Buttons.Left,
-                'j' => g.Buttons.Down,
-                'k' => g.Buttons.Up,
-                'l' => g.Buttons.Right,
+                ' ', 's', 'i' => .a,
+                'b', 'a', 'u' => .b,
+                'h' => .left,
+                'j' => .down,
+                'k' => .up,
+                'l' => .right,
                 else => null,
             },
             .control => switch (key.control) {
-                .LEFT => g.Buttons.Left,
-                .DOWN => g.Buttons.Down,
-                .UP => g.Buttons.Up,
-                .RIGHT => g.Buttons.Right,
+                .LEFT => .left,
+                .DOWN => .down,
+                .UP => .up,
+                .RIGHT => .right,
                 else => null,
             },
             .mouse => |m| cheat: {
@@ -149,22 +149,22 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Buttons {
                     .WHEEL_DOWN => self.cheat = .move_player_to_exit,
                     else => return null,
                 }
-                break :cheat g.Buttons.Cheat;
+                break :cheat .cheat;
             },
             else => null,
         };
-        if (known_key_code) |code| {
+        if (game_button) |gbtn| {
             const now = std.time.milliTimestamp();
             const delay = now - self.pressed_at;
             self.pressed_at = now;
-            var state: g.Buttons.State = .pushed;
+            var state: g.Button.State = .pressed;
             if (key.eql(prev_key)) {
                 if (delay < g.DOUBLE_PUSH_DELAY_MS)
-                    state = .double_pushed
+                    state = .double_pressed
                 else if (delay > g.HOLD_DELAY_MS)
                     state = .hold;
             }
-            return .{ .code = code, .state = state };
+            return .{ .game_button = gbtn, .state = state };
         } else {
             self.pressed_at = 0;
             return null;

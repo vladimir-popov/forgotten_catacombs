@@ -10,11 +10,78 @@ const log = std.log.scoped(.runtime);
 
 const Self = @This();
 
-const ButtonsLog = struct {
-    button: api.PDButtons = 0,
-    pressed_at: u32 = 0,
-    released_at: u32 = 0,
-    release_count: u16 = 0,
+const LastButton = struct {
+    const Btn = struct {
+        game_button: g.Button.GameButton,
+        is_pressed: bool,
+        pressed_at: u32,
+        pressed_count: u8,
+    };
+
+    button: ?Btn = null,
+
+    fn handleEvent(
+        button: api.PDButtons,
+        down: c_int,
+        when: u32,
+        ptr: ?*anyopaque,
+    ) callconv(.C) c_int {
+        const self: *LastButton = @ptrCast(@alignCast(ptr));
+        const is_pressed = down > 0;
+        if (g.Button.GameButton.fromCode(button)) |game_button| {
+            if (self.button) |*current_button| {
+                return self.handleEventWithCurrentButton(current_button, game_button, is_pressed, when);
+            } else if (is_pressed) {
+                // the first press:
+                self.button = .{
+                    .game_button = game_button,
+                    .is_pressed = true,
+                    .pressed_at = when,
+                    .pressed_count = 1,
+                };
+            } else {
+                self.button = null;
+            }
+        }
+        return 0;
+    }
+
+    fn handleEventWithCurrentButton(
+        self: *LastButton,
+        current_button: *Btn,
+        game_button: g.Button.GameButton,
+        is_pressed: bool,
+        when: u32,
+    ) callconv(.C) c_int {
+        // event for the same button
+        if (current_button.game_button == game_button) {
+            if (is_pressed) {
+                // the current button pressed again
+                current_button.is_pressed = true;
+                current_button.pressed_at = when;
+                if ((when - current_button.pressed_at) < g.DOUBLE_PUSH_DELAY_MS) {
+                    current_button.pressed_count += 1;
+                } else {
+                    current_button.pressed_count = 1;
+                }
+            } else {
+                current_button.is_pressed = false;
+            }
+        } else {
+            // event for another button
+            if (!current_button.is_pressed and is_pressed) {
+                self.button = .{
+                    .game_button = game_button,
+                    .is_pressed = true,
+                    .pressed_at = when,
+                    .pressed_count = 1,
+                };
+            } else {
+                self.button = null;
+            }
+        }
+        return 0;
+    }
 };
 
 var cheat: ?g.Cheat = null;
@@ -23,7 +90,7 @@ playdate: *api.PlaydateAPI,
 alloc: std.mem.Allocator,
 text_font: ?*api.LCDFont,
 sprites_font: ?*api.LCDFont,
-button_log: ButtonsLog = .{},
+last_button: *LastButton,
 
 pub fn init(playdate: *api.PlaydateAPI) !Self {
     const err: ?*[*c]const u8 = null;
@@ -40,19 +107,21 @@ pub fn init(playdate: *api.PlaydateAPI) !Self {
     };
     errdefer _ = playdate.system.realloc(sprites_font, 0);
 
+    const alloc = Allocator.allocator(playdate);
+    const last_button = try alloc.create(LastButton);
+    errdefer alloc.destroy(last_button);
+
     playdate.graphics.setFont(sprites_font);
     playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeCopy);
     playdate.system.setSerialMessageCallback(serialMessageCallback);
+    playdate.system.setButtonCallback(LastButton.handleEvent, last_button, 4);
 
-    var millis: c_uint = undefined;
-    _ = playdate.system.getSecondsSinceEpoch(&millis);
-
-    const alloc = Allocator.allocator(playdate);
     return .{
         .playdate = playdate,
         .alloc = alloc,
         .text_font = text_font,
         .sprites_font = sprites_font,
+        .last_button = last_button,
     };
 }
 
@@ -86,35 +155,32 @@ fn currentMillis(ptr: *anyopaque) c_uint {
     return self.playdate.system.getCurrentTimeMilliseconds();
 }
 
-fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Buttons {
+fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    if (cheat) |_| return .{ .code = g.Buttons.Cheat, .state = .pushed };
 
-    var current_buttons: api.PDButtons = 0;
-    var pressed_buttons: api.PDButtons = 0;
-    var released_buttons: api.PDButtons = 0;
-    self.playdate.system.getButtonState(&current_buttons, &pressed_buttons, &released_buttons);
+    if (cheat) |_| return .{ .game_button = .cheat, .state = .pressed };
 
-    if (pressed_buttons > 0) {
-        self.button_log.pressed_at = self.playdate.system.getCurrentTimeMilliseconds();
-    } else if (current_buttons > 0 and self.button_log.pressed_at > 0) {
-        const hold_delay = self.playdate.system.getCurrentTimeMilliseconds() - self.button_log.pressed_at;
-        if (hold_delay > g.HOLD_DELAY_MS)
-            return .{ .code = current_buttons, .state = .hold };
-    } else if (released_buttons > 0) {
-        self.button_log.pressed_at = 0;
-        self.button_log.release_count = if (released_buttons == self.button_log.button)
-            self.button_log.release_count + 1
-        else
-            1;
-        const now = self.playdate.system.getCurrentTimeMilliseconds();
-        self.button_log.button = released_buttons;
-        const delay = now - self.button_log.released_at;
-        self.button_log.released_at = now;
-        if (self.button_log.release_count > 1 and delay < g.DOUBLE_PUSH_DELAY_MS)
-            return .{ .code = current_buttons, .state = .double_pushed }
-        else
-            return .{ .code = released_buttons, .state = .pushed };
+    if (self.last_button.button) |btn| {
+        // handle only released button
+        if (!btn.is_pressed) {
+            self.last_button.button = null;
+            // stop handle held button right after release
+            if ((currentMillis(self) - btn.pressed_at) > g.HOLD_DELAY_MS) {
+                return null;
+            }
+            return .{
+                .game_button = btn.game_button,
+                .state = if (btn.pressed_count > 1)
+                    .double_pressed
+                else
+                    .pressed,
+            };
+        } else if ((currentMillis(self) - btn.pressed_at) > g.HOLD_DELAY_MS) {
+            return .{
+                .game_button = btn.game_button,
+                .state = .hold,
+            };
+        }
     }
     return null;
 }
