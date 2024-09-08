@@ -3,6 +3,8 @@ const g = @import("game_pkg.zig");
 const p = g.primitives;
 const c = g.components;
 
+const log = std.log.scoped(.runtime);
+
 const Self = @This();
 
 pub const DrawingMode = enum { normal, inverted, transparent };
@@ -46,7 +48,9 @@ pub inline fn currentMillis(self: Self) c_uint {
 }
 
 pub inline fn readPushedButtons(self: Self) !?g.Button {
-    return try self.vtable.readPushedButtons(self.context);
+    const btn = try self.vtable.readPushedButtons(self.context);
+    if (btn) |b| log.debug("Pressed button {s}", .{@tagName(b.game_button)});
+    return btn;
 }
 
 pub inline fn clearDisplay(self: Self) !void {

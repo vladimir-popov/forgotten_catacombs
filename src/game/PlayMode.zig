@@ -63,6 +63,9 @@ pub fn deinit(self: PlayMode) void {
 /// Updates the target entity after switching back to the play mode
 pub fn refresh(self: *PlayMode, entity_in_focus: ?g.Entity) !void {
     self.entity_in_focus = entity_in_focus;
+    if (entity_in_focus) |ef| if (ef == self.session.player) {
+        self.entity_in_focus = null;
+    };
     try self.updateTarget();
     try self.session.game.render.redraw(self.session, self.entity_in_focus);
 }
@@ -155,8 +158,6 @@ pub fn tick(self: *PlayMode) anyerror!void {
             if (self.session.level.components.getForEntity(self.session.player, c.Action)) |action| {
                 self.is_player_turn = false;
                 should_update_target = true;
-                if (self.entity_in_focus == self.session.player and action.type != .wait)
-                    self.entity_in_focus = null;
                 try self.updateEnemies(action.move_points);
             }
         }
@@ -214,49 +215,59 @@ fn updateEnemies(self: *PlayMode, move_points: u8) !void {
 }
 
 fn updateTarget(self: *PlayMode) anyerror!void {
+    defer {
+        const qa_str = if (self.quick_action) |qa| @tagName(qa.type) else "not defined";
+        log.debug("Entity in focus {any}; quick action {s}", .{ self.entity_in_focus, qa_str });
+    }
+
+    // check if quick action still available for target
+    if (self.entity_in_focus) |target| if (self.calculateQuickActionForTarget(target)) |qa| {
+        self.quick_action = qa;
+        return;
+    };
     // If we're not able to do any action with previous entity in focus
     // we should try to change the focus
-    if (self.calculateQuickActionForTarget(self.entity_in_focus)) |qa| {
-        self.quick_action = qa;
-    } else {
-        self.entity_in_focus = null;
-        self.quick_action = null;
-        const player_position = self.session.level.playerPosition();
-        // Check the nearest entities:
-        const region = p.Region{
-            .top_left = .{
-                .row = @max(player_position.point.row - 1, 1),
-                .col = @max(player_position.point.col - 1, 1),
-            },
-            .rows = 3,
-            .cols = 3,
-        };
-        // TODO improve:
-        const positions = self.session.level.components.arrayOf(c.Position);
-        for (positions.components.items, 0..) |position, idx| {
-            if (region.containsPoint(position.point)) {
-                if (positions.index_entity.get(@intCast(idx))) |entity| {
-                    if (entity == self.session.player) continue;
-                    if (self.calculateQuickActionForTarget(entity)) |qa| {
-                        self.entity_in_focus = entity;
-                        self.quick_action = qa;
-                        return;
-                    }
+    try self.tryToFindNewTarget();
+}
+
+fn tryToFindNewTarget(self: *PlayMode) !void {
+    self.entity_in_focus = null;
+    self.quick_action = null;
+    const player_position = self.session.level.playerPosition();
+    // Check the nearest entities:
+    const region = p.Region{
+        .top_left = .{
+            .row = @max(player_position.point.row - 1, 1),
+            .col = @max(player_position.point.col - 1, 1),
+        },
+        .rows = 3,
+        .cols = 3,
+    };
+    // TODO improve:
+    const positions = self.session.level.components.arrayOf(c.Position);
+    for (positions.components.items, 0..) |position, idx| {
+        if (region.containsPoint(position.point)) {
+            if (positions.index_entity.get(@intCast(idx))) |entity| {
+                if (entity == self.session.player) continue;
+                if (self.calculateQuickActionForTarget(entity)) |qa| {
+                    self.entity_in_focus = entity;
+                    self.quick_action = qa;
+                    return;
                 }
             }
         }
-        // if no other action was found, then use waiting as default
-        self.quick_action = waitAction(self.session);
     }
+    // if no other action was found, then use waiting as default
+    self.quick_action = .{
+        .type = .wait,
+        .move_points = self.session.level.components.getForEntityUnsafe(self.session.player, c.Speed).move_points,
+    };
 }
 
 fn calculateQuickActionForTarget(
     self: PlayMode,
-    target_enemy: ?g.Entity,
+    target: g.Entity,
 ) ?c.Action {
-    const target = target_enemy orelse return null;
-    if (target == self.session.player) return waitAction(self.session);
-
     const player_position = self.session.level.playerPosition();
     const target_position = self.session.level.components.getForEntity(target, c.Position) orelse return null;
     if (player_position.point.near(target_position.point)) {
@@ -291,11 +302,4 @@ fn calculateQuickActionForTarget(
         }
     }
     return null;
-}
-
-fn waitAction(session: *g.GameSession) c.Action {
-    return .{
-        .type = .wait,
-        .move_points = session.level.components.getForEntityUnsafe(session.player, c.Speed).move_points,
-    };
 }

@@ -12,6 +12,7 @@ pub fn doActions(session: *g.GameSession) !void {
         const entity = components[0];
         const action = components[1];
         const position = components[2];
+        log.debug("Do action {s} by the entity {d}", .{ @tagName(action.type), entity });
         switch (action.type) {
             .move => |*move| {
                 _ = try handleMoveAction(session, entity, position, move);
