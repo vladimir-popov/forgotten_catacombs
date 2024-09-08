@@ -6,7 +6,7 @@ pub const primitives = @import("primitives.zig");
 pub const dungeon = @import("dungeon/dungeon_pkg.zig");
 
 pub const Entity = ecs.Entity;
-pub const AnyRuntime = @import("AnyRuntime.zig");
+pub const Runtime = @import("Runtime.zig");
 pub const Button = @import("Button.zig");
 pub const Cheat = @import("cheats.zig").Cheat;
 pub const Dungeon = dungeon.Dungeon;

@@ -130,12 +130,14 @@ pub fn deinit(self: *Self) void {
     self.playdate.realloc(0, self.sprites_font);
 }
 
-pub fn any(self: *Self) g.AnyRuntime {
+pub fn runtime(self: *Self) g.Runtime {
     return .{
         .context = self,
         .alloc = self.alloc,
         .vtable = &.{
             .getCheat = getCheat,
+            .addMenuItem = addMenuItem,
+            .removeAllMenuItems = removeAllMenuItems,
             .currentMillis = currentMillis,
             .readPushedButtons = readPushedButtons,
             .clearDisplay = clearDisplay,
@@ -152,6 +154,21 @@ pub fn any(self: *Self) g.AnyRuntime {
 fn currentMillis(ptr: *anyopaque) c_uint {
     const self: *Self = @ptrCast(@alignCast(ptr));
     return self.playdate.system.getCurrentTimeMilliseconds();
+}
+
+fn addMenuItem(
+    ptr: *anyopaque,
+    title: []const u8,
+    game_object: *anyopaque,
+    callback: g.Runtime.MenuItemCallback,
+) *g.Runtime.MenuItem {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    return @ptrCast(@alignCast(self.playdate.system.addMenuItem(title.ptr, callback, game_object).?));
+}
+
+fn removeAllMenuItems(ptr: *anyopaque) void {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    self.playdate.system.removeAllMenuItems();
 }
 
 fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
@@ -221,7 +238,7 @@ fn drawSprite(
     screen: g.Screen,
     sprite: *const c.Sprite,
     position: *const c.Position,
-    mode: g.AnyRuntime.DrawingMode,
+    mode: g.Runtime.DrawingMode,
 ) anyerror!void {
     if (screen.region.containsPoint(position.point)) {
         const self: *Self = @ptrCast(@alignCast(ptr));
@@ -233,7 +250,7 @@ fn drawSprite(
     }
 }
 
-fn drawText(ptr: *anyopaque, text: []const u8, absolute_position: p.Point, mode: g.AnyRuntime.DrawingMode) !void {
+fn drawText(ptr: *anyopaque, text: []const u8, absolute_position: p.Point, mode: g.Runtime.DrawingMode) !void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     // choose the font for text:
     self.playdate.graphics.setFont(self.text_font);
@@ -248,7 +265,7 @@ fn drawText(ptr: *anyopaque, text: []const u8, absolute_position: p.Point, mode:
 inline fn drawTextWithMode(
     self: *Self,
     text: []const u8,
-    mode: g.AnyRuntime.DrawingMode,
+    mode: g.Runtime.DrawingMode,
     x: c_int,
     y: c_int,
 ) !void {

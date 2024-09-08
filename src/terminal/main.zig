@@ -39,7 +39,7 @@ pub fn main() !void {
 
     var runtime = try TtyRuntime.init(alloc, true, use_cheats);
     defer runtime.deinit();
-    var game = try g.Game.init(runtime.any(), seed);
+    var game = try g.Game.init(runtime.runtime(), seed);
     defer game.deinit();
     try runtime.run(&game);
 }

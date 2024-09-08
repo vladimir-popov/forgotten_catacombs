@@ -32,9 +32,9 @@ pub fn initWithCapacity(alloc: std.mem.Allocator, capacity_in_bytes: usize) Erro
     return .{ .bytes = try std.ArrayList(u8).initCapacity(alloc, capacity_in_bytes) };
 }
 
-pub fn initFill(alloc: std.mem.Allocator, char: u8, count: usize) Error!String {
-    var res = String{ .bytes = try std.ArrayList(u8).initCapacity(alloc, count) };
-    for (0..count) |_| {
+pub fn initFill(alloc: std.mem.Allocator, char: u8, length: usize) Error!String {
+    var res = String{ .bytes = try std.ArrayList(u8).initCapacity(alloc, length) };
+    for (0..length) |_| {
         try res.bytes.append(char);
     }
     return res;
@@ -51,6 +51,12 @@ pub fn fromSingleSymbol(alloc: std.mem.Allocator, codepoint: u21) Error!String {
 /// Frees memory allocated for this sting.
 pub fn deinit(self: String) void {
     self.bytes.deinit();
+}
+
+pub fn copy(self: String, alloc: std.mem.Allocator) !String {
+    var copied = try std.ArrayList(u8).initCapacity(alloc, self.bytes.capacity);
+    copied.appendSliceAssumeCapacity(self.bytes.items);
+    return .{ .bytes = copied };
 }
 
 /// Finds the index of the first byte of the utf-8 symbol on or next after `b_idx`.

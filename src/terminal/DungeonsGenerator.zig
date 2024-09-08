@@ -26,7 +26,7 @@ pub fn main() !void {
     var runtime = try Runtime.init(alloc, false, false);
     defer runtime.deinit();
 
-    var generator = DungeonsGenerator.init(runtime.any());
+    var generator = DungeonsGenerator.init(runtime.runtime());
     defer generator.deinit();
 
     try generator.generate(seed);
@@ -35,11 +35,11 @@ pub fn main() !void {
 
 const DungeonsGenerator = struct {
     entities_provider: g.ecs.EntitiesProvider,
-    runtime: g.AnyRuntime,
+    runtime: g.Runtime,
     render: g.Render,
     level: g.Level,
 
-    pub fn init(runtime: g.AnyRuntime) DungeonsGenerator {
+    pub fn init(runtime: g.Runtime) DungeonsGenerator {
         return .{
             .runtime = runtime,
             .render = g.Render.init(runtime),

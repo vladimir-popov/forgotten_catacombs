@@ -4,6 +4,8 @@ const p = g.primitives;
 const tty = @import("tty.zig");
 const utf8 = @import("utf8.zig");
 
+const Menu = @import("Menu.zig");
+
 const log = std.log.scoped(.tty_runtime);
 
 const TtyRuntime = @This();
@@ -15,16 +17,18 @@ var should_render_in_center: bool = true;
 var rows_pad: u8 = 0;
 var cols_pad: u8 = 0;
 
-alloc: std.mem.Allocator,
-// used to accumulate the buffer every run-loop circle
-arena: std.heap.ArenaAllocator,
-buffer: utf8.Buffer,
 termios: std.c.termios,
+alloc: std.mem.Allocator,
+// used to create the buffer, and can be completely free on cleanDisplay
+arena: std.heap.ArenaAllocator,
+// The main buffer to render the game
+buffer: utf8.Buffer,
+menu: Menu,
 // the last read button through readButton function.
 // it is used as a buffer to check ESC outside the readButton function
-prev_key: ?tty.KeyboardAndMouse.Button = null,
-pressed_at: i64 = 0,
+keyboard_buffer: ?tty.KeyboardAndMouse.Button = null,
 cheat: ?g.Cheat = null,
+is_exit: bool = false,
 
 pub fn enableGameMode(use_mouse: bool) !void {
     try tty.Display.hideCursor();
@@ -43,6 +47,7 @@ pub fn init(alloc: std.mem.Allocator, render_in_center: bool, use_cheats: bool) 
         .alloc = alloc,
         .arena = std.heap.ArenaAllocator.init(alloc),
         .buffer = undefined,
+        .menu = Menu.init(alloc),
         .termios = tty.Display.enterRawMode(),
     };
     try enableGameMode(use_cheats);
@@ -51,6 +56,7 @@ pub fn init(alloc: std.mem.Allocator, render_in_center: bool, use_cheats: bool) 
 }
 
 pub fn deinit(self: *TtyRuntime) void {
+    self.menu.deinit();
     _ = self.arena.reset(.free_all);
     disableGameMode() catch unreachable;
 }
@@ -58,10 +64,40 @@ pub fn deinit(self: *TtyRuntime) void {
 /// Run the main loop of the game
 pub fn run(self: *TtyRuntime, game: anytype) !void {
     handleWindowResize(0);
-    while (!self.isExit()) {
-        try game.tick();
-        try self.writeBuffer(tty.stdout_writer);
+    while (!self.is_exit) {
+        if (self.menu.is_shown) {
+            if (try readPushedButtons(self)) |btn| {
+                try self.menu.handleKeyboardButton(btn);
+            }
+            // menu can be closed after reading keyboard
+            if (self.menu.is_shown)
+                try writeBuffer(self.menu.buffer, tty.stdout_writer);
+        } else {
+            try game.tick();
+            try writeBuffer(self.buffer, tty.stdout_writer);
+        }
     }
+}
+
+fn reedKeyboardInput(self: *TtyRuntime) !?tty.KeyboardAndMouse.Button {
+    if (tty.KeyboardAndMouse.readPressedButton()) |btn| {
+        self.keyboard_buffer = btn;
+        switch (btn) {
+            .control => if (btn.control == tty.KeyboardAndMouse.ControlButton.ESC) {
+                self.keyboard_buffer = null;
+                self.is_exit = true;
+            },
+            .char => |ch| if (ch.char == ' ') {
+                self.keyboard_buffer = null;
+                if (self.menu.is_shown)
+                    try self.menu.close()
+                else
+                    try self.menu.show(self.buffer);
+            },
+            else => {},
+        }
+    }
+    return self.keyboard_buffer;
 }
 
 fn handleWindowResize(_: i32) callconv(.C) void {
@@ -73,30 +109,21 @@ fn handleWindowResize(_: i32) callconv(.C) void {
     }
 }
 
-fn isExit(self: TtyRuntime) bool {
-    if (self.prev_key) |btn| {
-        switch (btn) {
-            .control => return btn.control == tty.KeyboardAndMouse.ControlButton.ESC,
-            else => return false,
-        }
-    } else {
-        return false;
-    }
-}
-
-fn writeBuffer(self: TtyRuntime, writer: std.io.AnyWriter) !void {
-    for (self.buffer.lines.items, rows_pad..) |line, i| {
+fn writeBuffer(buffer: utf8.Buffer, writer: std.io.AnyWriter) !void {
+    for (buffer.lines.items, rows_pad..) |line, i| {
         try tty.Text.writeSetCursorPosition(writer, @intCast(i), cols_pad);
         _ = try writer.write(line.bytes.items);
     }
 }
 
-pub fn any(self: *TtyRuntime) g.AnyRuntime {
+pub fn runtime(self: *TtyRuntime) g.Runtime {
     return .{
         .context = self,
         .alloc = self.alloc,
         .vtable = &.{
             .getCheat = getCheat,
+            .addMenuItem = addMenuItem,
+            .removeAllMenuItems = removeAllMenuItems,
             .currentMillis = currentMillis,
             .readPushedButtons = readPushedButtons,
             .clearDisplay = clearDisplay,
@@ -112,16 +139,29 @@ fn currentMillis(_: *anyopaque) c_uint {
     return @truncate(@as(u64, @intCast(std.time.milliTimestamp())));
 }
 
+fn addMenuItem(
+    ptr: *anyopaque,
+    title: []const u8,
+    game_object: *anyopaque,
+    callback: g.Runtime.MenuItemCallback,
+) ?*g.Runtime.MenuItem {
+    const self: *TtyRuntime = @ptrCast(@alignCast(ptr));
+    return self.menu.addMenuItem(title, game_object, callback);
+}
+
+fn removeAllMenuItems(ptr: *anyopaque) void {
+    const self: *TtyRuntime = @ptrCast(@alignCast(ptr));
+    self.menu.removeAllItems();
+}
+
 fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
     var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
-    // const prev_key = self.prev_key;
-    if (tty.KeyboardAndMouse.readPressedButton()) |key| {
-        self.prev_key = key;
+    if (try self.reedKeyboardInput()) |key| {
         const game_button: ?g.Button.GameButton = switch (key) {
             .char => switch (key.char.char) {
                 // (B) (A)
-                ' ', 's', 'i' => .a,
-                'b', 'a', 'u' => .b,
+                's', 'i' => .a,
+                'a', 'u' => .b,
                 'h' => .left,
                 'j' => .down,
                 'k' => .up,
@@ -153,19 +193,9 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
             else => null,
         };
         if (game_button) |gbtn| {
-            const now = std.time.milliTimestamp();
-            self.pressed_at = now;
-            // const delay = now - self.pressed_at;
-            // var state: g.Button.State = .pressed;
-            // if (key.eql(prev_key)) {
-            //     if (delay < g.DOUBLE_PUSH_DELAY_MS)
-            //         state = .double_pressed
-            //     else if (delay > g.HOLD_DELAY_MS)
-            //         state = .hold;
-            // }
+            self.keyboard_buffer = null;
             return .{ .game_button = gbtn, .state = .pressed };
         } else {
-            self.pressed_at = 0;
             return null;
         }
     }
@@ -226,7 +256,7 @@ fn drawSprite(
     screen: g.Screen,
     sprite: *const g.components.Sprite,
     position: *const g.components.Position,
-    mode: g.AnyRuntime.DrawingMode,
+    mode: g.Runtime.DrawingMode,
 ) anyerror!void {
     if (screen.region.containsPoint(position.point)) {
         var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
@@ -252,7 +282,7 @@ fn drawText(
     ptr: *anyopaque,
     text: []const u8,
     absolute_position: p.Point,
-    mode: g.AnyRuntime.DrawingMode,
+    mode: g.Runtime.DrawingMode,
 ) !void {
     const self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     const r = absolute_position.row + 1; // +1 for top border

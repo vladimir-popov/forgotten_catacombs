@@ -30,14 +30,14 @@ const log = std.log.scoped(.render);
 
 const Render = @This();
 
-const DrawingMode = g.AnyRuntime.DrawingMode;
+const DrawingMode = g.Runtime.DrawingMode;
 const TextAlign = enum { center, left, right };
 
-runtime: g.AnyRuntime,
+runtime: g.Runtime,
 /// Visible area
 screen: g.Screen,
 
-pub fn init(runtime: g.AnyRuntime) Render {
+pub fn init(runtime: g.Runtime) Render {
     return .{
         .runtime = runtime,
         .screen = g.Screen.init(g.DISPLAY_ROWS - 2, g.DISPLAY_COLS),
@@ -75,7 +75,7 @@ pub fn drawSprites(self: Render, level: g.Level, entity_in_focus: ?g.Entity) !vo
         }
     }
     while (visible.removeOrNull()) |tuple| {
-        const mode: g.AnyRuntime.DrawingMode = if (entity_in_focus == tuple[0])
+        const mode: g.Runtime.DrawingMode = if (entity_in_focus == tuple[0])
             .inverted
         else
             .normal;
@@ -191,7 +191,7 @@ pub fn drawWelcomeScreen(self: Render) !void {
     const vertical_middle = g.DISPLAY_ROWS / 2 - 1;
     try self.drawText(g.DISPLAY_COLS, "Welcome", .{ .row = vertical_middle - 1, .col = 1 }, .normal, .center);
     try self.drawText(g.DISPLAY_COLS, "to", .{ .row = vertical_middle, .col = 1 }, .normal, .center);
-    try self.drawText(g.DISPLAY_COLS, "Forgotten catacomb", .{ .row = vertical_middle + 1, .col = 1 }, .normal, .center);
+    try self.drawText(g.DISPLAY_COLS, "Forgotten catacombs", .{ .row = vertical_middle + 1, .col = 1 }, .normal, .center);
 }
 
 pub fn drawGameOverScreen(self: Render) !void {
@@ -236,7 +236,7 @@ fn drawText(
     comptime max_length: u8,
     text: []const u8,
     absolut_position: p.Point,
-    mode: g.AnyRuntime.DrawingMode,
+    mode: g.Runtime.DrawingMode,
     aln: TextAlign,
 ) !void {
     const text_length = @min(max_length, text.len);

@@ -14,11 +14,27 @@ pub fn init(alloc: std.mem.Allocator) Buffer {
     return .{ .lines = std.ArrayList(String).init(alloc) };
 }
 
+pub fn initFill(alloc: std.mem.Allocator, char: u8, lines: usize, line_length: usize) !Buffer {
+    var self = Buffer{ .lines = try std.ArrayList(String).initCapacity(alloc, lines) };
+    for (0..lines) |_| {
+        try self.lines.append(try String.initFill(alloc, char, line_length));
+    }
+    return self;
+}
+
 pub fn deinit(self: Buffer) void {
     for (self.lines.items) |string| {
         string.deinit();
     }
     self.lines.deinit();
+}
+
+pub fn copy(self: Buffer, alloc: std.mem.Allocator) !Buffer {
+    var copied = Buffer{ .lines = try std.ArrayList(String).initCapacity(alloc, self.lines.capacity) };
+    for (self.lines.items) |str| {
+        try copied.lines.append(try str.copy(alloc));
+    }
+    return copied;
 }
 
 pub fn parseInit(alloc: std.mem.Allocator, str: []const u8) Error!Buffer {
@@ -28,6 +44,13 @@ pub fn parseInit(alloc: std.mem.Allocator, str: []const u8) Error!Buffer {
         try self.addLine(line);
     }
     return self;
+}
+
+pub fn fill(self: *Buffer, char: u8, lines_pad: usize, left_symbols_pad: usize, lines: usize, line_length: usize) !void {
+    var arena = std.heap.ArenaAllocator.init(self.lines.allocator);
+    defer arena.deinit();
+    const emptyBuffer = try initFill(arena.allocator(), char, lines, line_length);
+    try self.merge(emptyBuffer, lines_pad, left_symbols_pad);
 }
 
 pub inline fn get(self: Buffer, idx: usize) ?*String {
@@ -85,14 +108,14 @@ inline fn getLengthOfLine(self: Buffer, idx: usize) ?usize {
 }
 
 /// Merges string `str` with line `line` starting from the `pos` symbol (both start from 0).
-pub fn mergeLine(self: *Buffer, str: []const u8, line: u8, pos: u8) Error!void {
+pub fn mergeLine(self: *Buffer, str: []const u8, line: usize, pos: usize) Error!void {
     try self.addAbsentLines(line + 1);
     const string = try String.initParse(self.lines.allocator, str);
     defer string.deinit();
     try self.lines.items[line].merge(string, pos);
 }
 
-fn addAbsentLines(self: *Buffer, expected_lines_count: u8) Error!void {
+fn addAbsentLines(self: *Buffer, expected_lines_count: usize) Error!void {
     if (expected_lines_count > self.lines.items.len) {
         for (0..(expected_lines_count - self.lines.items.len)) |_| {
             try self.addEmptyLine();
@@ -100,7 +123,7 @@ fn addAbsentLines(self: *Buffer, expected_lines_count: u8) Error!void {
     }
 }
 
-pub fn merge(self: *Buffer, other: Buffer, lines_pad: u8, left_symbols_pad: u8) Error!void {
+pub fn merge(self: *Buffer, other: Buffer, lines_pad: usize, left_symbols_pad: usize) Error!void {
     // add lines till pad
     try self.addAbsentLines(lines_pad);
     // merge intersection
@@ -110,7 +133,7 @@ pub fn merge(self: *Buffer, other: Buffer, lines_pad: u8, left_symbols_pad: u8) 
     }
 }
 
-pub fn set(self: *Buffer, codepoint: u21, lines_pad: u8, left_symbols_pad: u8) Error!void {
+pub fn set(self: *Buffer, codepoint: u21, lines_pad: usize, left_symbols_pad: usize) Error!void {
     try self.addAbsentLines(lines_pad);
     try self.lines.items[lines_pad].set(left_symbols_pad, codepoint);
 }
@@ -266,6 +289,45 @@ test "merge buffers with utf-8 symbols" {
     // when:
     try first.merge(second, 1, 1);
     const actual = try first.toCString(std.testing.allocator);
+    defer std.testing.allocator.free(actual);
+
+    // then:
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "init filled" {
+    // given:
+    const expected =
+        \\....
+        \\....
+        \\....
+    ;
+    // when:
+    var buffer = try Buffer.initFill(std.testing.allocator, '.', 3, 4);
+    defer buffer.deinit();
+
+    const actual = try buffer.toCString(std.testing.allocator);
+    defer std.testing.allocator.free(actual);
+
+    // then:
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "fill" {
+    // given:
+    const expected =
+        \\....
+        \\..##
+        \\..##
+        \\..##
+    ;
+    var buffer = try Buffer.initFill(std.testing.allocator, '.', 4, 4);
+    defer buffer.deinit();
+
+    // when:
+    try buffer.fill('#', 1, 2, 3, 2);
+
+    const actual = try buffer.toCString(std.testing.allocator);
     defer std.testing.allocator.free(actual);
 
     // then:
