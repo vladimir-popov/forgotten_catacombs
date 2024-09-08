@@ -6,7 +6,7 @@ const p = g.primitives;
 
 const Allocator = @import("Allocator.zig");
 
-const log = std.log.scoped(.runtime);
+const log = std.log.scoped(.playdate_runtime);
 
 const Self = @This();
 
@@ -139,8 +139,7 @@ pub fn any(self: *Self) g.AnyRuntime {
             .currentMillis = currentMillis,
             .readPushedButtons = readPushedButtons,
             .clearDisplay = clearDisplay,
-            .drawScreenBorder = drawScreenBorder,
-            .drawHorizontalBorder = drawHorizontalBorder,
+            .drawHorizontalBorderLine = drawHorizontalBorderLine,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
             .drawText = drawText,
@@ -190,14 +189,12 @@ fn clearDisplay(ptr: *anyopaque) anyerror!void {
     self.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
 }
 
-fn drawScreenBorder(_: *anyopaque) anyerror!void {}
-
-fn drawHorizontalBorder(ptr: *anyopaque) anyerror!void {
+fn drawHorizontalBorderLine(ptr: *anyopaque, row: u8, length: u8) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
-    // separate dung and stats:
-    const y = g.DISPLAY_HEIGHT - g.FONT_HEIGHT * 2;
-    self.playdate.graphics.drawLine(0, y, g.DISPLAY_WIDHT, y, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
-    self.playdate.graphics.drawLine(0, y + 2, g.DISPLAY_WIDHT, y + 2, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
+    const y: c_int = @as(c_int, @intCast(row)) * g.SPRITE_HEIGHT + g.SPRITE_HEIGHT / 2;
+    const x: c_int = @as(c_int, @intCast(length)) * g.SPRITE_WIDTH;
+    self.playdate.graphics.drawLine(0, y, x, y, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
+    self.playdate.graphics.drawLine(0, y + 2, x, y + 2, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
 }
 
 fn drawDungeon(ptr: *anyopaque, screen: g.Screen, dungeon: g.Dungeon) anyerror!void {

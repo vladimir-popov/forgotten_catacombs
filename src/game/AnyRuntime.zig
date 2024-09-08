@@ -10,8 +10,7 @@ pub const DrawingMode = enum { normal, inverted, transparent };
 const VTable = struct {
     readPushedButtons: *const fn (context: *anyopaque) anyerror!?g.Button,
     clearDisplay: *const fn (context: *anyopaque) anyerror!void,
-    drawScreenBorder: *const fn (context: *anyopaque) anyerror!void,
-    drawHorizontalBorder: *const fn (context: *anyopaque) anyerror!void,
+    drawHorizontalBorderLine: *const fn (context: *anyopaque, row: u8, length: u8) anyerror!void,
     drawDungeon: *const fn (
         context: *anyopaque,
         screen: g.Screen,
@@ -54,12 +53,8 @@ pub inline fn clearDisplay(self: Self) !void {
     try self.vtable.clearDisplay(self.context);
 }
 
-pub inline fn drawScreenBorder(self: Self) !void {
-    try self.vtable.drawScreenBorder(self.context);
-}
-
-pub inline fn drawHorizontalBorder(self: Self) !void {
-    try self.vtable.drawHorizontalBorder(self.context);
+pub inline fn drawHorizontalBorderLine(self: Self, row: u8, length: u8) !void {
+    try self.vtable.drawHorizontalBorderLine(self.context, row, length);
 }
 
 pub inline fn drawDungeon(self: Self, screen: g.Screen, dungeon: g.Dungeon) !void {

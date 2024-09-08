@@ -22,7 +22,7 @@ game_session: ?*g.GameSession,
 pub fn init(runtime: g.AnyRuntime, seed: u64) !Game {
     var gm = Game{
         .runtime = runtime,
-        .render = g.Render.init(runtime, g.DISPLAY_ROWS - 1, g.DISPLAY_COLS),
+        .render = g.Render.init(runtime),
         .seed = seed,
         .state = .welcome,
         .game_session = null,

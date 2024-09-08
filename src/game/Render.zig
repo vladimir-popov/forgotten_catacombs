@@ -37,10 +37,10 @@ runtime: g.AnyRuntime,
 /// Visible area
 screen: g.Screen,
 
-pub fn init(runtime: g.AnyRuntime, rows: u8, cols: u8) Render {
+pub fn init(runtime: g.AnyRuntime) Render {
     return .{
         .runtime = runtime,
-        .screen = g.Screen.init(rows, cols),
+        .screen = g.Screen.init(g.DISPLAY_ROWS - 2, g.DISPLAY_COLS),
     };
 }
 
@@ -48,8 +48,8 @@ pub fn init(runtime: g.AnyRuntime, rows: u8, cols: u8) Render {
 /// Removes completed animations.
 pub fn redraw(self: Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
     try self.clearDisplay();
-    try self.runtime.drawScreenBorder();
-    try self.runtime.drawHorizontalBorder();
+    // separate dung and stats:
+    try self.runtime.drawHorizontalBorderLine(g.DISPLAY_ROWS - 2, g.DISPLAY_COLS);
     try self.drawScene(session, entity_in_focus);
 }
 
@@ -188,17 +188,15 @@ pub fn drawQuickActionButton(self: Render, quick_action: ?c.Action) !void {
 
 pub fn drawWelcomeScreen(self: Render) !void {
     try self.runtime.clearDisplay();
-    try self.runtime.drawScreenBorder();
-    const middle = g.DISPLAY_ROWS / 2 + 1;
-    try self.drawText(g.DISPLAY_COLS, "Welcome", .{ .row = middle - 1, .col = 1 }, .normal, .center);
-    try self.drawText(g.DISPLAY_COLS, "to", .{ .row = middle, .col = 1 }, .normal, .center);
-    try self.drawText(g.DISPLAY_COLS, "Forgotten catacomb", .{ .row = middle + 1, .col = 1 }, .normal, .center);
+    const vertical_middle = g.DISPLAY_ROWS / 2 - 1;
+    try self.drawText(g.DISPLAY_COLS, "Welcome", .{ .row = vertical_middle - 1, .col = 1 }, .normal, .center);
+    try self.drawText(g.DISPLAY_COLS, "to", .{ .row = vertical_middle, .col = 1 }, .normal, .center);
+    try self.drawText(g.DISPLAY_COLS, "Forgotten catacomb", .{ .row = vertical_middle + 1, .col = 1 }, .normal, .center);
 }
 
 pub fn drawGameOverScreen(self: Render) !void {
     try self.runtime.clearDisplay();
-    try self.runtime.drawScreenBorder();
-    try self.drawText(g.DISPLAY_COLS, "You are dead", .{ .row = 1 + g.DISPLAY_ROWS / 2, .col = 1 }, .normal, .center);
+    try self.drawText(g.DISPLAY_COLS, "You are dead", .{ .row = g.DISPLAY_ROWS / 2 - 1, .col = 1 }, .normal, .center);
 }
 
 inline fn cleanZone(self: Render, comptime zone: u8) !void {
@@ -216,21 +214,21 @@ inline fn drawZone(
         0 => try self.drawText(
             OUT_ZONE_LENGTH - 1,
             text,
-            .{ .row = g.DISPLAY_ROWS, .col = 1 },
+            .{ .row = g.DISPLAY_ROWS - 1, .col = 1 },
             mode,
             aln,
         ),
         1 => try self.drawText(
             MIDDLE_ZONE_LENGTH,
             text,
-            .{ .row = g.DISPLAY_ROWS, .col = OUT_ZONE_LENGTH + 1 },
+            .{ .row = g.DISPLAY_ROWS - 1, .col = OUT_ZONE_LENGTH + 1 },
             mode,
             aln,
         ),
         2 => try self.drawText(
             OUT_ZONE_LENGTH,
             text,
-            .{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS - OUT_ZONE_LENGTH },
+            .{ .row = g.DISPLAY_ROWS - 1, .col = g.DISPLAY_COLS - OUT_ZONE_LENGTH },
             mode,
             aln,
         ),
@@ -240,19 +238,18 @@ inline fn drawZone(
 
 fn drawText(
     self: Render,
-    comptime len: u8,
+    comptime max_length: u8,
     text: []const u8,
     absolut_position: p.Point,
     mode: g.AnyRuntime.DrawingMode,
     aln: TextAlign,
 ) !void {
-    var buf: [len]u8 = undefined;
-    inline for (0..len) |i| buf[i] = ' ';
-    const l = @min(len, text.len);
+    const text_length = @min(max_length, text.len);
+    var pos = absolut_position;
     switch (aln) {
-        .left => std.mem.copyForwards(u8, &buf, text[0..l]),
-        .center => std.mem.copyForwards(u8, buf[(len - l) / 2 ..], text[0..l]),
-        .right => std.mem.copyForwards(u8, buf[(len - l)..], text[0..l]),
+        .left => {},
+        .center => pos.col += (max_length - text_length) / 2,
+        .right => pos.col += (max_length - text_length),
     }
-    try self.runtime.drawText(&buf, absolut_position, mode);
+    try self.runtime.drawText(text[0..text_length], pos, mode);
 }

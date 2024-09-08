@@ -42,7 +42,7 @@ const DungeonsGenerator = struct {
     pub fn init(runtime: g.AnyRuntime) DungeonsGenerator {
         return .{
             .runtime = runtime,
-            .render = g.Render.init(runtime, g.Dungeon.ROWS, g.Dungeon.COLS),
+            .render = g.Render.init(runtime),
             .entities_provider = .{},
             .level = undefined,
         };

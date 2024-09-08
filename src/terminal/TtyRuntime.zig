@@ -4,7 +4,7 @@ const p = g.primitives;
 const tty = @import("tty.zig");
 const utf8 = @import("utf8.zig");
 
-const log = std.log.scoped(.runtime);
+const log = std.log.scoped(.tty_runtime);
 
 const TtyRuntime = @This();
 
@@ -100,8 +100,7 @@ pub fn any(self: *TtyRuntime) g.AnyRuntime {
             .currentMillis = currentMillis,
             .readPushedButtons = readPushedButtons,
             .clearDisplay = clearDisplay,
-            .drawScreenBorder = drawScreenBorder,
-            .drawHorizontalBorder = drawHorizontalBorder,
+            .drawHorizontalBorderLine = drawHorizontalBorderLine,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
             .drawText = drawText,
@@ -182,20 +181,19 @@ fn clearDisplay(ptr: *anyopaque) !void {
     var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     _ = self.arena.reset(.retain_capacity);
     self.buffer = utf8.Buffer.init(self.arena.allocator());
-}
-
-fn drawScreenBorder(ptr: *anyopaque) !void {
-    var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
+    // draw external border
     try self.buffer.addLine("╔" ++ "═" ** g.DISPLAY_COLS ++ "╗");
-    for (0..(g.DISPLAY_ROWS + 1)) |_| {
+    for (0..(g.DISPLAY_ROWS)) |_| {
         try self.buffer.addLine("║" ++ " " ** g.DISPLAY_COLS ++ "║");
     }
     try self.buffer.addLine("╚" ++ "═" ** g.DISPLAY_COLS ++ "╝");
 }
 
-fn drawHorizontalBorder(ptr: *anyopaque) !void {
+fn drawHorizontalBorderLine(ptr: *anyopaque, row: u8, length: u8) !void {
     var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
-    try self.buffer.mergeLine("║" ++ "═" ** g.DISPLAY_COLS ++ "║", g.DISPLAY_ROWS, 0);
+    const buf = "═" ** g.DISPLAY_COLS;
+    // the "═" symbol takes 3 bytes 0xE2 0x95 0x90
+    try self.buffer.mergeLine(buf[0 .. length * 3], row + 1, 1);
 }
 
 fn drawDungeon(ptr: *anyopaque, screen: g.Screen, dungeon: g.Dungeon) anyerror!void {
@@ -257,8 +255,7 @@ fn drawText(
     mode: g.AnyRuntime.DrawingMode,
 ) !void {
     const self: *TtyRuntime = @ptrCast(@alignCast(ptr));
-    // skip horizontal UI separator
-    const r = if (absolute_position.row == g.DISPLAY_ROWS) g.DISPLAY_ROWS + 1 else absolute_position.row;
+    const r = absolute_position.row + 1; // +1 for top border
     const c = absolute_position.col;
     var buf: [50]u8 = undefined;
     if (mode == .inverted) {
