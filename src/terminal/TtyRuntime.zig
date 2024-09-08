@@ -114,7 +114,7 @@ fn currentMillis(_: *anyopaque) c_uint {
 
 fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
     var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
-    const prev_key = self.prev_key;
+    // const prev_key = self.prev_key;
     if (tty.KeyboardAndMouse.readPressedButton()) |key| {
         self.prev_key = key;
         const game_button: ?g.Button.GameButton = switch (key) {
@@ -154,16 +154,16 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
         };
         if (game_button) |gbtn| {
             const now = std.time.milliTimestamp();
-            const delay = now - self.pressed_at;
             self.pressed_at = now;
-            var state: g.Button.State = .pressed;
-            if (key.eql(prev_key)) {
-                if (delay < g.DOUBLE_PUSH_DELAY_MS)
-                    state = .double_pressed
-                else if (delay > g.HOLD_DELAY_MS)
-                    state = .hold;
-            }
-            return .{ .game_button = gbtn, .state = state };
+            // const delay = now - self.pressed_at;
+            // var state: g.Button.State = .pressed;
+            // if (key.eql(prev_key)) {
+            //     if (delay < g.DOUBLE_PUSH_DELAY_MS)
+            //         state = .double_pressed
+            //     else if (delay > g.HOLD_DELAY_MS)
+            //         state = .hold;
+            // }
+            return .{ .game_button = gbtn, .state = .pressed };
         } else {
             self.pressed_at = 0;
             return null;
