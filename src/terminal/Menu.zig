@@ -88,7 +88,7 @@ fn drawMenuItem(self: *Menu, item_idx: u4, comptime is_selected: bool) !void {
 }
 
 pub fn close(self: *Menu) !void {
-    log.debug("Close menu with {d} items and {d} selected", .{self.items_count, self.selected_item});
+    log.debug("Close menu with {d} items and {d} selected", .{ self.items_count, self.selected_item });
     self.is_shown = false;
     _ = self.arena.reset(.retain_capacity);
 }

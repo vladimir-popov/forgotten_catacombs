@@ -162,18 +162,18 @@ pub const NPC = struct {
     pub fn deinit(_: *@This()) void {}
 };
 
-pub const Components = union {
-    position: Position,
-    sprite: Sprite,
-    door: Door,
-    ladder: Ladder,
-    animation: Animation,
-    move: Action,
-    description: Description,
-    health: Health,
-    damage: Damage,
-    collision: Collision,
-    speed: Speed,
-    melee: MeleeWeapon,
-    npc: NPC,
+pub const Components = struct {
+    position: ?Position,
+    sprite: ?Sprite,
+    door: ?Door,
+    ladder: ?Ladder,
+    animation: ?Animation,
+    move: ?Action,
+    description: ?Description,
+    health: ?Health,
+    damage: ?Damage,
+    collision: ?Collision,
+    speed: ?Speed,
+    melee: ?MeleeWeapon,
+    npc: ?NPC,
 };

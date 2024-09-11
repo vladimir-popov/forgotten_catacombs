@@ -2,6 +2,7 @@
 //! which is a core of the game.
 
 const std = @import("std");
+const Type = std.builtin.Type;
 
 /// The id of an entity.
 pub const Entity = u32;
@@ -148,66 +149,79 @@ test "The component should be initialized after detach" {
 }
 
 /// Generated in compile time structure,
-/// which has  fields for every type from the `ComponentsUnion` union.
-fn ComponentsMap(comptime ComponentsUnion: anytype) type {
-    const type_info = @typeInfo(ComponentsUnion);
+/// which has ArraySet for every type from the `ComponentsStruct`.
+fn ComponentsMap(comptime ComponentsStruct: anytype) type {
+    const type_info = @typeInfo(ComponentsStruct);
     switch (type_info) {
-        .Union => {},
+        .Struct => {},
         else => @compileError(
-            std.fmt.comptimePrint("Components have to be grouped to an union, but found {any}", .{type_info}),
+            std.fmt.comptimePrint(
+                "Wrong `{s}` type. The components have to be grouped to the struct with optional types, but found `{any}`",
+                .{ @typeName(ComponentsStruct), type_info },
+            ),
         ),
     }
-    const union_fields = type_info.Union.fields;
-    if (union_fields.len == 0) {
+    const struct_fields = type_info.Struct.fields;
+    if (struct_fields.len == 0) {
         @compileError("At least one component should exist");
     }
 
-    // every type in the union should be unique:
-    var tmp: [union_fields.len]std.builtin.Type.UnionField = undefined;
-    @memcpy(&tmp, union_fields);
-    std.sort.pdq(std.builtin.Type.UnionField, &tmp, {}, compareUnionFields);
-    for (0..tmp.len - 1) |i| {
-        if (tmp[i].type == tmp[i + 1].type) {
+    var components: [struct_fields.len]Type.StructField = undefined;
+    // every field inside the ComponentsStruct should be optional, but we need their child types
+    for (struct_fields, 0..) |field, i| {
+        switch (@typeInfo(field.type)) {
+            .Optional => |opt| {
+                components[i] = .{
+                    .name = @typeName(opt.child),
+                    .type = ArraySet(opt.child),
+                    .default_value = null,
+                    .is_comptime = false,
+                    .alignment = 0,
+                };
+            },
+            else => {
+                @compileError(std.fmt.comptimePrint(
+                    "All fields in the `{s}` should be optional, but the `{s}: {any}` was found.",
+                    .{ @typeName(ComponentsStruct), field.name, field.type },
+                ));
+            },
+        }
+    }
+    // every type in the struct should be unique:
+    std.sort.pdq(Type.StructField, &components, {}, compareTypes);
+    for (0..components.len - 1) |i| {
+        if (components[i].type == components[i + 1].type) {
             @compileError(std.fmt.comptimePrint(
-                "Both fields `{s}` and `{s}` have the same type `{any}` in the `{s}`, but components should have unique types.",
-                .{ tmp[i].name, tmp[i + 1].name, tmp[i].type, @typeName(ComponentsUnion) },
+                "The `{s}` has fields with the same type `{s}`, but all types of the components must be unique",
+                .{ @typeName(ComponentsStruct), components[i].name },
             ));
         }
     }
 
-    var struct_fields: [union_fields.len]std.builtin.Type.StructField = undefined;
-    for (union_fields, 0..) |f, i| {
-        struct_fields[i] = .{
-            .name = @typeName(f.type),
-            .type = ArraySet(f.type),
-            .default_value = null,
-            .is_comptime = false,
-            .alignment = 0,
-        };
-    }
     return @Type(.{
         .Struct = .{
             .layout = .auto,
-            .fields = struct_fields[0..],
+            .fields = components[0..],
             .decls = &[_]std.builtin.Type.Declaration{},
             .is_tuple = false,
         },
     });
 }
 
-/// Compares types of the two union fields. Used to check uniqueness of the components
-fn compareUnionFields(_: void, a: std.builtin.Type.UnionField, b: std.builtin.Type.UnionField) bool {
+/// Compares types of the two fields of the ComponentsStruct.
+/// Used to check uniqueness of the components.
+fn compareTypes(_: void, a: Type.StructField, b: Type.StructField) bool {
     return a.type != b.type;
 }
 
 /// The manager of the components.
-pub fn ComponentsManager(comptime ComponentsUnion: type) type {
+pub fn ComponentsManager(comptime ComponentsStruct: type) type {
     return struct {
         const Self = @This();
 
         const InnerState = struct {
             alloc: std.mem.Allocator,
-            components_map: ComponentsMap(ComponentsUnion),
+            components_map: ComponentsMap(ComponentsStruct),
         };
 
         inner_state: *InnerState,
@@ -219,7 +233,7 @@ pub fn ComponentsManager(comptime ComponentsUnion: type) type {
             inner_state.alloc = alloc;
             inner_state.components_map = undefined;
 
-            const Arrays = @typeInfo(ComponentsMap(ComponentsUnion)).Struct.fields;
+            const Arrays = @typeInfo(ComponentsMap(ComponentsStruct)).Struct.fields;
             inline for (Arrays) |array| {
                 @field(inner_state.components_map, array.name) =
                     array.type.init(alloc);
@@ -230,7 +244,7 @@ pub fn ComponentsManager(comptime ComponentsUnion: type) type {
 
         /// Cleans up all inner storages.
         pub fn deinit(self: *Self) void {
-            inline for (@typeInfo(ComponentsMap(ComponentsUnion)).Struct.fields) |field| {
+            inline for (@typeInfo(ComponentsMap(ComponentsStruct)).Struct.fields) |field| {
                 @field(self.inner_state.components_map, field.name).deinit();
             }
             self.inner_state.alloc.destroy(self.inner_state);
@@ -270,7 +284,7 @@ pub fn ComponentsManager(comptime ComponentsUnion: type) type {
 
         /// Removes all components from all stores which belong to the entity.
         pub fn removeAllForEntity(self: *Self, entity: Entity) !void {
-            inline for (@typeInfo(ComponentsMap(ComponentsUnion)).Struct.fields) |field| {
+            inline for (@typeInfo(ComponentsMap(ComponentsStruct)).Struct.fields) |field| {
                 try @field(self.inner_state.components_map, field.name).removeFromEntity(entity);
             }
         }
@@ -279,7 +293,7 @@ pub fn ComponentsManager(comptime ComponentsUnion: type) type {
         /// manager
         pub fn moveAllForEntity(self: *const Self, entity: Entity, target: *Self) !void {
             // TODO implement
-            inline for (@typeInfo(ComponentsMap(ComponentsUnion)).Struct.fields) |field| {
+            inline for (@typeInfo(ComponentsMap(ComponentsStruct)).Struct.fields) |field| {
                 if (try @field(self.inner_state.components_map, field.name).detachFromEntity(entity)) |c|
                     try target.setToEntity(entity, c);
             }
@@ -302,8 +316,8 @@ test "ComponentsManager: Add/Get/Remove component" {
         }
     };
 
-    const TestComponents = union {
-        foo: TestComponent,
+    const TestComponents = struct {
+        foo: ?TestComponent,
     };
 
     var manager = try ComponentsManager(TestComponents).init(std.testing.allocator);
@@ -345,7 +359,7 @@ test "ComponentsManager movesAllForEntity" {
         fn deinit(_: *@This()) void {}
     };
 
-    const TestComponents = union { foo: TestComponent1, bar: TestComponent2 };
+    const TestComponents = struct { foo: ?TestComponent1, bar: ?TestComponent2 };
 
     // given:
     var cm1 = try ComponentsManager(TestComponents).init(std.testing.allocator);
