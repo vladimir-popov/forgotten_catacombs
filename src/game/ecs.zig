@@ -230,6 +230,19 @@ pub fn ComponentsManager(comptime ComponentsStruct: type) type {
                 try @field(self.inner_state.components_map, field.name).removeFromEntity(entity);
             }
         }
+
+        pub fn entityToStruct(self: Self, entity: Entity) !ComponentsStruct {
+            var structure: ComponentsStruct = undefined;
+            inline for (@typeInfo(ComponentsStruct).Struct.fields) |field| {
+                const field_type = @typeInfo(field.type);
+                const type_name = @typeName(field_type.Optional.child);
+                if (@field(self.inner_state.components_map, type_name).getForEntity(entity)) |cmp_ptr|
+                    @field(structure, field.name) = cmp_ptr.*
+                else
+                    @field(structure, field.name) = null;
+            }
+            return structure;
+        }
     };
 }
 
@@ -275,6 +288,29 @@ test "ComponentsManager: Add/Get/Remove component" {
 
     // and finally, no memory leak should happened
 }
+
+test "ComponentsManager: get entity as struct" {
+    // given:
+    const Foo = struct { value: u8 };
+    const Bar = struct { value: bool };
+
+    const TestComponents = struct { foo: ?Foo, bar: ?Bar };
+
+    const entity = 1;
+
+    var manager = try ComponentsManager(TestComponents).init(std.testing.allocator);
+    defer manager.deinit();
+
+    try manager.setToEntity(entity, Bar{ .value = true });
+
+    // when:
+    const structure = try manager.entityToStruct(entity);
+
+    // then:
+    try std.testing.expectEqual(null, structure.foo);
+    try std.testing.expectEqualDeep(Bar{ .value = true }, structure.bar.?);
+}
+
 pub fn ComponentsQuery(comptime ComponentsUnion: type) type {
     return struct {
         const Self = @This();
