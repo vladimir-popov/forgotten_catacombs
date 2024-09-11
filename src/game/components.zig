@@ -8,8 +8,6 @@ pub const Codepoint = u21;
 
 pub const Position = struct {
     point: p.Point,
-
-    pub fn deinit(_: *@This()) void {}
 };
 
 /// Describes how and where something should look.
@@ -17,14 +15,11 @@ pub const Sprite = struct {
     codepoint: Codepoint,
     /// The sprite with bigger order should be rendered over the sprite with lower
     z_order: u2 = 0,
-    pub fn deinit(_: *@This()) void {}
 };
 
 pub const Description = struct {
     name: []const u8,
     description: []const u8 = "",
-
-    pub fn deinit(_: *@This()) void {}
 };
 
 pub const Animation = struct {
@@ -48,14 +43,11 @@ pub const Animation = struct {
         }
         return if (self.current_frame <= self.frames.len) self.frames[self.current_frame - 1] else null;
     }
-
-    pub fn deinit(_: *@This()) void {}
 };
 
 pub const Door = enum {
     opened,
     closed,
-    pub fn deinit(_: *@This()) void {}
 };
 
 /// The ladder to the upper or under level from the current one
@@ -67,7 +59,6 @@ pub const Ladder = struct {
     this_ladder: g.Entity,
     /// The id of the ladder on that level.
     that_ladder: ?g.Entity,
-    pub fn deinit(_: *@This()) void {}
 };
 
 /// The intension to perform an action.
@@ -97,8 +88,6 @@ pub const Action = struct {
     type: Type,
 
     move_points: u8,
-
-    pub fn deinit(_: *@This()) void {}
 };
 
 /// Intersection of two objects
@@ -116,8 +105,6 @@ pub const Collision = struct {
     obstacle: Obstacle,
     /// Where the collision happened
     at: p.Point,
-
-    pub fn deinit(_: *@This()) void {}
 };
 
 pub const Health = struct {
@@ -125,7 +112,6 @@ pub const Health = struct {
     max: u8,
     // The count of the current hp
     current: i16,
-    pub fn deinit(_: *@This()) void {}
 };
 
 /// This is only **intension** to make a damage.
@@ -133,14 +119,11 @@ pub const Health = struct {
 pub const Damage = struct {
     /// Damage amount
     amount: u8,
-    pub fn deinit(_: *@This()) void {}
 };
 
 pub const Speed = struct {
     /// How many move points are needed for moving on the neighbor position
     move_points: u8 = 10,
-
-    pub fn deinit(_: *@This()) void {}
 };
 
 pub const MeleeWeapon = struct {
@@ -150,16 +133,12 @@ pub const MeleeWeapon = struct {
     pub fn damage(self: MeleeWeapon, rand: std.Random) Damage {
         return .{ .amount = rand.uintLessThan(u8, self.max_damage) + 1 };
     }
-
-    pub fn deinit(_: *@This()) void {}
 };
 
 pub const NPC = struct {
     pub const Type = enum { melee };
 
     type: Type = .melee,
-
-    pub fn deinit(_: *@This()) void {}
 };
 
 pub const Components = struct {

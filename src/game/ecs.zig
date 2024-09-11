@@ -1,6 +1,3 @@
-//! This is an implementation of the Entity Component System pattern,
-//! which is a core of the game.
-
 const std = @import("std");
 const Type = std.builtin.Type;
 
@@ -19,7 +16,6 @@ pub const EntitiesProvider = struct {
 };
 
 /// The container of the components of the type `C`.
-/// The type `C` should have a function `fn deinit(component: *C) void` for invalidation the component.
 ///
 /// The components are stored in the array, and can be got
 /// for an entity for O(1) thanks for additional indexes inside.
@@ -42,18 +38,12 @@ pub fn ArraySet(comptime C: anytype) type {
 
         /// Deinits the inner storages and components.
         pub fn deinit(self: *Self) void {
-            for (self.components.items) |*component| {
-                component.deinit();
-            }
             self.components.deinit();
             self.entity_index.deinit();
             self.index_entity.deinit();
         }
 
         pub fn clear(self: *Self) !void {
-            for (self.components.items) |*component| {
-                component.deinit();
-            }
             try self.components.resize(0);
             self.entity_index.clearAndFree();
             self.index_entity.clearAndFree();
@@ -71,7 +61,6 @@ pub fn ArraySet(comptime C: anytype) type {
         /// Adds the component of the type `C` for the entity, or replaces existed.
         pub fn setToEntity(self: *Self, entity: Entity, component: C) !void {
             if (self.entity_index.get(entity)) |idx| {
-                self.components.items[idx].deinit();
                 self.components.items[idx] = component;
             } else {
                 try self.entity_index.put(entity, @intCast(self.components.items.len));
@@ -81,29 +70,11 @@ pub fn ArraySet(comptime C: anytype) type {
         }
 
         /// Deletes the components of the entity from the all inner stores
-        /// if they was added before, and invoke the `deinit` on the component, or does nothing.
+        /// if they was added before, or does nothing.
         pub fn removeFromEntity(self: *Self, entity: Entity) !void {
-            try self.removeOrDetachFromEntity(entity, true);
-        }
-
-        /// Deletes and returns the component for the entity if it is presented,
-        /// but doesn't invoke `deinit` on the component.
-        pub fn detachFromEntity(self: *Self, entity: Entity) !?C {
-            if (self.entity_index.get(entity)) |idx| {
-                const c = self.components.items[idx];
-                try self.removeOrDetachFromEntity(entity, false);
-                return c;
-            }
-            return null;
-        }
-
-        fn removeOrDetachFromEntity(self: *Self, entity: Entity, should_deinit: bool) !void {
             if (self.entity_index.get(entity)) |idx| {
                 _ = self.index_entity.remove(idx);
                 _ = self.entity_index.remove(entity);
-
-                if (should_deinit)
-                    self.components.items[idx].deinit();
 
                 const last_idx: u8 = @intCast(self.components.items.len - 1);
                 if (idx == last_idx) {
@@ -117,35 +88,6 @@ pub fn ArraySet(comptime C: anytype) type {
             }
         }
     };
-}
-
-test "The component should be initialized after detach" {
-    const TestComponent = struct {
-        const Self = @This();
-        state: std.ArrayList(u8),
-        fn init(value: u8) !Self {
-            var instance: Self = .{ .state = try std.ArrayList(u8).initCapacity(std.testing.allocator, 1) };
-            try instance.state.append(value);
-            return instance;
-        }
-
-        fn deinit(self: *Self) void {
-            self.state.deinit();
-        }
-    };
-    // given:
-    var array_set = ArraySet(TestComponent).init(std.testing.allocator);
-    errdefer array_set.deinit();
-    var c = try TestComponent.init(123);
-    defer c.deinit();
-    try array_set.setToEntity(0, c);
-
-    // when:
-    const result = try array_set.detachFromEntity(0);
-    array_set.deinit();
-
-    // then:
-    try std.testing.expectEqual(123, result.?.state.getLast());
 }
 
 /// Generated in compile time structure,
@@ -288,16 +230,6 @@ pub fn ComponentsManager(comptime ComponentsStruct: type) type {
                 try @field(self.inner_state.components_map, field.name).removeFromEntity(entity);
             }
         }
-
-        /// Moves all components defined for the entity to target entity
-        /// manager
-        pub fn moveAllForEntity(self: *const Self, entity: Entity, target: *Self) !void {
-            // TODO implement
-            inline for (@typeInfo(ComponentsMap(ComponentsStruct)).Struct.fields) |field| {
-                if (try @field(self.inner_state.components_map, field.name).detachFromEntity(entity)) |c|
-                    try target.setToEntity(entity, c);
-            }
-        }
     };
 }
 
@@ -325,7 +257,10 @@ test "ComponentsManager: Add/Get/Remove component" {
 
     // should return the component, which was added before
     const entity = 1;
-    try manager.setToEntity(entity, try TestComponent.init(123));
+    var component_instance = try TestComponent.init(123);
+    defer component_instance.deinit();
+
+    try manager.setToEntity(entity, component_instance);
     var component = manager.getForEntity(entity, TestComponent);
     try std.testing.expectEqual(123, component.?.state.items[0]);
 
@@ -340,53 +275,6 @@ test "ComponentsManager: Add/Get/Remove component" {
 
     // and finally, no memory leak should happened
 }
-test "ComponentsManager movesAllForEntity" {
-    const TestComponent1 = struct {
-        const Self = @This();
-        state: std.ArrayList(u8),
-        fn init(value: u8) !Self {
-            var instance: Self = .{ .state = try std.ArrayList(u8).initCapacity(std.testing.allocator, 1) };
-            try instance.state.append(value);
-            return instance;
-        }
-
-        fn deinit(self: *Self) void {
-            self.state.deinit();
-        }
-    };
-    const TestComponent2 = struct {
-        state: u8,
-        fn deinit(_: *@This()) void {}
-    };
-
-    const TestComponents = struct { foo: ?TestComponent1, bar: ?TestComponent2 };
-
-    // given:
-    var cm1 = try ComponentsManager(TestComponents).init(std.testing.allocator);
-    defer cm1.deinit();
-    var tc1 = try TestComponent1.init(42);
-    try cm1.setToEntity(1, tc1);
-    try cm1.setToEntity(1, TestComponent2{ .state = 3 });
-    try cm1.setToEntity(2, TestComponent2{ .state = 5 });
-    var cm2 = try ComponentsManager(TestComponents).init(std.testing.allocator);
-    defer cm2.deinit();
-
-    // when:
-    try cm1.moveAllForEntity(1, &cm2);
-
-    // then:
-    // 1. TC1 should not be deinited
-    try std.testing.expectEqual(42, tc1.state.getLast());
-    // 2. The TC1 and TC2 should not be available in the CM1 for the entity 1
-    try std.testing.expectEqual(null, cm1.getForEntity(1, TestComponent1));
-    try std.testing.expectEqual(null, cm1.getForEntity(1, TestComponent2));
-    // TC2 should be available in the CM1 for the entity 2
-    try std.testing.expectEqual(5, cm1.getForEntityUnsafe(2, TestComponent2).state);
-    // 3. TC1 and TC2 should be available in the CM2 for the entity 1
-    try std.testing.expectEqual(42, cm2.getForEntityUnsafe(1, TestComponent1).state.getLast());
-    try std.testing.expectEqual(3, cm2.getForEntityUnsafe(1, TestComponent2).state);
-}
-
 pub fn ComponentsQuery(comptime ComponentsUnion: type) type {
     return struct {
         const Self = @This();

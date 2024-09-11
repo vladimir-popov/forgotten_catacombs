@@ -121,7 +121,7 @@ pub fn moveToLevel(self: *GameSession, ladder: c.Ladder) !void {
         "Move {s} from the level {d} to {d}\n--------------------",
         .{ @tagName(ladder.direction), self.level.depth, new_depth },
     );
-    var new_level = try g.Level.generate(
+    const new_level = try g.Level.generate(
         self.game.runtime.alloc,
         self.seed,
         self.player,
@@ -131,7 +131,7 @@ pub fn moveToLevel(self: *GameSession, ladder: c.Ladder) !void {
         that_ladder,
         ladder.direction,
     );
-    try self.level.components.moveAllForEntity(self.player, &new_level.components);
+    // try self.level.components.moveAllForEntity(self.player, &new_level.components);
     self.level.deinit();
     self.level = new_level;
     try self.level.movePlayerToLadder(this_ladder);
