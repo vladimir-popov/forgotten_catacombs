@@ -27,6 +27,8 @@ menu: Menu,
 // the last read button through readButton function.
 // it is used as a buffer to check ESC outside the readButton function
 keyboard_buffer: ?tty.KeyboardAndMouse.Button = null,
+// The border should not be drawn for DungeonGenerator
+draw_border: bool = true,
 cheat: ?g.Cheat = null,
 is_exit: bool = false,
 
@@ -42,13 +44,14 @@ pub fn disableGameMode() !void {
     try tty.Display.showCursor();
 }
 
-pub fn init(alloc: std.mem.Allocator, render_in_center: bool, use_cheats: bool) !TtyRuntime {
+pub fn init(alloc: std.mem.Allocator, draw_border: bool, render_in_center: bool, use_cheats: bool) !TtyRuntime {
     const instance = TtyRuntime{
         .alloc = alloc,
         .arena = std.heap.ArenaAllocator.init(alloc),
         .buffer = undefined,
         .menu = Menu.init(alloc),
         .termios = tty.Display.enterRawMode(),
+        .draw_border = draw_border,
     };
     try enableGameMode(use_cheats);
     should_render_in_center = render_in_center;
@@ -212,11 +215,13 @@ fn clearDisplay(ptr: *anyopaque) !void {
     _ = self.arena.reset(.retain_capacity);
     self.buffer = utf8.Buffer.init(self.arena.allocator());
     // draw external border
-    try self.buffer.addLine("╔" ++ "═" ** g.DISPLAY_COLS ++ "╗");
-    for (0..(g.DISPLAY_ROWS)) |_| {
-        try self.buffer.addLine("║" ++ " " ** g.DISPLAY_COLS ++ "║");
+    if (self.draw_border) {
+        try self.buffer.addLine("╔" ++ "═" ** g.DISPLAY_COLS ++ "╗");
+        for (0..(g.DISPLAY_ROWS)) |_| {
+            try self.buffer.addLine("║" ++ " " ** g.DISPLAY_COLS ++ "║");
+        }
+        try self.buffer.addLine("╚" ++ "═" ** g.DISPLAY_COLS ++ "╝");
     }
-    try self.buffer.addLine("╚" ++ "═" ** g.DISPLAY_COLS ++ "╝");
 }
 
 fn drawHorizontalBorderLine(ptr: *anyopaque, row: u8, length: u8) !void {

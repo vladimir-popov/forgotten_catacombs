@@ -37,7 +37,7 @@ pub fn main() !void {
     const alloc = gpa.allocator();
     defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK DETECTED!");
 
-    var runtime = try TtyRuntime.init(alloc, true, use_cheats);
+    var runtime = try TtyRuntime.init(alloc, true, true, use_cheats);
     defer runtime.deinit();
     var game = try g.Game.init(runtime.runtime(), seed);
     defer game.deinit();

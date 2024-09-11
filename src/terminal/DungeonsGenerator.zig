@@ -3,7 +3,7 @@ const g = @import("game");
 const tty = @import("tty.zig");
 
 const Logger = @import("Logger.zig");
-const Runtime = @import("TtyRuntime.zig");
+const TtyRuntime = @import("TtyRuntime.zig");
 
 pub const std_options = .{
     .logFn = Logger.writeLog,
@@ -23,7 +23,7 @@ pub fn main() !void {
     defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK DETECTED!");
     const alloc = gpa.allocator();
 
-    var runtime = try Runtime.init(alloc, false, false);
+    var runtime = try TtyRuntime.init(alloc, false, false, false);
     defer runtime.deinit();
 
     var generator = DungeonsGenerator.init(runtime.runtime());
@@ -36,13 +36,13 @@ pub fn main() !void {
 const DungeonsGenerator = struct {
     entities_provider: g.ecs.EntitiesProvider,
     runtime: g.Runtime,
-    render: g.Render,
+    render: g.render.Render(g.Dungeon.ROWS, g.Dungeon.COLS),
     level: g.Level,
 
     pub fn init(runtime: g.Runtime) DungeonsGenerator {
         return .{
             .runtime = runtime,
-            .render = g.Render.init(runtime),
+            .render = g.render.Render(g.Dungeon.ROWS, g.Dungeon.COLS).init(runtime),
             .entities_provider = .{},
             .level = undefined,
         };

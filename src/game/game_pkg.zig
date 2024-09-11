@@ -4,6 +4,7 @@ pub const components = @import("components.zig");
 pub const ecs = @import("ecs.zig");
 pub const primitives = @import("primitives.zig");
 pub const dungeon = @import("dungeon/dungeon_pkg.zig");
+pub const render = @import("Render.zig");
 
 pub const Entity = ecs.Entity;
 pub const Runtime = @import("Runtime.zig");
@@ -13,7 +14,7 @@ pub const Dungeon = dungeon.Dungeon;
 pub const Game = @import("Game.zig");
 pub const GameSession = @import("GameSession.zig");
 pub const Level = @import("Level.zig");
-pub const Render = @import("Render.zig");
+pub const Render = render.Render(DISPLAY_ROWS, DISPLAY_COLS);
 pub const Screen = @import("Screen.zig");
 
 pub const RENDER_DELAY_MS = 150;
