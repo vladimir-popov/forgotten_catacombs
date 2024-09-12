@@ -231,6 +231,8 @@ pub fn ComponentsManager(comptime ComponentsStruct: type) type {
             }
         }
 
+        /// Takes all components for the entity and set them to the appropriate
+        /// fields of the `ComponentsStruct`.
         pub fn entityToStruct(self: Self, entity: Entity) !ComponentsStruct {
             var structure: ComponentsStruct = undefined;
             inline for (@typeInfo(ComponentsStruct).Struct.fields) |field| {
@@ -242,6 +244,15 @@ pub fn ComponentsManager(comptime ComponentsStruct: type) type {
                     @field(structure, field.name) = null;
             }
             return structure;
+        }
+
+        /// Sets all defined fields from the `ComponentsStruct` to the entity as the components
+        pub fn setComponentsToEntity(self: *Self, entity: Entity, components: ComponentsStruct) !void {
+            inline for (@typeInfo(ComponentsStruct).Struct.fields) |field| {
+                if (@field(components, field.name)) |component| {
+                    try self.setToEntity(entity, component);
+                }
+            }
         }
     };
 }
@@ -309,6 +320,29 @@ test "ComponentsManager: get entity as struct" {
     // then:
     try std.testing.expectEqual(null, structure.foo);
     try std.testing.expectEqualDeep(Bar{ .value = true }, structure.bar.?);
+}
+
+test "ComponentsManager: set components to the entity" {
+    // given:
+    const Foo = struct { value: u8 };
+    const Bar = struct { value: bool };
+
+    const TestComponents = struct { foo: ?Foo = null, bar: ?Bar = null };
+
+    const entity = 1;
+
+    var manager = try ComponentsManager(TestComponents).init(std.testing.allocator);
+    defer manager.deinit();
+
+    try manager.setComponentsToEntity(entity, .{ .foo = .{ .value = 42 } });
+
+    // when:
+    const foo = manager.getForEntity(entity, Foo);
+    const bar = manager.getForEntity(entity, Bar);
+
+    // then:
+    try std.testing.expectEqualDeep(Foo{ .value = 42 }, foo.?.*);
+    try std.testing.expectEqual(null, bar);
 }
 
 pub fn ComponentsQuery(comptime ComponentsUnion: type) type {
