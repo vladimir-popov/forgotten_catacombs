@@ -86,6 +86,22 @@ pub fn generate(
     }
 }
 
+pub fn regenerate(
+    self: *Level,
+    seed: u64,
+    depth: u8,
+    this_ladder: g.Entity,
+    from_ladder: ?g.Entity,
+    direction: c.Ladder.Direction,
+) !void {
+    const player = try self.components.entityToStruct(self.player);
+    self.entities.clearRetainingCapacity();
+    self.components.clearRetainingCapacity();
+    self.dungeon.clearRetainingCapacity();
+    self.depth = depth;
+    try self.generate(seed, player, this_ladder, from_ladder, direction);
+}
+
 /// Aggregates requests of few components for the same entities at once
 pub fn query(self: *const Level) ecs.ComponentsQuery(c.Components) {
     return .{ .entities = self.entities, .components_manager = self.components };

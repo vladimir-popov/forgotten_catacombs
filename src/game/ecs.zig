@@ -32,8 +32,14 @@ pub fn ArraySet(comptime C: anytype) type {
             self.index_entity.deinit();
         }
 
-        pub fn clear(self: *Self) !void {
-            try self.components.resize(0);
+        pub fn clearRetainingCapacity(self: *Self) void {
+            self.components.clearRetainingCapacity();
+            self.entity_index.clearRetainingCapacity();
+            self.index_entity.clearRetainingCapacity();
+        }
+
+        pub fn clear(self: *Self) void {
+            self.components.clearAndFree();
             self.entity_index.clearAndFree();
             self.index_entity.clearAndFree();
         }
@@ -181,6 +187,12 @@ pub fn ComponentsManager(comptime ComponentsStruct: type) type {
             self.inner_state.alloc.destroy(self.inner_state);
         }
 
+        pub fn clearRetainingCapacity(self: *Self) void {
+            inline for (@typeInfo(ComponentsMap(ComponentsStruct)).Struct.fields) |field| {
+                @field(self.inner_state.components_map, field.name).clearRetainingCapacity();
+            }
+        }
+
         pub fn getAll(self: Self, comptime C: type) []C {
             return self.arrayOf(C).components.items;
         }
@@ -189,8 +201,8 @@ pub fn ComponentsManager(comptime ComponentsStruct: type) type {
             return &@field(self.inner_state.components_map, @typeName(C));
         }
 
-        pub fn removeAll(self: *Self, comptime C: type) !void {
-            try @field(self.inner_state.components_map, @typeName(C)).clear();
+        pub fn removeAll(self: *Self, comptime C: type) void {
+            @field(self.inner_state.components_map, @typeName(C)).clear();
         }
 
         /// Returns the pointer to the component for the entity, if it was added before, or null.

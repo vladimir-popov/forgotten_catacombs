@@ -523,9 +523,7 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
 
         pub fn initEmpty(alloc: std.mem.Allocator) !Self {
             var self: Self = .{ .alloc = alloc, .bitsets = try alloc.alloc(std.StaticBitSet(cols), rows) };
-            for (0..rows) |idx| {
-                self.bitsets[idx] = std.StaticBitSet(cols).initEmpty();
-            }
+            self.clear();
             return self;
         }
 
@@ -540,6 +538,12 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
         pub fn deinit(self: *Self) void {
             self.alloc.free(self.bitsets);
             self.bitsets = undefined;
+        }
+        
+        pub fn clear(self: *Self) void {
+            for (0..rows) |idx| {
+                self.bitsets[idx] = std.StaticBitSet(cols).initEmpty();
+            }
         }
 
         pub fn parse(self: *Self, comptime symbol: u8, str: []const u8) !void {

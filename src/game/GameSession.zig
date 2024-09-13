@@ -84,16 +84,12 @@ pub fn moveToLevel(self: *GameSession, ladder: c.Ladder) !void {
         },
     }
     std.log.debug(
-        "Move {s} from the level {d} to {d}\n--------------------",
+        "\n--------------------\nMove {s} from the level {d} to {d}\n--------------------",
         .{ @tagName(ladder.direction), self.level.depth, new_depth },
     );
-    const player = try self.level.components.entityToStruct(self.level.player);
-    self.level.deinit();
-
-    self.level = try g.Level.init(self.game.runtime.alloc, new_depth);
-    try self.level.generate(
+    try self.level.regenerate(
         self.seed + new_depth,
-        player,
+        new_depth,
         this_ladder,
         that_ladder,
         ladder.direction,

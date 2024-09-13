@@ -28,5 +28,5 @@ pub fn handleCollisions(session: *g.GameSession) anyerror!void {
             .item => {},
         }
     }
-    try session.level.components.removeAll(c.Collision);
+    session.level.components.removeAll(c.Collision);
 }

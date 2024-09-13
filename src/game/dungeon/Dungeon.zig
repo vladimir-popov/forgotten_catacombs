@@ -65,6 +65,17 @@ pub fn deinit(self: *Dungeon) void {
     self.rooms.deinit();
 }
 
+pub fn clearRetainingCapacity(self: *Dungeon) void {
+    self.floor.clear();
+    self.walls.clear();
+    self.doors.clearRetainingCapacity();
+    for (self.passages.items) |passage| {
+        passage.deinit();
+    }
+    self.passages.clearRetainingCapacity();
+    self.rooms.clearRetainingCapacity();
+}
+
 pub inline fn cellAt(self: Dungeon, place: p.Point) ?Cell {
     if (place.row < 1 or place.row > ROWS) {
         return null;

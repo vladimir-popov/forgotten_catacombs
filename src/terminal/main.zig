@@ -25,7 +25,7 @@ pub fn main() !void {
     var args = std.process.args();
     _ = args.next();
     const seed = try Args.int(u64, "seed") orelse std.crypto.random.int(u64);
-    log.info("Seed of the game is {d}\n====================", .{seed});
+    log.info("\n====================\nSeed of the game is {d}\n====================", .{seed});
 
     var use_cheats = false;
     if (Args.key("mommys_cheater")) |_| {
