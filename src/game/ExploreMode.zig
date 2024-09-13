@@ -20,7 +20,7 @@ pub fn init(session: *g.GameSession) !ExploreMode {
     return .{
         .session = session,
         .entities_on_screen = ArrayOfEntitiesOnScreen.init(session.game.runtime.alloc),
-        .entity_in_focus = session.player,
+        .entity_in_focus = session.level.player,
     };
 }
 
@@ -29,7 +29,7 @@ pub fn deinit(self: *ExploreMode) void {
 }
 
 pub fn refresh(self: *ExploreMode) !void {
-    self.entity_in_focus = self.session.player;
+    self.entity_in_focus = self.session.level.player;
     self.entities_on_screen.clearRetainingCapacity();
     var itr = self.session.level.query().get(c.Position);
     while (itr.next()) |tuple| {
@@ -60,7 +60,7 @@ pub fn tick(self: *ExploreMode) anyerror!void {
 }
 
 fn chooseNextEntity(self: *ExploreMode, direction: p.Direction) void {
-    const target_entity = self.entity_in_focus orelse self.session.player;
+    const target_entity = self.entity_in_focus orelse self.session.level.player;
     const target_point = self.session.game.render.screen.relative(
         self.session.level.components.getForEntityUnsafe(target_entity, c.Position).point,
     );

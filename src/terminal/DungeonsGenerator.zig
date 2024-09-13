@@ -26,7 +26,7 @@ pub fn main() !void {
     var runtime = try TtyRuntime.init(alloc, false, false, false);
     defer runtime.deinit();
 
-    var generator = DungeonsGenerator.init(runtime.runtime());
+    var generator = try DungeonsGenerator.init(runtime.runtime());
     defer generator.deinit();
 
     try generator.generate(seed);
@@ -34,17 +34,15 @@ pub fn main() !void {
 }
 
 const DungeonsGenerator = struct {
-    entities_provider: g.ecs.EntitiesProvider,
     runtime: g.Runtime,
     render: g.render.Render(g.Dungeon.ROWS, g.Dungeon.COLS),
     level: g.Level,
 
-    pub fn init(runtime: g.Runtime) DungeonsGenerator {
+    pub fn init(runtime: g.Runtime) !DungeonsGenerator {
         return .{
             .runtime = runtime,
             .render = g.render.Render(g.Dungeon.ROWS, g.Dungeon.COLS).init(runtime),
-            .entities_provider = .{},
-            .level = undefined,
+            .level = try g.Level.init(runtime.alloc, 0),
         };
     }
 
@@ -54,13 +52,10 @@ const DungeonsGenerator = struct {
 
     fn generate(self: *DungeonsGenerator, seed: u64) !void {
         log.info("\n====================\nGenerate level with seed {d}\n====================\n", .{seed});
-        const entrance = self.entities_provider.newEntity();
-        self.level = try g.Level.generate(
-            self.runtime.alloc,
+        const entrance = 0;
+        try self.level.generate(
             seed,
-            self.entities_provider.newEntity(),
-            self.entities_provider,
-            0,
+            g.entities.Player,
             entrance,
             null,
             .down,
@@ -80,7 +75,7 @@ const DungeonsGenerator = struct {
         if (btn.game_button == .a) {
             const seed = std.crypto.random.int(u64);
             self.level.deinit();
-            self.entities_provider = .{};
+            self.level = try g.Level.init(self.runtime.alloc, 0);
             try self.generate(seed);
         }
     }

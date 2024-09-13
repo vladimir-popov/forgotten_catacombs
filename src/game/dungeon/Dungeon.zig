@@ -1,3 +1,7 @@
+/// This is value object which represents the dungeon as the bitmap for the
+/// walls and floor, list of the doors, list of the regions for rooms, and list
+/// of the passages.
+/// To build the dungeon the `DungeonBuilder` should be used.
 const std = @import("std");
 const g = @import("../game_pkg.zig");
 const p = g.primitives;

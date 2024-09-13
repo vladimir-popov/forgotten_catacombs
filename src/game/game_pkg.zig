@@ -1,9 +1,10 @@
 const std = @import("std");
 
 pub const components = @import("components.zig");
-pub const ecs = @import("ecs.zig");
-pub const primitives = @import("primitives.zig");
 pub const dungeon = @import("dungeon/dungeon_pkg.zig");
+pub const ecs = @import("ecs.zig");
+pub const entities = @import("entities.zig");
+pub const primitives = @import("primitives.zig");
 pub const render = @import("Render.zig");
 
 pub const Entity = ecs.Entity;

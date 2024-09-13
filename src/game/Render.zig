@@ -135,7 +135,7 @@ pub fn Render(comptime rows: u8, cols: u8) type {
             // Draw player's health, or pause mode indicator
             switch (session.mode) {
                 .explore => try self.drawZone(0, "Pause", .inverted),
-                .play => if (session.level.components.getForEntity(session.player, c.Health)) |health| {
+                .play => if (session.level.components.getForEntity(session.level.player, c.Health)) |health| {
                     var buf = [_]u8{0} ** 8;
                     const text = try std.fmt.bufPrint(&buf, "HP: {d}", .{health.current});
                     try self.drawZone(0, text, .normal);
@@ -151,7 +151,7 @@ pub fn Render(comptime rows: u8, cols: u8) type {
                     len = (try std.fmt.bufPrint(&buf, "{s}", .{desc.name})).len;
                 }
                 // Draw enemy's health
-                if (entity != session.player) {
+                if (entity != session.level.player) {
                     if (session.level.components.getForEntity(entity, c.Health)) |health| {
                         buf[len] = ':';
                         len += 1;

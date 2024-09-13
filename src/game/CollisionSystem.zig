@@ -16,7 +16,7 @@ pub fn handleCollisions(session: *g.GameSession) anyerror!void {
             .enemy => |enemy| {
                 if (session.level.components.getForEntity(collision.entity, c.Health)) |_| {
                     if (session.level.components.getForEntity(enemy, c.Health)) |_| {
-                        if (session.level.components.getForEntity(session.player, c.MeleeWeapon)) |weapon| {
+                        if (session.level.components.getForEntity(session.level.player, c.MeleeWeapon)) |weapon| {
                             try session.level.components.setToEntity(
                                 collision.entity,
                                 c.Action{ .type = .{ .hit = enemy }, .move_points = weapon.move_points },

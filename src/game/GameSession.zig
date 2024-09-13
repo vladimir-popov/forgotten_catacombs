@@ -33,34 +33,23 @@ mode: Mode,
 // stateful modes:
 play_mode: PlayMode,
 explore_mode: ExploreMode,
-/// Generate id for new entities.
-/// The ids should be unique for whole life circle of this session.
-entities_provider: ecs.EntitiesProvider,
-/// Entity of the player
-player: g.Entity = undefined,
 
 pub fn createNew(game: *g.Game, seed: u64) !*GameSession {
-    log.debug("Begin the new game session with seed {d}", .{seed});
+    log.debug("Begin the new game session with the seed {d}", .{seed});
     const session = try game.runtime.alloc.create(GameSession);
     session.* = .{
         .game = game,
         .seed = seed,
         .prng = std.Random.DefaultPrng.init(seed),
-        .entities_provider = .{},
         .mode = .play,
         .play_mode = try PlayMode.init(session),
         .explore_mode = try ExploreMode.init(session),
-        .level = undefined,
+        .level = try g.Level.init(game.runtime.alloc, 0),
     };
-    session.player = session.newEntity();
-    log.debug("Player entity is {d}", .{session.player});
-    const entrance = session.newEntity();
-    session.level = try g.Level.generate(
-        game.runtime.alloc,
-        seed,
-        session.player,
-        session.entities_provider,
-        0,
+    const entrance = 0;
+    try session.level.generate(
+        seed + session.level.depth,
+        g.entities.Player,
         entrance,
         null,
         .down,
@@ -75,29 +64,6 @@ pub fn destroy(self: *GameSession) void {
     self.play_mode.deinit();
     self.explore_mode.deinit();
     self.game.runtime.alloc.destroy(self);
-}
-
-inline fn newEntity(self: *GameSession) g.Entity {
-    return self.entities_provider.newEntity();
-}
-
-// TODO: Load session from file
-
-pub fn play(self: *GameSession, entity_in_focus: ?g.Entity) !void {
-    self.mode = .play;
-    try self.play_mode.refresh(entity_in_focus);
-}
-
-pub fn explore(self: *GameSession) !void {
-    self.mode = .explore;
-    try self.explore_mode.refresh();
-}
-
-pub inline fn tick(self: *GameSession) !void {
-    switch (self.mode) {
-        .play => try self.play_mode.tick(),
-        .explore => try self.explore_mode.tick(),
-    }
 }
 
 pub fn moveToLevel(self: *GameSession, ladder: c.Ladder) !void {
@@ -121,19 +87,36 @@ pub fn moveToLevel(self: *GameSession, ladder: c.Ladder) !void {
         "Move {s} from the level {d} to {d}\n--------------------",
         .{ @tagName(ladder.direction), self.level.depth, new_depth },
     );
-    const new_level = try g.Level.generate(
-        self.game.runtime.alloc,
-        self.seed,
-        self.player,
-        self.entities_provider,
-        new_depth,
+    const player = try self.level.components.entityToStruct(self.level.player);
+    self.level.deinit();
+
+    self.level = try g.Level.init(self.game.runtime.alloc, new_depth);
+    try self.level.generate(
+        self.seed + new_depth,
+        player,
         this_ladder,
         that_ladder,
         ladder.direction,
     );
-    // try self.level.components.moveAllForEntity(self.player, &new_level.components);
-    self.level.deinit();
-    self.level = new_level;
     try self.level.movePlayerToLadder(this_ladder);
     self.game.render.screen.centeredAround(self.level.playerPosition().point);
+}
+
+// TODO: Load session from file
+
+pub fn play(self: *GameSession, entity_in_focus: ?g.Entity) !void {
+    self.mode = .play;
+    try self.play_mode.refresh(entity_in_focus);
+}
+
+pub fn explore(self: *GameSession) !void {
+    self.mode = .explore;
+    try self.explore_mode.refresh();
+}
+
+pub inline fn tick(self: *GameSession) !void {
+    switch (self.mode) {
+        .play => try self.play_mode.tick(),
+        .explore => try self.explore_mode.tick(),
+    }
 }

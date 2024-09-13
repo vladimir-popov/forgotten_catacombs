@@ -63,7 +63,7 @@ pub fn deinit(self: PlayMode) void {
 /// Updates the target entity after switching back to the play mode
 pub fn refresh(self: *PlayMode, entity_in_focus: ?g.Entity) !void {
     self.entity_in_focus = entity_in_focus;
-    if (entity_in_focus) |ef| if (ef == self.session.player) {
+    if (entity_in_focus) |ef| if (ef == self.session.level.player) {
         self.entity_in_focus = null;
     };
     try self.updateTarget();
@@ -74,14 +74,14 @@ fn handleInput(self: *PlayMode, button: g.Button) !void {
     if (button.state == .double_pressed) log.info("Double press of {any}", .{button});
     switch (button.game_button) {
         .a => if (self.quick_action) |quick_action| {
-            try self.session.level.components.setToEntity(self.session.player, quick_action);
+            try self.session.level.components.setToEntity(self.session.level.player, quick_action);
         },
         .b => if (button.state == .pressed) {
             try self.session.explore();
         },
         .left, .right, .up, .down => {
-            const speed = self.session.level.components.getForEntityUnsafe(self.session.player, c.Speed);
-            try self.session.level.components.setToEntity(self.session.player, c.Action{
+            const speed = self.session.level.components.getForEntityUnsafe(self.session.level.player, c.Speed);
+            try self.session.level.components.setToEntity(self.session.level.player, c.Action{
                 .type = .{
                     .move = .{
                         .direction = button.toDirection().?,
@@ -131,7 +131,7 @@ fn handleInput(self: *PlayMode, button: g.Button) !void {
 fn movePlayerToPoint(self: *PlayMode, point: p.Point) !void {
     std.log.debug("Move player to {any}", .{point});
     try self.session.level.components.setToEntity(
-        self.session.player,
+        self.session.level.player,
         c.Position{ .point = point },
     );
     try self.updateTarget();
@@ -155,7 +155,7 @@ pub fn tick(self: *PlayMode) anyerror!void {
             // break this function if the mode was changed
             if (self.session.mode != .play) return;
             // If the player did some action
-            if (self.session.level.components.getForEntity(self.session.player, c.Action)) |action| {
+            if (self.session.level.components.getForEntity(self.session.level.player, c.Action)) |action| {
                 self.is_player_turn = false;
                 should_update_target = true;
                 try self.updateEnemies(action.move_points);
@@ -188,7 +188,7 @@ fn runSystems(self: *PlayMode) !void {
     try ActionSystem.doActions(self.session);
     try CollisionSystem.handleCollisions(self.session);
     // if the player had collision with enemy, that enemy should appear in focus
-    if (self.session.level.components.getForEntity(self.session.player, c.Action)) |action| {
+    if (self.session.level.components.getForEntity(self.session.level.player, c.Action)) |action| {
         switch (action.type) {
             .hit => |enemy| {
                 self.entity_in_focus = enemy;
@@ -248,7 +248,7 @@ fn tryToFindNewTarget(self: *PlayMode) !void {
     for (positions.components.items, 0..) |position, idx| {
         if (region.containsPoint(position.point)) {
             if (positions.index_entity.get(@intCast(idx))) |entity| {
-                if (entity == self.session.player) continue;
+                if (entity == self.session.level.player) continue;
                 if (self.calculateQuickActionForTarget(entity)) |qa| {
                     self.entity_in_focus = entity;
                     self.quick_action = qa;
@@ -260,7 +260,7 @@ fn tryToFindNewTarget(self: *PlayMode) !void {
     // if no other action was found, then use waiting as default
     self.quick_action = .{
         .type = .wait,
-        .move_points = self.session.level.components.getForEntityUnsafe(self.session.player, c.Speed).move_points,
+        .move_points = self.session.level.components.getForEntityUnsafe(self.session.level.player, c.Speed).move_points,
     };
 }
 
@@ -278,11 +278,11 @@ fn calculateQuickActionForTarget(
             // It's impossible to go upper the first level
             if (ladder.direction == .up and self.session.level.depth == 0) return null;
 
-            const player_speed = self.session.level.components.getForEntityUnsafe(self.session.player, c.Speed);
+            const player_speed = self.session.level.components.getForEntityUnsafe(self.session.level.player, c.Speed);
             return .{ .type = .{ .move_to_level = ladder.* }, .move_points = player_speed.move_points };
         }
         if (self.session.level.components.getForEntity(target, c.Health)) |_| {
-            const weapon = self.session.level.components.getForEntityUnsafe(self.session.player, c.MeleeWeapon);
+            const weapon = self.session.level.components.getForEntityUnsafe(self.session.level.player, c.MeleeWeapon);
             return .{
                 .type = .{ .hit = target },
                 .move_points = weapon.move_points,
@@ -294,7 +294,7 @@ fn calculateQuickActionForTarget(
                 return null;
             }
             const player_speed =
-                self.session.level.components.getForEntityUnsafe(self.session.player, c.Speed);
+                self.session.level.components.getForEntityUnsafe(self.session.level.player, c.Speed);
             return switch (door.*) {
                 .opened => .{ .type = .{ .close = target }, .move_points = player_speed.move_points },
                 .closed => .{ .type = .{ .open = target }, .move_points = player_speed.move_points },

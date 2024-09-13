@@ -22,11 +22,11 @@ fn nextAction(
     entity_position: *const c.Position,
     available_move_points: u8,
 ) c.Action {
-    const player_position = session.level.components.getForEntityUnsafe(session.player, c.Position);
+    const player_position = session.level.components.getForEntityUnsafe(session.level.player, c.Position);
     if (entity_position.point.near(player_position.point)) {
         const weapon = session.level.components.getForEntityUnsafe(entity, c.MeleeWeapon);
         if (available_move_points >= weapon.move_points) {
-            return .{ .type = .{ .hit = session.player }, .move_points = weapon.move_points };
+            return .{ .type = .{ .hit = session.level.player }, .move_points = weapon.move_points };
         }
     }
     // wait should always take all available move points

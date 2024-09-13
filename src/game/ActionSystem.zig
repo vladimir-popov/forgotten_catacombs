@@ -67,7 +67,7 @@ fn handleMoveAction(
         return false;
     }
     position.point.move(move.direction);
-    if (entity != session.player) return true;
+    if (entity != session.level.player) return true;
 
     // keep player on the screen:
     const screen = &session.game.render.screen;
