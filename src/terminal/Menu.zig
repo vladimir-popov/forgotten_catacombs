@@ -4,7 +4,7 @@ const p = g.primitives;
 const tty = @import("tty.zig");
 const utf8 = @import("utf8.zig");
 
-const log = std.log.scoped(.menu);
+const log = std.log.scoped(.tty_menu);
 
 const Menu = @This();
 
@@ -98,7 +98,7 @@ pub fn addMenuItem(
     title: []const u8,
     game_object: *anyopaque,
     callback: g.Runtime.MenuItemCallback,
-) ?*g.Runtime.MenuItem {
+) ?*anyopaque {
     if (self.items_count == self.items.len) return null;
 
     log.debug("Add menu item {s}", .{title});
@@ -110,8 +110,7 @@ pub fn addMenuItem(
         .callback = callback,
     };
     self.items_count += 1;
-    log.warn("!!!!!!!!!", .{});
-    return @ptrCast(@alignCast(&self.items[i]));
+    return &self.items[i];
 }
 
 pub inline fn removeAllItems(self: *Menu) void {

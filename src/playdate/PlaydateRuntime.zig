@@ -161,9 +161,9 @@ fn addMenuItem(
     title: []const u8,
     game_object: *anyopaque,
     callback: g.Runtime.MenuItemCallback,
-) *g.Runtime.MenuItem {
+) ?*anyopaque {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    return @ptrCast(@alignCast(self.playdate.system.addMenuItem(title.ptr, callback, game_object).?));
+    return self.playdate.system.addMenuItem(title.ptr, callback, game_object).?;
 }
 
 fn removeAllMenuItems(ptr: *anyopaque) void {

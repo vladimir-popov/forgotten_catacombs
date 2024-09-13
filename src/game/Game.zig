@@ -36,6 +36,7 @@ pub fn deinit(self: Game) void {
 }
 
 fn goToMainMenu(ptr: ?*anyopaque) callconv(.C) void {
+    if (ptr == null) return;
     const self: *Game = @ptrCast(@alignCast(ptr.?));
     self.welcome() catch @panic("Error when the Game went to the '.welcome' state");
 }
@@ -60,22 +61,22 @@ pub fn tick(self: *Game) !void {
 
 inline fn welcome(self: *Game) !void {
     self.state = .welcome;
-    if (self.game_session) |gs| {
-        gs.destroy();
-    }
     self.runtime.removeAllMenuItems();
     try self.render.drawWelcomeScreen();
-}
-
-pub fn gameOver(self: *Game) !void {
-    self.state = .game_over;
-    try self.render.drawGameOverScreen();
 }
 
 inline fn newGame(self: *Game) !void {
     self.state = .game;
     _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
-    if (self.game_session) |session| session.destroy();
+    if (self.game_session) |game_session| {
+        game_session.destroy();
+        self.game_session = null;
+    }
     self.game_session = try g.GameSession.createNew(self, self.seed);
     try self.game_session.?.play(null);
+}
+
+pub fn gameOver(self: *Game) !void {
+    self.state = .game_over;
+    try self.render.drawGameOverScreen();
 }

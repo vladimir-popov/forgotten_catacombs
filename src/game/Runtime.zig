@@ -9,8 +9,6 @@ const Runtime = @This();
 
 pub const DrawingMode = enum { normal, inverted, transparent };
 
-pub const MenuItem = opaque {};
-
 pub const MenuItemCallback = *const fn (userdata: ?*anyopaque) callconv(.C) void;
 
 const VTable = struct {
@@ -20,7 +18,7 @@ const VTable = struct {
         title: []const u8,
         game_object: *anyopaque,
         callback: MenuItemCallback,
-    ) ?*MenuItem,
+    ) ?*anyopaque,
     removeAllMenuItems: *const fn (context: *anyopaque) void,
     clearDisplay: *const fn (context: *anyopaque) anyerror!void,
     drawHorizontalBorderLine: *const fn (context: *anyopaque, row: u8, length: u8) anyerror!void,
@@ -63,7 +61,7 @@ pub inline fn addMenuItem(
     title: []const u8,
     game_object: *anyopaque,
     callback: MenuItemCallback,
-) ?*MenuItem {
+) ?*anyopaque {
     return self.vtable.addMenuItem(self.context, title, game_object, callback);
 }
 

@@ -539,7 +539,7 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
             self.alloc.free(self.bitsets);
             self.bitsets = undefined;
         }
-        
+
         pub fn clear(self: *Self) void {
             for (0..rows) |idx| {
                 self.bitsets[idx] = std.StaticBitSet(cols).initEmpty();

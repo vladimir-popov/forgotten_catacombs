@@ -147,7 +147,7 @@ fn addMenuItem(
     title: []const u8,
     game_object: *anyopaque,
     callback: g.Runtime.MenuItemCallback,
-) ?*g.Runtime.MenuItem {
+) ?*anyopaque {
     const self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     return self.menu.addMenuItem(title, game_object, callback);
 }
