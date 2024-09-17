@@ -6,6 +6,8 @@ const std = @import("std");
 const g = @import("../game_pkg.zig");
 const p = g.primitives;
 
+const log = std.log.scoped(.dungeon);
+
 pub const Passage = @import("Passage.zig");
 
 pub const Room = p.Region;
@@ -18,7 +20,7 @@ pub const Cell = enum {
     door,
 };
 
-pub const Map = p.BitMap(2 * g.DISPLAY_HEIGHT / g.SPRITE_HEIGHT, 2 * g.DISPLAY_WIDHT / g.SPRITE_WIDTH);
+pub const Map = p.BitMap(g.DISPLAY_HEIGHT / g.SPRITE_HEIGHT, g.DISPLAY_WIDHT / g.SPRITE_WIDTH);
 
 pub const ROWS = 40;
 pub const COLS = 100;
@@ -40,7 +42,7 @@ passages: std.ArrayList(Passage),
 doors: std.AutoHashMap(p.Point, void),
 /// The bit mask of the places with floor.
 floor: p.BitMap(ROWS, COLS),
-/// The bit mask of the places with walls. The floor under the walls is undefined, it can be, or can be omitted.
+/// The bit mask of the places with walls. The floor under the walls is undefined, it can be set, or can be omitted.
 walls: p.BitMap(ROWS, COLS),
 
 /// Creates an empty dungeon.
@@ -77,7 +79,17 @@ pub fn clearRetainingCapacity(self: *Dungeon) void {
 }
 
 pub fn createMap(self: Dungeon, alloc: std.mem.Allocator) !Map {
-    return try self.floor.bilinearInterpolate(alloc, Map.rows, Map.cols);
+    const v_scale = @as(f16, @floatFromInt(Map.rows)) / ROWS;
+    const h_scale = @as(f16, @floatFromInt(Map.cols)) / COLS;
+    var map = try Map.initEmpty(alloc);
+    for (self.rooms.items) |room| {
+        var scaled_room = room.scaled(v_scale, h_scale);
+        scaled_room.top_left.scaleCoordinates(v_scale, h_scale);
+        scaled_room.top_left.row = @max(1, scaled_room.top_left.row);
+        scaled_room.top_left.col = @max(1, scaled_room.top_left.col);
+        map.setRegionValue(scaled_room, true);
+    }
+    return map;
 }
 
 pub inline fn cellAt(self: Dungeon, place: p.Point) ?Cell {

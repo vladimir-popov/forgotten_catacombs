@@ -96,6 +96,11 @@ pub const Point = struct {
         return point;
     }
 
+    pub fn scaleCoordinates(self: *Point, v_scale: f16, h_scale: f16) void {
+        self.row = @intFromFloat(@round(v_scale * @as(f16, @floatFromInt(self.row))));
+        self.col = @intFromFloat(@round(h_scale * @as(f16, @floatFromInt(self.col))));
+    }
+
     pub inline fn eql(self: Point, other: Point) bool {
         return self.row == other.row and self.col == other.col;
     }
@@ -181,11 +186,18 @@ pub const Region = struct {
         return .{ .row = self.top_left.row + self.rows / 2, .col = self.top_left.col + self.cols / 2 };
     }
 
-    pub fn scale(self: *Region, k: f16) void {
+    /// Multiplies rows by `v_scale` and columns by `h_scale`
+    pub fn scale(self: *Region, v_scale: f16, h_scale: f16) void {
         const rows: f16 = @floatFromInt(self.rows);
         const cols: f16 = @floatFromInt(self.cols);
-        self.rows = @intFromFloat(@round(rows * k));
-        self.cols = @intFromFloat(@round(cols * k));
+        self.rows = @intFromFloat(@round(rows * v_scale));
+        self.cols = @intFromFloat(@round(cols * h_scale));
+    }
+
+    pub fn scaled(self: Region, v_scale: f16, h_scale: f16) Region {
+        var reg = self;
+        reg.scale(v_scale, h_scale);
+        return reg;
     }
 
     pub inline fn containsPoint(self: Region, point: Point) bool {
@@ -636,6 +648,7 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
             var result: BitMap(new_rows, new_cols) = try BitMap(new_rows, new_cols).initEmpty(alloc);
             const v_scale: f16 = @as(f16, @floatFromInt(rows)) / new_rows;
             const h_scale: f16 = @as(f16, @floatFromInt(cols)) / new_cols;
+            const k: f16 = 0.4;
             for (0..new_rows) |i| {
                 for (0..new_cols) |j| {
                     const r: f16 = @as(f16, @floatFromInt(i)) * v_scale;
@@ -655,7 +668,7 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
                         const q1 = self.getf(r, c_floor);
                         const q2 = self.getf(r, c_ceil);
                         const q = q1 * (c_ceil - c) + q2 * (c - c_floor);
-                        if (q >= 0.7) result.bitsets[i].set(j);
+                        if (q > k) result.bitsets[i].set(j);
                         continue;
                     }
 
@@ -663,7 +676,7 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
                         const q1 = self.getf(r_floor, c);
                         const q2 = self.getf(r_ceil, c);
                         const q = q1 * (r_ceil - r) + q2 * (r - r_floor);
-                        if (q >= 0.7) result.bitsets[i].set(j);
+                        if (q > k) result.bitsets[i].set(j);
                         continue;
                     }
 
@@ -687,7 +700,7 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
                     const q2 = v3 * d2 + v4 * d1;
                     const q = q1 * d4 + q2 * d3;
 
-                    if (q >= 0.7) result.bitsets[i].set(j);
+                    if (q > k) result.bitsets[i].set(j);
                 }
             }
             return result;

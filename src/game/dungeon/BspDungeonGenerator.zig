@@ -126,7 +126,8 @@ fn createRandomRegionInside(self: BspDungeonGenerator, region: p.Region, rand: s
     }
     var scale: f16 = @floatFromInt(1 + rand.uintLessThan(u16, room.area() - self.minArea()));
     scale = scale / @as(f16, @floatFromInt(room.area()));
-    room.scale(@max(self.min_scale, scale));
+    scale = @max(self.min_scale, scale);
+    room.scale(scale, scale);
     return room;
 }
 

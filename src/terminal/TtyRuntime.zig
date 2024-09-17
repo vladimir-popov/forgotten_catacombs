@@ -266,9 +266,9 @@ fn drawMap(ptr: *anyopaque, screen: g.Screen, map: g.Dungeon.Map) anyerror!void 
     for (0..rows) |r| {
         for (0..cols) |c| {
             if (map.bitsets[r].isSet(c))
-                try buffer.mergeLine(tty.Text.inverted("#"), r, c)
+                try buffer.mergeLine(tty.Text.inverted("."), r, c)
             else
-                try buffer.mergeLine(" ", r, c);
+                try buffer.mergeLine(tty.Text.normal(" "), r, c);
         }
     }
 }
