@@ -67,6 +67,10 @@ pub fn Render(comptime rows: u8, cols: u8) type {
             try self.runtime.drawDungeon(self.screen, dungeon);
         }
 
+        pub inline fn drawMap(self: Self, map: g.Dungeon.Map) !void {
+            try self.runtime.drawMap(self.screen, map);
+        }
+
         /// Draw sprites inside the screen and highlights the sprite of the entity in focus.
         pub fn drawSprites(self: Self, level: g.Level, entity_in_focus: ?g.Entity) !void {
             var visible = std.PriorityQueue(ZOrderedSprites, void, compareZOrder).init(self.runtime.alloc, {});

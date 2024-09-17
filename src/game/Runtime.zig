@@ -27,6 +27,7 @@ const VTable = struct {
         screen: g.Screen,
         dungeon: g.Dungeon,
     ) anyerror!void,
+    drawMap: *const fn (context: *anyopaque, screen: g.Screen, map: g.Dungeon.Map) anyerror!void,
     drawSprite: *const fn (
         context: *anyopaque,
         screen: g.Screen,
@@ -85,6 +86,10 @@ pub inline fn drawHorizontalBorderLine(self: Runtime, row: u8, length: u8) !void
 
 pub inline fn drawDungeon(self: Runtime, screen: g.Screen, dungeon: g.Dungeon) !void {
     try self.vtable.drawDungeon(self.context, screen, dungeon);
+}
+
+pub fn drawMap(self: Runtime, screen: g.Screen, map: g.Dungeon.Map) !void {
+    try self.vtable.drawMap(self.context, screen, map);
 }
 
 pub inline fn drawSprite(

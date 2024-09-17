@@ -18,6 +18,8 @@ pub const Cell = enum {
     door,
 };
 
+pub const Map = p.BitMap(2 * g.DISPLAY_HEIGHT / g.SPRITE_HEIGHT, 2 * g.DISPLAY_WIDHT / g.SPRITE_WIDTH);
+
 pub const ROWS = 40;
 pub const COLS = 100;
 pub const REGION: p.Region = .{
@@ -25,8 +27,6 @@ pub const REGION: p.Region = .{
     .rows = ROWS,
     .cols = COLS,
 };
-
-const BitMap = p.BitMap(ROWS, COLS);
 
 const Dungeon = @This();
 
@@ -39,15 +39,15 @@ passages: std.ArrayList(Passage),
 /// The set of places where doors are inside the dungeon.
 doors: std.AutoHashMap(p.Point, void),
 /// The bit mask of the places with floor.
-floor: BitMap,
+floor: p.BitMap(ROWS, COLS),
 /// The bit mask of the places with walls. The floor under the walls is undefined, it can be, or can be omitted.
-walls: BitMap,
+walls: p.BitMap(ROWS, COLS),
 
 /// Creates an empty dungeon.
 pub fn init(alloc: std.mem.Allocator) !Dungeon {
     return .{
-        .floor = try BitMap.initEmpty(alloc),
-        .walls = try BitMap.initEmpty(alloc),
+        .floor = try p.BitMap(ROWS, COLS).initEmpty(alloc),
+        .walls = try p.BitMap(ROWS, COLS).initEmpty(alloc),
         .doors = std.AutoHashMap(p.Point, void).init(alloc),
         .rooms = std.ArrayList(Room).init(alloc),
         .passages = std.ArrayList(Passage).init(alloc),
@@ -74,6 +74,10 @@ pub fn clearRetainingCapacity(self: *Dungeon) void {
     }
     self.passages.clearRetainingCapacity();
     self.rooms.clearRetainingCapacity();
+}
+
+pub fn createMap(self: Dungeon, alloc: std.mem.Allocator) !Map {
+    return try self.floor.bilinearInterpolate(alloc, Map.rows, Map.cols);
 }
 
 pub inline fn cellAt(self: Dungeon, place: p.Point) ?Cell {

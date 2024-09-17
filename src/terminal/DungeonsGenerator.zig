@@ -37,6 +37,7 @@ const DungeonsGenerator = struct {
     runtime: g.Runtime,
     render: g.render.Render(g.Dungeon.ROWS, g.Dungeon.COLS),
     level: g.Level,
+    draw_dungeon: bool = true, // if false the map should be drawn
 
     pub fn init(runtime: g.Runtime) !DungeonsGenerator {
         return .{
@@ -66,8 +67,12 @@ const DungeonsGenerator = struct {
 
     pub fn tick(self: *DungeonsGenerator) !void {
         try self.handleInput();
-        try self.render.drawDungeon(self.level.dungeon);
-        try self.render.drawSprites(self.level, null);
+        if (self.draw_dungeon) {
+            try self.render.drawDungeon(self.level.dungeon);
+            try self.render.drawSprites(self.level, null);
+        } else {
+            try self.render.drawMap(self.level.map);
+        }
     }
 
     fn handleInput(self: *DungeonsGenerator) anyerror!void {
@@ -77,6 +82,10 @@ const DungeonsGenerator = struct {
             self.level.deinit();
             self.level = try g.Level.init(self.runtime.alloc, 0);
             try self.generate(seed);
+        }
+        if (btn.game_button == .b) {
+            self.draw_dungeon = !self.draw_dungeon;
+            try self.render.clearDisplay();
         }
     }
 };

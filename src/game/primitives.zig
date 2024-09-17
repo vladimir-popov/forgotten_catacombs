@@ -625,6 +625,77 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
                 );
             }
         }
+
+        pub fn bilinearInterpolate(
+            self: Self,
+            alloc: std.mem.Allocator,
+            comptime new_rows: u8,
+            comptime new_cols: u8,
+        ) !BitMap(new_rows, new_cols) {
+            // https://meghal-darji.medium.com/implementing-bilinear-interpolation-for-image-resizing-357cbb2c2722
+            var result: BitMap(new_rows, new_cols) = try BitMap(new_rows, new_cols).initEmpty(alloc);
+            const v_scale: f16 = @as(f16, @floatFromInt(rows)) / new_rows;
+            const h_scale: f16 = @as(f16, @floatFromInt(cols)) / new_cols;
+            for (0..new_rows) |i| {
+                for (0..new_cols) |j| {
+                    const r: f16 = @as(f16, @floatFromInt(i)) * v_scale;
+                    const c: f16 = @as(f16, @floatFromInt(j)) * h_scale;
+
+                    const r_floor = @floor(r);
+                    const r_ceil = @ceil(r);
+                    const c_floor = @floor(c);
+                    const c_ceil = @ceil(c);
+
+                    if (r_floor == r_ceil and c_floor == c_ceil) {
+                        result.bitsets[i].setValue(j, self.getf(r, c) > 0);
+                        continue;
+                    }
+
+                    if (r_floor == r_ceil) {
+                        const q1 = self.getf(r, c_floor);
+                        const q2 = self.getf(r, c_ceil);
+                        const q = q1 * (c_ceil - c) + q2 * (c - c_floor);
+                        if (q >= 0.7) result.bitsets[i].set(j);
+                        continue;
+                    }
+
+                    if (c_floor == c_ceil) {
+                        const q1 = self.getf(r_floor, c);
+                        const q2 = self.getf(r_ceil, c);
+                        const q = q1 * (r_ceil - r) + q2 * (r - r_floor);
+                        if (q >= 0.7) result.bitsets[i].set(j);
+                        continue;
+                    }
+
+                    //      d1 d2
+                    //  v1 ---c--- v2
+                    //   |    |    | d3
+                    //   r   r:c---|
+                    //   |         | d4
+                    //  v3-------v4
+                    const v1: f16 = self.getf(r_floor, c_floor);
+                    const v2: f16 = self.getf(r_floor, c_ceil);
+                    const v3: f16 = self.getf(r_ceil, c_floor);
+                    const v4: f16 = self.getf(r_ceil, r_ceil);
+
+                    // Estimate the pixel value q using pixel values of neighbours
+                    const d1 = c - c_floor;
+                    const d2 = c_ceil - c;
+                    const d3 = r - r_floor;
+                    const d4 = r_ceil - r;
+                    const q1 = v1 * d2 + v2 * d1;
+                    const q2 = v3 * d2 + v4 * d1;
+                    const q = q1 * d4 + q2 * d3;
+
+                    if (q >= 0.7) result.bitsets[i].set(j);
+                }
+            }
+            return result;
+        }
+
+        inline fn getf(self: Self, i: f16, j: f16) f16 {
+            return if (self.bitsets[@intFromFloat(i)].isSet(@intFromFloat(j))) 1.0 else 0.0;
+        }
     };
 }
 

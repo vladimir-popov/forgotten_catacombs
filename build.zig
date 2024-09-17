@@ -61,7 +61,7 @@ pub fn build(b: *std.Build) !void {
     //                   Dungeons generator
     // ------------------------------------------------------------
     const dungeons_exe = b.addExecutable(.{
-        .name = "Dungeons generator",
+        .name = "dungeons-generator",
         .root_source_file = b.path("src/terminal/DungeonsGenerator.zig"),
         .target = desktop_target,
         .optimize = optimize,

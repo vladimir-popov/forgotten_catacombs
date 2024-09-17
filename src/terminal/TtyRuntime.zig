@@ -131,6 +131,7 @@ pub fn runtime(self: *TtyRuntime) g.Runtime {
             .readPushedButtons = readPushedButtons,
             .clearDisplay = clearDisplay,
             .drawHorizontalBorderLine = drawHorizontalBorderLine,
+            .drawMap = drawMap,
             .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
             .drawText = drawText,
@@ -214,6 +215,7 @@ fn clearDisplay(ptr: *anyopaque) !void {
     var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     _ = self.arena.reset(.retain_capacity);
     self.buffer = utf8.Buffer.init(self.arena.allocator());
+    try tty.Display.clearScreen();
     // draw external border
     if (self.draw_border) {
         try self.buffer.addLine("╔" ++ "═" ** g.DISPLAY_COLS ++ "╗");
@@ -252,6 +254,21 @@ fn drawDungeon(ptr: *anyopaque, screen: g.Screen, dungeon: g.Dungeon) anyerror!v
             @memset(line, 0);
             idx = 0;
             row += 1;
+        }
+    }
+}
+
+fn drawMap(ptr: *anyopaque, screen: g.Screen, map: g.Dungeon.Map) anyerror!void {
+    var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
+    const buffer = &self.buffer;
+    const rows = @min(screen.region.rows, g.Dungeon.Map.rows);
+    const cols = @min(screen.region.cols, g.Dungeon.Map.cols);
+    for (0..rows) |r| {
+        for (0..cols) |c| {
+            if (map.bitsets[r].isSet(c))
+                try buffer.mergeLine(tty.Text.inverted("#"), r, c)
+            else
+                try buffer.mergeLine(" ", r, c);
         }
     }
 }
