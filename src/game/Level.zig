@@ -61,7 +61,6 @@ pub fn generate(
     var prng = std.Random.DefaultPrng.init(seed);
     var bspGenerator = BspDungeonGenerator{ .alloc = self.alloc };
     try bspGenerator.generator().generateDungeon(prng.random(), .{ .dungeon = &self.dungeon });
-    self.map = try self.dungeon.createMap(self.alloc);
 
     self.next_entity = this_ladder + 1;
     var entrance_place: p.Point = undefined;
@@ -87,6 +86,8 @@ pub fn generate(
     for (0..prng.random().uintLessThan(u8, 10) + 10) |_| {
         try self.addEnemy(prng.random(), g.entities.Rat);
     }
+
+    self.map = try self.createMap(self.alloc);
 }
 
 pub fn regenerate(
@@ -103,6 +104,25 @@ pub fn regenerate(
     self.dungeon.clearRetainingCapacity();
     self.depth = depth;
     try self.generate(seed, player, this_ladder, from_ladder, direction);
+}
+
+pub fn createMap(self: Level, alloc: std.mem.Allocator) !g.Dungeon.Map {
+    var map = g.Dungeon.Map.init(alloc);
+    for (self.dungeon.rooms.items, 0..) |room, i| {
+        try map.addVisitedRoom(room, i == 0, i == self.dungeon.rooms.items.len - 1);
+    }
+    for (self.dungeon.passages.items) |passage| {
+        var itr = passage.places();
+        while (itr.next()) |place_in_passage| {
+            try map.addVisitedPlace(place_in_passage);
+        }
+    }
+    var itr = self.dungeon.doors.keyIterator();
+    while (itr.next()) |door| {
+        try map.addVisitedDoor(door.*);
+    }
+
+    return map;
 }
 
 /// Aggregates requests of few components for the same entities at once

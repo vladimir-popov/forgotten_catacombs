@@ -35,14 +35,14 @@ pub fn main() !void {
 
 const DungeonsGenerator = struct {
     runtime: g.Runtime,
-    render: g.render.Render(g.Dungeon.ROWS, g.Dungeon.COLS),
+    render: g.render.Render(g.Dungeon.ROWS + 1, g.Dungeon.COLS + 1),
     level: g.Level,
     draw_dungeon: bool = true, // if false the map should be drawn
 
     pub fn init(runtime: g.Runtime) !DungeonsGenerator {
         return .{
             .runtime = runtime,
-            .render = g.render.Render(g.Dungeon.ROWS, g.Dungeon.COLS).init(runtime),
+            .render = g.render.Render(g.Dungeon.ROWS + 1, g.Dungeon.COLS + 1).init(runtime),
             .level = try g.Level.init(runtime.alloc, 0),
         };
     }
@@ -76,7 +76,7 @@ const DungeonsGenerator = struct {
             try self.render.drawDungeon(self.level.dungeon);
             try self.render.drawSprites(self.level, null);
         } else {
-            try self.render.drawMap(self.level.map);
+            try self.render.drawMap(self.level.playerPosition().point, self.level.map);
         }
     }
 

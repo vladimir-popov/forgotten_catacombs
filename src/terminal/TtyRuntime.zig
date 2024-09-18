@@ -262,19 +262,28 @@ fn drawDungeon(ptr: *anyopaque, screen: g.Screen, dungeon: g.Dungeon) anyerror!v
     }
 }
 
-fn drawMap(ptr: *anyopaque, _: g.Screen, map: g.Dungeon.Map) anyerror!void {
+fn drawMap(ptr: *anyopaque, player: p.Point, map: g.Dungeon.Map) anyerror!void {
     var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
     if (self.buffer.lines.items.len == 0) try self.wrapBufferInBorder();
     var itr = map.visited_places.keyIterator();
     while (itr.next()) |place| {
-        try self.buffer.set('.', place.row, place.col);
+        try self.buffer.set('#', place.row, place.col);
     }
-    for (map.visited_rooms.items) |room| {
+    for (map.visited_rooms.items, 0..) |room, i| {
         try self.drawBorder(room, ' ');
+        if (map.room_with_entrance == i) {
+            const entrance = room.center();
+            try self.buffer.set('>', entrance.row, entrance.col);
+        }
+        if (map.room_with_exit == i) {
+            const exit = room.center();
+            try self.buffer.set('<', exit.row, exit.col);
+        }
     }
     for (map.visited_doors.items) |door| {
         try self.buffer.set('+', door.row, door.col);
     }
+    try self.buffer.set('@', player.row, player.col);
 }
 
 fn drawBorder(self: *TtyRuntime, region: p.Region, filler: u8) !void {
@@ -292,7 +301,7 @@ fn drawBorder(self: *TtyRuntime, region: p.Region, filler: u8) !void {
     fbs.reset();
 
     if (region.rows > 2) {
-        for (1..region.rows - 1) |l| {
+        for (1..(region.rows - 1)) |l| {
             _ = try writer.write("║");
             if (region.cols > 2) try writer.writeByteNTimes(filler, region.cols - 2);
             _ = try writer.write("║");

@@ -43,7 +43,7 @@ pub fn build(
 
     var splitter = Splitter{ .rand = rand, .opts = opts };
     var root: *Node = try Node.root(arena, region);
-    try root.split(arena, splitter.handler());
+    try root.split(arena, rand, splitter.handler());
 
     return root;
 }
@@ -130,6 +130,7 @@ fn GenericNode(comptime V: type) type {
         pub fn split(
             self: *NodeV,
             arena: *std.heap.ArenaAllocator,
+            rand: std.Random,
             splitter: SplitHandler,
         ) !void {
             std.debug.assert(self.left == null);
@@ -150,10 +151,12 @@ fn GenericNode(comptime V: type) type {
                         .value = values[1],
                     };
 
-                    if (another == null)
-                        another = node.right;
+                    const is_continue_with_left_node = rand.boolean();
 
-                    node = node.left.?;
+                    node = if (is_continue_with_left_node) node.left.? else node.right.?;
+                    if (another == null)
+                        another = if (is_continue_with_left_node) node.right else node.left;
+
                 } else if (another) |right| {
                     node = right;
                     another = null;

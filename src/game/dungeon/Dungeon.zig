@@ -20,8 +20,8 @@ pub const Cell = enum {
 
 const log = std.log.scoped(.dungeon);
 
-pub const ROWS = 40;
-pub const COLS = 100;
+pub const ROWS = g.DISPLAY_ROWS * 3;
+pub const COLS = g.DISPLAY_COLS * 3;
 pub const REGION: p.Region = .{
     .top_left = .{ .row = 1, .col = 1 },
     .rows = ROWS,
@@ -74,24 +74,6 @@ pub fn clearRetainingCapacity(self: *Dungeon) void {
     }
     self.passages.clearRetainingCapacity();
     self.rooms.clearRetainingCapacity();
-}
-
-pub fn createMap(self: Dungeon, alloc: std.mem.Allocator) !Map {
-    var map = Map.init(alloc);
-    for (self.rooms.items) |room| {
-        try map.addVisitedRoom(room);
-    }
-    for (self.passages.items) |passage| {
-        var itr = passage.places();
-        while (itr.next()) |place_in_passage| {
-            try map.addVisitedPlace(place_in_passage);
-        }
-    }
-    var itr = self.doors.keyIterator();
-    while (itr.next()) |door| {
-        try map.addVisitedDoor(door.*);
-    }
-    return map;
 }
 
 fn scaleCoordinates(self: *p.Point, v_scale: f16, h_scale: f16) void {

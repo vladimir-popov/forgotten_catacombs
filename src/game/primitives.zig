@@ -172,6 +172,10 @@ pub const Region = struct {
         return self.top_left.col + self.cols - 1;
     }
 
+    pub inline fn center(self: Region) Point {
+        return .{ .row = self.top_left.row + self.rows / 2, .col = self.top_left.col + self.cols / 2 };
+    }
+
     /// Returns the area of this region.
     pub inline fn area(self: Region) u16 {
         return std.math.mulWide(u8, self.rows, self.cols);
