@@ -84,12 +84,25 @@ pub fn createMap(self: Dungeon, alloc: std.mem.Allocator) !Map {
     var map = try Map.initEmpty(alloc);
     for (self.rooms.items) |room| {
         var scaled_room = room.scaled(v_scale, h_scale);
-        scaled_room.top_left.scaleCoordinates(v_scale, h_scale);
-        scaled_room.top_left.row = @max(1, scaled_room.top_left.row);
-        scaled_room.top_left.col = @max(1, scaled_room.top_left.col);
+        scaleCoordinates(&scaled_room.top_left, v_scale, h_scale);
         map.setRegionValue(scaled_room, true);
     }
+    for (self.passages.items) |passage| {
+        var itr = passage.places();
+        while (itr.next()) |place_in_passage| {
+            var place = place_in_passage;
+            scaleCoordinates(&place, v_scale, h_scale);
+            map.setAt(place);
+        }
+    }
     return map;
+}
+
+fn scaleCoordinates(self: *p.Point, v_scale: f16, h_scale: f16) void {
+    self.row = @intFromFloat(@round(v_scale * @as(f16, @floatFromInt(self.row))));
+    self.col = @intFromFloat(@round(h_scale * @as(f16, @floatFromInt(self.col))));
+    self.row = @max(self.row, 1);
+    self.col = @max(self.col, 1);
 }
 
 pub inline fn cellAt(self: Dungeon, place: p.Point) ?Cell {

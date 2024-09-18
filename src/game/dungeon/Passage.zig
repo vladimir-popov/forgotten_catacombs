@@ -38,6 +38,14 @@ pub fn deinit(self: Passage) void {
     self.turns.deinit();
 }
 
+pub inline fn entrance(self: Passage) p.Point {
+    return self.turns.items[0].place;
+}
+
+pub inline fn exit(self: Passage) p.Point {
+    return self.turns.getLast().place;
+}
+
 pub fn turnAt(self: *Passage, place: p.Point, direction: p.Direction) !Turn {
     const turn: Turn = .{ .place = place, .to_direction = direction };
     try self.turns.append(turn);
@@ -74,4 +82,23 @@ pub fn randomPlace(passage: Passage, rand: std.Random) p.Point {
             .col = from_turn.place.col,
         };
     }
+}
+
+pub const PlacesIterator = struct {
+    turns: std.ArrayList(Turn),
+    last_turn_idx: u8 = 0,
+    last_place: p.Point,
+
+    pub fn next(self: *PlacesIterator) ?p.Point {
+        if (self.last_turn_idx == (self.turns.items.len - 1)) return null;
+        const next_turn = self.turns.items[self.last_turn_idx + 1];
+        if (self.last_place.eql(next_turn.place)) self.last_turn_idx += 1;
+        const turn = self.turns.items[self.last_turn_idx];
+        self.last_place.move(turn.to_direction);
+        return self.last_place;
+    }
+};
+
+pub fn places(self: Passage) PlacesIterator {
+    return .{ .turns = self.turns, .last_place = self.turns.items[0].place };
 }

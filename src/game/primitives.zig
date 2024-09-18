@@ -96,11 +96,6 @@ pub const Point = struct {
         return point;
     }
 
-    pub fn scaleCoordinates(self: *Point, v_scale: f16, h_scale: f16) void {
-        self.row = @intFromFloat(@round(v_scale * @as(f16, @floatFromInt(self.row))));
-        self.col = @intFromFloat(@round(h_scale * @as(f16, @floatFromInt(self.col))));
-    }
-
     pub inline fn eql(self: Point, other: Point) bool {
         return self.row == other.row and self.col == other.col;
     }
