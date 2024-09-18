@@ -6,10 +6,8 @@ const std = @import("std");
 const g = @import("../game_pkg.zig");
 const p = g.primitives;
 
-const log = std.log.scoped(.dungeon);
-
+pub const Map = @import("Map.zig");
 pub const Passage = @import("Passage.zig");
-
 pub const Room = p.Region;
 
 /// Possible types of objects inside the dungeon.
@@ -20,7 +18,7 @@ pub const Cell = enum {
     door,
 };
 
-pub const Map = p.BitMap(g.DISPLAY_HEIGHT / g.SPRITE_HEIGHT, g.DISPLAY_WIDHT / g.SPRITE_WIDTH);
+const log = std.log.scoped(.dungeon);
 
 pub const ROWS = 40;
 pub const COLS = 100;
@@ -79,21 +77,19 @@ pub fn clearRetainingCapacity(self: *Dungeon) void {
 }
 
 pub fn createMap(self: Dungeon, alloc: std.mem.Allocator) !Map {
-    const v_scale = @as(f16, @floatFromInt(Map.rows)) / ROWS;
-    const h_scale = @as(f16, @floatFromInt(Map.cols)) / COLS;
-    var map = try Map.initEmpty(alloc);
+    var map = Map.init(alloc);
     for (self.rooms.items) |room| {
-        var scaled_room = room.scaled(v_scale, h_scale);
-        scaleCoordinates(&scaled_room.top_left, v_scale, h_scale);
-        map.setRegionValue(scaled_room, true);
+        try map.addVisitedRoom(room);
     }
     for (self.passages.items) |passage| {
         var itr = passage.places();
         while (itr.next()) |place_in_passage| {
-            var place = place_in_passage;
-            scaleCoordinates(&place, v_scale, h_scale);
-            map.setAt(place);
+            try map.addVisitedPlace(place_in_passage);
         }
+    }
+    var itr = self.doors.keyIterator();
+    while (itr.next()) |door| {
+        try map.addVisitedDoor(door.*);
     }
     return map;
 }

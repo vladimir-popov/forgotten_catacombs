@@ -218,12 +218,16 @@ fn clearDisplay(ptr: *anyopaque) !void {
     try tty.Display.clearScreen();
     // draw external border
     if (self.draw_border) {
-        try self.buffer.addLine("╔" ++ "═" ** g.DISPLAY_COLS ++ "╗");
-        for (0..(g.DISPLAY_ROWS)) |_| {
-            try self.buffer.addLine("║" ++ " " ** g.DISPLAY_COLS ++ "║");
-        }
-        try self.buffer.addLine("╚" ++ "═" ** g.DISPLAY_COLS ++ "╝");
+        try self.wrapBufferInBorder();
     }
+}
+
+fn wrapBufferInBorder(self: *TtyRuntime) !void {
+    try self.buffer.addLine("╔" ++ "═" ** g.DISPLAY_COLS ++ "╗");
+    for (0..(g.DISPLAY_ROWS)) |_| {
+        try self.buffer.addLine("║" ++ " " ** g.DISPLAY_COLS ++ "║");
+    }
+    try self.buffer.addLine("╚" ++ "═" ** g.DISPLAY_COLS ++ "╝");
 }
 
 fn drawHorizontalBorderLine(ptr: *anyopaque, row: u8, length: u8) !void {
@@ -258,19 +262,50 @@ fn drawDungeon(ptr: *anyopaque, screen: g.Screen, dungeon: g.Dungeon) anyerror!v
     }
 }
 
-fn drawMap(ptr: *anyopaque, screen: g.Screen, map: g.Dungeon.Map) anyerror!void {
+fn drawMap(ptr: *anyopaque, _: g.Screen, map: g.Dungeon.Map) anyerror!void {
     var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
-    const buffer = &self.buffer;
-    const rows = @min(screen.region.rows, g.Dungeon.Map.rows);
-    const cols = @min(screen.region.cols, g.Dungeon.Map.cols);
-    for (0..rows) |r| {
-        for (0..cols) |c| {
-            if (map.bitsets[r].isSet(c))
-                try buffer.mergeLine(tty.Text.inverted("."), r, c)
-            else
-                try buffer.mergeLine(tty.Text.normal(" "), r, c);
+    if (self.buffer.lines.items.len == 0) try self.wrapBufferInBorder();
+    var itr = map.visited_places.keyIterator();
+    while (itr.next()) |place| {
+        try self.buffer.set('.', place.row, place.col);
+    }
+    for (map.visited_rooms.items) |room| {
+        try self.drawBorder(room, ' ');
+    }
+    for (map.visited_doors.items) |door| {
+        try self.buffer.set('+', door.row, door.col);
+    }
+}
+
+fn drawBorder(self: *TtyRuntime, region: p.Region, filler: u8) !void {
+    const r = region.top_left.row;
+    const c = region.top_left.col;
+
+    var buf: [g.Dungeon.Map.cols * 3]u8 = undefined;
+    var fbs = std.io.fixedBufferStream(&buf);
+    const writer = fbs.writer();
+
+    _ = try writer.write("╔");
+    if (region.cols > 2) try writer.writeBytesNTimes("═", region.cols - 2);
+    _ = try writer.write("╗");
+    try self.buffer.mergeLine(fbs.getWritten(), r, c);
+    fbs.reset();
+
+    if (region.rows > 2) {
+        for (1..region.rows - 1) |l| {
+            _ = try writer.write("║");
+            if (region.cols > 2) try writer.writeByteNTimes(filler, region.cols - 2);
+            _ = try writer.write("║");
+            try self.buffer.mergeLine(fbs.getWritten(), r + l, c);
+            fbs.reset();
         }
     }
+
+    _ = try writer.write("╚");
+    if (region.cols > 2) try writer.writeBytesNTimes("═", region.cols - 2);
+    _ = try writer.write("╝");
+    try self.buffer.mergeLine(fbs.getWritten(), region.bottomRightRow(), c);
+    fbs.reset();
 }
 
 fn drawSprite(

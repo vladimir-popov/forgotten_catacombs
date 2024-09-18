@@ -87,18 +87,53 @@ pub fn randomPlace(passage: Passage, rand: std.Random) p.Point {
 pub const PlacesIterator = struct {
     turns: std.ArrayList(Turn),
     last_turn_idx: u8 = 0,
-    last_place: p.Point,
+    current_place: p.Point,
 
     pub fn next(self: *PlacesIterator) ?p.Point {
         if (self.last_turn_idx == (self.turns.items.len - 1)) return null;
+
         const next_turn = self.turns.items[self.last_turn_idx + 1];
-        if (self.last_place.eql(next_turn.place)) self.last_turn_idx += 1;
+        if (self.current_place.eql(next_turn.place)) self.last_turn_idx += 1;
         const turn = self.turns.items[self.last_turn_idx];
-        self.last_place.move(turn.to_direction);
-        return self.last_place;
+        const place = self.current_place;
+        self.current_place.move(turn.to_direction);
+        return place;
     }
 };
 
 pub fn places(self: Passage) PlacesIterator {
-    return .{ .turns = self.turns, .last_place = self.turns.items[0].place };
+    return .{ .turns = self.turns, .current_place = self.turns.items[0].place };
+}
+
+test "places iterator" {
+    // given:
+    //             turn
+    // Entrance o---o
+    //              |
+    //              o
+    //            Exit
+    var passage = Passage{ .turns = std.ArrayList(Turn).init(std.testing.allocator) };
+    defer passage.deinit();
+    _ = try passage.turnAt(.{ .row = 1, .col = 1 }, .right);
+    _ = try passage.turnAt(.{ .row = 1, .col = 3 }, .down);
+    _ = try passage.turnAt(.{ .row = 3, .col = 3 }, .down);
+
+    const expected_places: [5]p.Point = .{
+        .{ .row = 1, .col = 1 },
+        .{ .row = 1, .col = 2 },
+        .{ .row = 1, .col = 3 },
+        .{ .row = 2, .col = 3 },
+        .{ .row = 3, .col = 3 },
+    };
+    var actual_places = std.ArrayList(p.Point).init(std.testing.allocator);
+    defer actual_places.deinit();
+
+    // when:
+    var itr = passage.places();
+    while (itr.next()) |place| {
+        try actual_places.append(place);
+    }
+
+    // then:
+    try std.testing.expectEqualSlices(p.Point, &expected_places, actual_places.items);
 }

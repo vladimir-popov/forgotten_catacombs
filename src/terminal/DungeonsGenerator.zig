@@ -63,10 +63,15 @@ const DungeonsGenerator = struct {
         );
         try self.level.movePlayerToLadder(entrance);
         try self.render.clearDisplay();
+        try self.draw();
     }
 
     pub fn tick(self: *DungeonsGenerator) !void {
-        try self.handleInput();
+        if (!try self.handleInput()) return;
+        try self.draw();
+    }
+
+    fn draw(self: *DungeonsGenerator) !void {
         if (self.draw_dungeon) {
             try self.render.drawDungeon(self.level.dungeon);
             try self.render.drawSprites(self.level, null);
@@ -75,8 +80,8 @@ const DungeonsGenerator = struct {
         }
     }
 
-    fn handleInput(self: *DungeonsGenerator) !void {
-        const btn = try self.runtime.readPushedButtons() orelse return;
+    fn handleInput(self: *DungeonsGenerator) !bool {
+        const btn = try self.runtime.readPushedButtons() orelse return false;
         if (btn.game_button == .a) {
             const seed = std.crypto.random.int(u64);
             self.level.deinit();
@@ -87,5 +92,6 @@ const DungeonsGenerator = struct {
             self.draw_dungeon = !self.draw_dungeon;
             try self.render.clearDisplay();
         }
+        return true;
     }
 };
