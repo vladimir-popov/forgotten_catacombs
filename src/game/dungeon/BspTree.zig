@@ -2,13 +2,15 @@ const std = @import("std");
 const g = @import("../game_pkg.zig");
 const p = g.primitives;
 
+const log = std.log.scoped(.bsp_tree);
+
 pub const Node = GenericNode(p.Region);
 
 pub const MinRegionSettings = struct {
-    min_rows: u8 = 10,
-    min_cols: u8 = 24,
-    /// rows / cols ratio:
-    square_ratio: f16 = 0.3,
+    /// rows / cols ratio to keep regions looked as square:
+    square_ratio: f16,
+    min_rows: u8,
+    min_cols: u8,
 
     fn validateRegion(self: MinRegionSettings, region: p.Region) void {
         if (region.rows < self.min_rows) {
@@ -43,7 +45,7 @@ pub fn build(
 
     var splitter = Splitter{ .rand = rand, .opts = opts };
     var root: *Node = try Node.root(arena, region);
-    try root.split(arena, rand, splitter.handler());
+    try root.split(arena, splitter.handler());
 
     return root;
 }
@@ -58,31 +60,35 @@ const Splitter = struct {
 
     fn split(ptr: *anyopaque, node: *GenericNode(p.Region)) anyerror!?struct { p.Region, p.Region } {
         const self: *Splitter = @ptrCast(@alignCast(ptr));
-        const region: p.Region = node.value;
 
-        const split_vertical = region.ratio() < self.opts.square_ratio;
+        const split_vertical = node.value.ratio() < self.opts.square_ratio;
 
         if (split_vertical) {
-            if (divideRnd(self.rand, region.cols, self.opts.min_cols)) |cols| {
-                return region.splitVertically(cols);
+            if (node.value.cols >= self.opts.min_cols * 2) {
+                log.debug("Split vertically", .{});
+                return node.value.splitVertically(
+                    self.rand.intRangeAtMost(u8, self.opts.min_cols, node.value.cols - self.opts.min_cols),
+                );
+            } else {
+                log.debug(
+                    "Stop splitting vertically, because of cols are not enough: {any} {any}",
+                    .{ node.value, self.opts },
+                );
             }
         } else {
-            if (divideRnd(self.rand, region.rows, self.opts.min_rows)) |rows| {
-                return region.splitHorizontally(rows);
+            if (node.value.rows >= self.opts.min_rows * 2) {
+                log.debug("Split horizontally", .{});
+                return node.value.splitHorizontally(
+                    self.rand.intRangeAtMost(u8, self.opts.min_rows, node.value.rows - self.opts.min_rows),
+                );
+            } else {
+                log.debug(
+                    "Stop splitting horizontally, because of rows are not enough: {any} {any}",
+                    .{ node.value, self.opts },
+                );
             }
         }
         return null;
-    }
-
-    /// Randomly divides the `value` to two parts which are not less than `min`,
-    /// or return null if it is impossible.
-    inline fn divideRnd(rand: std.Random, value: u8, min: u8) ?u8 {
-        return if (value > min * 2)
-            min + rand.uintLessThan(u8, value - min * 2)
-        else if (value == 2 * min)
-            min
-        else
-            null;
     }
 };
 
@@ -130,16 +136,16 @@ fn GenericNode(comptime V: type) type {
         pub fn split(
             self: *NodeV,
             arena: *std.heap.ArenaAllocator,
-            rand: std.Random,
             splitter: SplitHandler,
         ) !void {
             std.debug.assert(self.left == null);
             std.debug.assert(self.right == null);
-            var node: *NodeV = self;
-            var another: ?*NodeV = null;
-            while (true) {
+            var stack = std.ArrayList(*NodeV).init(arena.allocator());
+            try stack.append(self);
+            while (stack.popOrNull()) |node| {
                 const maybe_values = try splitter.split(splitter.ptr, node);
                 if (maybe_values) |values| {
+                    log.debug("Splitted into regions: {any}", .{values});
                     node.left = try arena.allocator().create(NodeV);
                     node.left.?.* = NodeV{
                         .parent = node,
@@ -150,18 +156,8 @@ fn GenericNode(comptime V: type) type {
                         .parent = node,
                         .value = values[1],
                     };
-
-                    const is_continue_with_left_node = rand.boolean();
-
-                    node = if (is_continue_with_left_node) node.left.? else node.right.?;
-                    if (another == null)
-                        another = if (is_continue_with_left_node) node.right else node.left;
-
-                } else if (another) |right| {
-                    node = right;
-                    another = null;
-                } else {
-                    break;
+                    try stack.append(node.right.?);
+                    try stack.append(node.left.?);
                 }
             }
         }
@@ -193,9 +189,8 @@ fn GenericNode(comptime V: type) type {
         }
 
         /// Traverse all nodes of this tree in depth, and pass them to the callback.
-        pub fn traverse(self: *NodeV, alloc: std.mem.Allocator, handler: TraverseHandler) !void {
-            var stack = std.ArrayList(*NodeV).init(alloc);
-            defer stack.deinit();
+        pub fn traverse(self: *NodeV, arena: *std.heap.ArenaAllocator, handler: TraverseHandler) !void {
+            var stack = std.ArrayList(*NodeV).init(arena.allocator());
             try stack.append(self);
             while (stack.popOrNull()) |node| {
                 try handler.handle(handler.ptr, node);
@@ -212,9 +207,8 @@ fn GenericNode(comptime V: type) type {
         /// and modifies the parent of the leafs setting the value returned from the handler.
         /// Note, that only values from paired leafs are used.  Values of all other nodes are ignored,
         /// and replaces by the handler result.
-        pub fn foldModify(self: *NodeV, alloc: std.mem.Allocator, handler: FoldHandler) !V {
-            var stack = std.ArrayList(struct { *NodeV, *NodeV }).init(alloc);
-            defer stack.deinit();
+        pub fn foldModify(self: *NodeV, arena: *std.heap.ArenaAllocator, handler: FoldHandler) !V {
+            var stack = std.ArrayList(struct { *NodeV, *NodeV }).init(arena.allocator());
             var stack_prev_size: usize = 0;
             if (self.left orelse self.right == null) {
                 return self.value;

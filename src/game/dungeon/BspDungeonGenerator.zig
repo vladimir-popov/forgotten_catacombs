@@ -16,15 +16,18 @@ const Dungeon = @import("Dungeon.zig");
 const DungeonBuilder = @import("DungeonBuilder.zig");
 const DungeonGenerator = @import("DungeonGenerator.zig");
 
+const log = std.log.scoped(.bsp_generator);
+
 const BspDungeonGenerator = @This();
 
 /// Used to create arena for BSP tree
 alloc: std.mem.Allocator,
-/// Minimal rows count in the room
-min_rows: u8 = 5,
-/// Minimal columns count in the room
-min_cols: u8 = 5,
-/// Minimal scale rate to prevent too small rooms
+/// The minimal rows count in the final region after BSP splitting
+region_min_rows: u8 = 10,
+/// The minimal columns count in the final region after BSP splitting
+region_min_cols: u8 = 20,
+/// Minimal scale rate to prevent too small rooms.
+/// The small values make the dungeon looked more random.
 min_scale: f16 = 0.6,
 /// This is rows/cols ratio of the square.
 /// In case of ascii graphics it's not 1.0
@@ -47,7 +50,13 @@ fn generateDungeon(
     defer _ = bsp_arena.deinit();
 
     // BSP helps to mark regions for rooms without intersections
-    const root = try BspTree.build(&bsp_arena, rand, Dungeon.ROWS, Dungeon.COLS, .{});
+    const root = try BspTree.build(
+        &bsp_arena,
+        rand,
+        Dungeon.ROWS,
+        Dungeon.COLS,
+        .{ .min_rows = self.region_min_rows, .min_cols = self.region_min_cols, .square_ratio = self.square_ratio },
+    );
 
     // visit every BSP node and generate rooms in the leafs
     var createRooms: TraverseAndCreateRooms = .{
@@ -55,11 +64,13 @@ fn generateDungeon(
         .builder = builder,
         .rand = rand,
     };
-    try root.traverse(bsp_arena.allocator(), createRooms.handler());
+    try root.traverse(&bsp_arena, createRooms.handler());
+    log.debug("The rooms has been created", .{});
 
     // fold the BSP tree and binds nodes with the same parent:
     var createPassages: CreatePassageBetweenRegions = .{ .builder = builder, .alloc = self.alloc, .rand = rand };
-    _ = try root.foldModify(bsp_arena.allocator(), createPassages.handler());
+    _ = try root.foldModify(&bsp_arena, createPassages.handler());
+    log.debug("The passages has been created", .{});
 }
 
 const TraverseAndCreateRooms = struct {
@@ -94,7 +105,7 @@ const CreatePassageBetweenRegions = struct {
     }
 };
 
-/// Creates smaller region inside the passed with random padding.
+/// Creates a smaller region inside the passed with random padding.
 ///
 /// Example of the room inside the 7x7 region with padding 1
 /// (the room's region includes the '#' cells):
@@ -114,17 +125,17 @@ fn createRandomRegionInside(self: BspDungeonGenerator, region: p.Region, rand: s
         // make the region 'more square'
         if (region.ratio() > self.square_ratio) {
             room.rows = @max(
-                self.min_rows,
+                self.region_min_rows,
                 @as(u8, @intFromFloat(@round(@as(f16, @floatFromInt(region.cols)) * self.square_ratio))),
             );
         } else {
             room.cols = @max(
-                self.min_cols,
+                self.region_min_cols,
                 @as(u8, @intFromFloat(@round(@as(f16, @floatFromInt(region.rows)) / self.square_ratio))),
             );
         }
     }
-    var scale: f16 = @floatFromInt(1 + rand.uintLessThan(u16, room.area() - self.minArea()));
+    var scale: f16 = @floatFromInt(1 + rand.uintAtMost(u16, room.area() - self.minArea()));
     scale = scale / @as(f16, @floatFromInt(room.area()));
     scale = @max(self.min_scale, scale);
     room.scale(scale, scale);
@@ -133,5 +144,5 @@ fn createRandomRegionInside(self: BspDungeonGenerator, region: p.Region, rand: s
 
 /// Minimal area of the room
 inline fn minArea(self: BspDungeonGenerator) u8 {
-    return self.min_rows * self.min_cols;
+    return self.region_min_rows * self.region_min_cols;
 }

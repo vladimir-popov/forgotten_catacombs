@@ -36,10 +36,10 @@ pub fn init(alloc: std.mem.Allocator, depth: u8) !Level {
 }
 
 pub fn deinit(self: *Level) void {
+    if (self.entities.items.len > 0) self.map.deinit();
     self.entities.deinit();
     self.components.deinit();
     self.dungeon.deinit();
-    if (self.dungeon.rooms.items.len > 0) self.map.deinit();
 }
 
 /// `this_ladder` - the id of the entrance when generated the lever below,
@@ -61,6 +61,7 @@ pub fn generate(
     var prng = std.Random.DefaultPrng.init(seed);
     var bspGenerator = BspDungeonGenerator{ .alloc = self.alloc };
     try bspGenerator.generator().generateDungeon(prng.random(), .{ .dungeon = &self.dungeon });
+    log.debug("The dungeon has been generated", .{});
 
     self.next_entity = this_ladder + 1;
     var entrance_place: p.Point = undefined;

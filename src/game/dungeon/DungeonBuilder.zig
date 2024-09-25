@@ -10,7 +10,7 @@ const Room = g.Dungeon.Room;
 const Passage = g.Dungeon.Passage;
 const Cell = g.Dungeon.Cell;
 
-const log = std.log.scoped(.placements_self);
+const log = std.log.scoped(.dungeon_builder);
 
 const DungeonBuilder = @This();
 
@@ -45,7 +45,12 @@ pub fn createAndAddPassageBetweenRegions(
         return Error.NoSpaceForDoor;
 
     const passage = try self.dungeon.passages.addOne();
+    errdefer _ = self.dungeon.passages.orderedRemove(self.dungeon.passages.items.len - 1);
+
     passage.turns = std.ArrayList(Passage.Turn).init(alloc);
+    errdefer passage.deinit();
+
+    log.debug("Found places for doors: {any}; {any}. Prepare the passage between them...", .{door1, door2});
     _ = try passage.turnAt(door1, direction);
     if (door1.row != door2.row and door1.col != door2.col) {
         // intersection of the passage from the door 1 and region 1
@@ -76,6 +81,7 @@ pub fn createAndAddPassageBetweenRegions(
         turn = try passage.turnToPoint(middle2, door2);
     }
     _ = try passage.turnAt(door2, direction);
+    log.debug("The passage was prepared: {any}", .{passage});
 
     try self.digPassage(passage);
     try self.forceCreateDoorAt(door1);
@@ -285,14 +291,14 @@ fn findPlaceForDoorInRegionRnd(
         var new_regions: [2]?p.Region = .{ null, null };
         if (side == .up or side == .down) {
             new_regions = if (rand.boolean())
-                .{ region.cropVerticallyTo(place.col), region.cropVerticallyAfter(place.col) }
+                .{ region.croppedVerticallyTo(place.col), region.croppedVerticallyAfter(place.col) }
             else
-                .{ region.cropVerticallyAfter(place.col), region.cropVerticallyTo(place.col) };
+                .{ region.croppedVerticallyAfter(place.col), region.croppedVerticallyTo(place.col) };
         } else {
             new_regions = if (rand.boolean())
-                .{ region.cropHorizontallyTo(place.row), region.cropHorizontallyAfter(place.row) }
+                .{ region.croppedHorizontallyTo(place.row), region.croppedHorizontallyAfter(place.row) }
             else
-                .{ region.cropHorizontallyAfter(place.row), region.cropHorizontallyTo(place.row) };
+                .{ region.croppedHorizontallyAfter(place.row), region.croppedHorizontallyTo(place.row) };
         }
         for (new_regions) |new_region| {
             if (new_region) |reg| {

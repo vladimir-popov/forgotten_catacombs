@@ -191,6 +191,8 @@ pub const Region = struct {
         const cols: f16 = @floatFromInt(self.cols);
         self.rows = @intFromFloat(@round(rows * v_scale));
         self.cols = @intFromFloat(@round(cols * h_scale));
+        std.debug.assert(self.rows > 0);
+        std.debug.assert(self.cols > 0);
     }
 
     pub fn scaled(self: Region, v_scale: f16, h_scale: f16) Region {
@@ -221,23 +223,21 @@ pub const Region = struct {
     /// ┌───┬───┐
     /// │ 1 │ 2 │
     /// └───┴───┘
-    pub fn splitVertically(self: Region, cols: u8) ?struct { Region, Region } {
-        if (0 < cols and cols < self.cols) {
-            return .{
-                Region{
-                    .top_left = .{ .row = self.top_left.row, .col = self.top_left.col },
-                    .rows = self.rows,
-                    .cols = cols,
-                },
-                Region{
-                    .top_left = .{ .row = self.top_left.row, .col = self.top_left.col + cols },
-                    .rows = self.rows,
-                    .cols = self.cols - cols,
-                },
-            };
-        } else {
-            return null;
-        }
+    pub fn splitVertically(self: Region, cols: u8) struct { Region, Region } {
+        std.debug.assert(0 < cols);
+        std.debug.assert(cols < self.cols);
+        return .{
+            Region{
+                .top_left = .{ .row = self.top_left.row, .col = self.top_left.col },
+                .rows = self.rows,
+                .cols = cols,
+            },
+            Region{
+                .top_left = .{ .row = self.top_left.row, .col = self.top_left.col + cols },
+                .rows = self.rows,
+                .cols = self.cols - cols,
+            },
+        };
     }
 
     /// Splits horizontally the region in two if it possible. The first one contains the top
@@ -248,33 +248,32 @@ pub const Region = struct {
     /// ├───┤
     /// │ 2 │
     /// └───┘
-    pub fn splitHorizontally(self: Region, rows: u8) ?struct { Region, Region } {
-        if (0 < rows and rows < self.rows) {
-            return .{
-                Region{
-                    .top_left = .{ .row = self.top_left.row, .col = self.top_left.col },
-                    .rows = rows,
-                    .cols = self.cols,
-                },
-                Region{
-                    .top_left = .{ .row = self.top_left.row + rows, .col = self.top_left.col },
-                    .rows = self.rows - rows,
-                    .cols = self.cols,
-                },
-            };
-        } else {
-            return null;
-        }
+    pub fn splitHorizontally(self: Region, rows: u8) struct { Region, Region } {
+        std.debug.assert(0 < rows);
+        std.debug.assert(rows < self.rows);
+        return .{
+            Region{
+                .top_left = .{ .row = self.top_left.row, .col = self.top_left.col },
+                .rows = rows,
+                .cols = self.cols,
+            },
+            Region{
+                .top_left = .{ .row = self.top_left.row + rows, .col = self.top_left.col },
+                .rows = self.rows - rows,
+                .cols = self.cols,
+            },
+        };
     }
 
-    /// Crops all rows before the `row` if it possible.
+    /// Makes copy of this region, and crops all rows before the `row` if it possible,
+    /// or returns the copy without changes.
     ///
     /// ┌---┐
     /// ¦   ¦
     /// ├───┤ < row (exclusive)
     /// │ r │
     /// └───┘
-    pub fn cropHorizontallyAfter(self: Region, row: u8) ?Region {
+    pub fn croppedHorizontallyAfter(self: Region, row: u8) ?Region {
         if (self.top_left.row <= row and row < self.bottomRightRow()) {
             // copy original:
             var region = self;
@@ -287,11 +286,11 @@ pub const Region = struct {
         }
     }
 
-    test cropHorizontallyAfter {
+    test croppedHorizontallyAfter {
         // given:
         const region = Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 5, .cols = 3 };
         // when:
-        const result = region.cropHorizontallyAfter(2);
+        const result = region.croppedHorizontallyAfter(2);
         // then:
         try std.testing.expectEqualDeep(
             Region{ .top_left = .{ .row = 3, .col = 1 }, .rows = 3, .cols = 3 },
@@ -299,14 +298,15 @@ pub const Region = struct {
         );
     }
 
-    /// Crops all cols before the `col` if it possible.
+    /// Makes copy of this region, and crops all cols before the `col` if it possible,
+    /// or returns the copy without changes.
     ///
     /// ┌---┬───┐
     /// ¦   │ r │
     /// └---┴───┘
     ///     ^
     ///     col (exclusive)
-    pub fn cropVerticallyAfter(self: Region, col: u8) ?Region {
+    pub fn croppedVerticallyAfter(self: Region, col: u8) ?Region {
         if (self.top_left.col <= col and col < self.bottomRightCol()) {
             // copy original:
             var region = self;
@@ -319,11 +319,11 @@ pub const Region = struct {
         }
     }
 
-    test cropVerticallyAfter {
+    test croppedVerticallyAfter {
         // given:
         const region = Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 3, .cols = 5 };
         // when:
-        const result = region.cropVerticallyAfter(2);
+        const result = region.croppedVerticallyAfter(2);
         // then:
         try std.testing.expectEqualDeep(
             Region{ .top_left = .{ .row = 1, .col = 3 }, .rows = 3, .cols = 3 },
@@ -331,14 +331,15 @@ pub const Region = struct {
         );
     }
 
-    /// Crops all rows after the `row` (exclusive) if it possible.
+    /// Makes copy of this region, and crops all rows after the `row` (exclusive) if it possible,
+    /// or returns the copy without changes.
     ///
     /// ┌───┐
     /// │ r │
     /// ├───┤ < row (exclusive)
     /// ¦   ¦
     /// └---┘
-    pub fn cropHorizontallyTo(self: Region, row: u8) ?Region {
+    pub fn croppedHorizontallyTo(self: Region, row: u8) ?Region {
         if (self.top_left.row < row and row <= self.bottomRightRow()) {
             // copy original:
             var region = self;
@@ -350,11 +351,11 @@ pub const Region = struct {
         }
     }
 
-    test cropHorizontallyTo {
+    test croppedHorizontallyTo {
         // given:
         const region = Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 5, .cols = 3 };
         // when:
-        const result = region.cropHorizontallyTo(3);
+        const result = region.croppedHorizontallyTo(3);
         // then:
         try std.testing.expectEqualDeep(
             Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 2, .cols = 3 },
@@ -362,14 +363,15 @@ pub const Region = struct {
         );
     }
 
-    /// Crops all cols after the `col` (exclusive) if it possible.
+    /// Makes copy of this region, and crops all cols after the `col` (exclusive) if it possible,
+    /// or returns the copy without changes.
     ///
     /// ┌───┬---┐
     /// │ r │   ¦
     /// └───┴---┘
     ///     ^
     ///     col (exclusive)
-    pub fn cropVerticallyTo(self: Region, col: u8) ?Region {
+    pub fn croppedVerticallyTo(self: Region, col: u8) ?Region {
         if (self.top_left.col < col and col <= self.bottomRightCol()) {
             // copy original:
             var region = self;
@@ -381,11 +383,11 @@ pub const Region = struct {
         }
     }
 
-    test cropVerticallyTo {
+    test croppedVerticallyTo {
         // given:
         const region = Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 3, .cols = 5 };
         // when:
-        const result = region.cropVerticallyTo(3);
+        const result = region.croppedVerticallyTo(3);
         // then:
         try std.testing.expectEqualDeep(
             Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 3, .cols = 2 },

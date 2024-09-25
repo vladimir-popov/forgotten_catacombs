@@ -90,14 +90,14 @@ pub inline fn cellAt(self: Dungeon, place: p.Point) ?Cell {
     if (place.col < 1 or place.col > COLS) {
         return null;
     }
+    if (self.doors.get(place)) |_| {
+        return .door;
+    }
     if (self.walls.isSet(place.row, place.col)) {
         return .wall;
     }
     if (self.floor.isSet(place.row, place.col)) {
         return .floor;
-    }
-    if (self.doors.get(place)) |_| {
-        return .door;
     }
     return .nothing;
 }

@@ -22,12 +22,7 @@ fn createEmptyRoom(dungeon: *Dungeon, region: p.Region) Room {
         }
     }
     // generate floor:
-    var floor = region;
-    floor.top_left.row += 1;
-    floor.top_left.col += 1;
-    floor.rows -= 2;
-    floor.cols -= 2;
-    dungeon.floor.setRegionValue(floor, true);
+    dungeon.floor.setRegionValue(region, true);
 
     return region;
 }
