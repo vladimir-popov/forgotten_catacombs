@@ -87,6 +87,7 @@ const TraverseAndCreateRooms = struct {
         const self: *TraverseAndCreateRooms = @ptrCast(@alignCast(ptr));
         const region_for_room = try self.generator.createRandomRegionInside(node.value, self.rand);
         try self.builder.generateAndAddRoom(self.rand, region_for_room);
+        // try self.builder.generateAndAddRoom(self.rand, node.value);
     }
 };
 

@@ -11,6 +11,7 @@ pub const MinRegionSettings = struct {
     square_ratio: f16,
     min_rows: u8,
     min_cols: u8,
+    split_with_gap: bool = false,
 
     fn validateRegion(self: MinRegionSettings, region: p.Region) void {
         if (region.rows < self.min_rows) {
@@ -62,13 +63,22 @@ const Splitter = struct {
         const self: *Splitter = @ptrCast(@alignCast(ptr));
 
         const split_vertical = node.value.ratio() < self.opts.square_ratio;
-
+        const gap: u8 = if (self.opts.split_with_gap) 1 else 0;
         if (split_vertical) {
-            if (node.value.cols >= self.opts.min_cols * 2) {
-                log.debug("Split vertically", .{});
-                return node.value.splitVertically(
-                    self.rand.intRangeAtMost(u8, self.opts.min_cols, node.value.cols - self.opts.min_cols),
+            if (node.value.cols >= (2 * self.opts.min_cols + gap)) {
+                const middle = self.rand.intRangeAtMost(
+                    u8,
+                    self.opts.min_cols,
+                    node.value.cols - self.opts.min_cols,
                 );
+                log.debug(
+                    "Split {any} vertically at {d} {s}",
+                    .{ node.value, middle, if (self.opts.split_with_gap) "with gap" else "without gap" },
+                );
+                if (self.opts.split_with_gap)
+                    return zip(node.value.croppedVerticallyTo(middle), node.value.croppedVerticallyAfter(middle))
+                else
+                    return node.value.splitVertically(middle);
             } else {
                 log.debug(
                     "Stop splitting vertically, because of cols are not enough: {any} {any}",
@@ -76,11 +86,16 @@ const Splitter = struct {
                 );
             }
         } else {
-            if (node.value.rows >= self.opts.min_rows * 2) {
-                log.debug("Split horizontally", .{});
-                return node.value.splitHorizontally(
-                    self.rand.intRangeAtMost(u8, self.opts.min_rows, node.value.rows - self.opts.min_rows),
+            if (node.value.rows >= (2 * self.opts.min_rows + gap)) {
+                const middle = self.rand.intRangeAtMost(u8, self.opts.min_rows, node.value.rows - self.opts.min_rows);
+                log.debug(
+                    "Split {any} horizontally at {d} {s}",
+                    .{ node.value, middle, if (self.opts.split_with_gap) "with gap" else "without gap" },
                 );
+                if (self.opts.split_with_gap)
+                    return zip(node.value.croppedHorizontallyTo(middle), node.value.croppedHorizontallyAfter(middle))
+                else
+                    return node.value.splitHorizontally(middle);
             } else {
                 log.debug(
                     "Stop splitting horizontally, because of rows are not enough: {any} {any}",
@@ -91,6 +106,14 @@ const Splitter = struct {
         return null;
     }
 };
+
+fn zip(
+    maybe_a: anytype,
+    maybe_b: anytype,
+) ?struct { @typeInfo(@TypeOf(maybe_a)).Optional.child, @typeInfo(@TypeOf(maybe_b)).Optional.child } {
+    if (maybe_a) |a| if (maybe_b) |b| return .{ a, b };
+    return null;
+}
 
 /// The Node of the Tree.
 fn GenericNode(comptime V: type) type {

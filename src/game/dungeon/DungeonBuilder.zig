@@ -54,7 +54,7 @@ pub fn createAndAddPassageBetweenRegions(
     _ = try passage.turnAt(door1, direction);
     if (door1.row != door2.row and door1.col != door2.col) {
         // intersection of the passage from the door 1 and region 1
-        var middle1: p.Point = if (direction == .left or direction == .right)
+        var middle1: p.Point = if (direction.isHorizontal())
             // left or right
             .{ .row = door1.row, .col = r1.bottomRightCol() }
         else
@@ -62,7 +62,7 @@ pub fn createAndAddPassageBetweenRegions(
             .{ .row = r1.bottomRightRow(), .col = door1.col };
 
         // intersection of the passage from the region 1 and door 2
-        var middle2: p.Point = if (direction == .left or direction == .right)
+        var middle2: p.Point = if (direction.isHorizontal())
             // left or right
             .{ .row = door2.row, .col = r1.bottomRightCol() }
         else
@@ -70,8 +70,7 @@ pub fn createAndAddPassageBetweenRegions(
             .{ .row = r1.bottomRightRow(), .col = door2.col };
 
         // try to find better places for turn:
-        const is_horizontal: bool = direction == .left or direction == .right;
-        if (try self.findPlaceForPassageTurn(&stack_arena, door1, door2, is_horizontal, 0)) |places| {
+        if (try self.findPlaceForPassageTurn(&stack_arena, door1, door2, direction.isHorizontal(), 0)) |places| {
             middle1 = places[0];
             middle2 = places[1];
         }
@@ -148,7 +147,7 @@ pub fn createFloorAt(self: DungeonBuilder, place: p.Point) void {
 }
 
 /// Trying to find a line between `from` and `to` with `nothing` cells only.
-/// Gives up after N attempts to prevent long search.
+/// Gives up after MAX_ATTEMPTS attempts to prevent long search.
 fn findPlaceForPassageTurn(
     self: DungeonBuilder,
     stack_arena: *std.heap.ArenaAllocator,
@@ -157,6 +156,8 @@ fn findPlaceForPassageTurn(
     is_horizontal: bool,
     attempt: u8,
 ) !?struct { p.Point, p.Point } {
+    const MAX_ATTEMPTS = 5;
+    // to prevent infinite loop
     var current_attempt = attempt;
     var stack = std.ArrayList(struct { p.Point, p.Point }).init(stack_arena.allocator());
     try stack.append(.{ init_from, init_to });
@@ -170,7 +171,7 @@ fn findPlaceForPassageTurn(
         else
             to.row - from.row;
 
-        if (distance > 4 and current_attempt < 5) {
+        if (distance > 4 and current_attempt < MAX_ATTEMPTS) {
             if (is_horizontal) {
                 middle1.row = from.row;
                 middle1.col = distance / 2 + from.col;
