@@ -75,9 +75,7 @@ const DungeonsGenerator = struct {
         if (self.draw_dungeon) {
             try self.render.drawDungeon(self.level.dungeon);
             try self.render.drawSprites(self.level, null);
-        } else {
-            try self.render.drawMap(self.level.playerPosition().point, self.level.map);
-        }
+        } else {}
     }
 
     fn handleInput(self: *DungeonsGenerator) !bool {

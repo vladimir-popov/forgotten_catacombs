@@ -1,7 +1,6 @@
 const std = @import("std");
 
 pub const components = @import("components.zig");
-pub const dungeon = @import("dungeon/dungeon_pkg.zig");
 pub const ecs = @import("ecs.zig");
 pub const entities = @import("entities.zig");
 pub const primitives = @import("primitives.zig");
@@ -11,7 +10,7 @@ pub const Entity = ecs.Entity;
 pub const Runtime = @import("Runtime.zig");
 pub const Button = @import("Button.zig");
 pub const Cheat = @import("cheats.zig").Cheat;
-pub const Dungeon = dungeon.Dungeon;
+pub const Dungeon = @import("dungeon/Dungeon.zig");
 pub const Game = @import("Game.zig");
 pub const GameSession = @import("GameSession.zig");
 pub const Level = @import("Level.zig");

@@ -27,7 +27,6 @@ const VTable = struct {
         screen: g.Screen,
         dungeon: g.Dungeon,
     ) anyerror!void,
-    drawMap: *const fn (context: *anyopaque, player: p.Point, map: g.Dungeon.Map) anyerror!void,
     drawSprite: *const fn (
         context: *anyopaque,
         screen: g.Screen,

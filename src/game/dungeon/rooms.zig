@@ -7,8 +7,8 @@ const Room = g.Dungeon.Room;
 
 /// Generate the room inside the passed region, and creates random interior inside the room.
 /// Returns the actual region of the generated room
-pub fn createRoom(builder: g.dungeon.DungeonBuilder, _: std.Random, region: p.Region) !Room {
-    return createEmptyRoom(builder.dungeon, region);
+pub fn createRoom(dungeon: *g.Dungeon, _: std.Random, region: p.Region) !Room {
+    return createEmptyRoom(dungeon, region);
 }
 
 fn createEmptyRoom(dungeon: *Dungeon, region: p.Region) Room {

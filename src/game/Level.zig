@@ -17,13 +17,13 @@ entities: std.ArrayList(g.Entity),
 /// Collection of the components of the entities
 components: ecs.ComponentsManager(c.Components),
 dungeon: g.Dungeon,
+map: g.Dungeon.Map,
 /// The depth of the current level. The session_seed + depth is unique seed for the level.
 depth: u8,
 /// The new new entity id
 next_entity: g.Entity = 0,
 /// The entity id of the player
 player: g.Entity = undefined,
-map: g.Dungeon.Map = undefined,
 
 pub fn init(alloc: std.mem.Allocator, depth: u8) !Level {
     return .{
@@ -31,15 +31,16 @@ pub fn init(alloc: std.mem.Allocator, depth: u8) !Level {
         .entities = std.ArrayList(g.Entity).init(alloc),
         .components = try ecs.ComponentsManager(c.Components).init(alloc),
         .dungeon = try g.Dungeon.init(alloc),
+        .map = try g.Dungeon.Map.init(alloc),
         .depth = depth,
     };
 }
 
 pub fn deinit(self: *Level) void {
-    if (self.entities.items.len > 0) self.map.deinit();
     self.entities.deinit();
     self.components.deinit();
     self.dungeon.deinit();
+    self.map.deinit();
 }
 
 /// `this_ladder` - the id of the entrance when generated the lever below,
@@ -60,7 +61,7 @@ pub fn generate(
     // to be able to be regenerated when the player travels from level to level.
     var prng = std.Random.DefaultPrng.init(seed);
     var bspGenerator = BspDungeonGenerator{ .alloc = self.alloc };
-    try bspGenerator.generator().generateDungeon(prng.random(), .{ .dungeon = &self.dungeon });
+    try bspGenerator.generator().generateDungeon(prng.random(), &self.dungeon);
     log.debug("The dungeon has been generated", .{});
 
     self.next_entity = this_ladder + 1;
@@ -87,8 +88,6 @@ pub fn generate(
     for (0..prng.random().uintLessThan(u8, 10) + 10) |_| {
         try self.addEnemy(prng.random(), g.entities.Rat);
     }
-
-    self.map = try self.createMap(self.alloc);
 }
 
 pub fn regenerate(
@@ -103,27 +102,9 @@ pub fn regenerate(
     self.entities.clearRetainingCapacity();
     self.components.clearRetainingCapacity();
     self.dungeon.clearRetainingCapacity();
+    self.map.clearRetainingCapacity();
     self.depth = depth;
     try self.generate(seed, player, this_ladder, from_ladder, direction);
-}
-
-pub fn createMap(self: Level, alloc: std.mem.Allocator) !g.Dungeon.Map {
-    var map = g.Dungeon.Map.init(alloc);
-    for (self.dungeon.rooms.items, 0..) |room, i| {
-        try map.addVisitedRoom(room, i == 0, i == self.dungeon.rooms.items.len - 1);
-    }
-    for (self.dungeon.passages.items) |passage| {
-        var itr = passage.places();
-        while (itr.next()) |place_in_passage| {
-            try map.addVisitedPlace(place_in_passage);
-        }
-    }
-    var itr = self.dungeon.doors.keyIterator();
-    while (itr.next()) |door| {
-        try map.addVisitedDoor(door.*);
-    }
-
-    return map;
 }
 
 /// Aggregates requests of few components for the same entities at once

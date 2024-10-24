@@ -216,11 +216,11 @@ pub const Display = struct {
     /// Returns count of rows and cols of the current window
     pub fn getWindowSize() !RowsCols {
         var ws: c.winsize = std.mem.zeroes(c.winsize);
-        if (c.ioctl(c.STDOUT_FILENO, std.posix.system.T.IOCGWINSZ, &ws) == 1 or ws.col == 0) {
+        if (c.ioctl(c.STDOUT_FILENO, std.posix.system.T.IOCGWINSZ, &ws) == 1 or ws.ws_col == 0) {
             try write(Text.cursorDown(999) ++ Text.cursorRight(999));
             return try getCursorPosition();
         } else {
-            return .{ .rows = ws.row, .cols = ws.col };
+            return .{ .rows = ws.ws_row, .cols = ws.ws_col };
         }
     }
 
@@ -228,7 +228,7 @@ pub const Display = struct {
         act.flags = std.posix.SA.RESTART;
         act.handler = .{ .handler = handler };
         act.mask = std.posix.empty_sigset;
-        std.posix.sigaction(std.posix.SIG.WINCH, act, null);
+        try std.posix.sigaction(std.posix.SIG.WINCH, act, null);
     }
 };
 

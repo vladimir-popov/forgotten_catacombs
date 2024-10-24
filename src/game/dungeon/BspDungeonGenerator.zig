@@ -13,7 +13,6 @@ const p = g.primitives;
 
 const BspTree = @import("BspTree.zig");
 const Dungeon = @import("Dungeon.zig");
-const DungeonBuilder = @import("DungeonBuilder.zig");
 const DungeonGenerator = @import("DungeonGenerator.zig");
 
 const log = std.log.scoped(.bsp_generator);
@@ -41,7 +40,7 @@ pub fn generator(self: *BspDungeonGenerator) DungeonGenerator {
 fn generateDungeon(
     ptr: *anyopaque,
     rand: std.Random,
-    builder: DungeonBuilder,
+    dungeon: *Dungeon,
 ) !void {
     const self: *BspDungeonGenerator = @ptrCast(@alignCast(ptr));
     // this arena is used to build a BSP tree, which can be destroyed
@@ -61,21 +60,21 @@ fn generateDungeon(
     // visit every BSP node and generate rooms in the leafs
     var createRooms: TraverseAndCreateRooms = .{
         .generator = self,
-        .builder = builder,
+        .dungeon = dungeon,
         .rand = rand,
     };
     try root.traverse(&bsp_arena, createRooms.handler());
     log.debug("The rooms has been created", .{});
 
     // fold the BSP tree and binds nodes with the same parent:
-    var createPassages: CreatePassageBetweenRegions = .{ .builder = builder, .alloc = self.alloc, .rand = rand };
+    var createPassages: CreatePassageBetweenRegions = .{ .dungeon = dungeon, .alloc = self.alloc, .rand = rand };
     _ = try root.foldModify(&bsp_arena, createPassages.handler());
     log.debug("The passages has been created", .{});
 }
 
 const TraverseAndCreateRooms = struct {
     generator: *const BspDungeonGenerator,
-    builder: DungeonBuilder,
+    dungeon: *Dungeon,
     rand: std.Random,
 
     fn handler(self: *TraverseAndCreateRooms) BspTree.Node.TraverseHandler {
@@ -86,13 +85,13 @@ const TraverseAndCreateRooms = struct {
         if (!node.isLeaf()) return;
         const self: *TraverseAndCreateRooms = @ptrCast(@alignCast(ptr));
         const region_for_room = try self.generator.createRandomRegionInside(node.value, self.rand);
-        try self.builder.generateAndAddRoom(self.rand, region_for_room);
+        try self.dungeon.generateAndAddRoom(self.rand, region_for_room);
         // try self.builder.generateAndAddRoom(self.rand, node.value);
     }
 };
 
 const CreatePassageBetweenRegions = struct {
-    builder: DungeonBuilder,
+    dungeon: *Dungeon,
     alloc: std.mem.Allocator,
     rand: std.Random,
 
@@ -102,7 +101,7 @@ const CreatePassageBetweenRegions = struct {
 
     fn combine(ptr: *anyopaque, left: p.Region, right: p.Region) !p.Region {
         const self: *CreatePassageBetweenRegions = @ptrCast(@alignCast(ptr));
-        return try self.builder.createAndAddPassageBetweenRegions(self.alloc, self.rand, left, right);
+        return try self.dungeon.createAndAddPassageBetweenRegions(self.alloc, self.rand, left, right);
     }
 };
 
