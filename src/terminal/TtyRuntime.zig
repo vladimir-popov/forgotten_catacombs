@@ -131,7 +131,6 @@ pub fn runtime(self: *TtyRuntime) g.Runtime {
             .readPushedButtons = readPushedButtons,
             .clearDisplay = clearDisplay,
             .drawHorizontalBorderLine = drawHorizontalBorderLine,
-            .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
             .drawText = drawText,
         },
@@ -236,31 +235,6 @@ fn drawHorizontalBorderLine(ptr: *anyopaque, row: u8, length: u8) !void {
     try self.buffer.mergeLine(buf[0 .. length * 3], row + 1, 1);
 }
 
-fn drawDungeon(ptr: *anyopaque, screen: g.Screen, dungeon: g.Dungeon) anyerror!void {
-    var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
-    const buffer = &self.buffer;
-    var itr = dungeon.cellsInRegion(screen.region) orelse return;
-    var line = try self.alloc.alloc(u8, screen.region.cols);
-    defer self.alloc.free(line);
-
-    var idx: u8 = 0;
-    var row: u8 = 1;
-    while (itr.next()) |cell| {
-        line[idx] = switch (cell) {
-            .floor => '.',
-            .wall => '#',
-            else => ' ',
-        };
-        idx += 1;
-        if (itr.current_place.col == itr.region.bottomRightCol()) {
-            try buffer.mergeLine(line[0..idx], row, 1);
-            @memset(line, 0);
-            idx = 0;
-            row += 1;
-        }
-    }
-}
-
 fn drawBorder(self: *TtyRuntime, region: p.Region, filler: u8) !void {
     const r = region.top_left.row;
     const c = region.top_left.col;
@@ -294,40 +268,25 @@ fn drawBorder(self: *TtyRuntime, region: p.Region, filler: u8) !void {
 
 fn drawSprite(
     ptr: *anyopaque,
-    screen: g.Screen,
-    sprite: *const g.components.Sprite,
-    position: *const g.components.Position,
+    symbol: u21,
+    position_on_display: p.Point,
     mode: g.Runtime.DrawingMode,
-) anyerror!void {
-    if (screen.region.containsPoint(position.point)) {
-        var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
-        const r = position.point.row - screen.region.top_left.row + 1; // +1 for border
-        const c = position.point.col - screen.region.top_left.col + 1;
-        if (mode == .inverted) {
-            var symbol: [4]u8 = undefined;
-            const len = try std.unicode.utf8Encode(sprite.codepoint, &symbol);
-            var buf: [12]u8 = undefined;
-            try self.buffer.mergeLine(
-                try std.fmt.bufPrint(&buf, tty.Text.inverted("{s}"), .{symbol[0..len]}),
-                r,
-                c,
-            );
-        } else {
-            try self.buffer.set(sprite.codepoint, r, c);
-        }
-    }
+) !void {
+    var buf: [4]u8 = undefined;
+    const len = try std.unicode.utf8Encode(symbol, &buf);
+    try drawText(ptr, buf[0..len], position_on_display, mode);
 }
 
 // row and col - position of the lable in the window, not inside the screen!
 fn drawText(
     ptr: *anyopaque,
     text: []const u8,
-    absolute_position: p.Point,
+    position_on_display: p.Point,
     mode: g.Runtime.DrawingMode,
 ) !void {
     const self: *TtyRuntime = @ptrCast(@alignCast(ptr));
-    const r = absolute_position.row + 1; // +1 for top border
-    const c = absolute_position.col;
+    const r = position_on_display.row + 1; // +1 for border
+    const c = position_on_display.col + 1;
     var buf: [50]u8 = undefined;
     if (mode == .inverted) {
         try self.buffer.mergeLine(try std.fmt.bufPrint(&buf, tty.Text.inverted("{s}"), .{text}), r, c);

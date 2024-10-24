@@ -7,7 +7,7 @@ const log = std.log.scoped(.runtime);
 
 const Runtime = @This();
 
-pub const DrawingMode = enum { normal, inverted, transparent };
+pub const DrawingMode = enum { normal, inverted };
 
 pub const MenuItemCallback = *const fn (userdata: ?*anyopaque) callconv(.C) void;
 
@@ -22,22 +22,16 @@ const VTable = struct {
     removeAllMenuItems: *const fn (context: *anyopaque) void,
     clearDisplay: *const fn (context: *anyopaque) anyerror!void,
     drawHorizontalBorderLine: *const fn (context: *anyopaque, row: u8, length: u8) anyerror!void,
-    drawDungeon: *const fn (
-        context: *anyopaque,
-        screen: g.Screen,
-        dungeon: g.Dungeon,
-    ) anyerror!void,
     drawSprite: *const fn (
         context: *anyopaque,
-        screen: g.Screen,
-        sprite: *const c.Sprite,
-        position: *const c.Position,
+        symbol: u21,
+        position_on_display: p.Point,
         mode: DrawingMode,
     ) anyerror!void,
     drawText: *const fn (
         context: *anyopaque,
         text: []const u8,
-        absolute_position: p.Point,
+        position_on_display: p.Point,
         mode: DrawingMode,
     ) anyerror!void,
     currentMillis: *const fn (context: *anyopaque) c_uint,
@@ -83,22 +77,8 @@ pub inline fn drawHorizontalBorderLine(self: Runtime, row: u8, length: u8) !void
     try self.vtable.drawHorizontalBorderLine(self.context, row, length);
 }
 
-pub inline fn drawDungeon(self: Runtime, screen: g.Screen, dungeon: g.Dungeon) !void {
-    try self.vtable.drawDungeon(self.context, screen, dungeon);
-}
-
-pub fn drawMap(self: Runtime, player: p.Point, map: g.Dungeon.Map) !void {
-    try self.vtable.drawMap(self.context, player, map);
-}
-
-pub inline fn drawSprite(
-    self: Runtime,
-    screen: g.Screen,
-    sprite: *const c.Sprite,
-    position: *const c.Position,
-    mode: DrawingMode,
-) !void {
-    try self.vtable.drawSprite(self.context, screen, sprite, position, mode);
+pub fn drawSprite(self: Runtime, symbol: u21, absolut_position: p.Point, mode: g.Runtime.DrawingMode) !void {
+    try self.vtable.drawSprite(self.context, symbol, absolut_position, mode);
 }
 
 pub fn drawText(self: Runtime, text: []const u8, absolut_position: p.Point, mode: g.Runtime.DrawingMode) !void {

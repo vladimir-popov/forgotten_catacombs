@@ -142,7 +142,6 @@ pub fn runtime(self: *Self) g.Runtime {
             .readPushedButtons = readPushedButtons,
             .clearDisplay = clearDisplay,
             .drawHorizontalBorderLine = drawHorizontalBorderLine,
-            .drawDungeon = drawDungeon,
             .drawSprite = drawSprite,
             .drawText = drawText,
         },
@@ -214,55 +213,30 @@ fn drawHorizontalBorderLine(ptr: *anyopaque, row: u8, length: u8) anyerror!void 
     self.playdate.graphics.drawLine(0, y + 2, x, y + 2, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
 }
 
-fn drawDungeon(ptr: *anyopaque, screen: g.Screen, dungeon: g.Dungeon) anyerror!void {
-    var itr = dungeon.cellsInRegion(screen.region) orelse return;
-    var position = .{ .point = screen.region.top_left };
-    var sprite = c.Sprite{ .codepoint = undefined };
-    while (itr.next()) |cell| {
-        sprite.codepoint = switch (cell) {
-            .floor => '.',
-            .wall => '#',
-            else => ' ',
-        };
-        try drawSprite(ptr, screen, &sprite, &position, .normal);
-        position.point.move(.right);
-        if (!screen.region.containsPoint(position.point)) {
-            position.point.col = screen.region.top_left.col;
-            position.point.move(.down);
-        }
-    }
+fn drawSprite(ptr: *anyopaque, symbol: u21, position_on_display: p.Point, mode: g.Runtime.DrawingMode) !void {
+    var self: *Self = @ptrCast(@alignCast(ptr));
+    // draw text:
+    const x = @as(c_int, position_on_display.col) * g.SPRITE_WIDTH;
+    const y = @as(c_int, position_on_display.row) * g.SPRITE_HEIGHT;
+
+    var buf: [4]u8 = undefined;
+    const len = try std.unicode.utf8Encode(symbol, &buf);
+    try self.drawTextOnDisplay(buf[0..len], mode, x, y);
 }
 
-fn drawSprite(
-    ptr: *anyopaque,
-    screen: g.Screen,
-    sprite: *const c.Sprite,
-    position: *const c.Position,
-    mode: g.Runtime.DrawingMode,
-) anyerror!void {
-    if (screen.region.containsPoint(position.point)) {
-        const self: *Self = @ptrCast(@alignCast(ptr));
-        const y: c_int = g.SPRITE_HEIGHT * @as(c_int, position.point.row - screen.region.top_left.row);
-        const x: c_int = g.SPRITE_WIDTH * @as(c_int, position.point.col - screen.region.top_left.col);
-        var buf: [4]u8 = undefined;
-        const len = try std.unicode.utf8Encode(sprite.codepoint, &buf);
-        try self.drawTextWithMode(buf[0..len], mode, x, y);
-    }
-}
-
-fn drawText(ptr: *anyopaque, text: []const u8, absolute_position: p.Point, mode: g.Runtime.DrawingMode) !void {
+fn drawText(ptr: *anyopaque, text: []const u8, position_on_display: p.Point, mode: g.Runtime.DrawingMode) !void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     // choose the font for text:
     self.playdate.graphics.setFont(self.text_font);
     // draw text:
-    const x = @as(c_int, absolute_position.col) * g.SPRITE_WIDTH;
-    const y = @as(c_int, absolute_position.row) * g.SPRITE_HEIGHT;
-    try self.drawTextWithMode(text, mode, x, y);
+    const x = @as(c_int, position_on_display.col) * g.SPRITE_WIDTH;
+    const y = @as(c_int, position_on_display.row) * g.SPRITE_HEIGHT;
+    try self.drawTextOnDisplay(text, mode, x, y);
     // revert font for sprites:
     self.playdate.graphics.setFont(self.sprites_font);
 }
 
-inline fn drawTextWithMode(
+inline fn drawTextOnDisplay(
     self: *Self,
     text: []const u8,
     mode: g.Runtime.DrawingMode,

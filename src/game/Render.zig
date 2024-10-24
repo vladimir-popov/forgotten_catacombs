@@ -61,12 +61,41 @@ pub fn Render(comptime rows: u8, cols: u8) type {
             try self.runtime.clearDisplay();
         }
 
-        pub inline fn drawDungeon(self: Self, dungeon: g.Dungeon) !void {
-            // any runtime can have its own implementation of drawing the dungeon
-            // in performance purposes
-            try self.runtime.drawDungeon(self.screen, dungeon);
+        /// Draws dungeon, sprites, animations, and stats on the screen.
+        /// Removes completed animations.
+        pub fn drawScene(self: Self, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
+            try self.drawDungeon(session.level.dungeon);
+            try self.drawSprites(session.level, entity_in_focus);
+            try self.drawAnimationsFrame(session, entity_in_focus);
+            try self.drawInfoBar(session, entity_in_focus);
         }
 
+        pub fn drawDungeon(self: Self, dungeon: g.Dungeon) anyerror!void {
+            var itr = dungeon.cellsInRegion(self.screen.region) orelse return;
+            var place = self.screen.region.top_left;
+            var sprite = c.Sprite{ .codepoint = undefined };
+            while (itr.next()) |cell| {
+                sprite.codepoint = switch (cell) {
+                    .floor => '.',
+                    .wall => '#',
+                    else => ' ',
+                };
+                try self.drawSprite(sprite, place, .normal);
+                place.move(.right);
+                if (!self.screen.region.containsPoint(place)) {
+                    place.col = self.screen.region.top_left.col;
+                    place.move(.down);
+                }
+            }
+        }
+
+        const ZOrderedSprites = struct { g.Entity, *c.Position, *c.Sprite };
+        fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order {
+            if (a[2].z_order < b[2].z_order)
+                return .lt
+            else
+                return .gt;
+        }
         /// Draw sprites inside the screen and highlights the sprite of the entity in focus.
         pub fn drawSprites(self: Self, level: g.Level, entity_in_focus: ?g.Entity) !void {
             var visible = std.PriorityQueue(ZOrderedSprites, void, compareZOrder).init(self.runtime.alloc, {});
@@ -83,24 +112,23 @@ pub fn Render(comptime rows: u8, cols: u8) type {
                     .inverted
                 else
                     .normal;
-                try self.runtime.drawSprite(self.screen, tuple[2], tuple[1], mode);
+                try self.drawSprite(tuple[2].*, tuple[1].point, mode);
             }
         }
-        const ZOrderedSprites = struct { g.Entity, *c.Position, *c.Sprite };
-        fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order {
-            if (a[2].z_order < b[2].z_order)
-                return .lt
-            else
-                return .gt;
-        }
 
-        /// Draws dungeon, sprites, animations, and stats on the screen.
-        /// Removes completed animations.
-        pub fn drawScene(self: Self, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
-            try self.drawDungeon(session.level.dungeon);
-            try self.drawSprites(session.level, entity_in_focus);
-            try self.drawAnimationsFrame(session, entity_in_focus);
-            try self.drawInfoBar(session, entity_in_focus);
+        fn drawSprite(
+            self: Self,
+            sprite: c.Sprite,
+            place: p.Point,
+            mode: g.Runtime.DrawingMode,
+        ) anyerror!void {
+            if (self.screen.region.containsPoint(place)) {
+                const position_on_display = p.Point{
+                    .row = place.row - self.screen.region.top_left.row,
+                    .col = place.col - self.screen.region.top_left.col,
+                };
+                try self.runtime.drawSprite(sprite.codepoint, position_on_display, mode);
+            }
         }
 
         /// Draws a single frame from every animation.
@@ -117,10 +145,9 @@ pub fn Render(comptime rows: u8, cols: u8) type {
                             .inverted
                         else
                             .normal;
-                        try self.runtime.drawSprite(
-                            self.screen,
-                            &.{ .codepoint = frame },
-                            position,
+                        try self.drawSprite(
+                            .{ .codepoint = frame },
+                            position.point,
                             mode,
                         );
                     }
