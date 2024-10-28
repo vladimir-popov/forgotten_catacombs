@@ -3,7 +3,7 @@ const tty = @import("tty.zig");
 const g = @import("game");
 
 pub const DisplayCell = struct {
-    symbol: union(enum) { ascii: u8, utf8: u21 },
+    symbol: u21,
     mode: g.Runtime.DrawingMode,
 };
 
@@ -27,7 +27,7 @@ pub fn DisplayBuffer(comptime ROWS: u8, comptime COLS: u8) type {
             self.alloc.free(self.lines);
         }
 
-        pub fn clean(self: Self) void {
+        pub fn cleanAndWrap(self: Self) void {
             self.setUtf8Text("╔" ++ "═" ** (COLS - 2) ++ "╗", 0, 0, .normal);
             self.setUtf8Text("╚" ++ "═" ** (COLS - 2) ++ "╝", ROWS - 1, 0, .normal);
             for (1..(ROWS - 1)) |r| {
@@ -35,24 +35,14 @@ pub fn DisplayBuffer(comptime ROWS: u8, comptime COLS: u8) type {
             }
         }
 
-        pub fn setAsciiSymbol(
-            self: Self,
-            symbol: u8,
-            row: u8,
-            col: u8,
-            mode: g.Render.DrawingMode,
-        ) void {
-            self.lines[row][col] = .{ .symbol = .{ .ascii = symbol }, .mode = mode };
-        }
-
-        pub fn setUtf8Symbol(
+        pub inline fn setSymbol(
             self: Self,
             symbol: u21,
             row: u8,
             col: u8,
             mode: g.Runtime.DrawingMode,
         ) void {
-            self.lines[row][col] = .{ .symbol = .{ .utf8 = symbol }, .mode = mode };
+            self.lines[row][col] = .{ .symbol = symbol, .mode = mode };
         }
 
         pub fn setAsciiText(
@@ -63,7 +53,7 @@ pub fn DisplayBuffer(comptime ROWS: u8, comptime COLS: u8) type {
             mode: g.Runtime.DrawingMode,
         ) void {
             for (text, 0..) |s, i| {
-                self.lines[row][col + i] = .{ .symbol = .{ .ascii = s }, .mode = mode };
+                self.lines[row][col + i] = .{ .symbol = s, .mode = mode };
             }
         }
 
@@ -78,7 +68,7 @@ pub fn DisplayBuffer(comptime ROWS: u8, comptime COLS: u8) type {
             var itr = view.iterator();
             var i = col;
             while (itr.nextCodepoint()) |u| {
-                self.lines[row][i] = .{ .symbol = .{ .utf8 = u }, .mode = mode };
+                self.lines[row][i] = .{ .symbol = u, .mode = mode };
                 i += 1;
             }
         }
@@ -88,20 +78,19 @@ pub fn DisplayBuffer(comptime ROWS: u8, comptime COLS: u8) type {
             for (self.lines, rows_pad..) |line, i| {
                 var mode: g.Runtime.DrawingMode = .normal;
                 try tty.Text.writeSetCursorPosition(writer, @intCast(i), cols_pad);
-                for (line) |symbol| {
-                    if (mode != symbol.mode) {
-                        mode = symbol.mode;
+                for (line) |cell| {
+                    if (mode != cell.mode) {
+                        mode = cell.mode;
                         switch (mode) {
                             .inverted => _ = try writer.write(tty.Text.SGR_INVERT_COLORS),
                             else => _ = try writer.write(tty.Text.SGR_RESET),
                         }
                     }
-                    switch (symbol.symbol) {
-                        .ascii => |b| try writer.writeByte(b),
-                        .utf8 => |u| {
-                            const len = try std.unicode.utf8Encode(u, &buf);
-                            _ = try writer.write(buf[0..len]);
-                        },
+                    if (cell.symbol <= 255) {
+                        try writer.writeByte(@truncate(cell.symbol));
+                    } else {
+                        const len = try std.unicode.utf8Encode(cell.symbol, &buf);
+                        _ = try writer.write(buf[0..len]);
                     }
                 }
                 _ = try writer.write(tty.Text.SGR_RESET);

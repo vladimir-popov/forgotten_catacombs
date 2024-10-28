@@ -85,7 +85,7 @@ pub fn TtyRuntime(comptime ROWS: u8, comptime COLS: u8) type {
             handleWindowResize(0);
             while (!self.is_exit) {
                 if (self.menu.is_shown) {
-                    try self.menu.buffer.writeBuffer(stdout, rows_pad, cols_pad + (COLS - MENU_COLS - 1));
+                    try self.menu.buffer.writeBuffer(stdout, rows_pad, cols_pad + (COLS - MENU_COLS));
                     if (try readPushedButtons(self)) |btn| {
                         try self.menu.handleKeyboardButton(btn);
                     }
@@ -212,7 +212,7 @@ pub fn TtyRuntime(comptime ROWS: u8, comptime COLS: u8) type {
         fn clearDisplay(ptr: *anyopaque) !void {
             const self: *Self = @ptrCast(@alignCast(ptr));
             try tty.Display.clearScreen();
-            self.buffer.clean();
+            self.buffer.cleanAndWrap();
         }
 
         fn drawSprite(
@@ -222,7 +222,7 @@ pub fn TtyRuntime(comptime ROWS: u8, comptime COLS: u8) type {
             mode: g.Runtime.DrawingMode,
         ) !void {
             const self: *Self = @ptrCast(@alignCast(ptr));
-            self.buffer.setUtf8Symbol(symbol, position_on_display.row + 1, position_on_display.col + 1, mode);
+            self.buffer.setSymbol(symbol, position_on_display.row + 1, position_on_display.col + 1, mode);
         }
 
         fn drawText(

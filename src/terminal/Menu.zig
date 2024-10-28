@@ -15,7 +15,7 @@ const Item = struct {
 
 pub fn Menu(comptime ROWS: u8, comptime COLS: u8) type {
     return struct {
-        const TITLE_LENGTH = COLS - 1;
+        const TITLE_LENGTH = COLS - 2;
         const MAX_ITEMS_COUNT = 3;
 
         const Self = @This();
@@ -54,12 +54,7 @@ pub fn Menu(comptime ROWS: u8, comptime COLS: u8) type {
         pub fn show(self: *Self) !void {
             log.debug("Show menu with {d} items", .{self.items_count});
             self.is_shown = true;
-            self.buffer.setUtf8Symbol('╔', 0, 0, .normal);
-            // draw border
-            for (1..(ROWS - 1)) |r| {
-                self.buffer.setUtf8Text("║" ++ " " ** TITLE_LENGTH, @intCast(r), 0, .normal);
-            }
-            self.buffer.setUtf8Symbol('╚', ROWS - 1, 0, .normal);
+            self.buffer.cleanAndWrap();
             // draw items
             for (0..self.items_count) |i| {
                 try self.drawMenuItem(@intCast(i), i == self.selected_item);
