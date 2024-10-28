@@ -128,7 +128,6 @@ pub fn TtyRuntime(comptime ROWS: u8, comptime COLS: u8) type {
                     .currentMillis = currentMillis,
                     .readPushedButtons = readPushedButtons,
                     .clearDisplay = clearDisplay,
-                    .drawHorizontalBorderLine = drawHorizontalBorderLine,
                     .drawSprite = drawSprite,
                     .drawText = drawText,
                 },
@@ -224,12 +223,6 @@ pub fn TtyRuntime(comptime ROWS: u8, comptime COLS: u8) type {
         ) !void {
             const self: *Self = @ptrCast(@alignCast(ptr));
             self.buffer.setUtf8Symbol(symbol, position_on_display.row + 1, position_on_display.col + 1, mode);
-        }
-
-        fn drawHorizontalBorderLine(ptr: *anyopaque, row: u8, length: u8) !void {
-            for (0..length) |c| {
-                try drawSprite(ptr, '═', .{ .row = row, .col = @intCast(c) }, .normal);
-            }
         }
 
         fn drawText(

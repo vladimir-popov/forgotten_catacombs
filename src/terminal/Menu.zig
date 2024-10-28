@@ -73,7 +73,6 @@ pub fn Menu(comptime ROWS: u8, comptime COLS: u8) type {
             const item = self.items[item_idx];
             var buf: [TITLE_LENGTH]u8 = undefined;
             var fbs = std.io.fixedBufferStream(&buf);
-            _ = try std.fmt.bufPrint(&buf, "{s^}", .{item.title});
             try std.fmt.formatBuf(item.title, .{ .alignment = .center, .width = TITLE_LENGTH }, fbs.writer().any());
             self.buffer.setAsciiText(fbs.getWritten(), item_idx * 3 + 2, 1, mode);
         }

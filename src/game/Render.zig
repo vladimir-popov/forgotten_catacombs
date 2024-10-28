@@ -55,7 +55,7 @@ pub fn Render(comptime rows: u8, cols: u8) type {
         pub fn redraw(self: Self, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
             try self.clearDisplay();
             // separate dung and stats:
-            try self.runtime.drawHorizontalBorderLine(ROWS - 2, COLS);
+            try self.drawHorizontalBorderLine(ROWS - 2, COLS);
             try self.drawScene(session, entity_in_focus);
         }
 
@@ -196,6 +196,12 @@ pub fn Render(comptime rows: u8, cols: u8) type {
                 try self.drawZone(1, buf[0..len], .normal);
             } else {
                 try self.cleanZone(1);
+            }
+        }
+
+        fn drawHorizontalBorderLine(self: Self, row: u8, length: u8) !void {
+            for (0..length) |col| {
+                try self.runtime.drawSprite('═', .{ .row = row, .col = @intCast(col) }, .normal);
             }
         }
 

@@ -141,7 +141,6 @@ pub fn runtime(self: *Self) g.Runtime {
             .currentMillis = currentMillis,
             .readPushedButtons = readPushedButtons,
             .clearDisplay = clearDisplay,
-            .drawHorizontalBorderLine = drawHorizontalBorderLine,
             .drawSprite = drawSprite,
             .drawText = drawText,
         },
@@ -205,16 +204,12 @@ fn clearDisplay(ptr: *anyopaque) anyerror!void {
     self.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
 }
 
-fn drawHorizontalBorderLine(ptr: *anyopaque, row: u8, length: u8) anyerror!void {
-    var self: *Self = @ptrCast(@alignCast(ptr));
-    const y: c_int = @as(c_int, @intCast(row)) * g.SPRITE_HEIGHT + g.SPRITE_HEIGHT / 2;
-    const x: c_int = @as(c_int, @intCast(length)) * g.SPRITE_WIDTH;
-    self.playdate.graphics.drawLine(0, y, x, y, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
-    self.playdate.graphics.drawLine(0, y + 2, x, y + 2, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
-}
-
 fn drawSprite(ptr: *anyopaque, symbol: u21, position_on_display: p.Point, mode: g.Runtime.DrawingMode) !void {
     var self: *Self = @ptrCast(@alignCast(ptr));
+    if (symbol == '═') {
+        self.drawHorizontalBorderSymbol(position_on_display.row, position_on_display.col);
+        return;
+    }
     // draw text:
     const x = @as(c_int, position_on_display.col) * g.SPRITE_WIDTH;
     const y = @as(c_int, position_on_display.row) * g.SPRITE_HEIGHT;
@@ -222,6 +217,13 @@ fn drawSprite(ptr: *anyopaque, symbol: u21, position_on_display: p.Point, mode: 
     var buf: [4]u8 = undefined;
     const len = try std.unicode.utf8Encode(symbol, &buf);
     try self.drawTextOnDisplay(buf[0..len], mode, x, y);
+}
+
+fn drawHorizontalBorderSymbol(self: *Self, row: u8, col: u8) void {
+    const y: c_int = @as(c_int, @intCast(row)) * g.SPRITE_HEIGHT + g.SPRITE_HEIGHT / 2;
+    const x: c_int = @as(c_int, @intCast(col)) * g.SPRITE_WIDTH;
+    self.playdate.graphics.drawLine(x, y, x + g.SPRITE_WIDTH, y, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
+    self.playdate.graphics.drawLine(x, y + 2, x + g.SPRITE_WIDTH, y + 2, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
 }
 
 fn drawText(ptr: *anyopaque, text: []const u8, position_on_display: p.Point, mode: g.Runtime.DrawingMode) !void {

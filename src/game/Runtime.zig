@@ -21,7 +21,6 @@ const VTable = struct {
     ) ?*anyopaque,
     removeAllMenuItems: *const fn (context: *anyopaque) void,
     clearDisplay: *const fn (context: *anyopaque) anyerror!void,
-    drawHorizontalBorderLine: *const fn (context: *anyopaque, row: u8, length: u8) anyerror!void,
     drawSprite: *const fn (
         context: *anyopaque,
         symbol: u21,
@@ -71,10 +70,6 @@ pub inline fn readPushedButtons(self: Runtime) !?g.Button {
 
 pub inline fn clearDisplay(self: Runtime) !void {
     try self.vtable.clearDisplay(self.context);
-}
-
-pub inline fn drawHorizontalBorderLine(self: Runtime, row: u8, length: u8) !void {
-    try self.vtable.drawHorizontalBorderLine(self.context, row, length);
 }
 
 pub fn drawSprite(self: Runtime, symbol: u21, absolut_position: p.Point, mode: g.Runtime.DrawingMode) !void {
