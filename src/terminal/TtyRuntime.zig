@@ -2,35 +2,18 @@ const std = @import("std");
 const g = @import("game");
 const p = g.primitives;
 const tty = @import("tty.zig");
-const utf8 = @import("utf8.zig");
-
-const Menu = @import("Menu.zig");
 
 const log = std.log.scoped(.tty_runtime);
 
-const TtyRuntime = @This();
+pub const Menu = @import("Menu.zig").Menu;
+pub const DisplayBuffer = @import("DisplayBuffer.zig").DisplayBuffer;
 
 var window_size: tty.Display.RowsCols = undefined;
 var act: std.posix.Sigaction = undefined;
 /// true if game should be rendered in the center of the terminal window:
 var should_render_in_center: bool = true;
-var rows_pad: u8 = 0;
-var cols_pad: u8 = 0;
-
-termios: std.c.termios,
-alloc: std.mem.Allocator,
-// used to create the buffer, and can be completely free on cleanDisplay
-arena: std.heap.ArenaAllocator,
-// The main buffer to render the game
-buffer: utf8.Buffer,
-menu: Menu,
-// the last read button through readButton function.
-// it is used as a buffer to check ESC outside the readButton function
-keyboard_buffer: ?tty.KeyboardAndMouse.Button = null,
-// The border should not be drawn for DungeonGenerator
-draw_border: bool = true,
-cheat: ?g.Cheat = null,
-is_exit: bool = false,
+var rows_pad: u8 = 1;
+var cols_pad: u8 = 1;
 
 pub fn enableGameMode(use_mouse: bool) !void {
     try tty.Display.hideCursor();
@@ -44,65 +27,6 @@ pub fn disableGameMode() !void {
     try tty.Display.showCursor();
 }
 
-pub fn init(alloc: std.mem.Allocator, draw_border: bool, render_in_center: bool, use_cheats: bool) !TtyRuntime {
-    const instance = TtyRuntime{
-        .alloc = alloc,
-        .arena = std.heap.ArenaAllocator.init(alloc),
-        .buffer = undefined,
-        .menu = Menu.init(alloc),
-        .termios = tty.Display.enterRawMode(),
-        .draw_border = draw_border,
-    };
-    try enableGameMode(use_cheats);
-    should_render_in_center = render_in_center;
-    return instance;
-}
-
-pub fn deinit(self: *TtyRuntime) void {
-    self.menu.deinit();
-    _ = self.arena.reset(.free_all);
-    disableGameMode() catch unreachable;
-}
-
-/// Run the main loop of the game
-pub fn run(self: *TtyRuntime, game: anytype) !void {
-    handleWindowResize(0);
-    while (!self.is_exit) {
-        if (self.menu.is_shown) {
-            if (try readPushedButtons(self)) |btn| {
-                try self.menu.handleKeyboardButton(btn);
-            }
-            // menu can be closed after reading keyboard
-            if (self.menu.is_shown)
-                try writeBuffer(self.menu.buffer, tty.stdout_writer);
-        } else {
-            try game.tick();
-            try writeBuffer(self.buffer, tty.stdout_writer);
-        }
-    }
-}
-
-fn reedKeyboardInput(self: *TtyRuntime) !?tty.KeyboardAndMouse.Button {
-    if (tty.KeyboardAndMouse.readPressedButton()) |btn| {
-        self.keyboard_buffer = btn;
-        switch (btn) {
-            .control => if (btn.control == tty.KeyboardAndMouse.ControlButton.ESC) {
-                self.keyboard_buffer = null;
-                self.is_exit = true;
-            },
-            .char => |ch| if (ch.char == ' ') {
-                self.keyboard_buffer = null;
-                if (self.menu.is_shown)
-                    try self.menu.close()
-                else
-                    try self.menu.show(self.buffer);
-            },
-            else => {},
-        }
-    }
-    return self.keyboard_buffer;
-}
-
 fn handleWindowResize(_: i32) callconv(.C) void {
     window_size = tty.Display.getWindowSize() catch unreachable;
     tty.Display.clearScreen() catch unreachable;
@@ -112,185 +36,210 @@ fn handleWindowResize(_: i32) callconv(.C) void {
     }
 }
 
-fn writeBuffer(buffer: utf8.Buffer, writer: std.io.AnyWriter) !void {
-    for (buffer.lines.items, rows_pad..) |line, i| {
-        try tty.Text.writeSetCursorPosition(writer, @intCast(i), cols_pad);
-        _ = try writer.write(line.bytes.items);
-    }
-}
+pub fn TtyRuntime(comptime ROWS: u8, comptime COLS: u8) type {
+    return struct {
+        const Self = @This();
 
-pub fn runtime(self: *TtyRuntime) g.Runtime {
-    return .{
-        .context = self,
-        .alloc = self.alloc,
-        .vtable = &.{
-            .getCheat = getCheat,
-            .addMenuItem = addMenuItem,
-            .removeAllMenuItems = removeAllMenuItems,
-            .currentMillis = currentMillis,
-            .readPushedButtons = readPushedButtons,
-            .clearDisplay = clearDisplay,
-            .drawHorizontalBorderLine = drawHorizontalBorderLine,
-            .drawSprite = drawSprite,
-            .drawText = drawText,
-        },
-    };
-}
+        const MENU_COLS = (COLS - 2) / 2;
 
-fn currentMillis(_: *anyopaque) c_uint {
-    return @truncate(@as(u64, @intCast(std.time.milliTimestamp())));
-}
+        termios: std.c.termios,
+        alloc: std.mem.Allocator,
+        // The main buffer to render the game
+        buffer: DisplayBuffer(ROWS, COLS),
+        menu: Menu(ROWS, MENU_COLS),
+        // the last read button through readButton function.
+        // it is used as a buffer to check ESC outside the readButton function
+        keyboard_buffer: ?tty.KeyboardAndMouse.Button = null,
+        // The border should not be drawn for DungeonGenerator
+        draw_border: bool = true,
+        cheat: ?g.Cheat = null,
+        is_exit: bool = false,
 
-fn addMenuItem(
-    ptr: *anyopaque,
-    title: []const u8,
-    game_object: *anyopaque,
-    callback: g.Runtime.MenuItemCallback,
-) ?*anyopaque {
-    const self: *TtyRuntime = @ptrCast(@alignCast(ptr));
-    return self.menu.addMenuItem(title, game_object, callback);
-}
+        pub fn init(
+            alloc: std.mem.Allocator,
+            draw_border: bool,
+            render_in_center: bool,
+            use_cheats: bool,
+        ) !Self {
+            const instance = Self{
+                .alloc = alloc,
+                .buffer = try DisplayBuffer(ROWS, COLS).init(alloc),
+                .menu = try Menu(ROWS, MENU_COLS).init(alloc),
+                .termios = tty.Display.enterRawMode(),
+                .draw_border = draw_border,
+            };
+            try enableGameMode(use_cheats);
+            should_render_in_center = render_in_center;
+            return instance;
+        }
 
-fn removeAllMenuItems(ptr: *anyopaque) void {
-    const self: *TtyRuntime = @ptrCast(@alignCast(ptr));
-    self.menu.removeAllItems();
-}
+        pub fn deinit(self: *Self) void {
+            self.buffer.deinit();
+            self.menu.deinit();
+            disableGameMode() catch unreachable;
+        }
 
-fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
-    var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
-    if (try self.reedKeyboardInput()) |key| {
-        const game_button: ?g.Button.GameButton = switch (key) {
-            .char => switch (key.char.char) {
-                // (B) (A)
-                's', 'i' => .a,
-                'a', 'u' => .b,
-                'h' => .left,
-                'j' => .down,
-                'k' => .up,
-                'l' => .right,
-                else => null,
-            },
-            .control => switch (key.control) {
-                .LEFT => .left,
-                .DOWN => .down,
-                .UP => .up,
-                .RIGHT => .right,
-                else => null,
-            },
-            .mouse => |m| cheat: {
-                // handle mouse buttons only on press
-                if (m.is_released) return null;
-                switch (m.button) {
-                    .RIGHT => self.cheat = .refresh_screen,
-                    .LEFT => {
-                        // -1 for border
-                        self.cheat = .{ .move_player = .{ .row = m.row - rows_pad - 1, .col = m.col - cols_pad - 1 } };
-                    },
-                    .WHEEL_UP => self.cheat = .move_player_to_entrance,
-                    .WHEEL_DOWN => self.cheat = .move_player_to_exit,
-                    else => return null,
+        /// Run the main loop of the game
+        pub fn run(self: *Self, game: anytype) !void {
+            const stdout = std.io.getStdOut().writer().any();
+            handleWindowResize(0);
+            while (!self.is_exit) {
+                if (self.menu.is_shown) {
+                    try self.menu.buffer.writeBuffer(stdout, rows_pad, cols_pad + (COLS - MENU_COLS - 1));
+                    if (try readPushedButtons(self)) |btn| {
+                        try self.menu.handleKeyboardButton(btn);
+                    }
+                } else {
+                    try game.tick();
+                    try self.buffer.writeBuffer(stdout, rows_pad, cols_pad);
                 }
-                break :cheat .cheat;
-            },
-            else => null,
-        };
-        if (game_button) |gbtn| {
-            self.keyboard_buffer = null;
-            return .{ .game_button = gbtn, .state = .pressed };
-        } else {
+            }
+        }
+
+        fn readKeyboardInput(self: *Self) !?tty.KeyboardAndMouse.Button {
+            if (tty.KeyboardAndMouse.readPressedButton()) |btn| {
+                self.keyboard_buffer = btn;
+                switch (btn) {
+                    .control => if (btn.control == tty.KeyboardAndMouse.ControlButton.ESC) {
+                        self.keyboard_buffer = null;
+                        self.is_exit = true;
+                    },
+                    .char => |ch| if (ch.char == ' ') {
+                        self.keyboard_buffer = null;
+                        if (self.menu.is_shown)
+                            self.menu.close()
+                        else
+                            try self.menu.show();
+                    },
+                    else => {},
+                }
+            }
+            return self.keyboard_buffer;
+        }
+
+        pub fn runtime(self: *Self) g.Runtime {
+            return .{
+                .context = self,
+                .alloc = self.alloc,
+                .vtable = &.{
+                    .getCheat = getCheat,
+                    .addMenuItem = addMenuItem,
+                    .removeAllMenuItems = removeAllMenuItems,
+                    .currentMillis = currentMillis,
+                    .readPushedButtons = readPushedButtons,
+                    .clearDisplay = clearDisplay,
+                    .drawHorizontalBorderLine = drawHorizontalBorderLine,
+                    .drawSprite = drawSprite,
+                    .drawText = drawText,
+                },
+            };
+        }
+
+        fn currentMillis(_: *anyopaque) c_uint {
+            return @truncate(@as(u64, @intCast(std.time.milliTimestamp())));
+        }
+
+        fn addMenuItem(
+            ptr: *anyopaque,
+            title: []const u8,
+            game_object: *anyopaque,
+            callback: g.Runtime.MenuItemCallback,
+        ) ?*anyopaque {
+            const self: *Self = @ptrCast(@alignCast(ptr));
+            return self.menu.addMenuItem(title, game_object, callback);
+        }
+
+        fn removeAllMenuItems(ptr: *anyopaque) void {
+            const self: *Self = @ptrCast(@alignCast(ptr));
+            self.menu.removeAllItems();
+        }
+
+        fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
+            var self: *Self = @ptrCast(@alignCast(ptr));
+            if (try self.readKeyboardInput()) |key| {
+                const game_button: ?g.Button.GameButton = switch (key) {
+                    .char => switch (key.char.char) {
+                        // (B) (A)
+                        's', 'i' => .a,
+                        'a', 'u' => .b,
+                        'h' => .left,
+                        'j' => .down,
+                        'k' => .up,
+                        'l' => .right,
+                        else => null,
+                    },
+                    .control => switch (key.control) {
+                        .LEFT => .left,
+                        .DOWN => .down,
+                        .UP => .up,
+                        .RIGHT => .right,
+                        else => null,
+                    },
+                    .mouse => |m| cheat: {
+                        // handle mouse buttons only on press
+                        if (m.is_released) return null;
+                        switch (m.button) {
+                            .RIGHT => self.cheat = .refresh_screen,
+                            .LEFT => {
+                                // -1 for border
+                                self.cheat = .{ .move_player = .{
+                                    .row = m.row - rows_pad - 1,
+                                    .col = m.col - cols_pad - 1,
+                                } };
+                            },
+                            .WHEEL_UP => self.cheat = .move_player_to_entrance,
+                            .WHEEL_DOWN => self.cheat = .move_player_to_exit,
+                            else => return null,
+                        }
+                        break :cheat .cheat;
+                    },
+                    else => null,
+                };
+                if (game_button) |gbtn| {
+                    self.keyboard_buffer = null;
+                    return .{ .game_button = gbtn, .state = .pressed };
+                } else {
+                    return null;
+                }
+            }
             return null;
         }
-    }
-    return null;
-}
 
-fn getCheat(ptr: *anyopaque) ?g.Cheat {
-    const self: *TtyRuntime = @ptrCast(@alignCast(ptr));
-    return self.cheat;
-}
-
-fn clearDisplay(ptr: *anyopaque) !void {
-    var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
-    _ = self.arena.reset(.retain_capacity);
-    self.buffer = utf8.Buffer.init(self.arena.allocator());
-    try tty.Display.clearScreen();
-    // draw external border
-    if (self.draw_border) {
-        try self.wrapBufferInBorder();
-    }
-}
-
-fn wrapBufferInBorder(self: *TtyRuntime) !void {
-    try self.buffer.addLine("╔" ++ "═" ** g.DISPLAY_COLS ++ "╗");
-    for (0..(g.DISPLAY_ROWS)) |_| {
-        try self.buffer.addLine("║" ++ " " ** g.DISPLAY_COLS ++ "║");
-    }
-    try self.buffer.addLine("╚" ++ "═" ** g.DISPLAY_COLS ++ "╝");
-}
-
-fn drawHorizontalBorderLine(ptr: *anyopaque, row: u8, length: u8) !void {
-    var self: *TtyRuntime = @ptrCast(@alignCast(ptr));
-    const buf = "═" ** g.DISPLAY_COLS;
-    // the "═" symbol takes 3 bytes 0xE2 0x95 0x90
-    try self.buffer.mergeLine(buf[0 .. length * 3], row + 1, 1);
-}
-
-fn drawBorder(self: *TtyRuntime, region: p.Region, filler: u8) !void {
-    const r = region.top_left.row;
-    const c = region.top_left.col;
-
-    var buf: [g.Dungeon.Map.cols * 3]u8 = undefined;
-    var fbs = std.io.fixedBufferStream(&buf);
-    const writer = fbs.writer();
-
-    _ = try writer.write("╔");
-    if (region.cols > 2) try writer.writeBytesNTimes("═", region.cols - 2);
-    _ = try writer.write("╗");
-    try self.buffer.mergeLine(fbs.getWritten(), r, c);
-    fbs.reset();
-
-    if (region.rows > 2) {
-        for (1..(region.rows - 1)) |l| {
-            _ = try writer.write("║");
-            if (region.cols > 2) try writer.writeByteNTimes(filler, region.cols - 2);
-            _ = try writer.write("║");
-            try self.buffer.mergeLine(fbs.getWritten(), r + l, c);
-            fbs.reset();
+        fn getCheat(ptr: *anyopaque) ?g.Cheat {
+            const self: *Self = @ptrCast(@alignCast(ptr));
+            return self.cheat;
         }
-    }
 
-    _ = try writer.write("╚");
-    if (region.cols > 2) try writer.writeBytesNTimes("═", region.cols - 2);
-    _ = try writer.write("╝");
-    try self.buffer.mergeLine(fbs.getWritten(), region.bottomRightRow(), c);
-    fbs.reset();
-}
+        fn clearDisplay(ptr: *anyopaque) !void {
+            const self: *Self = @ptrCast(@alignCast(ptr));
+            try tty.Display.clearScreen();
+            self.buffer.clean();
+        }
 
-fn drawSprite(
-    ptr: *anyopaque,
-    symbol: u21,
-    position_on_display: p.Point,
-    mode: g.Runtime.DrawingMode,
-) !void {
-    var buf: [4]u8 = undefined;
-    const len = try std.unicode.utf8Encode(symbol, &buf);
-    try drawText(ptr, buf[0..len], position_on_display, mode);
-}
+        fn drawSprite(
+            ptr: *anyopaque,
+            symbol: u21,
+            position_on_display: p.Point,
+            mode: g.Runtime.DrawingMode,
+        ) !void {
+            const self: *Self = @ptrCast(@alignCast(ptr));
+            self.buffer.setUtf8Symbol(symbol, position_on_display.row + 1, position_on_display.col + 1, mode);
+        }
 
-// row and col - position of the lable in the window, not inside the screen!
-fn drawText(
-    ptr: *anyopaque,
-    text: []const u8,
-    position_on_display: p.Point,
-    mode: g.Runtime.DrawingMode,
-) !void {
-    const self: *TtyRuntime = @ptrCast(@alignCast(ptr));
-    const r = position_on_display.row + 1; // +1 for border
-    const c = position_on_display.col + 1;
-    var buf: [50]u8 = undefined;
-    if (mode == .inverted) {
-        try self.buffer.mergeLine(try std.fmt.bufPrint(&buf, tty.Text.inverted("{s}"), .{text}), r, c);
-    } else {
-        try self.buffer.mergeLine(try std.fmt.bufPrint(&buf, tty.Text.normal("{s}"), .{text}), r, c);
-    }
+        fn drawHorizontalBorderLine(ptr: *anyopaque, row: u8, length: u8) !void {
+            for (0..length) |c| {
+                try drawSprite(ptr, '═', .{ .row = row, .col = @intCast(c) }, .normal);
+            }
+        }
+
+        fn drawText(
+            ptr: *anyopaque,
+            text: []const u8,
+            position_on_display: p.Point,
+            mode: g.Runtime.DrawingMode,
+        ) !void {
+            const self: *Self = @ptrCast(@alignCast(ptr));
+            self.buffer.setAsciiText(text, position_on_display.row + 1, position_on_display.col + 1, mode);
+        }
+    };
 }

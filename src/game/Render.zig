@@ -28,6 +28,8 @@ const log = std.log.scoped(.render);
 const DrawingMode = g.Runtime.DrawingMode;
 const TextAlign = enum { center, left, right };
 
+// we do not use global constants here to be able to reuse render in the
+// terminal.DungeonGenerator
 pub fn Render(comptime rows: u8, cols: u8) type {
     return struct {
         const ROWS: u8 = rows;

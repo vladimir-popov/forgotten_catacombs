@@ -23,7 +23,7 @@ pub fn main() !void {
     defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK DETECTED!");
     const alloc = gpa.allocator();
 
-    var runtime = try TtyRuntime.init(alloc, false, false, false);
+    var runtime = try TtyRuntime.TtyRuntime(g.Dungeon.ROWS + 2, g.Dungeon.COLS + 2).init(alloc, false, false, false);
     defer runtime.deinit();
 
     var generator = try DungeonsGenerator.init(runtime.runtime());
@@ -35,14 +35,14 @@ pub fn main() !void {
 
 const DungeonsGenerator = struct {
     runtime: g.Runtime,
-    render: g.render.Render(g.Dungeon.ROWS + 1, g.Dungeon.COLS + 1),
+    render: g.render.Render(g.Dungeon.ROWS, g.Dungeon.COLS),
     level: g.Level,
     draw_dungeon: bool = true, // if false the map should be drawn
 
     pub fn init(runtime: g.Runtime) !DungeonsGenerator {
         return .{
             .runtime = runtime,
-            .render = g.render.Render(g.Dungeon.ROWS + 1, g.Dungeon.COLS + 1).init(runtime),
+            .render = g.render.Render(g.Dungeon.ROWS, g.Dungeon.COLS).init(runtime),
             .level = try g.Level.init(runtime.alloc, 0),
         };
     }

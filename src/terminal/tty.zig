@@ -29,11 +29,11 @@ pub const Text = struct {
 
     // SGR – Select Graphic Rendition
     // Text decoration
-    const SGR_RESET = csi("m");
-    const SGR_BOLD = csi("1m");
-    const SGR_ITALIC = csi("3m");
-    const SGR_UNDERLINE = csi("4m");
-    const SGR_INVERT_COLORS = csi("7m");
+    pub const SGR_RESET = csi("m");
+    pub const SGR_BOLD = csi("1m");
+    pub const SGR_ITALIC = csi("3m");
+    pub const SGR_UNDERLINE = csi("4m");
+    pub const SGR_INVERT_COLORS = csi("7m");
 
     // MOUSE MODES
     const MOUSE_TRACK_ON = csi("?1000;1006;1015h");
@@ -373,9 +373,4 @@ pub const KeyboardAndMouse = struct {
 pub inline fn write(str: []const u8) !void {
     if (c.write(c.STDOUT_FILENO, str.ptr, str.len) != str.len)
         return error.WritenNotAllBytes;
-}
-
-pub const stdout_writer = std.io.AnyWriter{ .context = undefined, .writeFn = writeStdoutFn };
-fn writeStdoutFn(_: *const anyopaque, bytes: []const u8) anyerror!usize {
-    return @intCast(c.write(c.STDOUT_FILENO, bytes.ptr, bytes.len));
 }
