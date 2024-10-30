@@ -33,9 +33,9 @@ pub fn refresh(self: *ExploreMode) !void {
     self.entities_on_screen.clearRetainingCapacity();
     var itr = self.session.level.query().get(c.Position);
     while (itr.next()) |tuple| {
-        if (self.session.game.render.screen.region.containsPoint(tuple[1].point)) {
+        if (self.session.game.render.viewport.region.containsPoint(tuple[1].point)) {
             const item = try self.entities_on_screen.addOne();
-            item.* = .{ tuple[0], self.session.game.render.screen.relative(tuple[1].point) };
+            item.* = .{ tuple[0], self.session.game.render.viewport.relative(tuple[1].point) };
         }
     }
     try self.session.game.render.redraw(self.session, self.entity_in_focus);
@@ -61,7 +61,7 @@ pub fn tick(self: *ExploreMode) anyerror!void {
 
 fn chooseNextEntity(self: *ExploreMode, direction: p.Direction) void {
     const target_entity = self.entity_in_focus orelse self.session.level.player;
-    const target_point = self.session.game.render.screen.relative(
+    const target_point = self.session.game.render.viewport.relative(
         self.session.level.components.getForEntityUnsafe(target_entity, c.Position).point,
     );
     var min_distance: u8 = 255;

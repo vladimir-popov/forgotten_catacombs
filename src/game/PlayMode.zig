@@ -96,7 +96,7 @@ fn handleInput(self: *PlayMode, button: g.Button) !void {
                 log.debug("Cheat {any}", .{cheat});
                 switch (cheat) {
                     .refresh_screen => {
-                        self.session.game.render.screen.centeredAround(self.session.level.playerPosition().point);
+                        self.session.game.render.viewport.centeredAround(self.session.level.playerPosition().point);
                         try self.session.game.render.redraw(self.session, self.entity_in_focus);
                     },
                     .move_player_to_entrance => {
@@ -116,7 +116,7 @@ fn handleInput(self: *PlayMode, button: g.Button) !void {
                         }
                     },
                     .move_player => |point_on_screen| {
-                        const screen_corner = self.session.game.render.screen.region.top_left;
+                        const screen_corner = self.session.game.render.viewport.region.top_left;
                         try self.movePlayerToPoint(.{
                             .row = point_on_screen.row + screen_corner.row,
                             .col = point_on_screen.col + screen_corner.col,
@@ -135,7 +135,7 @@ fn movePlayerToPoint(self: *PlayMode, point: p.Point) !void {
         c.Position{ .point = point },
     );
     try self.updateTarget();
-    self.session.game.render.screen.centeredAround(point);
+    self.session.game.render.viewport.centeredAround(point);
     try self.session.game.render.redraw(self.session, self.entity_in_focus);
 }
 

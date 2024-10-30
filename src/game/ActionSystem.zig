@@ -70,16 +70,16 @@ fn handleMoveAction(
     if (entity != session.level.player) return true;
 
     // keep player on the screen:
-    const screen = &session.game.render.screen;
-    const inner_region = screen.innerRegion();
+    const viewport = &session.game.render.viewport;
+    const inner_region = viewport.innerRegion();
     if (move.direction == .up and position.point.row < inner_region.top_left.row)
-        screen.move(move.direction);
+        viewport.move(move.direction);
     if (move.direction == .down and position.point.row > inner_region.bottomRightRow())
-        screen.move(move.direction);
+        viewport.move(move.direction);
     if (move.direction == .left and position.point.col < inner_region.top_left.col)
-        screen.move(move.direction);
+        viewport.move(move.direction);
     if (move.direction == .right and position.point.col > inner_region.bottomRightCol())
-        screen.move(move.direction);
+        viewport.move(move.direction);
     return true;
 }
 

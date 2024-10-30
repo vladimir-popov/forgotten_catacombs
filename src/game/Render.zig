@@ -4,14 +4,14 @@
 ///
 ///   ╔═══════════════════════════════════════╗-------
 ///   ║                                       ║ |   |
-///   ║                                       ║
-///   ║                                       ║ S
-///   ║                                       ║ c   D
-///   ║                                       ║ r   i
-///   ║                                       ║ e   s
-///   ║                                       ║ e   p
-///   ║                                       ║ n   l
-///   ║                                       ║     a
+///   ║                                       ║ V
+///   ║                                       ║ i
+///   ║                                       ║ e   D
+///   ║                                       ║ w   i
+///   ║                                       ║ p   s
+///   ║                                       ║ o   p
+///   ║                                       ║ r   l
+///   ║                                       ║ t   a
 ///   ║                                       ║ |   y
 ///   ║═══════════════════════════════════════║---
 ///   ║HP: 100     Rat:||||||||||||||| Attack ║     |
@@ -41,12 +41,12 @@ pub fn Render(comptime rows: u8, cols: u8) type {
 
         runtime: g.Runtime,
         /// Visible area
-        screen: g.Screen,
+        viewport: g.Viewport,
 
         pub fn init(runtime: g.Runtime) Self {
             return .{
                 .runtime = runtime,
-                .screen = g.Screen.init(ROWS - 2, COLS),
+                .viewport = g.Viewport.init(ROWS - 2, COLS),
             };
         }
 
@@ -73,8 +73,8 @@ pub fn Render(comptime rows: u8, cols: u8) type {
         }
 
         pub fn drawDungeon(self: Self, dungeon: g.Dungeon) anyerror!void {
-            var itr = dungeon.cellsInRegion(self.screen.region) orelse return;
-            var place = self.screen.region.top_left;
+            var itr = dungeon.cellsInRegion(self.viewport.region) orelse return;
+            var place = self.viewport.region.top_left;
             var sprite = c.Sprite{ .codepoint = undefined };
             while (itr.next()) |cell| {
                 sprite.codepoint = switch (cell) {
@@ -84,8 +84,8 @@ pub fn Render(comptime rows: u8, cols: u8) type {
                 };
                 try self.drawSprite(sprite, place, .normal);
                 place.move(.right);
-                if (!self.screen.region.containsPoint(place)) {
-                    place.col = self.screen.region.top_left.col;
+                if (!self.viewport.region.containsPoint(place)) {
+                    place.col = self.viewport.region.top_left.col;
                     place.move(.down);
                 }
             }
@@ -105,7 +105,7 @@ pub fn Render(comptime rows: u8, cols: u8) type {
 
             var itr = level.query().get2(c.Position, c.Sprite);
             while (itr.next()) |tuple| {
-                if (self.screen.region.containsPoint(tuple[1].point)) {
+                if (self.viewport.region.containsPoint(tuple[1].point)) {
                     try visible.add(tuple);
                 }
             }
@@ -124,10 +124,10 @@ pub fn Render(comptime rows: u8, cols: u8) type {
             place: p.Point,
             mode: g.Runtime.DrawingMode,
         ) anyerror!void {
-            if (self.screen.region.containsPoint(place)) {
+            if (self.viewport.region.containsPoint(place)) {
                 const position_on_display = p.Point{
-                    .row = place.row - self.screen.region.top_left.row,
-                    .col = place.col - self.screen.region.top_left.col,
+                    .row = place.row - self.viewport.region.top_left.row,
+                    .col = place.col - self.viewport.region.top_left.col,
                 };
                 try self.runtime.drawSprite(sprite.codepoint, position_on_display, mode);
             }
@@ -142,7 +142,7 @@ pub fn Render(comptime rows: u8, cols: u8) type {
                 const position = components[1];
                 const animation = components[2];
                 if (animation.frame(now)) |frame| {
-                    if (frame > 0 and self.screen.region.containsPoint(position.point)) {
+                    if (frame > 0 and self.viewport.region.containsPoint(position.point)) {
                         const mode: DrawingMode = if (entity_in_focus == components[0])
                             .inverted
                         else

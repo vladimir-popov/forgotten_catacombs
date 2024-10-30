@@ -15,7 +15,7 @@ pub const Game = @import("Game.zig");
 pub const GameSession = @import("GameSession.zig");
 pub const Level = @import("Level.zig");
 pub const Render = render.Render(DISPLAY_ROWS, DISPLAY_COLS);
-pub const Screen = @import("Screen.zig");
+pub const Viewport = @import("Viewport.zig");
 
 pub const RENDER_DELAY_MS = 150;
 

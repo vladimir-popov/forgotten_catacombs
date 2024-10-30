@@ -55,7 +55,7 @@ pub fn createNew(game: *g.Game, seed: u64) !*GameSession {
         .down,
     );
     try session.level.movePlayerToLadder(entrance);
-    session.game.render.screen.centeredAround(session.level.playerPosition().point);
+    session.game.render.viewport.centeredAround(session.level.playerPosition().point);
     return session;
 }
 
@@ -95,7 +95,7 @@ pub fn moveToLevel(self: *GameSession, ladder: c.Ladder) !void {
         ladder.direction,
     );
     try self.level.movePlayerToLadder(this_ladder);
-    self.game.render.screen.centeredAround(self.level.playerPosition().point);
+    self.game.render.viewport.centeredAround(self.level.playerPosition().point);
 }
 
 // TODO: Load session from file
