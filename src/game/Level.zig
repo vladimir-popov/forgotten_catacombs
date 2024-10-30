@@ -61,7 +61,7 @@ pub fn generate(
     // to be able to be regenerated when the player travels from level to level.
     var prng = std.Random.DefaultPrng.init(seed);
     var bspGenerator = BspDungeonGenerator{ .alloc = self.alloc };
-    try bspGenerator.generator().generateDungeon(prng.random(), &self.dungeon);
+    try bspGenerator.generateDungeon(prng.random(), &self.dungeon);
     log.debug("The dungeon has been generated", .{});
 
     self.next_entity = this_ladder + 1;

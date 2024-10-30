@@ -13,7 +13,6 @@ const p = g.primitives;
 
 const BspTree = @import("BspTree.zig");
 const Dungeon = @import("Dungeon.zig");
-const DungeonGenerator = @import("DungeonGenerator.zig");
 
 const log = std.log.scoped(.bsp_generator);
 
@@ -32,17 +31,12 @@ min_scale: f16 = 0.6,
 /// In case of ascii graphics it's not 1.0
 square_ratio: f16 = 0.4,
 
-pub fn generator(self: *BspDungeonGenerator) DungeonGenerator {
-    return .{ .context = self, .generateFn = generateDungeon };
-}
-
 /// Creates the dungeon with BSP algorithm.
-fn generateDungeon(
-    ptr: *anyopaque,
+pub fn generateDungeon(
+    self: BspDungeonGenerator,
     rand: std.Random,
     dungeon: *Dungeon,
 ) !void {
-    const self: *BspDungeonGenerator = @ptrCast(@alignCast(ptr));
     // this arena is used to build a BSP tree, which can be destroyed
     // right after completing the dungeon.
     var bsp_arena = std.heap.ArenaAllocator.init(self.alloc);
@@ -59,7 +53,7 @@ fn generateDungeon(
 
     // visit every BSP node and generate rooms in the leafs
     var createRooms: TraverseAndCreateRooms = .{
-        .generator = self,
+        .generator = &self,
         .dungeon = dungeon,
         .rand = rand,
     };
