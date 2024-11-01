@@ -9,9 +9,9 @@ pub fn handleCollisions(session: *g.GameSession) anyerror!void {
     for (session.level.components.getAll(c.Collision)) |collision| {
         switch (collision.obstacle) {
             .wall => {},
-            .door => |door| try session.level.components.setToEntity(
+            .closed_door => |door_entity| try session.level.components.setToEntity(
                 collision.entity,
-                c.Action{ .type = .{ .open = door.entity }, .move_points = 10 },
+                c.Action{ .type = .{ .open = door_entity }, .move_points = 10 },
             ),
             .enemy => |enemy| {
                 if (session.level.components.getForEntity(collision.entity, c.Health)) |_| {

@@ -27,10 +27,16 @@ pub fn Exit(this_ladder: g.Entity, that_ladder: ?g.Entity) c.Components {
     };
 }
 
+pub const OpenedDoor = c.Components{
+    .door = .{ .state = .opened },
+    .sprite = .{ .codepoint = '\'' },
+    .description = .{ .name = "Opened door" },
+};
+
 pub const ClosedDoor = c.Components{
-    .door = .closed,
+    .door = .{ .state = .closed },
     .sprite = .{ .codepoint = '+' },
-    .description = .{ .name = "Door" },
+    .description = .{ .name = "Closed door" },
 };
 
 pub const Rat = c.Components{

@@ -20,7 +20,22 @@ pub const Turn = struct {
     }
 };
 
+// the last turn - is a place where the passage is ended, the turn direction is not important there.
 turns: std.ArrayList(Turn),
+/// The indexes of the doors inside this passage. It should be at least two doors.
+doors: std.AutoHashMap(p.Point, void),
+
+pub fn init(alloc: std.mem.Allocator) Passage {
+    return .{
+        .turns = std.ArrayList(Turn).init(alloc),
+        .doors = std.AutoHashMap(p.Point, void).init(alloc),
+    };
+}
+
+pub fn deinit(self: *Passage) void {
+    self.turns.deinit();
+    self.doors.deinit();
+}
 
 pub fn format(
     self: Passage,
@@ -34,16 +49,30 @@ pub fn format(
     try writer.print("Passage({any})", .{self.turns.items});
 }
 
-pub fn deinit(self: Passage) void {
-    self.turns.deinit();
+pub fn contains(self: Passage, place: p.Point) bool {
+    var prev = self.turns.items[0];
+    for (self.turns.items[1..]) |curr| {
+        if (prev.to_direction.isHorizontal())
+            if (isOnHorizontalLine(prev.place, curr.place, place))
+                return true
+            else if (isOnVerticalLine(prev.place, curr.place, place))
+                return true;
+
+        prev = curr;
+    }
+    return false;
 }
 
-pub inline fn entrance(self: Passage) p.Point {
-    return self.turns.items[0].place;
+inline fn isOnHorizontalLine(p1: p.Point, p2: p.Point, place: p.Point) bool {
+    return place.row == p1.row and isBetween(p1.col, p2.col, place.col);
 }
 
-pub inline fn exit(self: Passage) p.Point {
-    return self.turns.getLast().place;
+inline fn isOnVerticalLine(p1: p.Point, p2: p.Point, place: p.Point) bool {
+    return place.col == p1.col and isBetween(p1.row, p2.row, place.row);
+}
+
+inline fn isBetween(x: u8, y: u8, value: u8) bool {
+    return @min(x, y) <= value and value <= @max(x, y);
 }
 
 pub fn turnAt(self: *Passage, place: p.Point, direction: p.Direction) !Turn {
@@ -112,7 +141,7 @@ test "places iterator" {
     //              |
     //              o
     //            Exit
-    var passage = Passage{ .turns = std.ArrayList(Turn).init(std.testing.allocator) };
+    var passage = Passage.init(std.testing.allocator);
     defer passage.deinit();
     _ = try passage.turnAt(.{ .row = 1, .col = 1 }, .right);
     _ = try passage.turnAt(.{ .row = 1, .col = 3 }, .down);

@@ -18,18 +18,10 @@ pub fn doActions(session: *g.GameSession) !void {
                 _ = try handleMoveAction(session, entity, position, move);
             },
             .open => |door| {
-                try session.level.components.setToEntity(door, c.Door.opened);
-                try session.level.components.setToEntity(
-                    door,
-                    c.Sprite{ .codepoint = '\'' },
-                );
+                try session.level.components.setComponentsToEntity(door, g.entities.OpenedDoor);
             },
             .close => |door| {
-                try session.level.components.setToEntity(door, c.Door.closed);
-                try session.level.components.setToEntity(
-                    door,
-                    c.Sprite{ .codepoint = '+' },
-                );
+                try session.level.components.setComponentsToEntity(door, g.entities.ClosedDoor);
             },
             .hit => |enemy| {
                 if (session.level.components.getForEntity(entity, c.MeleeWeapon)) |weapon| {
@@ -89,8 +81,8 @@ fn checkCollision(session: *g.GameSession, position: p.Point) ?c.Collision.Obsta
             .nothing, .wall => return .wall,
             .door => if (session.level.entityAt(position)) |entity| {
                 if (session.level.components.getForEntity(entity, c.Door)) |door|
-                    if (door.* == .closed)
-                        return .{ .door = .{ .entity = entity, .state = .closed } }
+                    if (door.state == .closed)
+                        return .{ .closed_door = entity }
                     else
                         return null;
             } else {

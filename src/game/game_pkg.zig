@@ -14,6 +14,7 @@ pub const Dungeon = @import("dungeon/Dungeon.zig");
 pub const Game = @import("Game.zig");
 pub const GameSession = @import("GameSession.zig");
 pub const Level = @import("Level.zig");
+pub const LevelMap = @import("LevelMap.zig");
 pub const Render = render.Render(DISPLAY_ROWS, DISPLAY_COLS);
 pub const Viewport = @import("Viewport.zig");
 

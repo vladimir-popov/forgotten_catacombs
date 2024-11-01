@@ -3,15 +3,14 @@ const g = @import("../game_pkg.zig");
 const p = g.primitives;
 
 const Dungeon = g.Dungeon;
-const Room = g.Dungeon.Room;
 
 /// Generate the room inside the passed region, and creates random interior inside the room.
 /// Returns the actual region of the generated room
-pub fn createRoom(dungeon: *g.Dungeon, _: std.Random, region: p.Region) !Room {
+pub fn createRoom(dungeon: *g.Dungeon, _: std.Random, region: p.Region) !p.Region {
     return createEmptyRoom(dungeon, region);
 }
 
-fn createEmptyRoom(dungeon: *Dungeon, region: p.Region) Room {
+fn createEmptyRoom(dungeon: *Dungeon, region: p.Region) p.Region {
     // generate walls:
     for (region.top_left.row..(region.top_left.row + region.rows)) |r| {
         if (r == region.top_left.row or r == region.bottomRightRow()) {

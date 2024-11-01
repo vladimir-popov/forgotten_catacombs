@@ -295,7 +295,7 @@ fn calculateQuickActionForTarget(
             }
             const player_speed =
                 self.session.level.components.getForEntityUnsafe(self.session.level.player, c.Speed);
-            return switch (door.*) {
+            return switch (door.state) {
                 .opened => .{ .type = .{ .close = target }, .move_points = player_speed.move_points },
                 .closed => .{ .type = .{ .open = target }, .move_points = player_speed.move_points },
             };

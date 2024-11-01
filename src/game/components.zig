@@ -10,6 +10,10 @@ pub const Position = struct {
     point: p.Point,
 };
 
+pub const Door = struct {
+    state: g.Dungeon.Door.State,
+};
+
 /// Describes how and where something should look.
 pub const Sprite = struct {
     codepoint: Codepoint,
@@ -43,11 +47,6 @@ pub const Animation = struct {
         }
         return if (self.current_frame <= self.frames.len) self.frames[self.current_frame - 1] else null;
     }
-};
-
-pub const Door = enum {
-    opened,
-    closed,
 };
 
 /// The ladder to the upper or under level from the current one
@@ -94,7 +93,7 @@ pub const Action = struct {
 pub const Collision = struct {
     pub const Obstacle = union(enum) {
         wall,
-        door: struct { entity: g.Entity, state: c.Door },
+        closed_door: g.Entity,
         item: g.Entity,
         enemy: g.Entity,
     };
