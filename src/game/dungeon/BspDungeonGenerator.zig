@@ -80,7 +80,6 @@ const TraverseAndCreateRooms = struct {
         const self: *TraverseAndCreateRooms = @ptrCast(@alignCast(ptr));
         const region_for_room = try self.generator.createRandomRegionInside(node.value, self.rand);
         try self.dungeon.generateAndAddRoom(self.rand, region_for_room);
-        // try self.builder.generateAndAddRoom(self.rand, node.value);
     }
 };
 
@@ -95,7 +94,8 @@ const CreatePassageBetweenRegions = struct {
 
     fn combine(ptr: *anyopaque, left: p.Region, right: p.Region) !p.Region {
         const self: *CreatePassageBetweenRegions = @ptrCast(@alignCast(ptr));
-        return try self.dungeon.createAndAddPassageBetweenRegions(self.alloc, self.rand, left, right);
+        log.debug("Creating passage between {any} and {any}", .{ left, right });
+        return try self.dungeon.createAndAddPassageBetweenRegions(self.rand, left, right);
     }
 };
 

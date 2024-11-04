@@ -12,6 +12,10 @@ pub const std_options = .{
 
 const log = std.log.scoped(.main);
 
+pub const scope_levels = [_]std.log.ScopeLevel{
+    .{ .scope = .bsp_tree, .level = .info },
+};
+
 pub fn panic(
     msg: []const u8,
     error_return_trace: ?*std.builtin.StackTrace,
@@ -41,7 +45,9 @@ pub fn main() !void {
     defer runtime.deinit();
     var game = try g.Game.init(runtime.runtime(), seed);
     defer game.deinit();
-    try runtime.run(&game);
+    runtime.run(&game) catch |e| {
+        std.debug.panic("Fatal error {any}", .{e});
+    };
 }
 
 test {

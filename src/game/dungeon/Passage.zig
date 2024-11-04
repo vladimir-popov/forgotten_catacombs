@@ -52,11 +52,13 @@ pub fn format(
 pub fn contains(self: Passage, place: p.Point) bool {
     var prev = self.turns.items[0];
     for (self.turns.items[1..]) |curr| {
-        if (prev.to_direction.isHorizontal())
+        if (prev.to_direction.isHorizontal()) {
             if (isOnHorizontalLine(prev.place, curr.place, place))
-                return true
-            else if (isOnVerticalLine(prev.place, curr.place, place))
                 return true;
+        } else {
+            if (isOnVerticalLine(prev.place, curr.place, place))
+                return true;
+        }
 
         prev = curr;
     }
