@@ -35,8 +35,8 @@ pub const Cell = enum {
 pub const Doorway = struct {
     // will be overwritten late on level initialization
     door_id: g.Entity = 0,
-    idx_from: u8,
-    idx_to: u8,
+    placement_from: *Placement,
+    placement_to: *Placement,
 };
 pub const Room = struct {
     region: p.Region,
@@ -299,9 +299,17 @@ pub fn createAndAddPassageBetweenRegions(
 
     try self.digPassage(passage);
     const placement1_idx = try self.findPlacementIdx(doorPlace1.movedTo(direction.opposite()));
-    try self.forceCreateDoorBetween(@intCast(passage_idx), @intCast(placement1_idx), doorPlace1);
+    try self.forceCreateDoorBetween(
+        &self.placements.items[passage_idx],
+        &self.placements.items[placement1_idx],
+        doorPlace1,
+    );
     const placement2_idx = try self.findPlacementIdx(doorPlace2.movedTo(direction));
-    try self.forceCreateDoorBetween(@intCast(passage_idx), @intCast(placement2_idx), doorPlace2);
+    try self.forceCreateDoorBetween(
+        &self.placements.items[passage_idx],
+        &self.placements.items[placement2_idx],
+        doorPlace2,
+    );
 
     return r1.unionWith(r2);
 }
@@ -344,15 +352,15 @@ pub fn forceCreateWallAt(self: Dungeon, place: p.Point) !void {
 }
 
 /// Removes doors, floor and walls on the passed place, and create a cell with floor.
-pub fn forceCreateDoorBetween(self: *Dungeon, placement_from_idx: u8, placement_to_idx: u8, place: p.Point) !void {
+pub fn forceCreateDoorBetween(self: *Dungeon, placement_from: *Placement, placement_to: *Placement, place: p.Point) !void {
     if (!Dungeon.REGION.containsPoint(place)) {
         return Error.PlaceOutsideTheDungeon;
     }
     self.cleanAt(place);
-    const door = Doorway{ .idx_from = placement_from_idx, .idx_to = placement_to_idx };
+    const door = Doorway{ .placement_from = placement_from, .placement_to = placement_to };
     try self.doorways.put(place, door);
-    try self.placements.items[placement_from_idx].addDoor(place);
-    try self.placements.items[placement_to_idx].addDoor(place);
+    try placement_from.addDoor(place);
+    try placement_to.addDoor(place);
     log.debug("Created {any} at {any}", .{ door, place });
 }
 
