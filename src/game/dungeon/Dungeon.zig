@@ -2,15 +2,15 @@
 /// walls and floor, list of the doors, list of the regions for rooms, and list
 /// of the passages.
 const std = @import("std");
-const builtin = @import("builtin");
-const dbg = builtin.mode == std.builtin.OptimizeMode.Debug;
 const g = @import("../game_pkg.zig");
 const p = g.primitives;
 const Rooms = @import("Rooms.zig");
 
 const log = std.log.scoped(.dungeon);
 
+/// 36
 pub const ROWS = g.DISPLAY_ROWS * 3;
+/// 120
 pub const COLS = g.DISPLAY_COLS * 3;
 pub const REGION: p.Region = .{
     .top_left = .{ .row = 1, .col = 1 },
@@ -79,7 +79,7 @@ pub const Placement = union(enum) {
 const Dungeon = @This();
 
 arena: *std.heap.ArenaAllocator,
-alloc: std.mem.Allocator,
+arena_alloc: std.mem.Allocator,
 placements: std.ArrayList(Placement),
 doorways: std.AutoHashMap(p.Point, Doorway),
 /// The bit mask of the places with floor.
@@ -94,7 +94,7 @@ pub fn init(alloc: std.mem.Allocator) !Dungeon {
     const arena_alloc = arena.allocator();
     return .{
         .arena = arena,
-        .alloc = arena_alloc,
+        .arena_alloc = arena_alloc,
         .placements = std.ArrayList(Placement).init(arena_alloc),
         .doorways = std.AutoHashMap(p.Point, Doorway).init(arena_alloc),
         .floor = try p.BitMap(ROWS, COLS).initEmpty(arena_alloc),
@@ -106,14 +106,20 @@ pub fn deinit(self: *Dungeon) void {
     const alloc = self.arena.child_allocator;
     self.arena.deinit();
     alloc.destroy(self.arena);
+    self.arena_alloc = undefined;
+    self.arena = undefined;
 }
 
-pub fn clearRetainingCapacity(self: *Dungeon) void {
+pub fn clearRetainingCapacity(self: *Dungeon) !void {
     _ = self.arena.reset(.retain_capacity);
+    self.placements = std.ArrayList(Placement).init(self.arena_alloc);
+    self.doorways = std.AutoHashMap(p.Point, Doorway).init(self.arena_alloc);
+    self.floor = try p.BitMap(ROWS, COLS).initEmpty(self.arena_alloc);
+    self.walls = try p.BitMap(ROWS, COLS).initEmpty(self.arena_alloc);
 }
 
 fn dumpToLog(self: Dungeon, stage: []const u8) void {
-    if (dbg) {
+    if (std.log.logEnabled(.debug, .dungeon)) {
         var buf: [(ROWS + 1) * COLS]u8 = undefined;
         var writer = std.io.fixedBufferStream(&buf);
         self.write(writer.writer().any()) catch unreachable;
@@ -237,13 +243,13 @@ pub fn generateAndAddRoom(self: *Dungeon, rand: std.Random, region: p.Region) !v
 }
 
 inline fn addRoom(self: *Dungeon, room_region: p.Region) !u8 {
-    try self.placements.append(.{ .room = Room.init(self.alloc, room_region) });
+    try self.placements.append(.{ .room = Room.init(self.arena_alloc, room_region) });
     self.dumpToLog(" Added room ");
     return @intCast(self.placements.items.len - 1);
 }
 
 inline fn addEmptyPassage(self: *Dungeon) !u8 {
-    try self.placements.append(.{ .passage = Passage.init(self.alloc) });
+    try self.placements.append(.{ .passage = Passage.init(self.arena_alloc) });
     return @intCast(self.placements.items.len - 1);
 }
 
@@ -253,7 +259,7 @@ pub fn createAndAddPassageBetweenRegions(
     r1: p.Region,
     r2: p.Region,
 ) !p.Region {
-    var stack_arena = std.heap.ArenaAllocator.init(self.alloc);
+    var stack_arena = std.heap.ArenaAllocator.init(self.arena_alloc);
     defer _ = stack_arena.deinit();
 
     const direction: p.Direction = if (r1.top_left.row == r2.top_left.row) .right else .down;

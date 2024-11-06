@@ -101,5 +101,5 @@ fn checkCollision(session: *g.GameSession, position: p.Point) ?c.Collision.Obsta
             },
         }
     }
-    return .wall;
+    return null;
 }

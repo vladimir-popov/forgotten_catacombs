@@ -8,13 +8,14 @@ const Logger = @import("Logger.zig");
 
 pub const std_options = .{
     .logFn = Logger.writeLog,
+    .log_scope_levels = &[_]std.log.ScopeLevel{
+        .{ .scope = .action_system, .level = .info },
+        .{ .scope = .bsp_generator, .level = .info },
+        .{ .scope = .dungeon, .level = .info },
+    },
 };
 
 const log = std.log.scoped(.main);
-
-pub const scope_levels = [_]std.log.ScopeLevel{
-    .{ .scope = .bsp_tree, .level = .info },
-};
 
 pub fn panic(
     msg: []const u8,

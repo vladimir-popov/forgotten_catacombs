@@ -32,7 +32,9 @@ pub const SPRITE_WIDTH = 10;
 pub const FONT_HEIGHT = 16;
 pub const FONT_WIDTH = 8;
 
+/// 12
 pub const DISPLAY_ROWS = DISPLAY_HEIGHT / SPRITE_HEIGHT;
+/// 40
 pub const DISPLAY_COLS = DISPLAY_WIDHT / SPRITE_WIDTH;
 
 pub const DOUBLE_PUSH_DELAY_MS = 250;
