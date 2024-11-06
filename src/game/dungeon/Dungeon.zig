@@ -79,6 +79,7 @@ pub const Placement = union(enum) {
 
 const Dungeon = @This();
 
+arena: *std.heap.ArenaAllocator,
 alloc: std.mem.Allocator,
 placements: std.ArrayList(Placement),
 doors: std.AutoHashMap(p.Point, Door),
@@ -89,33 +90,27 @@ walls: p.BitMap(ROWS, COLS),
 
 /// Creates an empty dungeon.
 pub fn init(alloc: std.mem.Allocator) !Dungeon {
+    const arena = try alloc.create(std.heap.ArenaAllocator);
+    arena.* = std.heap.ArenaAllocator.init(alloc);
+    const arena_alloc = arena.allocator();
     return .{
-        .alloc = alloc,
-        .placements = std.ArrayList(Placement).init(alloc),
-        .doors = std.AutoHashMap(p.Point, Door).init(alloc),
-        .floor = try p.BitMap(ROWS, COLS).initEmpty(alloc),
-        .walls = try p.BitMap(ROWS, COLS).initEmpty(alloc),
+        .arena = arena,
+        .alloc = arena_alloc,
+        .placements = std.ArrayList(Placement).init(arena_alloc),
+        .doors = std.AutoHashMap(p.Point, Door).init(arena_alloc),
+        .floor = try p.BitMap(ROWS, COLS).initEmpty(arena_alloc),
+        .walls = try p.BitMap(ROWS, COLS).initEmpty(arena_alloc),
     };
 }
 
 pub fn deinit(self: *Dungeon) void {
-    self.walls.deinit();
-    self.floor.deinit();
-    self.doors.deinit();
-    for (self.placements.items) |*placement| {
-        placement.deinit();
-    }
-    self.placements.deinit();
+    const alloc = self.arena.child_allocator;
+    self.arena.deinit();
+    alloc.destroy(self.arena);
 }
 
 pub fn clearRetainingCapacity(self: *Dungeon) void {
-    self.walls.clear();
-    self.floor.clear();
-    self.doors.clearRetainingCapacity();
-    for (self.placements.items) |*placement| {
-        placement.deinit();
-    }
-    self.placements.clearRetainingCapacity();
+    _ = self.arena.reset(.retain_capacity);
 }
 
 fn dumpToLog(self: Dungeon, stage: []const u8) void {
