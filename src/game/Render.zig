@@ -73,7 +73,7 @@ pub fn Render(comptime rows: u8, cols: u8) type {
         }
 
         pub fn drawDungeon(self: Self, dungeon: g.Dungeon) anyerror!void {
-            var itr = try dungeon.cellsInRegion(self.viewport.region);
+            var itr = dungeon.cellsInRegion(self.viewport.region);
             var place = self.viewport.region.top_left;
             var sprite = c.Sprite{ .codepoint = undefined };
             while (itr.next()) |cell| {

@@ -76,30 +76,17 @@ fn handleMoveAction(
 }
 
 fn checkCollision(session: *g.GameSession, position: p.Point) ?c.Collision.Obstacle {
-    if (session.level.dungeon.cellAt(position)) |cell| {
-        switch (cell) {
-            .nothing, .wall => return .wall,
-            .door => if (session.level.entityAt(position)) |entity| {
-                if (session.level.components.getForEntity(entity, c.Door)) |door|
-                    if (door.state == .closed)
-                        return .{ .closed_door = entity }
-                    else
-                        return null;
-            } else {
-                return null;
-            },
-            .floor => if (session.level.entityAt(position)) |entity| {
-                if (session.level.components.getForEntity(entity, c.Health)) |_|
-                    return .{ .enemy = entity };
-
-                if (session.level.components.getForEntity(entity, c.Ladder)) |_|
-                    return null;
-
-                return .{ .item = entity };
-            } else {
-                return null;
-            },
-        }
+    switch (session.level.dungeon.cellAt(position)) {
+        .nothing, .wall => return .wall,
+        .door => if (session.level.entityAt(position)) |entity| {
+            if (session.level.components.getForEntity(entity, c.Door)) |door|
+                if (door.state == .closed)
+                    return .{ .closed_door = entity };
+        },
+        .floor => if (session.level.entityAt(position)) |entity| {
+            if (session.level.components.getForEntity(entity, c.Health)) |_|
+                return .{ .enemy = entity };
+        },
     }
     return null;
 }

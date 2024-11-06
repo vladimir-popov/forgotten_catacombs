@@ -131,7 +131,7 @@ fn write(
     self: Dungeon,
     writer: std.io.AnyWriter,
 ) !void {
-    var itr = try self.cellsInRegion(REGION);
+    var itr = self.cellsInRegion(REGION);
     var row: usize = 1;
     var col: usize = 1;
     while (itr.next()) |cell| {
@@ -151,12 +151,12 @@ fn write(
     }
 }
 
-pub inline fn cellAt(self: Dungeon, place: p.Point) ?Cell {
+pub inline fn cellAt(self: Dungeon, place: p.Point) Cell {
     if (place.row < 1 or place.row > ROWS) {
-        return null;
+        return .nothing;
     }
     if (place.col < 1 or place.col > COLS) {
-        return null;
+        return .nothing;
     }
     if (self.walls.isSet(place.row, place.col)) {
         return .wall;
@@ -171,7 +171,7 @@ pub inline fn cellAt(self: Dungeon, place: p.Point) ?Cell {
 }
 
 pub inline fn isCellAt(self: Dungeon, place: p.Point, assumption: Cell) bool {
-    if (self.cellAt(place)) |cl| return cl == assumption else return false;
+    return self.cellAt(place) == assumption;
 }
 
 pub const CellsIterator = struct {
@@ -185,28 +185,22 @@ pub const CellsIterator = struct {
         if (!self.region.containsPoint(self.current_place))
             return null;
 
-        if (self.dungeon.cellAt(self.current_place)) |cl| {
-            self.next_place = self.current_place.movedTo(.right);
-            if (self.next_place.col > self.region.bottomRightCol()) {
-                self.next_place.col = self.region.top_left.col;
-                self.next_place.row += 1;
-            }
-            return cl;
+        const cl = self.dungeon.cellAt(self.current_place);
+        self.next_place = self.current_place.movedTo(.right);
+        if (self.next_place.col > self.region.bottomRightCol()) {
+            self.next_place.col = self.region.top_left.col;
+            self.next_place.row += 1;
         }
-        return null;
+        return cl;
     }
 };
 
-pub fn cellsInRegion(self: *const Dungeon, region: p.Region) !CellsIterator {
-    if (REGION.intersect(region)) |reg| {
-        return .{
-            .dungeon = self,
-            .region = reg,
-            .next_place = reg.top_left,
-        };
-    } else {
-        return Error.PlaceOutsideTheDungeon;
-    }
+pub fn cellsInRegion(self: *const Dungeon, region: p.Region) CellsIterator {
+    return .{
+        .dungeon = self,
+        .region = region,
+        .next_place = region.top_left,
+    };
 }
 
 pub fn cellsAround(self: Dungeon, place: p.Point) ?CellsIterator {
@@ -524,13 +518,11 @@ fn findPlaceForDoorInRegionRnd(
             },
         };
         if (self.findPlaceForDoor(side.opposite(), place, region)) |candidate| {
-            if (self.cellAt(candidate)) |cl| {
-                switch (cl) {
-                    .wall => {
-                        return candidate;
-                    },
-                    else => {},
-                }
+            switch (self.cellAt(candidate)) {
+                .wall => {
+                    return candidate;
+                },
+                else => {},
             }
         }
         // try to find in the different parts of the region:
@@ -563,28 +555,24 @@ fn findPlaceForDoorInRegionRnd(
 fn findPlaceForDoor(self: Dungeon, direction: p.Direction, start: p.Point, region: p.Region) ?p.Point {
     var place = start;
     while (region.containsPoint(place)) {
-        if (self.cellAt(place)) |cl| {
-            switch (cl) {
-                .nothing => {},
-                .wall => {
-                    if (!self.isCellAt(place.movedTo(direction), .floor)) {
-                        return null;
-                    }
-                    // check that no one door near
-                    if (self.isCellAt(place.movedTo(direction.rotatedClockwise(true)), .door)) {
-                        return null;
-                    }
-                    if (self.isCellAt(place.movedTo(direction.rotatedClockwise(false)), .door)) {
-                        return null;
-                    }
-                    return place;
-                },
-                else => {
+        switch (self.cellAt(place)) {
+            .nothing => {},
+            .wall => {
+                if (!self.isCellAt(place.movedTo(direction), .floor)) {
                     return null;
-                },
-            }
-        } else {
-            return null;
+                }
+                // check that no one door near
+                if (self.isCellAt(place.movedTo(direction.rotatedClockwise(true)), .door)) {
+                    return null;
+                }
+                if (self.isCellAt(place.movedTo(direction.rotatedClockwise(false)), .door)) {
+                    return null;
+                }
+                return place;
+            },
+            else => {
+                return null;
+            },
         }
         place.move(direction);
     }
