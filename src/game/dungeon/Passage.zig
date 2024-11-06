@@ -23,18 +23,18 @@ pub const Turn = struct {
 // the last turn - is a place where the passage is ended, the turn direction is not important there.
 turns: std.ArrayList(Turn),
 /// The indexes of the doors inside this passage. It should be at least two doors.
-doors: std.AutoHashMap(p.Point, void),
+doorways: std.AutoHashMap(p.Point, void),
 
 pub fn init(alloc: std.mem.Allocator) Passage {
     return .{
         .turns = std.ArrayList(Turn).init(alloc),
-        .doors = std.AutoHashMap(p.Point, void).init(alloc),
+        .doorways = std.AutoHashMap(p.Point, void).init(alloc),
     };
 }
 
 pub fn deinit(self: *Passage) void {
     self.turns.deinit();
-    self.doors.deinit();
+    self.doorways.deinit();
 }
 
 pub fn format(

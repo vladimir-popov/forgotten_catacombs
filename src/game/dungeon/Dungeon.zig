@@ -32,22 +32,21 @@ pub const Cell = enum {
     door,
 };
 
-pub const Door = struct {
-    pub const State = enum { opened, closed };
-
-    state: State,
+pub const Doorway = struct {
+    // will be overwritten late on level initialization
+    door_id: g.Entity = 0,
     idx_from: u8,
     idx_to: u8,
 };
 pub const Room = struct {
     region: p.Region,
-    doors: std.AutoHashMap(p.Point, void),
+    doorways: std.AutoHashMap(p.Point, void),
 
     pub fn init(alloc: std.mem.Allocator, region: p.Region) Room {
-        return .{ .region = region, .doors = std.AutoHashMap(p.Point, void).init(alloc) };
+        return .{ .region = region, .doorways = std.AutoHashMap(p.Point, void).init(alloc) };
     }
     pub fn deinit(self: *Room) void {
-        self.doors.deinit();
+        self.doorways.deinit();
     }
 };
 pub const Passage = @import("Passage.zig");
@@ -64,8 +63,8 @@ pub const Placement = union(enum) {
 
     pub fn addDoor(self: *Placement, place: p.Point) !void {
         switch (self.*) {
-            .passage => try self.passage.doors.put(place, {}),
-            .room => try self.room.doors.put(place, {}),
+            .passage => try self.passage.doorways.put(place, {}),
+            .room => try self.room.doorways.put(place, {}),
         }
     }
 
@@ -82,7 +81,7 @@ const Dungeon = @This();
 arena: *std.heap.ArenaAllocator,
 alloc: std.mem.Allocator,
 placements: std.ArrayList(Placement),
-doors: std.AutoHashMap(p.Point, Door),
+doorways: std.AutoHashMap(p.Point, Doorway),
 /// The bit mask of the places with floor.
 floor: p.BitMap(ROWS, COLS),
 /// The bit mask of the places with walls. The floor under the walls is undefined, it can be set, or can be omitted.
@@ -97,7 +96,7 @@ pub fn init(alloc: std.mem.Allocator) !Dungeon {
         .arena = arena,
         .alloc = arena_alloc,
         .placements = std.ArrayList(Placement).init(arena_alloc),
-        .doors = std.AutoHashMap(p.Point, Door).init(arena_alloc),
+        .doorways = std.AutoHashMap(p.Point, Doorway).init(arena_alloc),
         .floor = try p.BitMap(ROWS, COLS).initEmpty(arena_alloc),
         .walls = try p.BitMap(ROWS, COLS).initEmpty(arena_alloc),
     };
@@ -159,7 +158,7 @@ pub inline fn cellAt(self: Dungeon, place: p.Point) ?Cell {
     if (self.floor.isSet(place.row, place.col)) {
         return .floor;
     }
-    if (self.doors.contains(place)) {
+    if (self.doorways.contains(place)) {
         return .door;
     }
     return .nothing;
@@ -321,7 +320,7 @@ pub fn cleanAt(self: *Dungeon, place: p.Point) void {
     if (!Dungeon.REGION.containsPoint(place)) {
         return;
     }
-    if (self.doors.contains(place)) std.debug.panic("Impossible to remove the door at {any}", .{place});
+    if (self.doorways.contains(place)) std.debug.panic("Impossible to remove the door at {any}", .{place});
     self.floor.unsetAt(place);
     self.walls.unsetAt(place);
 }
@@ -350,8 +349,8 @@ pub fn forceCreateDoorBetween(self: *Dungeon, placement_from_idx: u8, placement_
         return Error.PlaceOutsideTheDungeon;
     }
     self.cleanAt(place);
-    const door = Door{ .state = .closed, .idx_from = placement_from_idx, .idx_to = placement_to_idx };
-    try self.doors.put(place, door);
+    const door = Doorway{ .idx_from = placement_from_idx, .idx_to = placement_to_idx };
+    try self.doorways.put(place, door);
     try self.placements.items[placement_from_idx].addDoor(place);
     try self.placements.items[placement_to_idx].addDoor(place);
     log.debug("Created {any} at {any}", .{ door, place });

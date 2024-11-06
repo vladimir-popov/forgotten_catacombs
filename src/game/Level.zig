@@ -82,9 +82,9 @@ pub fn generate(
     self.player = try self.addNewEntity(player, entrance_place);
     log.debug("The Player entity id is {d}", .{self.player});
 
-    var doors = self.dungeon.doors.keyIterator();
-    while (doors.next()) |at| {
-        _ = try self.addNewEntity(g.entities.ClosedDoor, at.*);
+    var doors = self.dungeon.doorways.iterator();
+    while (doors.next()) |entry| {
+        entry.value_ptr.door_id = try self.addNewEntity(g.entities.ClosedDoor, entry.key_ptr.*);
     }
 
     for (0..prng.random().uintLessThan(u8, 10) + 10) |_| {

@@ -11,7 +11,7 @@ pub const Position = struct {
 };
 
 pub const Door = struct {
-    state: g.Dungeon.Door.State,
+    state: enum { opened, closed }
 };
 
 /// Describes how and where something should look.
