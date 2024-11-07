@@ -18,7 +18,7 @@ seed: u64,
 state: State,
 /// The current game session
 game_session: ?*g.GameSession,
-/// 
+///
 events: g.events.EventBus,
 
 pub fn init(runtime: g.Runtime, seed: u64) !*Game {

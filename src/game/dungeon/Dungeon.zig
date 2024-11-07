@@ -51,6 +51,8 @@ pub const Room = struct {
 };
 pub const Passage = @import("Passage.zig");
 pub const Placement = union(enum) {
+    pub const DoorwaysIterator = std.AutoHashMap(p.Point, void).KeyIterator;
+
     passage: Passage,
     room: Room,
 
@@ -59,6 +61,13 @@ pub const Placement = union(enum) {
             .passage => |ps| return ps.contains(place),
             .room => |r| return r.region.containsPoint(place),
         }
+    }
+
+    pub inline fn doorways(self: Placement) DoorwaysIterator {
+        return switch (self) {
+            .room => |room| room.doorways.keyIterator(),
+            .passage => |ps| ps.doorways.keyIterator(),
+        };
     }
 
     pub fn addDoor(self: *Placement, place: p.Point) !void {

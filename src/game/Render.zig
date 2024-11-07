@@ -66,14 +66,14 @@ pub fn Render(comptime rows: u8, cols: u8) type {
         /// Draws dungeon, sprites, animations, and stats on the screen.
         /// Removes completed animations.
         pub fn drawScene(self: Self, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
-            try self.drawDungeon(session.level.dungeon);
+            try self.drawDungeon(session.level);
             try self.drawSprites(session.level, entity_in_focus);
             try self.drawAnimationsFrame(session, entity_in_focus);
             try self.drawInfoBar(session, entity_in_focus);
         }
 
-        pub fn drawDungeon(self: Self, dungeon: g.Dungeon) anyerror!void {
-            var itr = dungeon.cellsInRegion(self.viewport.region);
+        pub fn drawDungeon(self: Self, level: g.Level) anyerror!void {
+            var itr = level.dungeon.cellsInRegion(self.viewport.region);
             var place = self.viewport.region.top_left;
             var sprite = c.Sprite{ .codepoint = undefined };
             while (itr.next()) |cell| {
@@ -82,7 +82,7 @@ pub fn Render(comptime rows: u8, cols: u8) type {
                     .wall => '#',
                     else => ' ',
                 };
-                try self.drawSprite(sprite, place, .normal);
+                try self.drawSprite(level, sprite, place, .normal);
                 place.move(.right);
                 if (!self.viewport.region.containsPoint(place)) {
                     place.col = self.viewport.region.top_left.col;
@@ -114,12 +114,13 @@ pub fn Render(comptime rows: u8, cols: u8) type {
                     .inverted
                 else
                     .normal;
-                try self.drawSprite(tuple[2].*, tuple[1].point, mode);
+                try self.drawSprite(level, tuple[2].*, tuple[1].point, mode);
             }
         }
 
         fn drawSprite(
             self: Self,
+            level: g.Level,
             sprite: c.Sprite,
             place: p.Point,
             mode: g.Runtime.DrawingMode,
@@ -129,7 +130,10 @@ pub fn Render(comptime rows: u8, cols: u8) type {
                     .row = place.row - self.viewport.region.top_left.row,
                     .col = place.col - self.viewport.region.top_left.col,
                 };
-                try self.runtime.drawSprite(sprite.codepoint, position_on_display, mode);
+                if (level.isVisible(place))
+                    try self.runtime.drawSprite(sprite.codepoint, position_on_display, mode)
+                else
+                    try self.runtime.drawSprite(' ', position_on_display, mode);
             }
         }
 
@@ -148,6 +152,7 @@ pub fn Render(comptime rows: u8, cols: u8) type {
                         else
                             .normal;
                         try self.drawSprite(
+                            session.level,
                             .{ .codepoint = frame },
                             position.point,
                             mode,

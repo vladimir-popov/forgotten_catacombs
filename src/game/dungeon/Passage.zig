@@ -22,7 +22,6 @@ pub const Turn = struct {
 
 // the last turn - is a place where the passage is ended, the turn direction is not important there.
 turns: std.ArrayList(Turn),
-/// The indexes of the doors inside this passage. It should be at least two doors.
 doorways: std.AutoHashMap(p.Point, void),
 
 pub fn init(alloc: std.mem.Allocator) Passage {
@@ -53,10 +52,14 @@ pub fn contains(self: Passage, place: p.Point) bool {
     var prev = self.turns.items[0];
     for (self.turns.items[1..]) |curr| {
         if (prev.to_direction.isHorizontal()) {
-            if (isOnHorizontalLine(prev.place, curr.place, place))
+            if (isOnHorizontalLine(prev.place, curr.place, place) or
+                isOnHorizontalLine(prev.place.movedTo(.up), curr.place.movedTo(.up), place) or
+                isOnHorizontalLine(prev.place.movedTo(.down), curr.place.movedTo(.down), place))
                 return true;
         } else {
-            if (isOnVerticalLine(prev.place, curr.place, place))
+            if (isOnVerticalLine(prev.place, curr.place, place) or
+                isOnVerticalLine(prev.place.movedTo(.left), curr.place.movedTo(.left), place) or
+                isOnVerticalLine(prev.place.movedTo(.right), curr.place.movedTo(.right), place))
                 return true;
         }
 

@@ -138,6 +138,28 @@ pub fn entityAt(self: Level, place: p.Point) ?g.Entity {
     return null;
 }
 
+pub fn isVisible(self: Level, place: p.Point) bool {
+    if (self.player_placement.contains(place))
+        return true;
+
+    var doorways = self.player_placement.doorways();
+    while (doorways.next()) |door_place| {
+        if (self.dungeon.doorways.getPtr(door_place.*)) |doorway| {
+            // skip neighbor if the door between is closed
+            if (self.components.getForEntityUnsafe(doorway.door_id, c.Door).state == .closed)
+                continue;
+
+            const neighbor = if (doorway.placement_from == self.player_placement)
+                doorway.placement_to
+            else
+                doorway.placement_from;
+
+            return neighbor.contains(place);
+        }
+    }
+    return false;
+}
+
 fn initPlayer(self: *Level) !void {
     log.debug("Init player {d}", .{self.player});
     var itr = self.query().get2(c.Position, c.Ladder);

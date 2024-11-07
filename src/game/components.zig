@@ -10,9 +10,7 @@ pub const Position = struct {
     point: p.Point,
 };
 
-pub const Door = struct {
-    state: enum { opened, closed }
-};
+pub const Door = struct { state: enum { opened, closed } };
 
 /// Describes how and where something should look.
 pub const Sprite = struct {
