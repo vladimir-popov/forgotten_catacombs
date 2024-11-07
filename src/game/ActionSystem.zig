@@ -58,20 +58,15 @@ fn handleMoveAction(
         );
         return false;
     }
+    const event = g.events.EntityMoved{
+        .entity = entity,
+        .is_player = (entity == session.level.player),
+        .from = position.point,
+        .to = new_position,
+        .direction = move.direction,
+    };
     position.point.move(move.direction);
-    if (entity != session.level.player) return true;
-
-    // keep player on the screen:
-    const viewport = &session.game.render.viewport;
-    const inner_region = viewport.innerRegion();
-    if (move.direction == .up and position.point.row < inner_region.top_left.row)
-        viewport.move(move.direction);
-    if (move.direction == .down and position.point.row > inner_region.bottomRightRow())
-        viewport.move(move.direction);
-    if (move.direction == .left and position.point.col < inner_region.top_left.col)
-        viewport.move(move.direction);
-    if (move.direction == .right and position.point.col > inner_region.bottomRightCol())
-        viewport.move(move.direction);
+    try session.game.events.notify(event);
     return true;
 }
 

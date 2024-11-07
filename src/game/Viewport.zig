@@ -21,6 +21,26 @@ pub fn init(rows: u8, cols: u8) Viewport {
     };
 }
 
+pub fn subscriber(self: *Viewport) g.events.Subscriber(g.events.EntityMoved) {
+    return .{ .context = self, .onEvent = onEntityMoved };
+}
+
+fn onEntityMoved(ptr: *anyopaque, event: g.events.EntityMoved) !void {
+    if (!event.is_player) return;
+    const self: *Viewport = @ptrCast(@alignCast(ptr));
+
+    // keep player on the screen:
+    const inner_region = self.innerRegion();
+    if (event.direction == .up and event.to.row < inner_region.top_left.row)
+        self.move(event.direction);
+    if (event.direction == .down and event.to.row > inner_region.bottomRightRow())
+        self.move(event.direction);
+    if (event.direction == .left and event.to.col < inner_region.top_left.col)
+        self.move(event.direction);
+    if (event.direction == .right and event.to.col > inner_region.bottomRightCol())
+        self.move(event.direction);
+}
+
 /// Moves the screen to have the point in the center.
 /// The point is some place in the dungeon.
 pub fn centeredAround(self: *Viewport, point: p.Point) void {

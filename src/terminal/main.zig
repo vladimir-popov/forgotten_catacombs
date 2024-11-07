@@ -44,9 +44,9 @@ pub fn main() !void {
 
     var runtime = try TtyRuntime.TtyRuntime(g.DISPLAY_ROWS + 2, g.DISPLAY_COLS + 2).init(alloc, true, true, use_cheats);
     defer runtime.deinit();
-    var game = try g.Game.init(runtime.runtime(), seed);
-    defer game.deinit();
-    runtime.run(&game) catch |e| {
+    const game = try g.Game.init(runtime.runtime(), seed);
+    defer game.destroy();
+    runtime.run(game) catch |e| {
         std.debug.panic("Fatal error {any}", .{e});
     };
 }

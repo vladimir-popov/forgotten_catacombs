@@ -18,21 +18,28 @@ seed: u64,
 state: State,
 /// The current game session
 game_session: ?*g.GameSession,
+/// 
+events: g.events.EventBus,
 
-pub fn init(runtime: g.Runtime, seed: u64) !Game {
-    var self = Game{
+pub fn init(runtime: g.Runtime, seed: u64) !*Game {
+    var self = try runtime.alloc.create(Game);
+    self.* = .{
         .runtime = runtime,
         .render = g.Render.init(runtime),
         .seed = seed,
         .state = .welcome,
         .game_session = null,
+        .events = g.events.EventBus.init(runtime.alloc),
     };
+    try self.events.subscribeOn(g.events.EntityMoved, self.render.viewport.subscriber());
     try self.welcome();
     return self;
 }
 
-pub fn deinit(self: Game) void {
+pub fn destroy(self: *Game) void {
     if (self.game_session) |session| session.destroy();
+    self.events.deinit();
+    self.runtime.alloc.destroy(self);
 }
 
 fn goToMainMenu(ptr: ?*anyopaque) callconv(.C) void {
