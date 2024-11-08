@@ -8,7 +8,7 @@ const p = g.primitives;
 
 const BspDungeonGenerator = @import("dungeon/BspDungeonGenerator.zig");
 
-const log = std.log.scoped(.Level);
+const log = std.log.scoped(.level);
 
 const Error = error{RoomWasNotFound};
 
@@ -26,7 +26,7 @@ depth: u8,
 next_entity: g.Entity = 0,
 /// The entity id of the player
 player: g.Entity = undefined,
-player_placement: *g.Dungeon.Placement = undefined,
+player_placement: *const g.Dungeon.Placement = undefined,
 
 pub fn init(alloc: std.mem.Allocator, depth: u8) !Level {
     return .{
@@ -68,7 +68,7 @@ pub fn generate(
     log.debug("The dungeon has been generated", .{});
 
     self.next_entity = this_ladder + 1;
-    var entrance_place: struct { *g.Dungeon.Placement, p.Point } = undefined;
+    var entrance_place: struct { *const g.Dungeon.Placement, p.Point } = undefined;
     switch (direction) {
         .down => {
             entrance_place = try self.addEntrance(prng.random(), this_ladder, from_ladder);
@@ -81,7 +81,7 @@ pub fn generate(
     }
 
     self.player = try self.addNewEntity(player, entrance_place[1]);
-    self.player_placement = entrance_place[0];
+    try self.setPlacementWithPlayer(entrance_place[0]);
     log.debug("The Player entity id is {d}", .{self.player});
 
     var doors = self.dungeon.doorways.iterator();
@@ -138,26 +138,56 @@ pub fn entityAt(self: Level, place: p.Point) ?g.Entity {
     return null;
 }
 
-pub fn isVisible(self: Level, place: p.Point) bool {
+pub fn isVisible(self: Level, place: p.Point) g.render.Visibility {
     if (self.player_placement.contains(place))
-        return true;
+        return .visible;
 
     var doorways = self.player_placement.doorways();
     while (doorways.next()) |door_place| {
         if (self.dungeon.doorways.getPtr(door_place.*)) |doorway| {
-            // skip neighbor if the door between is closed
+            // skip the neighbor if the door between is closed
             if (self.components.getForEntityUnsafe(doorway.door_id, c.Door).state == .closed)
                 continue;
 
-            const neighbor = if (doorway.placement_from == self.player_placement)
-                doorway.placement_to
-            else
-                doorway.placement_from;
-
-            return neighbor.contains(place);
+            if (doorway.oppositePlacement(self.player_placement).contains(place))
+                return .visible;
         }
     }
-    return false;
+    if (self.map.visited_places.isSet(place.row, place.col))
+        return .known;
+
+    return .invisible;
+}
+
+pub fn entityMovedSubscriber(self: *Level) g.events.Subscriber(g.events.EntityMoved) {
+    return .{ .context = self, .onEvent = updatePlacement };
+}
+
+fn updatePlacement(ptr: *anyopaque, event: g.events.EntityMoved) !void {
+    if (!event.is_player) return;
+
+    const self: *Level = @ptrCast(@alignCast(ptr));
+
+    if (self.player_placement.contains(event.moved_to)) return;
+
+    if (self.dungeon.doorways.getPtr(event.moved_from)) |doorway| {
+        const placement = doorway.oppositePlacement(self.player_placement);
+        std.debug.assert(placement.contains(event.moved_to));
+        try self.setPlacementWithPlayer(placement);
+    }
+}
+
+pub fn setPlacementWithPlayer(self: *Level, placement: *const g.Dungeon.Placement) !void {
+    log.debug("New placement with player: {any}", .{placement});
+    self.player_placement = placement;
+    try self.map.addVisitedPlacement(placement);
+    var doorways = self.player_placement.doorways();
+    while (doorways.next()) |door_place| {
+        if (self.dungeon.doorways.getPtr(door_place.*)) |doorway| {
+            if (self.components.getForEntity(doorway.door_id, c.Door)) |door| if (door.state == .opened)
+                try self.map.addVisitedPlacement(doorway.oppositePlacement(self.player_placement));
+        }
+    }
 }
 
 fn initPlayer(self: *Level) !void {
@@ -193,7 +223,7 @@ fn addEntrance(
     rand: std.Random,
     this_ladder: g.Entity,
     that_ladder: ?g.Entity,
-) !struct { *g.Dungeon.Placement, p.Point } {
+) !struct { *const g.Dungeon.Placement, p.Point } {
     try self.entities.append(this_ladder);
     try self.components.setComponentsToEntity(this_ladder, g.entities.Entrance(this_ladder, that_ladder));
     const firstRoom = try getFirstRoom(self.dungeon);
@@ -214,8 +244,8 @@ fn addExit(self: *Level, rand: std.Random, this_ladder: g.Entity, that_ladder: ?
     std.log.debug("Created exit {any} at {any}", .{ this_ladder, place });
 }
 
-fn getFirstRoom(dungeon: g.Dungeon) Error!*g.Dungeon.Placement {
-    for (dungeon.placements.items) |*placement| {
+fn getFirstRoom(dungeon: g.Dungeon) Error!*const g.Dungeon.Placement {
+    for (dungeon.placements.items) |placement| {
         switch (placement.*) {
             .room => return placement,
             else => {},
@@ -224,11 +254,11 @@ fn getFirstRoom(dungeon: g.Dungeon) Error!*g.Dungeon.Placement {
     return Error.RoomWasNotFound;
 }
 
-fn getLastRoom(dungeon: g.Dungeon) Error!*g.Dungeon.Placement {
+fn getLastRoom(dungeon: g.Dungeon) Error!*const g.Dungeon.Placement {
     var i: usize = dungeon.placements.items.len - 1;
     while (i >= 0) : (i -= 1) {
-        switch (dungeon.placements.items[i]) {
-            .room => return &dungeon.placements.items[i],
+        switch (dungeon.placements.items[i].*) {
+            .room => return dungeon.placements.items[i],
             else => {},
         }
     }
@@ -271,7 +301,7 @@ fn randomEmptyPlace(self: *Level, rand: std.Random, clarification: PlaceClarific
 
 fn randomPlace(self: *Level, rand: std.Random) p.Point {
     const placement = self.dungeon.placements.items[rand.uintLessThan(usize, self.dungeon.placements.items.len)];
-    switch (placement) {
+    switch (placement.*) {
         .room => |room| return randomPlaceInRegion(room.region, rand),
         .passage => |passage| return passage.randomPlace(rand),
     }

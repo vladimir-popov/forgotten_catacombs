@@ -18,6 +18,10 @@ pub const Turn = struct {
 
         try writer.print("Turn(at {any} to {s})", .{ self.place, @tagName(self.to_direction) });
     }
+
+    pub fn corner(self: Turn, from_direction: p.Direction) p.Point {
+        return self.place.movedTo(from_direction).movedTo(self.to_direction.opposite());
+    }
 };
 
 // the last turn - is a place where the passage is ended, the turn direction is not important there.
@@ -45,13 +49,21 @@ pub fn format(
     _ = fmt;
     _ = options;
 
-    try writer.print("Passage({any})", .{self.turns.items});
+    try writer.print("Passage({any}; doorways: ", .{self.turns.items});
+    var itr = self.doorways.keyIterator();
+    while (itr.next()) |doorway|
+        try writer.print("{any};", .{doorway.*});
+    try writer.print(")", .{});
 }
 
-pub fn contains(self: Passage, place: p.Point) bool {
+/// Returns true if the passed place is inside this passage, or on the wall of
+/// this passage.
+pub fn isPartOfThisPassage(self: Passage, place: p.Point) bool {
     var prev = self.turns.items[0];
     for (self.turns.items[1..]) |curr| {
-        if (prev.to_direction.isHorizontal()) {
+        if (curr.corner(prev.to_direction).eql(place)) {
+            return true;
+        } else if (prev.to_direction.isHorizontal()) {
             if (isOnHorizontalLine(prev.place, curr.place, place) or
                 isOnHorizontalLine(prev.place.movedTo(.up), curr.place.movedTo(.up), place) or
                 isOnHorizontalLine(prev.place.movedTo(.down), curr.place.movedTo(.down), place))

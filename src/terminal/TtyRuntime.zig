@@ -219,7 +219,7 @@ pub fn TtyRuntime(comptime ROWS: u8, comptime COLS: u8) type {
             ptr: *anyopaque,
             symbol: u21,
             position_on_display: p.Point,
-            mode: g.Runtime.DrawingMode,
+            mode: g.render.DrawingMode,
         ) !void {
             const self: *Self = @ptrCast(@alignCast(ptr));
             self.buffer.setSymbol(symbol, position_on_display.row + 1, position_on_display.col + 1, mode);
@@ -229,7 +229,7 @@ pub fn TtyRuntime(comptime ROWS: u8, comptime COLS: u8) type {
             ptr: *anyopaque,
             text: []const u8,
             position_on_display: p.Point,
-            mode: g.Runtime.DrawingMode,
+            mode: g.render.DrawingMode,
         ) !void {
             const self: *Self = @ptrCast(@alignCast(ptr));
             self.buffer.setAsciiText(text, position_on_display.row + 1, position_on_display.col + 1, mode);

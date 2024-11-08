@@ -25,7 +25,8 @@ const p = g.primitives;
 
 const log = std.log.scoped(.render);
 
-const DrawingMode = g.Runtime.DrawingMode;
+pub const DrawingMode = enum { normal, inverted };
+pub const Visibility = enum { visible, known, invisible };
 const TextAlign = enum { center, left, right };
 
 // we do not use global constants here to be able to reuse render in the
@@ -42,11 +43,16 @@ pub fn Render(comptime rows: u8, cols: u8) type {
         runtime: g.Runtime,
         /// Visible area
         viewport: g.Viewport,
+        /// Custom function to decide should the place be drawn or not.
+        /// Usually provided by the Level, but the DungeonGenerator ha the different implementation
+        /// to make whole dungeon visible.
+        isVisible: *const fn (level: g.Level, place: p.Point) Visibility,
 
-        pub fn init(runtime: g.Runtime) Self {
+        pub fn init(runtime: g.Runtime, is_visible: *const fn (level: g.Level, place: p.Point) Visibility) Self {
             return .{
                 .runtime = runtime,
                 .viewport = g.Viewport.init(ROWS - 2, COLS),
+                .isVisible = is_visible,
             };
         }
 
@@ -110,7 +116,7 @@ pub fn Render(comptime rows: u8, cols: u8) type {
                 }
             }
             while (visible.removeOrNull()) |tuple| {
-                const mode: g.Runtime.DrawingMode = if (entity_in_focus == tuple[0])
+                const mode: g.render.DrawingMode = if (entity_in_focus == tuple[0])
                     .inverted
                 else
                     .normal;
@@ -123,17 +129,24 @@ pub fn Render(comptime rows: u8, cols: u8) type {
             level: g.Level,
             sprite: c.Sprite,
             place: p.Point,
-            mode: g.Runtime.DrawingMode,
+            mode: g.render.DrawingMode,
         ) anyerror!void {
             if (self.viewport.region.containsPoint(place)) {
                 const position_on_display = p.Point{
                     .row = place.row - self.viewport.region.top_left.row,
                     .col = place.col - self.viewport.region.top_left.col,
                 };
-                if (level.isVisible(place))
-                    try self.runtime.drawSprite(sprite.codepoint, position_on_display, mode)
-                else
-                    try self.runtime.drawSprite(' ', position_on_display, mode);
+                switch (self.isVisible(level, place)) {
+                    .invisible => try self.runtime.drawSprite(' ', position_on_display, mode),
+                    .visible => try self.runtime.drawSprite(sprite.codepoint, position_on_display, mode),
+                    .known => {
+                        const codepoint: u21 = switch (sprite.codepoint) {
+                            '#', ' ', '<', '>', '\'', '+' => sprite.codepoint,
+                            else => '.',
+                        };
+                        try self.runtime.drawSprite(codepoint, position_on_display, mode);
+                    },
+                }
             }
         }
 
@@ -280,7 +293,7 @@ pub fn Render(comptime rows: u8, cols: u8) type {
             comptime max_length: u8,
             text: []const u8,
             absolut_position: p.Point,
-            mode: g.Runtime.DrawingMode,
+            mode: g.render.DrawingMode,
             aln: TextAlign,
         ) !void {
             const text_length = @min(max_length, text.len);

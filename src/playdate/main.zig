@@ -37,7 +37,7 @@ var playdate_log_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) voi
 
 pub const GlobalState = struct {
     runtime: PlaydateRuntime,
-    game: g.Game,
+    game: *g.Game,
 };
 
 pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent, arg: u32) callconv(.C) c_int {

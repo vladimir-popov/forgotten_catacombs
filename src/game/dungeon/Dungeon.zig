@@ -37,6 +37,15 @@ pub const Doorway = struct {
     door_id: g.Entity = 0,
     placement_from: *Placement,
     placement_to: *Placement,
+
+    pub inline fn oppositePlacement(self: Doorway, placement: *const Placement) *Placement {
+        if (self.placement_from == placement)
+            return self.placement_to
+        else {
+            std.debug.assert(self.placement_to == placement);
+            return self.placement_from;
+        }
+    }
 };
 pub const Room = struct {
     region: p.Region,
@@ -48,6 +57,22 @@ pub const Room = struct {
     pub fn deinit(self: *Room) void {
         self.doorways.deinit();
     }
+
+    pub fn format(
+        self: Room,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+
+        try writer.print("Room({any}; doorways: ", .{self.region});
+        var itr = self.doorways.keyIterator();
+        while (itr.next()) |doorway|
+            try writer.print("{any};", .{doorway.*});
+        try writer.print(")", .{});
+    }
 };
 pub const Passage = @import("Passage.zig");
 pub const Placement = union(enum) {
@@ -58,7 +83,7 @@ pub const Placement = union(enum) {
 
     pub fn contains(self: Placement, place: p.Point) bool {
         switch (self) {
-            .passage => |ps| return ps.contains(place),
+            .passage => |ps| return ps.isPartOfThisPassage(place),
             .room => |r| return r.region.containsPoint(place),
         }
     }
@@ -89,7 +114,9 @@ const Dungeon = @This();
 
 arena: *std.heap.ArenaAllocator,
 arena_alloc: std.mem.Allocator,
-placements: std.ArrayList(Placement),
+/// The index over all placements in the dungeon
+placements: std.ArrayList(*Placement),
+/// Index of all doorways by their place
 doorways: std.AutoHashMap(p.Point, Doorway),
 /// The bit mask of the places with floor.
 floor: p.BitMap(ROWS, COLS),
@@ -104,7 +131,7 @@ pub fn init(alloc: std.mem.Allocator) !Dungeon {
     return .{
         .arena = arena,
         .arena_alloc = arena_alloc,
-        .placements = std.ArrayList(Placement).init(arena_alloc),
+        .placements = std.ArrayList(*Placement).init(arena_alloc),
         .doorways = std.AutoHashMap(p.Point, Doorway).init(arena_alloc),
         .floor = try p.BitMap(ROWS, COLS).initEmpty(arena_alloc),
         .walls = try p.BitMap(ROWS, COLS).initEmpty(arena_alloc),
@@ -121,7 +148,7 @@ pub fn deinit(self: *Dungeon) void {
 
 pub fn clearRetainingCapacity(self: *Dungeon) !void {
     _ = self.arena.reset(.retain_capacity);
-    self.placements = std.ArrayList(Placement).init(self.arena_alloc);
+    self.placements = std.ArrayList(*Placement).init(self.arena_alloc);
     self.doorways = std.AutoHashMap(p.Point, Doorway).init(self.arena_alloc);
     self.floor = try p.BitMap(ROWS, COLS).initEmpty(self.arena_alloc);
     self.walls = try p.BitMap(ROWS, COLS).initEmpty(self.arena_alloc);
@@ -245,15 +272,19 @@ pub fn generateAndAddRoom(self: *Dungeon, rand: std.Random, region: p.Region) !v
     _ = try self.addRoom(room_region);
 }
 
-inline fn addRoom(self: *Dungeon, room_region: p.Region) !u8 {
-    try self.placements.append(.{ .room = Room.init(self.arena_alloc, room_region) });
+inline fn addRoom(self: *Dungeon, room_region: p.Region) !*Placement {
+    const pl = try self.arena_alloc.create(Placement);
+    pl.* = .{ .room = Room.init(self.arena_alloc, room_region) };
+    try self.placements.append(pl);
     self.dumpToLog(" Added room ");
-    return @intCast(self.placements.items.len - 1);
+    return pl;
 }
 
-inline fn addEmptyPassage(self: *Dungeon) !u8 {
-    try self.placements.append(.{ .passage = Passage.init(self.arena_alloc) });
-    return @intCast(self.placements.items.len - 1);
+inline fn addEmptyPassage(self: *Dungeon) !*Placement {
+    const pl = try self.arena_alloc.create(Placement);
+    pl.* = .{ .passage = Passage.init(self.arena_alloc) };
+    try self.placements.append(pl);
+    return pl;
 }
 
 pub fn createAndAddPassageBetweenRegions(
@@ -271,12 +302,10 @@ pub fn createAndAddPassageBetweenRegions(
     const doorPlace2 = try self.findPlaceForDoorInRegionRnd(&stack_arena, rand, r2, direction.opposite()) orelse
         return Error.NoSpaceForDoor;
 
-    const passage_idx = try self.addEmptyPassage();
-    errdefer _ = self.placements.orderedRemove(self.placements.items.len - 1);
-    const passage = &self.placements.items[passage_idx].passage;
+    const passage = try self.addEmptyPassage();
 
     log.debug("Found places for doors: {any}; {any}. Prepare the passage between them...", .{ doorPlace1, doorPlace2 });
-    _ = try passage.turnAt(doorPlace1, direction);
+    _ = try passage.passage.turnAt(doorPlace1, direction);
     if (doorPlace1.row != doorPlace2.row and doorPlace1.col != doorPlace2.col) {
         // intersection of the passage from the door 1 and region 1
         var middle1: p.Point = if (direction.isHorizontal())
@@ -300,32 +329,32 @@ pub fn createAndAddPassageBetweenRegions(
             middle2 = places[1];
         }
 
-        _ = try passage.turnToPoint(middle1, middle2);
-        _ = try passage.turnToPoint(middle2, doorPlace2);
+        _ = try passage.passage.turnToPoint(middle1, middle2);
+        _ = try passage.passage.turnToPoint(middle2, doorPlace2);
     }
-    _ = try passage.turnAt(doorPlace2, direction);
+    _ = try passage.passage.turnAt(doorPlace2, direction);
     log.debug("The passage was prepared: {any}", .{passage});
 
-    try self.digPassage(passage);
-    const placement1_idx = try self.findPlacementIdx(doorPlace1.movedTo(direction.opposite()));
+    try self.digPassage(passage.passage);
+    const placement1 = try self.findPlacement(doorPlace1.movedTo(direction.opposite()));
     try self.forceCreateDoorBetween(
-        &self.placements.items[passage_idx],
-        &self.placements.items[placement1_idx],
+        passage,
+        placement1,
         doorPlace1,
     );
-    const placement2_idx = try self.findPlacementIdx(doorPlace2.movedTo(direction));
+    const placement2 = try self.findPlacement(doorPlace2.movedTo(direction));
     try self.forceCreateDoorBetween(
-        &self.placements.items[passage_idx],
-        &self.placements.items[placement2_idx],
+        passage,
+        placement2,
         doorPlace2,
     );
 
     return r1.unionWith(r2);
 }
 
-fn findPlacementIdx(self: Dungeon, place: p.Point) !u8 {
-    for (self.placements.items, 0..) |placement, idx| {
-        if (placement.contains(place)) return @intCast(idx);
+fn findPlacement(self: Dungeon, place: p.Point) !*Placement {
+    for (self.placements.items) |placement| {
+        if (placement.contains(place)) return placement;
     }
     log.err("No one placement was found with {any}", .{place});
     self.dumpToLog(" Not found placement ");
@@ -361,7 +390,12 @@ pub fn forceCreateWallAt(self: Dungeon, place: p.Point) !void {
 }
 
 /// Removes doors, floor and walls on the passed place, and create a cell with floor.
-pub fn forceCreateDoorBetween(self: *Dungeon, placement_from: *Placement, placement_to: *Placement, place: p.Point) !void {
+pub fn forceCreateDoorBetween(
+    self: *Dungeon,
+    placement_from: *Placement,
+    placement_to: *Placement,
+    place: p.Point,
+) !void {
     if (!Dungeon.REGION.containsPoint(place)) {
         return Error.PlaceOutsideTheDungeon;
     }
@@ -462,7 +496,7 @@ fn isFreeLine(self: Dungeon, from: p.Point, to: p.Point) bool {
     return true;
 }
 
-fn digPassage(self: *Dungeon, passage: *const Passage) !void {
+fn digPassage(self: *Dungeon, passage: Passage) !void {
     var prev: Passage.Turn = passage.turns.items[0];
     for (passage.turns.items[1 .. passage.turns.items.len - 1]) |turn| {
         try self.dig(prev.place, turn.place, prev.to_direction);

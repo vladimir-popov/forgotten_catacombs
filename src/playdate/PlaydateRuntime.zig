@@ -204,7 +204,7 @@ fn clearDisplay(ptr: *anyopaque) anyerror!void {
     self.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
 }
 
-fn drawSprite(ptr: *anyopaque, symbol: u21, position_on_display: p.Point, mode: g.Runtime.DrawingMode) !void {
+fn drawSprite(ptr: *anyopaque, symbol: u21, position_on_display: p.Point, mode: g.render.DrawingMode) !void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     if (symbol == '═') {
         self.drawHorizontalBorderSymbol(position_on_display.row, position_on_display.col);
@@ -226,7 +226,7 @@ fn drawHorizontalBorderSymbol(self: *Self, row: u8, col: u8) void {
     self.playdate.graphics.drawLine(x, y + 2, x + g.SPRITE_WIDTH, y + 2, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
 }
 
-fn drawText(ptr: *anyopaque, text: []const u8, position_on_display: p.Point, mode: g.Runtime.DrawingMode) !void {
+fn drawText(ptr: *anyopaque, text: []const u8, position_on_display: p.Point, mode: g.render.DrawingMode) !void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     // choose the font for text:
     self.playdate.graphics.setFont(self.text_font);
@@ -241,7 +241,7 @@ fn drawText(ptr: *anyopaque, text: []const u8, position_on_display: p.Point, mod
 inline fn drawTextOnDisplay(
     self: *Self,
     text: []const u8,
-    mode: g.Runtime.DrawingMode,
+    mode: g.render.DrawingMode,
     x: c_int,
     y: c_int,
 ) !void {

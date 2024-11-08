@@ -19,6 +19,7 @@ pub fn doActions(session: *g.GameSession) !void {
             },
             .open => |door| {
                 try session.level.components.setComponentsToEntity(door, g.entities.OpenedDoor);
+                try session.level.setPlacementWithPlayer(session.level.player_placement);
             },
             .close => |door| {
                 try session.level.components.setComponentsToEntity(door, g.entities.ClosedDoor);
@@ -61,8 +62,8 @@ fn handleMoveAction(
     const event = g.events.EntityMoved{
         .entity = entity,
         .is_player = (entity == session.level.player),
-        .from = position.point,
-        .to = new_position,
+        .moved_from = position.point,
+        .moved_to = new_position,
         .direction = move.direction,
     };
     position.point.move(move.direction);

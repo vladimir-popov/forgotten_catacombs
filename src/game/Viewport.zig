@@ -31,13 +31,13 @@ fn onEntityMoved(ptr: *anyopaque, event: g.events.EntityMoved) !void {
 
     // keep player on the screen:
     const inner_region = self.innerRegion();
-    if (event.direction == .up and event.to.row < inner_region.top_left.row)
+    if (event.direction == .up and event.moved_to.row < inner_region.top_left.row)
         self.move(event.direction);
-    if (event.direction == .down and event.to.row > inner_region.bottomRightRow())
+    if (event.direction == .down and event.moved_to.row > inner_region.bottomRightRow())
         self.move(event.direction);
-    if (event.direction == .left and event.to.col < inner_region.top_left.col)
+    if (event.direction == .left and event.moved_to.col < inner_region.top_left.col)
         self.move(event.direction);
-    if (event.direction == .right and event.to.col > inner_region.bottomRightCol())
+    if (event.direction == .right and event.moved_to.col > inner_region.bottomRightCol())
         self.move(event.direction);
 }
 

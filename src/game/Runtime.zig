@@ -7,8 +7,6 @@ const log = std.log.scoped(.runtime);
 
 const Runtime = @This();
 
-pub const DrawingMode = enum { normal, inverted };
-
 pub const MenuItemCallback = *const fn (userdata: ?*anyopaque) callconv(.C) void;
 
 const VTable = struct {
@@ -25,13 +23,13 @@ const VTable = struct {
         context: *anyopaque,
         symbol: u21,
         position_on_display: p.Point,
-        mode: DrawingMode,
+        mode: g.render.DrawingMode,
     ) anyerror!void,
     drawText: *const fn (
         context: *anyopaque,
         text: []const u8,
         position_on_display: p.Point,
-        mode: DrawingMode,
+        mode: g.render.DrawingMode,
     ) anyerror!void,
     currentMillis: *const fn (context: *anyopaque) c_uint,
     getCheat: *const fn (context: *anyopaque) ?g.Cheat,
@@ -72,10 +70,10 @@ pub inline fn clearDisplay(self: Runtime) !void {
     try self.vtable.clearDisplay(self.context);
 }
 
-pub fn drawSprite(self: Runtime, symbol: u21, absolut_position: p.Point, mode: g.Runtime.DrawingMode) !void {
+pub fn drawSprite(self: Runtime, symbol: u21, absolut_position: p.Point, mode: g.render.DrawingMode) !void {
     try self.vtable.drawSprite(self.context, symbol, absolut_position, mode);
 }
 
-pub fn drawText(self: Runtime, text: []const u8, absolut_position: p.Point, mode: g.Runtime.DrawingMode) !void {
+pub fn drawText(self: Runtime, text: []const u8, absolut_position: p.Point, mode: g.render.DrawingMode) !void {
     try self.vtable.drawText(self.context, text, absolut_position, mode);
 }

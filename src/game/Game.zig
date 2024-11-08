@@ -25,7 +25,7 @@ pub fn init(runtime: g.Runtime, seed: u64) !*Game {
     var self = try runtime.alloc.create(Game);
     self.* = .{
         .runtime = runtime,
-        .render = g.Render.init(runtime),
+        .render = g.Render.init(runtime, g.Level.isVisible),
         .seed = seed,
         .state = .welcome,
         .game_session = null,

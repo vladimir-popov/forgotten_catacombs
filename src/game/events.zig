@@ -9,8 +9,8 @@ const log = std.log.scoped(.event_bus);
 pub const EntityMoved = struct {
     entity: g.Entity,
     is_player: bool,
-    from: p.Point,
-    to: p.Point,
+    moved_from: p.Point,
+    moved_to: p.Point,
     direction: p.Direction,
 };
 
@@ -95,8 +95,8 @@ test "publish/consume" {
     const event = EntityMoved{
         .entity = 1,
         .is_player = true,
-        .from = .{ .row = 1, .col = 1 },
-        .to = .{ .row = 1, .col = 2 },
+        .moved_from = .{ .row = 1, .col = 1 },
+        .moved_to = .{ .row = 1, .col = 2 },
         .direction = .right,
     };
 

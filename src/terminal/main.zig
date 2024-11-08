@@ -6,12 +6,11 @@ const Args = @import("Args.zig");
 const TtyRuntime = @import("TtyRuntime.zig");
 const Logger = @import("Logger.zig");
 
-pub const std_options = .{
+pub const std_options: std.Options = .{
     .logFn = Logger.writeLog,
+    .log_level = .info,
     .log_scope_levels = &[_]std.log.ScopeLevel{
-        .{ .scope = .action_system, .level = .info },
-        .{ .scope = .bsp_generator, .level = .info },
-        .{ .scope = .dungeon, .level = .info },
+        .{ .scope = .level, .level = .debug },
     },
 };
 
@@ -27,8 +26,6 @@ pub fn panic(
 }
 
 pub fn main() !void {
-    var args = std.process.args();
-    _ = args.next();
     const seed = try Args.int(u64, "seed") orelse std.crypto.random.int(u64);
     log.info("\n====================\nSeed of the game is {d}\n====================", .{seed});
 

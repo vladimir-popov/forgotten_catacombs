@@ -1,5 +1,6 @@
 const std = @import("std");
 const g = @import("game");
+const p = g.primitives;
 const tty = @import("tty.zig");
 
 const Logger = @import("Logger.zig");
@@ -42,13 +43,17 @@ const DungeonsGenerator = struct {
     pub fn init(runtime: g.Runtime) !DungeonsGenerator {
         return .{
             .runtime = runtime,
-            .render = g.render.Render(g.Dungeon.ROWS, g.Dungeon.COLS).init(runtime),
+            .render = g.render.Render(g.Dungeon.ROWS, g.Dungeon.COLS).init(runtime, isVisible),
             .level = try g.Level.init(runtime.alloc, 0),
         };
     }
 
     pub fn deinit(self: *DungeonsGenerator) void {
         self.level.deinit();
+    }
+
+    fn isVisible(_: g.Level, _: p.Point) g.render.Visibility {
+        return .visible;
     }
 
     fn generate(self: *DungeonsGenerator, seed: u64) !void {
@@ -73,7 +78,7 @@ const DungeonsGenerator = struct {
 
     fn draw(self: *DungeonsGenerator) !void {
         if (self.draw_dungeon) {
-            try self.render.drawDungeon(self.level.dungeon);
+            try self.render.drawDungeon(self.level);
             try self.render.drawSprites(self.level, null);
         } else {}
     }

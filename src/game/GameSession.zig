@@ -46,6 +46,7 @@ pub fn createNew(game: *g.Game, seed: u64) !*GameSession {
         .explore_mode = try ExploreMode.init(session),
         .level = try g.Level.init(game.runtime.alloc, 0),
     };
+    try game.events.subscribeOn(g.events.EntityMoved, session.level.entityMovedSubscriber());
     const entrance = 0;
     try session.level.generate(
         seed + session.level.depth,

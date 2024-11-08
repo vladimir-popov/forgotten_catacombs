@@ -7,7 +7,7 @@ pub const Player = c.Components{
     .sprite = .{ .codepoint = '@', .z_order = 3 },
     .description = .{ .name = "You" },
     .health = .{ .max = 100, .current = 30 },
-    .melee_weapon = .{ .max_damage = 3, .move_points = 10 },
+    .melee_weapon = .{ .max_damage = 3, .move_points = 5 },
     .speed = .{ .move_points = 10 },
 };
 
@@ -44,6 +44,6 @@ pub const Rat = c.Components{
     .sprite = .{ .codepoint = 'r', .z_order = 3 },
     .description = .{ .name = "Rat" },
     .health = .{ .max = 10, .current = 10 },
-    .melee_weapon = .{ .max_damage = 3, .move_points = 5 },
+    .melee_weapon = .{ .max_damage = 3, .move_points = 10 },
     .speed = .{ .move_points = 10 },
 };
