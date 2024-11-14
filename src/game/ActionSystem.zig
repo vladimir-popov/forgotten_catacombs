@@ -67,7 +67,7 @@ fn handleMoveAction(
         .direction = move.direction,
     };
     position.point.move(move.direction);
-    try session.game.events.notify(event);
+    try session.events.notify(event);
     return true;
 }
 

@@ -24,28 +24,36 @@ pub fn Subscriber(comptime Event: type) type {
 }
 
 pub const EventBus = struct {
-    subscribers: Subscribers = undefined,
+    alloc: std.mem.Allocator,
+    subscribers: *Subscribers,
 
-    pub fn init(alloc: std.mem.Allocator) EventBus {
-        var self = EventBus{};
+    pub fn init(alloc: std.mem.Allocator) !EventBus {
+        var self = EventBus{ .alloc = alloc, .subscribers = try alloc.create(Subscribers) };
         inline for (@typeInfo(Subscribers).Struct.fields) |field| {
             @field(self.subscribers, field.name) = field.type.init(alloc);
         }
         return self;
     }
 
-    pub fn deinit(self: EventBus) void {
+    pub fn deinit(self: *EventBus) void {
         inline for (@typeInfo(Subscribers).Struct.fields) |field| {
             @field(self.subscribers, field.name).deinit();
         }
+        self.alloc.destroy(self.subscribers);
     }
 
-    pub fn subscribeOn(self: *EventBus, comptime Event: type, subscriber: Subscriber(Event)) !void {
-        try @field(self.subscribers, @typeName(Event)).append(subscriber);
+    pub fn subscribeOn(self: EventBus, comptime Event: type, subscriber: Subscriber(Event)) !void {
+        const gop = try @field(self.subscribers, @typeName(Event)).getOrPut(@intFromPtr(subscriber.context));
+        gop.value_ptr.* = subscriber;
+    }
+
+    pub fn unsubscribe(self: EventBus, subscriber_context: *anyopaque, comptime Event: type) bool {
+        return @field(self.subscribers, @typeName(Event)).remove(subscriber_context);
     }
 
     pub fn notify(self: EventBus, event: anytype) !void {
-        for (@field(self.subscribers, @typeName(@TypeOf(event))).items) |subscriber| {
+        var itr = @field(self.subscribers, @typeName(@TypeOf(event))).valueIterator();
+        while (itr.next()) |subscriber| {
             try subscriber.onEvent(subscriber.context, event);
         }
     }
@@ -60,7 +68,7 @@ const Subscribers = blk: {
     for (events_as_fields, 0..) |event_as_field, i| {
         fields[i] = .{
             .name = @typeName(event_as_field.type),
-            .type = std.ArrayList(Subscriber(event_as_field.type)),
+            .type = std.AutoHashMap(usize, Subscriber(event_as_field.type)),
             .default_value = null,
             .is_comptime = false,
             .alignment = 0,
@@ -89,7 +97,7 @@ test "publish/consume" {
             self.event = event;
         }
     };
-    var bus = EventBus.init(std.testing.allocator);
+    var bus = try EventBus.init(std.testing.allocator);
     defer bus.deinit();
     var subscriber = TestSubscriber{};
     const event = EntityMoved{

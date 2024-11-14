@@ -18,8 +18,6 @@ const log = std.log.scoped(.bsp_generator);
 
 const BspDungeonGenerator = @This();
 
-/// Used to create arena for BSP tree
-alloc: std.mem.Allocator,
 /// The minimal rows count in the final region after BSP splitting
 region_min_rows: u8 = 10,
 /// The minimal columns count in the final region after BSP splitting
@@ -34,12 +32,13 @@ square_ratio: f16 = 0.4,
 /// Creates the dungeon with BSP algorithm.
 pub fn generateDungeon(
     self: BspDungeonGenerator,
+    alloc: std.mem.Allocator,
     rand: std.Random,
     dungeon: *Dungeon,
 ) !void {
     // this arena is used to build a BSP tree, which can be destroyed
     // right after completing the dungeon.
-    var bsp_arena = std.heap.ArenaAllocator.init(self.alloc);
+    var bsp_arena = std.heap.ArenaAllocator.init(alloc);
     defer _ = bsp_arena.deinit();
 
     // BSP helps to mark regions for rooms without intersections
@@ -61,7 +60,7 @@ pub fn generateDungeon(
     log.debug("The rooms has been created", .{});
 
     // fold the BSP tree and binds nodes with the same parent:
-    var createPassages: CreatePassageBetweenRegions = .{ .dungeon = dungeon, .alloc = self.alloc, .rand = rand };
+    var createPassages: CreatePassageBetweenRegions = .{ .dungeon = dungeon, .alloc = alloc, .rand = rand };
     _ = try root.foldModify(&bsp_arena, createPassages.handler());
     log.debug("The passages has been created", .{});
 }

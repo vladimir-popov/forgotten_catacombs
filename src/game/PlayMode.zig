@@ -43,10 +43,10 @@ entity_in_focus: ?g.Entity,
 // An action which could be applied to the entity in focus
 quick_action: ?c.Action,
 
-pub fn init(session: *g.GameSession) !PlayMode {
+pub fn init(session: *g.GameSession, alloc: std.mem.Allocator) !PlayMode {
     return .{
         .session = session,
-        .enemies = std.ArrayList(Enemy).init(session.game.runtime.alloc),
+        .enemies = std.ArrayList(Enemy).init(alloc),
         .current_enemy = 0,
         .moved_enemies = 0,
         .is_player_turn = true,
@@ -67,7 +67,7 @@ pub fn refresh(self: *PlayMode, entity_in_focus: ?g.Entity) !void {
         self.entity_in_focus = null;
     };
     try self.updateTarget();
-    try self.session.game.render.redraw(self.session, self.entity_in_focus);
+    try self.session.render.redraw(self.session, self.entity_in_focus);
 }
 
 fn handleInput(self: *PlayMode, button: g.Button) !void {
@@ -92,12 +92,12 @@ fn handleInput(self: *PlayMode, button: g.Button) !void {
             });
         },
         .cheat => {
-            if (self.session.game.runtime.getCheat()) |cheat| {
+            if (self.session.runtime.getCheat()) |cheat| {
                 log.debug("Cheat {any}", .{cheat});
                 switch (cheat) {
                     .refresh_screen => {
-                        self.session.game.render.viewport.centeredAround(self.session.level.playerPosition().point);
-                        try self.session.game.render.redraw(self.session, self.entity_in_focus);
+                        self.session.viewport.centeredAround(self.session.level.playerPosition().point);
+                        try self.session.render.redraw(self.session, self.entity_in_focus);
                     },
                     .move_player_to_entrance => {
                         var itr = self.session.level.query().get2(c.Ladder, c.Position);
@@ -116,7 +116,7 @@ fn handleInput(self: *PlayMode, button: g.Button) !void {
                         }
                     },
                     .move_player => |point_on_screen| {
-                        const screen_corner = self.session.game.render.viewport.region.top_left;
+                        const screen_corner = self.session.viewport.region.top_left;
                         try self.movePlayerToPoint(.{
                             .row = point_on_screen.row + screen_corner.row,
                             .col = point_on_screen.col + screen_corner.col,
@@ -135,22 +135,22 @@ fn movePlayerToPoint(self: *PlayMode, point: p.Point) !void {
         c.Position{ .point = point },
     );
     try self.updateTarget();
-    self.session.game.render.viewport.centeredAround(point);
-    try self.session.game.render.redraw(self.session, self.entity_in_focus);
+    self.session.viewport.centeredAround(point);
+    try self.session.render.redraw(self.session, self.entity_in_focus);
 }
 
 pub fn tick(self: *PlayMode) anyerror!void {
-    try self.session.game.render.drawAnimationsFrame(self.session, self.entity_in_focus);
+    try self.session.render.drawAnimationsFrame(self.session, self.entity_in_focus);
     if (self.session.level.components.getAll(c.Animation).len > 0)
         return;
 
-    try self.session.game.render.drawScene(self.session, self.entity_in_focus);
-    try self.session.game.render.drawQuickActionButton(self.quick_action);
+    try self.session.render.drawScene(self.session, self.entity_in_focus);
+    try self.session.render.drawQuickActionButton(self.quick_action);
     // we should update target only if player did some action at this tick
     var should_update_target: bool = false;
 
     if (self.is_player_turn) {
-        if (try self.session.game.runtime.readPushedButtons()) |buttons| {
+        if (try self.session.runtime.readPushedButtons()) |buttons| {
             try self.handleInput(buttons);
             // break this function if the mode was changed
             if (self.session.mode != .play) return;

@@ -36,23 +36,20 @@ pub fn main() !void {
 
 const DungeonsGenerator = struct {
     runtime: g.Runtime,
-    render: g.render.Render(g.Dungeon.ROWS, g.Dungeon.COLS),
-    level: g.Level,
+    render: g.Render,
+    viewport: g.Viewport,
+    level: g.Level = undefined,
     draw_dungeon: bool = true, // if false the map should be drawn
 
     pub fn init(runtime: g.Runtime) !DungeonsGenerator {
         return .{
             .runtime = runtime,
-            .render = g.render.Render(g.Dungeon.ROWS, g.Dungeon.COLS).init(runtime, isVisible),
-            .level = try g.Level.init(runtime.alloc, 0),
+            .render = g.Render.init(runtime, isVisible),
+            .viewport = g.Viewport.init(g.Dungeon.ROWS, g.Dungeon.COLS),
         };
     }
 
-    pub fn deinit(self: *DungeonsGenerator) void {
-        self.level.deinit();
-    }
-
-    fn isVisible(_: g.Level, _: p.Point) g.render.Visibility {
+    fn isVisible(_: g.Level, _: p.Point) g.Render.Visibility {
         return .visible;
     }
 

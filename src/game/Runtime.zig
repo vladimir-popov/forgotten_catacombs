@@ -23,20 +23,19 @@ const VTable = struct {
         context: *anyopaque,
         symbol: u21,
         position_on_display: p.Point,
-        mode: g.render.DrawingMode,
+        mode: g.Render.DrawingMode,
     ) anyerror!void,
     drawText: *const fn (
         context: *anyopaque,
         text: []const u8,
         position_on_display: p.Point,
-        mode: g.render.DrawingMode,
+        mode: g.Render.DrawingMode,
     ) anyerror!void,
     currentMillis: *const fn (context: *anyopaque) c_uint,
     getCheat: *const fn (context: *anyopaque) ?g.Cheat,
 };
 
 context: *anyopaque,
-alloc: std.mem.Allocator,
 vtable: *const VTable,
 
 pub inline fn getCheat(self: Runtime) ?g.Cheat {
@@ -70,10 +69,10 @@ pub inline fn clearDisplay(self: Runtime) !void {
     try self.vtable.clearDisplay(self.context);
 }
 
-pub fn drawSprite(self: Runtime, symbol: u21, absolut_position: p.Point, mode: g.render.DrawingMode) !void {
+pub fn drawSprite(self: Runtime, symbol: u21, absolut_position: p.Point, mode: g.Render.DrawingMode) !void {
     try self.vtable.drawSprite(self.context, symbol, absolut_position, mode);
 }
 
-pub fn drawText(self: Runtime, text: []const u8, absolut_position: p.Point, mode: g.render.DrawingMode) !void {
+pub fn drawText(self: Runtime, text: []const u8, absolut_position: p.Point, mode: g.Render.DrawingMode) !void {
     try self.vtable.drawText(self.context, text, absolut_position, mode);
 }

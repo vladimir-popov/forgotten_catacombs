@@ -14,7 +14,6 @@ const Error = error{RoomWasNotFound};
 
 const Level = @This();
 
-alloc: std.mem.Allocator,
 entities: std.ArrayList(g.Entity),
 /// Collection of the components of the entities
 components: ecs.ComponentsManager(c.Components),
@@ -28,34 +27,24 @@ next_entity: g.Entity = 0,
 player: g.Entity = undefined,
 player_placement: *const g.Dungeon.Placement = undefined,
 
-pub fn init(alloc: std.mem.Allocator, depth: u8) !Level {
-    return .{
-        .alloc = alloc,
-        .entities = std.ArrayList(g.Entity).init(alloc),
-        .components = try ecs.ComponentsManager(c.Components).init(alloc),
-        .dungeon = try g.Dungeon.init(alloc),
-        .map = try g.LevelMap.init(alloc),
-        .depth = depth,
-    };
-}
-
-pub fn deinit(self: *Level) void {
-    self.entities.deinit();
-    self.components.deinit();
-    self.dungeon.deinit();
-    self.map.deinit();
-}
-
+/// This methods generates a new Level. All fields of the passed level will be overwritten.
 /// `this_ladder` - the id of the entrance when generated the lever below,
 /// and the id of the exit when generated the level above.
 pub fn generate(
     self: *Level,
+    alloc: std.mem.Allocator,
     seed: u64,
+    depth: u8,
     player: c.Components,
     this_ladder: g.Entity,
     from_ladder: ?g.Entity,
     direction: c.Ladder.Direction,
 ) !void {
+    self.entities = std.ArrayList(g.Entity).init(alloc);
+    self.components = try ecs.ComponentsManager(c.Components).init(alloc);
+    self.dungeon = try g.Dungeon.init(alloc);
+    self.map = try g.LevelMap.init(alloc);
+    self.depth = depth;
     log.debug(
         "Generate level {s} on depth {d} with seed {d} from ladder {any} to the ladder {d} on this level",
         .{ @tagName(direction), self.depth, seed, from_ladder, this_ladder },
@@ -63,8 +52,8 @@ pub fn generate(
     // This prng is used to generate entity on this level. But the dungeon should have its own prng
     // to be able to be regenerated when the player travels from level to level.
     var prng = std.Random.DefaultPrng.init(seed);
-    var bspGenerator = BspDungeonGenerator{ .alloc = self.alloc };
-    try bspGenerator.generateDungeon(prng.random(), &self.dungeon);
+    var bspGenerator = BspDungeonGenerator{};
+    try bspGenerator.generateDungeon(alloc, prng.random(), &self.dungeon);
     log.debug("The dungeon has been generated", .{});
 
     self.next_entity = this_ladder + 1;
@@ -94,22 +83,6 @@ pub fn generate(
     }
 }
 
-pub fn regenerate(
-    self: *Level,
-    seed: u64,
-    depth: u8,
-    this_ladder: g.Entity,
-    from_ladder: ?g.Entity,
-    direction: c.Ladder.Direction,
-) !void {
-    const player = try self.components.entityToStruct(self.player);
-    self.entities.clearRetainingCapacity();
-    self.components.clearRetainingCapacity();
-    try self.dungeon.clearRetainingCapacity();
-    self.map.clearRetainingCapacity();
-    self.depth = depth;
-    try self.generate(seed, player, this_ladder, from_ladder, direction);
-}
 
 /// Aggregates requests of few components for the same entities at once
 pub fn query(self: *const Level) ecs.ComponentsQuery(c.Components) {
@@ -138,7 +111,7 @@ pub fn entityAt(self: Level, place: p.Point) ?g.Entity {
     return null;
 }
 
-pub fn isVisible(self: Level, place: p.Point) g.render.Visibility {
+pub fn isVisible(self: Level, place: p.Point) g.Render.Visibility {
     if (self.player_placement.contains(place))
         return .visible;
 

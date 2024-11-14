@@ -11,8 +11,6 @@ region: p.Region,
 rows_pad: u8,
 cols_pad: u8,
 
-pub fn deinit(_: *@This()) void {}
-
 pub fn init(rows: u8, cols: u8) Viewport {
     return .{
         .region = .{ .top_left = .{ .row = 1, .col = 1 }, .rows = rows, .cols = cols },
@@ -21,7 +19,7 @@ pub fn init(rows: u8, cols: u8) Viewport {
     };
 }
 
-pub fn subscriber(self: *Viewport) g.events.Subscriber(g.events.EntityMoved) {
+pub fn entityMovedSubscriber(self: *Viewport) g.events.Subscriber(g.events.EntityMoved) {
     return .{ .context = self, .onEvent = onEntityMoved };
 }
 

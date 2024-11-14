@@ -7,6 +7,7 @@ const Game = @This();
 
 pub const State = enum { welcome, game_over, game };
 
+alloc: std.mem.Allocator,
 /// Playdate or terminal
 runtime: g.Runtime,
 /// Module to draw the game
@@ -17,35 +18,63 @@ seed: u64,
 /// The current state of the game
 state: State,
 /// The current game session
-game_session: ?*g.GameSession,
+game_session: g.GameSession = undefined,
+game_session_arena: std.heap.ArenaAllocator,
 ///
 events: g.events.EventBus,
 
-pub fn init(runtime: g.Runtime, seed: u64) !*Game {
-    var self = try runtime.alloc.create(Game);
+pub fn create(alloc: std.mem.Allocator, runtime: g.Runtime, seed: u64) !*Game {
+    var self = try alloc.create(Game);
     self.* = .{
+        .alloc = alloc,
         .runtime = runtime,
-        .render = g.Render.init(runtime, g.Level.isVisible),
+        .render = try g.Render.init(alloc, runtime, g.Level.isVisible),
         .seed = seed,
         .state = .welcome,
-        .game_session = null,
-        .events = g.events.EventBus.init(runtime.alloc),
+        .game_session_arena = std.heap.ArenaAllocator.init(alloc),
+        .events = try g.events.EventBus.init(alloc),
     };
-    try self.events.subscribeOn(g.events.EntityMoved, self.render.viewport.subscriber());
     try self.welcome();
     return self;
 }
 
 pub fn destroy(self: *Game) void {
-    if (self.game_session) |session| session.destroy();
+    self.game_session_arena.deinit();
     self.events.deinit();
-    self.runtime.alloc.destroy(self);
+    self.render.deinit();
+    self.alloc.destroy(self);
+}
+
+inline fn welcome(self: *Game) !void {
+    _ = self.game_session_arena.reset(.retain_capacity);
+    self.state = .welcome;
+    self.runtime.removeAllMenuItems();
+    try self.render.drawWelcomeScreen();
+}
+
+inline fn newGame(self: *Game) !void {
+    self.state = .game;
+    _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
+    try self.game_session.initNew(
+        self.game_session_arena.allocator(),
+        self.seed,
+        self.runtime,
+        self.render,
+        self.events,
+    );
+    try self.game_session.play(null);
 }
 
 fn goToMainMenu(ptr: ?*anyopaque) callconv(.C) void {
     if (ptr == null) return;
     const self: *Game = @ptrCast(@alignCast(ptr.?));
     self.welcome() catch @panic("Error when the Game went to the '.welcome' state");
+}
+
+pub fn gameOver(self: *Game) !void {
+    if (self.state == .game) self.game_session.deinit();
+    self.state = .game_over;
+    try self.render.drawGameOverScreen();
 }
 
 pub fn tick(self: *Game) !void {
@@ -62,28 +91,6 @@ pub fn tick(self: *Game) !void {
                 else => {},
             }
         },
-        .game => if (self.game_session) |session| try session.tick(),
+        .game => try self.game_session.tick(),
     }
-}
-
-inline fn welcome(self: *Game) !void {
-    self.state = .welcome;
-    self.runtime.removeAllMenuItems();
-    try self.render.drawWelcomeScreen();
-}
-
-inline fn newGame(self: *Game) !void {
-    self.state = .game;
-    _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
-    if (self.game_session) |game_session| {
-        game_session.destroy();
-        self.game_session = null;
-    }
-    self.game_session = try g.GameSession.createNew(self, self.seed);
-    try self.game_session.?.play(null);
-}
-
-pub fn gameOver(self: *Game) !void {
-    self.state = .game_over;
-    try self.render.drawGameOverScreen();
 }

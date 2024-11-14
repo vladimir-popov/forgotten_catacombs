@@ -64,7 +64,7 @@ pub fn Menu(comptime ROWS: u8, comptime COLS: u8) type {
         fn drawMenuItem(self: Self, item_idx: u4, is_selected: bool) !void {
             if (item_idx >= self.items_count) return;
 
-            const mode: g.render.DrawingMode = if (is_selected) .inverted else .normal;
+            const mode: g.Render.DrawingMode = if (is_selected) .inverted else .normal;
             const item = self.items[item_idx];
             var buf: [TITLE_LENGTH]u8 = undefined;
             var fbs = std.io.fixedBufferStream(&buf);

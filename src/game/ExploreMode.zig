@@ -16,10 +16,10 @@ entities_on_screen: ArrayOfEntitiesOnScreen,
 /// Highlighted entity
 entity_in_focus: ?g.Entity,
 
-pub fn init(session: *g.GameSession) !ExploreMode {
+pub fn init(session: *g.GameSession, alloc: std.mem.Allocator) !ExploreMode {
     return .{
         .session = session,
-        .entities_on_screen = ArrayOfEntitiesOnScreen.init(session.game.runtime.alloc),
+        .entities_on_screen = ArrayOfEntitiesOnScreen.init(alloc),
         .entity_in_focus = session.level.player,
     };
 }
@@ -33,17 +33,17 @@ pub fn refresh(self: *ExploreMode) !void {
     self.entities_on_screen.clearRetainingCapacity();
     var itr = self.session.level.query().get(c.Position);
     while (itr.next()) |tuple| {
-        if (self.session.game.render.viewport.region.containsPoint(tuple[1].point)) {
+        if (self.session.viewport.region.containsPoint(tuple[1].point)) {
             const item = try self.entities_on_screen.addOne();
-            item.* = .{ tuple[0], self.session.game.render.viewport.relative(tuple[1].point) };
+            item.* = .{ tuple[0], self.session.viewport.relative(tuple[1].point) };
         }
     }
-    try self.session.game.render.redraw(self.session, self.entity_in_focus);
+    try self.session.render.redraw(self.session, self.entity_in_focus);
 }
 
 pub fn tick(self: *ExploreMode) anyerror!void {
     // Nothing should happened until the player pushes a button
-    if (try self.session.game.runtime.readPushedButtons()) |btn| {
+    if (try self.session.runtime.readPushedButtons()) |btn| {
         switch (btn.game_button) {
             .a => {},
             .b => if (btn.state == .pressed) {
@@ -52,7 +52,7 @@ pub fn tick(self: *ExploreMode) anyerror!void {
             },
             .left, .right, .up, .down => {
                 self.chooseNextEntity(btn.toDirection().?);
-                try self.session.game.render.drawScene(self.session, self.entity_in_focus);
+                try self.session.render.drawScene(self.session, self.entity_in_focus);
             },
             else => {},
         }
@@ -61,7 +61,7 @@ pub fn tick(self: *ExploreMode) anyerror!void {
 
 fn chooseNextEntity(self: *ExploreMode, direction: p.Direction) void {
     const target_entity = self.entity_in_focus orelse self.session.level.player;
-    const target_point = self.session.game.render.viewport.relative(
+    const target_point = self.session.viewport.relative(
         self.session.level.components.getForEntityUnsafe(target_entity, c.Position).point,
     );
     var min_distance: u8 = 255;

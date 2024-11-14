@@ -5,7 +5,6 @@ pub const ecs = @import("ecs.zig");
 pub const entities = @import("entities.zig");
 pub const events = @import("events.zig");
 pub const primitives = @import("primitives.zig");
-pub const render = @import("Render.zig");
 
 pub const Entity = ecs.Entity;
 pub const Runtime = @import("Runtime.zig");
@@ -16,7 +15,7 @@ pub const Game = @import("Game.zig");
 pub const GameSession = @import("GameSession.zig");
 pub const Level = @import("Level.zig");
 pub const LevelMap = @import("LevelMap.zig");
-pub const Render = render.Render(DISPLAY_ROWS, DISPLAY_COLS);
+pub const Render = @import("Render.zig");
 pub const Viewport = @import("Viewport.zig");
 
 pub const RENDER_DELAY_MS = 150;

@@ -4,7 +4,7 @@ const g = @import("game");
 
 pub const DisplayCell = struct {
     symbol: u21,
-    mode: g.render.DrawingMode,
+    mode: g.Render.DrawingMode,
 };
 
 /// ROWS and COLS - the size of the buffer included the border.
@@ -40,7 +40,7 @@ pub fn DisplayBuffer(comptime ROWS: u8, comptime COLS: u8) type {
             symbol: u21,
             row: u8,
             col: u8,
-            mode: g.render.DrawingMode,
+            mode: g.Render.DrawingMode,
         ) void {
             self.lines[row][col] = .{ .symbol = symbol, .mode = mode };
         }
@@ -50,7 +50,7 @@ pub fn DisplayBuffer(comptime ROWS: u8, comptime COLS: u8) type {
             text: []const u8,
             row: u8,
             col: u8,
-            mode: g.render.DrawingMode,
+            mode: g.Render.DrawingMode,
         ) void {
             for (text, 0..) |s, i| {
                 self.lines[row][col + i] = .{ .symbol = s, .mode = mode };
@@ -62,7 +62,7 @@ pub fn DisplayBuffer(comptime ROWS: u8, comptime COLS: u8) type {
             comptime text: []const u8,
             row: u8,
             col: u8,
-            mode: g.render.DrawingMode,
+            mode: g.Render.DrawingMode,
         ) void {
             const view = std.unicode.Utf8View.initComptime(text);
             var itr = view.iterator();
@@ -76,7 +76,7 @@ pub fn DisplayBuffer(comptime ROWS: u8, comptime COLS: u8) type {
         pub fn writeBuffer(self: Self, writer: std.io.AnyWriter, rows_pad: u8, cols_pad: u8) !void {
             var buf: [4]u8 = undefined;
             for (self.lines, rows_pad..) |line, i| {
-                var mode: g.render.DrawingMode = .normal;
+                var mode: g.Render.DrawingMode = .normal;
                 try tty.Text.writeSetCursorPosition(writer, @intCast(i), cols_pad);
                 for (line) |cell| {
                     if (mode != cell.mode) {
