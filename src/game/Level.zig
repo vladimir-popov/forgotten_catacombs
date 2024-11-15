@@ -83,7 +83,6 @@ pub fn generate(
     }
 }
 
-
 /// Aggregates requests of few components for the same entities at once
 pub fn query(self: *const Level) ecs.ComponentsQuery(c.Components) {
     return .{ .entities = self.entities, .components_manager = self.components };
@@ -132,20 +131,22 @@ pub fn isVisible(self: Level, place: p.Point) g.Render.Visibility {
     return .invisible;
 }
 
-pub fn entityMovedSubscriber(self: *Level) g.events.Subscriber(g.events.EntityMoved) {
+pub fn subscriber(self: *Level) g.events.Subscriber {
     return .{ .context = self, .onEvent = updatePlacement };
 }
 
-fn updatePlacement(ptr: *anyopaque, event: g.events.EntityMoved) !void {
-    if (!event.is_player) return;
+fn updatePlacement(ptr: *anyopaque, event: g.events.Event) !void {
+    if (event.get(.entity_moved) == null) return;
+    if (!event.entity_moved.is_player) return;
 
     const self: *Level = @ptrCast(@alignCast(ptr));
+    const entity_moved = event.entity_moved;
 
-    if (self.player_placement.contains(event.moved_to)) return;
+    if (self.player_placement.contains(entity_moved.moved_to)) return;
 
-    if (self.dungeon.doorways.getPtr(event.moved_from)) |doorway| {
+    if (self.dungeon.doorways.getPtr(entity_moved.moved_from)) |doorway| {
         const placement = doorway.oppositePlacement(self.player_placement);
-        std.debug.assert(placement.contains(event.moved_to));
+        std.debug.assert(placement.contains(entity_moved.moved_to));
         try self.setPlacementWithPlayer(placement);
     }
 }

@@ -149,7 +149,9 @@ fn drawSprite(
             .visible => try self.runtime.drawSprite(sprite.codepoint, position_on_display, mode),
             .known => {
                 const codepoint: u21 = switch (sprite.codepoint) {
+                    // always show this sprites
                     '#', ' ', '<', '>', '\'', '+' => sprite.codepoint,
+                    // and others
                     else => '.',
                 };
                 try self.runtime.drawSprite(codepoint, position_on_display, mode);

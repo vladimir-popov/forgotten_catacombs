@@ -59,15 +59,17 @@ fn handleMoveAction(
         );
         return false;
     }
-    const event = g.events.EntityMoved{
-        .entity = entity,
-        .is_player = (entity == session.level.player),
-        .moved_from = position.point,
-        .moved_to = new_position,
-        .direction = move.direction,
+    const event = g.events.Event{
+        .entity_moved = .{
+            .entity = entity,
+            .is_player = (entity == session.level.player),
+            .moved_from = position.point,
+            .moved_to = new_position,
+            .direction = move.direction,
+        },
     };
     position.point.move(move.direction);
-    try session.events.notify(event);
+    try session.events.sendEvent(event);
     return true;
 }
 

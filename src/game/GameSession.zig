@@ -28,7 +28,7 @@ render: g.Render,
 /// Visible area
 viewport: g.Viewport,
 runtime: g.Runtime,
-events: g.events.EventBus,
+events: *g.events.EventBus,
 /// The current level
 level: g.Level = undefined,
 level_arena: std.heap.ArenaAllocator,
@@ -40,11 +40,11 @@ explore_mode: ExploreMode,
 
 pub fn initNew(
     self: *GameSession,
-    alloc: std.mem.Allocator,
+    arena: *std.heap.ArenaAllocator,
     seed: u64,
     runtime: g.Runtime,
     render: g.Render,
-    events: g.events.EventBus,
+    events: *g.events.EventBus,
 ) !void {
     log.debug("Begin the new game session with the seed {d}", .{seed});
     self.* = .{
@@ -54,12 +54,12 @@ pub fn initNew(
         .viewport = g.Viewport.init(g.DISPLAY_ROWS - 2, g.DISPLAY_COLS),
         .runtime = runtime,
         .events = events,
-        .level_arena = std.heap.ArenaAllocator.init(alloc),
-        .play_mode = try PlayMode.init(self, alloc),
-        .explore_mode = try ExploreMode.init(self, alloc),
+        .level_arena = std.heap.ArenaAllocator.init(arena.allocator()),
+        .play_mode = try PlayMode.init(self, arena.allocator()),
+        .explore_mode = try ExploreMode.init(self, arena.allocator()),
     };
-    try events.subscribeOn(g.events.EntityMoved, self.viewport.entityMovedSubscriber());
-    try events.subscribeOn(g.events.EntityMoved, self.level.entityMovedSubscriber());
+    try events.subscribeOn(.entity_moved, self.viewport.subscriber());
+    try events.subscribeOn(.entity_moved, self.level.subscriber());
 
     const entrance = 0;
     try self.level.generate(

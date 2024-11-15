@@ -17,10 +17,12 @@ pub fn handleDamage(session: *g.GameSession) anyerror!void {
         );
         if (components[2].current <= 0) {
             log.debug("The entity {d} is died", .{components[0]});
-            if (components[0] == session.level.player)
-                try session.game.gameOver()
-            else
-                try session.level.removeEntity(components[0]);
+            try session.level.removeEntity(components[0]);
+            try session.events.sendEvent(
+                g.events.Event{
+                    .entity_died = .{ .entity = components[0], .is_player = (components[0] == session.level.player) },
+                },
+            );
         }
     }
 }

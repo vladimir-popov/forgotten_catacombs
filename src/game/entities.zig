@@ -6,7 +6,7 @@ const p = g.primitives;
 pub const Player = c.Components{
     .sprite = .{ .codepoint = '@', .z_order = 3 },
     .description = .{ .name = "You" },
-    .health = .{ .max = 100, .current = 30 },
+    .health = .{ .max = 100, .current = 5 },
     .melee_weapon = .{ .max_damage = 3, .move_points = 5 },
     .speed = .{ .move_points = 10 },
 };

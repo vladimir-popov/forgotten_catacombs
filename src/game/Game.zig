@@ -21,7 +21,8 @@ state: State,
 game_session: g.GameSession = undefined,
 game_session_arena: std.heap.ArenaAllocator,
 ///
-events: g.events.EventBus,
+events: g.events.EventBus = undefined,
+events_arena: std.heap.ArenaAllocator,
 
 pub fn create(alloc: std.mem.Allocator, runtime: g.Runtime, seed: u64) !*Game {
     var self = try alloc.create(Game);
@@ -32,15 +33,17 @@ pub fn create(alloc: std.mem.Allocator, runtime: g.Runtime, seed: u64) !*Game {
         .seed = seed,
         .state = .welcome,
         .game_session_arena = std.heap.ArenaAllocator.init(alloc),
-        .events = try g.events.EventBus.init(alloc),
+        .events_arena = std.heap.ArenaAllocator.init(alloc),
     };
+    try self.events.init(&self.events_arena);
+    try self.events.subscribeOn(.entity_died, self.subscriber());
     try self.welcome();
     return self;
 }
 
 pub fn destroy(self: *Game) void {
     self.game_session_arena.deinit();
-    self.events.deinit();
+    self.events_arena.deinit();
     self.render.deinit();
     self.alloc.destroy(self);
 }
@@ -56,11 +59,11 @@ inline fn newGame(self: *Game) !void {
     self.state = .game;
     _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
     try self.game_session.initNew(
-        self.game_session_arena.allocator(),
+        &self.game_session_arena,
         self.seed,
         self.runtime,
         self.render,
-        self.events,
+        &self.events,
     );
     try self.game_session.play(null);
 }
@@ -71,10 +74,22 @@ fn goToMainMenu(ptr: ?*anyopaque) callconv(.C) void {
     self.welcome() catch @panic("Error when the Game went to the '.welcome' state");
 }
 
-pub fn gameOver(self: *Game) !void {
-    if (self.state == .game) self.game_session.deinit();
-    self.state = .game_over;
-    try self.render.drawGameOverScreen();
+pub fn subscriber(self: *Game) g.events.Subscriber {
+    return .{ .context = self, .onEvent = gameOver };
+}
+
+pub fn gameOver(ptr: *anyopaque, event: g.events.Event) !void {
+    const self: *Game = @ptrCast(@alignCast(ptr));
+    switch (event) {
+        .entity_died => |entity_died| {
+            if (entity_died.is_player) {
+                _ = self.game_session_arena.reset(.retain_capacity);
+                self.state = .game_over;
+                try self.render.drawGameOverScreen();
+            }
+        },
+        else => {},
+    }
 }
 
 pub fn tick(self: *Game) !void {
@@ -93,4 +108,5 @@ pub fn tick(self: *Game) !void {
         },
         .game => try self.game_session.tick(),
     }
+    try self.events.notifySubscribers();
 }

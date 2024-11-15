@@ -10,6 +10,7 @@ pub const std_options: std.Options = .{
     .logFn = Logger.writeLog,
     .log_level = .info,
     .log_scope_levels = &[_]std.log.ScopeLevel{
+        .{ .scope = .event_bus, .level = .debug },
         .{ .scope = .level, .level = .debug },
     },
 };
@@ -31,7 +32,7 @@ pub fn main() !void {
 
     var use_cheats = false;
     if (Args.key("mommys_cheater")) |_| {
-        log.warn("Mommy's cheater in the room!", .{});
+        log.warn("Mommy's cheater is in the room!", .{});
         use_cheats = true;
     }
 

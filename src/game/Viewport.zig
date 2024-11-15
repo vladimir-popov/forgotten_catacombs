@@ -19,24 +19,26 @@ pub fn init(rows: u8, cols: u8) Viewport {
     };
 }
 
-pub fn entityMovedSubscriber(self: *Viewport) g.events.Subscriber(g.events.EntityMoved) {
+pub fn subscriber(self: *Viewport) g.events.Subscriber {
     return .{ .context = self, .onEvent = onEntityMoved };
 }
 
-fn onEntityMoved(ptr: *anyopaque, event: g.events.EntityMoved) !void {
-    if (!event.is_player) return;
+fn onEntityMoved(ptr: *anyopaque, event: g.events.Event) !void {
+    if (event.get(.entity_moved) == null) return;
+    if (!event.entity_moved.is_player) return;
     const self: *Viewport = @ptrCast(@alignCast(ptr));
+    const entity_moved = event.entity_moved;
 
     // keep player on the screen:
     const inner_region = self.innerRegion();
-    if (event.direction == .up and event.moved_to.row < inner_region.top_left.row)
-        self.move(event.direction);
-    if (event.direction == .down and event.moved_to.row > inner_region.bottomRightRow())
-        self.move(event.direction);
-    if (event.direction == .left and event.moved_to.col < inner_region.top_left.col)
-        self.move(event.direction);
-    if (event.direction == .right and event.moved_to.col > inner_region.bottomRightCol())
-        self.move(event.direction);
+    if (entity_moved.direction == .up and entity_moved.moved_to.row < inner_region.top_left.row)
+        self.move(entity_moved.direction);
+    if (entity_moved.direction == .down and entity_moved.moved_to.row > inner_region.bottomRightRow())
+        self.move(entity_moved.direction);
+    if (entity_moved.direction == .left and entity_moved.moved_to.col < inner_region.top_left.col)
+        self.move(entity_moved.direction);
+    if (entity_moved.direction == .right and entity_moved.moved_to.col > inner_region.bottomRightCol())
+        self.move(entity_moved.direction);
 }
 
 /// Moves the screen to have the point in the center.
