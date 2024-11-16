@@ -27,7 +27,7 @@ pub fn main() !void {
     var runtime = try TtyRuntime.TtyRuntime(g.Dungeon.ROWS + 2, g.Dungeon.COLS + 2).init(alloc, false, false, false);
     defer runtime.deinit();
 
-    var generator = try DungeonsGenerator.init(runtime.runtime());
+    var generator = try DungeonsGenerator.init(alloc, runtime.runtime());
     defer generator.deinit();
 
     try generator.generate(seed);
@@ -39,14 +39,21 @@ const DungeonsGenerator = struct {
     render: g.Render,
     viewport: g.Viewport,
     level: g.Level = undefined,
+    level_arena: std.heap.ArenaAllocator,
     draw_dungeon: bool = true, // if false the map should be drawn
 
-    pub fn init(runtime: g.Runtime) !DungeonsGenerator {
+    pub fn init(alloc: std.mem.Allocator, runtime: g.Runtime) !DungeonsGenerator {
         return .{
             .runtime = runtime,
-            .render = g.Render.init(runtime, isVisible),
+            .render = try g.Render.init(alloc, runtime, isVisible),
             .viewport = g.Viewport.init(g.Dungeon.ROWS, g.Dungeon.COLS),
+            .level_arena = std.heap.ArenaAllocator.init(alloc),
         };
+    }
+
+    pub fn deinit(self: *DungeonsGenerator) void {
+        self.level_arena.deinit();
+        self.render.deinit();
     }
 
     fn isVisible(_: g.Level, _: p.Point) g.Render.Visibility {
@@ -56,8 +63,11 @@ const DungeonsGenerator = struct {
     fn generate(self: *DungeonsGenerator, seed: u64) !void {
         log.info("\n====================\nGenerate level with seed {d}\n====================\n", .{seed});
         const entrance = 0;
+        _ = self.level_arena.reset(.retain_capacity);
         try self.level.generate(
+            self.level_arena.allocator(),
             seed,
+            0,
             g.entities.Player,
             entrance,
             null,
@@ -75,8 +85,8 @@ const DungeonsGenerator = struct {
 
     fn draw(self: *DungeonsGenerator) !void {
         if (self.draw_dungeon) {
-            try self.render.drawDungeon(self.level);
-            try self.render.drawSprites(self.level, null);
+            try self.render.drawDungeon(self.level, self.viewport);
+            try self.render.drawSprites(self.level, self.viewport, null);
         } else {}
     }
 
@@ -84,8 +94,6 @@ const DungeonsGenerator = struct {
         const btn = try self.runtime.readPushedButtons() orelse return false;
         if (btn.game_button == .a) {
             const seed = std.crypto.random.int(u64);
-            self.level.deinit();
-            self.level = try g.Level.init(self.runtime.alloc, 0);
             try self.generate(seed);
         }
         if (btn.game_button == .b) {

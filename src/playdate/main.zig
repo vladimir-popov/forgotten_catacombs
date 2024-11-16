@@ -36,7 +36,7 @@ var playdate_error_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) v
 var playdate_log_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) void = undefined;
 
 pub const GlobalState = struct {
-    runtime: PlaydateRuntime,
+    playdate_runtime: PlaydateRuntime,
     game: *g.Game,
 };
 
@@ -48,9 +48,13 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
             playdate_log_to_console = playdate.system.logToConsole;
 
             var state: *GlobalState = @ptrCast(@alignCast(playdate.system.realloc(null, @sizeOf(GlobalState))));
-            state.runtime = PlaydateRuntime.init(playdate) catch
+            state.playdate_runtime = PlaydateRuntime.init(playdate) catch
                 @panic("Error on creating Runtime");
-            state.game = g.Game.init(state.runtime.runtime(), playdate.system.getCurrentTimeMilliseconds()) catch
+            state.game = g.Game.create(
+                state.playdate_runtime.alloc,
+                state.playdate_runtime.runtime(),
+                playdate.system.getCurrentTimeMilliseconds(),
+            ) catch
                 @panic("Error on creating game session");
 
             playdate.display.setRefreshRate(0);
@@ -66,7 +70,7 @@ fn update_and_render(userdata: ?*anyopaque) callconv(.C) c_int {
     state.game.tick() catch |err|
         std.debug.panic("Error {any} on game tick", .{err});
 
-    state.runtime.playdate.system.drawFPS(1, 1);
+    state.playdate_runtime.playdate.system.drawFPS(1, 1);
 
     //returning 1 signals to the OS to draw the frame.
     return 1;
