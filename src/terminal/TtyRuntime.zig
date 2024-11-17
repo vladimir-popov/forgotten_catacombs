@@ -209,8 +209,8 @@ pub fn TtyRuntime(comptime ROWS: u8, comptime COLS: u8) type {
         }
 
         fn clearDisplay(ptr: *anyopaque) !void {
-            const self: *Self = @ptrCast(@alignCast(ptr));
             try tty.Display.clearScreen();
+            const self: *Self = @ptrCast(@alignCast(ptr));
             self.buffer.cleanAndWrap();
         }
 
@@ -221,7 +221,9 @@ pub fn TtyRuntime(comptime ROWS: u8, comptime COLS: u8) type {
             mode: g.Render.DrawingMode,
         ) !void {
             const self: *Self = @ptrCast(@alignCast(ptr));
-            self.buffer.setSymbol(symbol, position_on_display.row + 1, position_on_display.col + 1, mode);
+            // the buffer used indexes begun from 0, but the position coordinates begun from 1
+            // we do not convert them here because we need a margin for border
+            self.buffer.setSymbol(symbol, position_on_display.row, position_on_display.col, mode);
         }
 
         fn drawText(

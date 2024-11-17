@@ -27,6 +27,7 @@ pub fn DisplayBuffer(comptime ROWS: u8, comptime COLS: u8) type {
             self.alloc.free(self.lines);
         }
 
+        /// Replaces all cells of the buffer by the border and spaces
         pub fn cleanAndWrap(self: Self) void {
             self.setUtf8Text("╔" ++ "═" ** (COLS - 2) ++ "╗", 0, 0, .normal);
             self.setUtf8Text("╚" ++ "═" ** (COLS - 2) ++ "╝", ROWS - 1, 0, .normal);
@@ -38,11 +39,11 @@ pub fn DisplayBuffer(comptime ROWS: u8, comptime COLS: u8) type {
         pub inline fn setSymbol(
             self: Self,
             symbol: u21,
-            row: u8,
-            col: u8,
+            row_idx: u8,
+            col_idx: u8,
             mode: g.Render.DrawingMode,
         ) void {
-            self.lines[row][col] = .{ .symbol = symbol, .mode = mode };
+            self.lines[row_idx][col_idx] = .{ .symbol = symbol, .mode = mode };
         }
 
         pub fn setAsciiText(

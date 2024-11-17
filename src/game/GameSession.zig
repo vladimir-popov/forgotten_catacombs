@@ -51,7 +51,7 @@ pub fn initNew(
         .seed = seed,
         .prng = std.Random.DefaultPrng.init(seed),
         .render = render,
-        .viewport = g.Viewport.init(g.DISPLAY_ROWS - 2, g.DISPLAY_COLS),
+        .viewport = try g.Viewport.init(arena.allocator(), g.DISPLAY_ROWS - 2, g.DISPLAY_COLS),
         .runtime = runtime,
         .events = events,
         .level_arena = std.heap.ArenaAllocator.init(arena.allocator()),

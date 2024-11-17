@@ -83,6 +83,32 @@ pub fn generate(
     }
 }
 
+pub fn visibilityStrategy(self: *Level) g.Render.VisibilityStrategy {
+    return .{ .context = self, .isVisible = isVisible };
+}
+
+pub fn isVisible(ptr: *anyopaque, place: p.Point) g.Render.Visibility {
+    const self: *Level = @ptrCast(@alignCast(ptr));
+    if (self.player_placement.contains(place))
+        return .visible;
+
+    var doorways = self.player_placement.doorways();
+    while (doorways.next()) |door_place| {
+        if (self.dungeon.doorways.getPtr(door_place.*)) |doorway| {
+            // skip the neighbor if the door between is closed
+            if (self.components.getForEntityUnsafe(doorway.door_id, c.Door).state == .closed)
+                continue;
+
+            if (doorway.oppositePlacement(self.player_placement).contains(place))
+                return .visible;
+        }
+    }
+    if (self.map.visited_places.isSet(place.row, place.col))
+        return .known;
+
+    return .invisible;
+}
+
 /// Aggregates requests of few components for the same entities at once
 pub fn query(self: *const Level) ecs.ComponentsQuery(c.Components) {
     return .{ .entities = self.entities, .components_manager = self.components };
@@ -108,27 +134,6 @@ pub fn entityAt(self: Level, place: p.Point) ?g.Entity {
         }
     }
     return null;
-}
-
-pub fn isVisible(self: Level, place: p.Point) g.Render.Visibility {
-    if (self.player_placement.contains(place))
-        return .visible;
-
-    var doorways = self.player_placement.doorways();
-    while (doorways.next()) |door_place| {
-        if (self.dungeon.doorways.getPtr(door_place.*)) |doorway| {
-            // skip the neighbor if the door between is closed
-            if (self.components.getForEntityUnsafe(doorway.door_id, c.Door).state == .closed)
-                continue;
-
-            if (doorway.oppositePlacement(self.player_placement).contains(place))
-                return .visible;
-        }
-    }
-    if (self.map.visited_places.isSet(place.row, place.col))
-        return .known;
-
-    return .invisible;
 }
 
 pub fn subscriber(self: *Level) g.events.Subscriber {

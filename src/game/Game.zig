@@ -29,7 +29,7 @@ pub fn create(alloc: std.mem.Allocator, runtime: g.Runtime, seed: u64) !*Game {
     self.* = .{
         .alloc = alloc,
         .runtime = runtime,
-        .render = try g.Render.init(alloc, runtime, g.Level.isVisible),
+        .render = try g.Render.init(runtime, self.game_session.level.visibilityStrategy()),
         .seed = seed,
         .state = .welcome,
         .game_session_arena = std.heap.ArenaAllocator.init(alloc),
@@ -44,7 +44,6 @@ pub fn create(alloc: std.mem.Allocator, runtime: g.Runtime, seed: u64) !*Game {
 pub fn destroy(self: *Game) void {
     self.game_session_arena.deinit();
     self.events_arena.deinit();
-    self.render.deinit();
     self.alloc.destroy(self);
 }
 

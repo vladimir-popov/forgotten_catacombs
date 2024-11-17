@@ -8,7 +8,7 @@ const p = g.primitives;
 const log = std.log.scoped(.pause_mode);
 
 const ExploreMode = @This();
-const ArrayOfEntitiesOnScreen = std.ArrayList(struct { g.Entity, p.Point });
+const ArrayOfEntitiesOnScreen = std.ArrayList(struct { g.Entity, p.Point, u21 });
 
 session: *g.GameSession,
 /// Arrays of entities and their positions on the screen
@@ -31,11 +31,11 @@ pub fn deinit(self: *ExploreMode) void {
 pub fn refresh(self: *ExploreMode) !void {
     self.entity_in_focus = self.session.level.player;
     self.entities_on_screen.clearRetainingCapacity();
-    var itr = self.session.level.query().get(c.Position);
+    var itr = self.session.level.query().get2(c.Position, c.Sprite);
     while (itr.next()) |tuple| {
         if (self.session.viewport.region.containsPoint(tuple[1].point)) {
             const item = try self.entities_on_screen.addOne();
-            item.* = .{ tuple[0], self.session.viewport.relative(tuple[1].point) };
+            item.* = .{ tuple[0], self.session.viewport.relative(tuple[1].point), tuple[2].codepoint };
         }
     }
     try self.session.render.redraw(self.session, self.entity_in_focus);
@@ -67,6 +67,9 @@ fn chooseNextEntity(self: *ExploreMode, direction: p.Direction) void {
     var min_distance: u8 = 255;
     for (self.entities_on_screen.items) |tuple| {
         if (target_entity == tuple[0]) continue;
+        // we should follow the same logic as the render:
+        // only entities, which should be drawn, can be in focus
+        if (self.session.render.actualCodepoint(tuple[2], tuple[1]) != tuple[2]) continue;
 
         const d = distance(target_point, tuple[1], direction);
         if (d < min_distance) {

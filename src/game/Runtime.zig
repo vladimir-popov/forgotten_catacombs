@@ -69,10 +69,10 @@ pub inline fn clearDisplay(self: Runtime) !void {
     try self.vtable.clearDisplay(self.context);
 }
 
-pub fn drawSprite(self: Runtime, symbol: u21, absolut_position: p.Point, mode: g.Render.DrawingMode) !void {
-    try self.vtable.drawSprite(self.context, symbol, absolut_position, mode);
+pub fn drawSprite(self: Runtime, symbol: u21, position_on_display: p.Point, mode: g.Render.DrawingMode) !void {
+    try self.vtable.drawSprite(self.context, symbol, position_on_display, mode);
 }
 
-pub fn drawText(self: Runtime, text: []const u8, absolut_position: p.Point, mode: g.Render.DrawingMode) !void {
-    try self.vtable.drawText(self.context, text, absolut_position, mode);
+pub fn drawText(self: Runtime, text: []const u8, position_on_display: p.Point, mode: g.Render.DrawingMode) !void {
+    try self.vtable.drawText(self.context, text, position_on_display, mode);
 }

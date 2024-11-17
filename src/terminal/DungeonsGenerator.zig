@@ -34,6 +34,10 @@ pub fn main() !void {
     try runtime.run(&generator);
 }
 
+fn showAll(_: *anyopaque, _: p.Point) g.Render.Visibility {
+    return .visible;
+}
+
 const DungeonsGenerator = struct {
     runtime: g.Runtime,
     render: g.Render,
@@ -45,19 +49,15 @@ const DungeonsGenerator = struct {
     pub fn init(alloc: std.mem.Allocator, runtime: g.Runtime) !DungeonsGenerator {
         return .{
             .runtime = runtime,
-            .render = try g.Render.init(alloc, runtime, isVisible),
-            .viewport = g.Viewport.init(g.Dungeon.ROWS, g.Dungeon.COLS),
+            .render = try g.Render.init(runtime, .{ .context = undefined, .isVisible = showAll }),
+            .viewport = try g.Viewport.init(alloc, g.Dungeon.ROWS, g.Dungeon.COLS),
             .level_arena = std.heap.ArenaAllocator.init(alloc),
         };
     }
 
     pub fn deinit(self: *DungeonsGenerator) void {
         self.level_arena.deinit();
-        self.render.deinit();
-    }
-
-    fn isVisible(_: g.Level, _: p.Point) g.Render.Visibility {
-        return .visible;
+        self.viewport.deinit();
     }
 
     fn generate(self: *DungeonsGenerator, seed: u64) !void {
@@ -85,8 +85,7 @@ const DungeonsGenerator = struct {
 
     fn draw(self: *DungeonsGenerator) !void {
         if (self.draw_dungeon) {
-            try self.render.drawDungeon(self.level, self.viewport);
-            try self.render.drawSprites(self.level, self.viewport, null);
+            try self.render.drawLevelOnly(self.level, &self.viewport);
         } else {}
     }
 

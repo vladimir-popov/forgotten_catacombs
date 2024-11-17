@@ -128,6 +128,7 @@ fn handleInput(self: *PlayMode, button: g.Button) !void {
     }
 }
 
+// used in cheats only
 fn movePlayerToPoint(self: *PlayMode, point: p.Point) !void {
     std.log.debug("Move player to {any}", .{point});
     try self.session.level.components.setToEntity(
@@ -140,11 +141,10 @@ fn movePlayerToPoint(self: *PlayMode, point: p.Point) !void {
 }
 
 pub fn tick(self: *PlayMode) anyerror!void {
-    try self.session.render.drawAnimationsFrame(self.session, self.entity_in_focus);
+    try self.session.render.drawScene(self.session, self.entity_in_focus);
     if (self.session.level.components.getAll(c.Animation).len > 0)
         return;
 
-    try self.session.render.drawScene(self.session, self.entity_in_focus);
     try self.session.render.drawQuickActionButton(self.quick_action);
     // we should update target only if player did some action at this tick
     var should_update_target: bool = false;

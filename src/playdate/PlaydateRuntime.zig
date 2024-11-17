@@ -210,8 +210,8 @@ fn drawSprite(ptr: *anyopaque, symbol: u21, position_on_display: p.Point, mode: 
         return;
     }
     // draw text:
-    const x = @as(c_int, position_on_display.col) * g.SPRITE_WIDTH;
-    const y = @as(c_int, position_on_display.row) * g.SPRITE_HEIGHT;
+    const x = @as(c_int, position_on_display.col - 1) * g.SPRITE_WIDTH;
+    const y = @as(c_int, position_on_display.row - 1) * g.SPRITE_HEIGHT;
 
     var buf: [4]u8 = undefined;
     const len = try std.unicode.utf8Encode(symbol, &buf);
@@ -219,8 +219,8 @@ fn drawSprite(ptr: *anyopaque, symbol: u21, position_on_display: p.Point, mode: 
 }
 
 fn drawHorizontalBorderSymbol(self: *Self, row: u8, col: u8) void {
-    const y: c_int = @as(c_int, @intCast(row)) * g.SPRITE_HEIGHT + g.SPRITE_HEIGHT / 2;
-    const x: c_int = @as(c_int, @intCast(col)) * g.SPRITE_WIDTH;
+    const y: c_int = @as(c_int, @intCast(row - 1)) * g.SPRITE_HEIGHT + g.SPRITE_HEIGHT / 2;
+    const x: c_int = @as(c_int, @intCast(col - 1)) * g.SPRITE_WIDTH;
     self.playdate.graphics.drawLine(x, y, x + g.SPRITE_WIDTH, y, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
     self.playdate.graphics.drawLine(x, y + 2, x + g.SPRITE_WIDTH, y + 2, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
 }

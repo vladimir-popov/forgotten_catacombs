@@ -34,40 +34,54 @@ const MIDDLE_ZONE_LENGTH = g.DISPLAY_COLS - (OUT_ZONE_LENGTH + 1) * 2 - 2;
 
 const Render = @This();
 
-/// Used to memorize drawn sprites to override sprites with lower z-index
-arena: *std.heap.ArenaAllocator,
-runtime: g.Runtime,
-/// Custom function to decide should the place be drawn or not.
 /// Usually provided by the Level, but the DungeonGenerator ha the different implementation
 /// to make whole dungeon visible.
-isVisible: *const fn (level: g.Level, place: p.Point) Visibility,
+pub const VisibilityStrategy = struct {
+    context: *anyopaque,
+    /// Custom function to decide should the place be drawn or not.
+    isVisible: *const fn (context: *anyopaque, place: p.Point) Visibility,
+};
+
+runtime: g.Runtime,
+visibility_strategy: VisibilityStrategy,
 
 pub fn init(
-    alloc: std.mem.Allocator,
     runtime: g.Runtime,
-    is_visible: *const fn (level: g.Level, place: p.Point) Visibility,
+    visibility_strategy: VisibilityStrategy,
 ) !Render {
-    const arena = try alloc.create(std.heap.ArenaAllocator);
-    arena.* = std.heap.ArenaAllocator.init(alloc);
     return .{
-        .arena = arena,
         .runtime = runtime,
-        .isVisible = is_visible,
+        .visibility_strategy = visibility_strategy,
     };
 }
 
-pub fn deinit(self: *Render) void {
-    const alloc = self.arena.child_allocator;
-    self.arena.deinit();
-    alloc.destroy(self.arena);
+/// Draws dungeon, sprites, animations, and stats on the screen.
+/// Removes completed animations.
+pub fn drawScene(self: Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
+    try self.drawDungeon(session.level.dungeon, session.viewport);
+    try self.drawSprites(session.level, session.viewport, entity_in_focus);
+    try self.drawAnimationsFrame(session, entity_in_focus);
+    try self.drawInfoBar(session, entity_in_focus);
+    try self.drawChangedSymbols(&session.viewport);
+}
+
+// Should be used in DungeonGenerator only
+pub fn drawLevelOnly(self: Render, level: g.Level, viewport: *g.Viewport) !void {
+    viewport.buffer.reset();
+    try self.drawDungeon(level.dungeon, viewport.*);
+    try self.drawSprites(level, viewport.*, null);
+    try self.drawChangedSymbols(viewport);
 }
 
 /// Clears the screen and draw all from scratch.
 /// Removes completed animations.
 pub fn redraw(self: Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
+    log.debug("REDRAW", .{});
     try self.clearDisplay();
-    // separate dung and stats:
-    try self.drawHorizontalBorderLine(session.viewport.region.rows - 2, session.viewport.region.cols);
+    session.viewport.buffer.reset();
+    // separate dung and stats.
+    // do not part of the drawScene in performance purpose
+    try self.drawHorizontalBorderLine(session.viewport.region.rows + 1, session.viewport.region.cols);
     try self.drawScene(session, entity_in_focus);
 }
 
@@ -75,26 +89,17 @@ pub inline fn clearDisplay(self: Render) !void {
     try self.runtime.clearDisplay();
 }
 
-/// Draws dungeon, sprites, animations, and stats on the screen.
-/// Removes completed animations.
-pub fn drawScene(self: Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
-    try self.drawDungeon(session.level, session.viewport);
-    try self.drawSprites(session.level, session.viewport, entity_in_focus);
-    try self.drawAnimationsFrame(session, entity_in_focus);
-    try self.drawInfoBar(session, entity_in_focus);
-}
-
-pub fn drawDungeon(self: Render, level: g.Level, viewport: g.Viewport) anyerror!void {
-    var itr = level.dungeon.cellsInRegion(viewport.region);
+fn drawDungeon(self: Render, dungeon: g.Dungeon, viewport: g.Viewport) anyerror!void {
+    var itr = dungeon.cellsInRegion(viewport.region);
     var place = viewport.region.top_left;
-    var sprite = c.Sprite{ .codepoint = undefined };
+    var sprite = c.Sprite{ .codepoint = undefined, .z_order = 0 };
     while (itr.next()) |cell| {
         sprite.codepoint = switch (cell) {
             .floor => '.',
             .wall => '#',
             else => ' ',
         };
-        try self.drawSprite(level, viewport, sprite, place, .normal);
+        try self.drawSprite(viewport, sprite, place, .normal);
         place.move(.right);
         if (!viewport.region.containsPoint(place)) {
             place.col = viewport.region.top_left.col;
@@ -111,58 +116,60 @@ fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order
         return .gt;
 }
 /// Draw sprites inside the screen and highlights the sprite of the entity in focus.
-pub fn drawSprites(self: Render, level: g.Level, viewport: g.Viewport, entity_in_focus: ?g.Entity) !void {
-    _ = self.arena.reset(.retain_capacity);
-    var drawn = std.AutoHashMap(p.Point, c.Sprite).init(self.arena.allocator());
-
+fn drawSprites(self: Render, level: g.Level, viewport: g.Viewport, entity_in_focus: ?g.Entity) !void {
     var itr = level.query().get2(c.Position, c.Sprite);
     while (itr.next()) |tuple| {
         if (!viewport.region.containsPoint(tuple[1].point)) continue;
-
-        var gop = try drawn.getOrPut(tuple[1].point);
-        if (!gop.found_existing or gop.value_ptr.z_order < tuple[2].z_order) {
-            gop.value_ptr = tuple[2];
-        }
         const mode: g.Render.DrawingMode = if (entity_in_focus == tuple[0])
             .inverted
         else
             .normal;
-        try self.drawSprite(level, viewport, gop.value_ptr.*, tuple[1].point, mode);
+        try self.drawSprite(viewport, tuple[2].*, tuple[1].point, mode);
     }
 }
 
 fn drawSprite(
     self: Render,
-    level: g.Level,
     viewport: g.Viewport,
     sprite: c.Sprite,
-    place: p.Point,
+    place_in_dungeon: p.Point,
     mode: g.Render.DrawingMode,
 ) anyerror!void {
-    if (viewport.region.containsPoint(place)) {
-        const position_on_display = p.Point{
-            .row = place.row - viewport.region.top_left.row,
-            .col = place.col - viewport.region.top_left.col,
+    if (viewport.region.containsPoint(place_in_dungeon)) {
+        const point_on_display = p.Point{
+            .row = place_in_dungeon.row - viewport.region.top_left.row + 1,
+            .col = place_in_dungeon.col - viewport.region.top_left.col + 1,
         };
-        switch (self.isVisible(level, place)) {
-            .invisible => try self.runtime.drawSprite(' ', position_on_display, mode),
-            .visible => try self.runtime.drawSprite(sprite.codepoint, position_on_display, mode),
-            .known => {
-                const codepoint: u21 = switch (sprite.codepoint) {
-                    // always show this sprites
-                    '#', ' ', '<', '>', '\'', '+' => sprite.codepoint,
-                    // and others
-                    else => '.',
-                };
-                try self.runtime.drawSprite(codepoint, position_on_display, mode);
-            },
-        }
+        const codepoint: u21 = self.actualCodepoint(sprite.codepoint, place_in_dungeon);
+        viewport.setSymbol(point_on_display, codepoint, mode, sprite.z_order);
+    }
+}
+
+pub inline fn actualCodepoint(self: Render, codepoint: u21, place: p.Point) u21 {
+    return switch (self.visibility_strategy.isVisible(self.visibility_strategy.context, place)) {
+        .visible => codepoint,
+        .invisible => ' ',
+        .known => switch (codepoint) {
+            // always show this known sprites
+            '#', ' ', '<', '>', '\'', '+' => codepoint,
+            // all others should be shown as the floor
+            else => '.',
+        },
+    };
+}
+
+/// Invokes the runtime to draw only changed symbols.
+/// After drawing all changes, the number of the viewport.buffer.iteration will be incremented.
+fn drawChangedSymbols(self: Render, viewport: *g.Viewport) !void {
+    var itr = viewport.changedSymbols();
+    while (itr.next()) |tuple| {
+        try self.runtime.drawSprite(tuple[1].symbol, tuple[0], tuple[1].mode);
     }
 }
 
 /// Draws a single frame from every animation.
 /// Removes the animation if the last frame was drawn.
-pub fn drawAnimationsFrame(self: Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
+fn drawAnimationsFrame(self: Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
     const now: c_uint = self.runtime.currentMillis();
     var itr = session.level.query().get2(c.Position, c.Animation);
     while (itr.next()) |components| {
@@ -175,9 +182,8 @@ pub fn drawAnimationsFrame(self: Render, session: *g.GameSession, entity_in_focu
                 else
                     .normal;
                 try self.drawSprite(
-                    session.level,
                     session.viewport,
-                    .{ .codepoint = frame },
+                    .{ .codepoint = frame, .z_order = 3 },
                     position.point,
                     mode,
                 );
@@ -228,9 +234,9 @@ pub fn drawInfoBar(self: Render, session: *const g.GameSession, entity_in_focus:
     }
 }
 
-fn drawHorizontalBorderLine(self: Render, row: u8, length: u8) !void {
+fn drawHorizontalBorderLine(self: Render, row_on_display: u8, length: u8) !void {
     for (0..length) |col| {
-        try self.runtime.drawSprite('═', .{ .row = row, .col = @intCast(col) }, .normal);
+        try self.runtime.drawSprite('═', .{ .row = row_on_display, .col = @intCast(col + 1) }, .normal);
     }
 }
 
@@ -255,7 +261,7 @@ pub fn drawQuickActionButton(self: Render, quick_action: ?c.Action) !void {
 }
 
 pub fn drawWelcomeScreen(self: Render) !void {
-    try self.runtime.clearDisplay();
+    try self.clearDisplay();
     const vertical_middle = g.DISPLAY_ROWS / 2 - 1;
     try self.drawText(g.DISPLAY_COLS, "Welcome", .{ .row = vertical_middle - 1, .col = 1 }, .normal, .center);
     try self.drawText(g.DISPLAY_COLS, "to", .{ .row = vertical_middle, .col = 1 }, .normal, .center);
@@ -263,7 +269,7 @@ pub fn drawWelcomeScreen(self: Render) !void {
 }
 
 pub fn drawGameOverScreen(self: Render) !void {
-    try self.runtime.clearDisplay();
+    try self.clearDisplay();
     try self.drawText(g.DISPLAY_COLS, "You are dead", .{ .row = g.DISPLAY_ROWS / 2 - 1, .col = 1 }, .normal, .center);
 }
 

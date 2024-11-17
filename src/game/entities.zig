@@ -6,7 +6,7 @@ const p = g.primitives;
 pub const Player = c.Components{
     .sprite = .{ .codepoint = '@', .z_order = 3 },
     .description = .{ .name = "You" },
-    .health = .{ .max = 100, .current = 5 },
+    .health = .{ .max = 100, .current = 50 },
     .melee_weapon = .{ .max_damage = 3, .move_points = 5 },
     .speed = .{ .move_points = 10 },
 };
@@ -29,13 +29,13 @@ pub fn Exit(this_ladder: g.Entity, that_ladder: ?g.Entity) c.Components {
 
 pub const OpenedDoor = c.Components{
     .door = .{ .state = .opened },
-    .sprite = .{ .codepoint = '\'' },
+    .sprite = .{ .codepoint = '\'', .z_order = 0 },
     .description = .{ .name = "Opened door" },
 };
 
 pub const ClosedDoor = c.Components{
     .door = .{ .state = .closed },
-    .sprite = .{ .codepoint = '+' },
+    .sprite = .{ .codepoint = '+', .z_order = 0 },
     .description = .{ .name = "Closed door" },
 };
 

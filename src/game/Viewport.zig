@@ -2,7 +2,115 @@ const std = @import("std");
 const g = @import("game_pkg.zig");
 const p = g.primitives;
 
+const log = std.log.scoped(.viewport);
+
 const Viewport = @This();
+
+pub const Cell = struct {
+    symbol: u21,
+    mode: g.Render.DrawingMode,
+};
+
+const SceneBuffer = struct {
+    const VersionedCell = struct {
+        cell: Cell,
+        z_order: u2,
+        ver: u1,
+        is_changed: bool,
+    };
+    pub const Row = []VersionedCell;
+
+    rows: []Row,
+    arena: *std.heap.ArenaAllocator,
+    current_iteration: u1 = 1,
+
+    pub fn init(alloc: std.mem.Allocator, rows: u8, cols: u8) !SceneBuffer {
+        const arena = try alloc.create(std.heap.ArenaAllocator);
+        arena.* = std.heap.ArenaAllocator.init(alloc);
+        const arena_alloc = arena.allocator();
+        var self = SceneBuffer{ .arena = arena, .rows = try arena_alloc.alloc(Row, rows) };
+        for (0..rows) |r| {
+            self.rows[r] = try arena_alloc.alloc(VersionedCell, cols);
+        }
+        self.reset();
+        return self;
+    }
+
+    pub fn deinit(self: *SceneBuffer) void {
+        const alloc = self.arena.child_allocator;
+        self.arena.deinit();
+        alloc.destroy(self.arena);
+    }
+
+    pub fn reset(self: *SceneBuffer) void {
+        self.current_iteration = 1;
+        for (0..self.rows.len) |r| {
+            for (self.rows[r]) |*cell| {
+                cell.cell.symbol = 0;
+                cell.z_order = 0;
+                cell.ver = 0;
+                cell.is_changed = false;
+            }
+        }
+    }
+
+    fn dumpToLog(self: SceneBuffer) void {
+        if (std.log.logEnabled(.debug, .viewport)) {
+            // the biggest possible size of the viewport (in case when all codepoints < 255)
+            var buf: [g.Dungeon.ROWS * (g.Dungeon.COLS + 1) + 1]u8 = undefined;
+            var writer = std.io.fixedBufferStream(&buf);
+            self.write(writer.writer().any()) catch unreachable;
+            log.debug("\n{s}", .{buf});
+        }
+    }
+
+    fn write(self: SceneBuffer, writer: std.io.AnyWriter) !void {
+        var buf: [4]u8 = undefined;
+        for (self.rows) |row| {
+            for (row) |cell| {
+                if (!cell.is_changed) {
+                    try writer.writeByte(' ');
+                    continue;
+                }
+
+                if (cell.cell.symbol < 255) {
+                    try writer.writeByte(@intCast(cell.cell.symbol));
+                } else {
+                    const len = try std.unicode.utf8Encode(cell.cell.symbol, &buf);
+                    _ = try writer.write(buf[0..len]);
+                }
+            }
+            try writer.writeByte('\n');
+        }
+        try writer.writeByte(0);
+    }
+};
+
+pub const CellIterator = struct {
+    buffer: *SceneBuffer,
+    r_idx: u8 = 0,
+    c_idx: u8 = 0,
+
+    pub fn next(self: *CellIterator) ?struct { p.Point, Cell } {
+        while (true) {
+            defer self.c_idx += 1;
+
+            if (self.c_idx == self.buffer.rows[0].len) {
+                self.r_idx += 1;
+                self.c_idx = 0;
+            }
+            if (self.r_idx == self.buffer.rows.len) {
+                self.buffer.current_iteration +%= 1;
+                return null;
+            }
+
+            const cell = &self.buffer.rows[self.r_idx][self.c_idx];
+            if (cell.is_changed) {
+                return .{ .{ .row = self.r_idx + 1, .col = self.c_idx + 1 }, cell.cell };
+            }
+        }
+    }
+};
 
 /// The region which should be displayed.
 /// The top left corner is related to the dungeon.
@@ -10,13 +118,55 @@ region: p.Region,
 // Padding for the player's sprite
 rows_pad: u8,
 cols_pad: u8,
+buffer: SceneBuffer,
 
-pub fn init(rows: u8, cols: u8) Viewport {
+pub fn init(alloc: std.mem.Allocator, rows: u8, cols: u8) !Viewport {
     return .{
         .region = .{ .top_left = .{ .row = 1, .col = 1 }, .rows = rows, .cols = cols },
         .rows_pad = @intFromFloat(@as(f16, @floatFromInt(rows)) * 0.2),
         .cols_pad = @intFromFloat(@as(f16, @floatFromInt(cols)) * 0.2),
+        .buffer = try SceneBuffer.init(alloc, rows, cols),
     };
+}
+
+pub fn deinit(self: *Viewport) void {
+    self.buffer.deinit();
+}
+
+pub fn setSymbol(
+    self: Viewport,
+    point_on_viewport: p.Point,
+    codepoint: u21,
+    mode: g.Render.DrawingMode,
+    z_order: u2,
+) void {
+    std.debug.assert(point_on_viewport.row > 0);
+    std.debug.assert(point_on_viewport.col > 0);
+    std.debug.assert(point_on_viewport.row <= self.buffer.rows.len);
+    std.debug.assert(point_on_viewport.col <= self.buffer.rows[0].len);
+
+    const cell = &self.buffer.rows[point_on_viewport.row - 1][point_on_viewport.col - 1];
+    defer cell.ver = self.buffer.current_iteration;
+
+    if (cell.ver != self.buffer.current_iteration) {
+        cell.is_changed = false;
+    }
+
+    // if the symbol is not changed from the previous iteration, the version
+    // of the cell should not be changed
+    if (cell.cell.symbol == codepoint and cell.cell.mode == mode) return;
+
+    // if the new symbol is under the existed at the same iteration, do nothing too
+    if (cell.ver == self.buffer.current_iteration and cell.z_order > z_order and cell.cell.mode == mode) return;
+
+    cell.cell = .{ .symbol = codepoint, .mode = mode };
+    cell.z_order = z_order;
+    cell.is_changed = true;
+}
+
+pub fn changedSymbols(self: *Viewport) CellIterator {
+    // self.buffer.dumpToLog();
+    return .{ .buffer = &self.buffer };
 }
 
 pub fn subscriber(self: *Viewport) g.events.Subscriber {

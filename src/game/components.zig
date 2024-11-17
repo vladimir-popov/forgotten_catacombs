@@ -16,7 +16,7 @@ pub const Door = struct { state: enum { opened, closed } };
 pub const Sprite = struct {
     codepoint: Codepoint,
     /// The sprite with bigger order should be rendered over the sprite with lower
-    z_order: u2 = 0,
+    z_order: u2,
 };
 
 pub const Description = struct {
