@@ -264,8 +264,8 @@ inline fn newEntity(self: *Level) g.Entity {
 
 pub fn removeEntity(self: *Level, entity: g.Entity) !void {
     try self.components.removeAllForEntity(entity);
-    // this is rare operation, and O(n) here is not as bad, as good the iteration over elements
-    // in array in all other cases
+    // this is a rare operation, and O(n) here is not as bad, as good the iteration over elements
+    // in the array in all other cases
     if (std.mem.indexOfScalar(g.Entity, self.entities.items, entity)) |idx|
         _ = self.entities.swapRemove(idx);
 }
