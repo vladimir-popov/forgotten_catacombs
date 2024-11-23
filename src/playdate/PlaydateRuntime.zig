@@ -203,9 +203,9 @@ fn clearDisplay(ptr: *anyopaque) anyerror!void {
     self.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
 }
 
-fn drawSprite(ptr: *anyopaque, symbol: u21, position_on_display: p.Point, mode: g.Render.DrawingMode) !void {
+fn drawSprite(ptr: *anyopaque, codepoint: g.Codepoint, position_on_display: p.Point, mode: g.Render.DrawingMode) !void {
     var self: *Self = @ptrCast(@alignCast(ptr));
-    if (symbol == '═') {
+    if (codepoint == '═') {
         self.drawHorizontalBorderSymbol(position_on_display.row, position_on_display.col);
         return;
     }
@@ -214,7 +214,7 @@ fn drawSprite(ptr: *anyopaque, symbol: u21, position_on_display: p.Point, mode: 
     const y = @as(c_int, position_on_display.row - 1) * g.SPRITE_HEIGHT;
 
     var buf: [4]u8 = undefined;
-    const len = try std.unicode.utf8Encode(symbol, &buf);
+    const len = try std.unicode.utf8Encode(codepoint, &buf);
     try self.drawTextOnDisplay(buf[0..len], mode, x, y);
 }
 

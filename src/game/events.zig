@@ -10,8 +10,14 @@ pub const EntityMoved = struct {
     entity: g.Entity,
     is_player: bool,
     moved_from: p.Point,
-    moved_to: p.Point,
-    direction: p.Direction,
+    target: g.components.Action.Move.Target,
+
+    pub fn movedTo(self: EntityMoved) p.Point {
+        return switch (self.target) {
+            .direction => |direction| self.moved_from.movedTo(direction),
+            .new_place => |place| place,
+        };
+    }
 };
 
 pub const EntityDied = struct {
@@ -109,8 +115,7 @@ test "publish/consume" {
             .entity = 1,
             .is_player = true,
             .moved_from = .{ .row = 1, .col = 1 },
-            .moved_to = .{ .row = 1, .col = 2 },
-            .direction = .right,
+            .target = .{ .new_place = .{ .row = 1, .col = 2 } },
         },
     };
 

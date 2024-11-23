@@ -3,9 +3,6 @@ const g = @import("game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
-// coz zig uses u21 for utf8 symbols
-pub const Codepoint = u21;
-
 pub const Position = struct {
     point: p.Point,
 };
@@ -14,7 +11,7 @@ pub const Door = struct { state: enum { opened, closed } };
 
 /// Describes how and where something should look.
 pub const Sprite = struct {
-    codepoint: Codepoint,
+    codepoint: g.Codepoint,
     /// The sprite with bigger order should be rendered over the sprite with lower
     z_order: u2,
 };
@@ -26,17 +23,17 @@ pub const Description = struct {
 
 pub const Animation = struct {
     pub const Presets = struct {
-        pub const hit: [3]Codepoint = [_]Codepoint{ 0, 'X', 0 };
-        pub const miss: [1]Codepoint = [_]Codepoint{'.'};
+        pub const hit: [3]g.Codepoint = [_]g.Codepoint{ 0, 'X', 0 };
+        pub const miss: [1]g.Codepoint = [_]g.Codepoint{'.'};
     };
 
     /// Frames of the animation. One frame per render circle will be shown.
-    frames: []const Codepoint,
+    frames: []const g.Codepoint,
     current_frame: u8 = 0,
     previous_render_time: c_uint = 0,
     lag: u32 = 0,
 
-    pub fn frame(self: *Animation, now: c_uint) ?Codepoint {
+    pub fn frame(self: *Animation, now: c_uint) ?g.Codepoint {
         self.lag += now - self.previous_render_time;
         self.previous_render_time = now;
         if (self.lag > g.RENDER_DELAY_MS) {
@@ -62,7 +59,11 @@ pub const Ladder = struct {
 /// Describes what some entity is going to do.
 pub const Action = struct {
     pub const Move = struct {
-        direction: p.Direction,
+        pub const Target = union(enum) {
+            new_place: p.Point,
+            direction: p.Direction,
+        };
+        target: Target,
         keep_moving: bool = false,
     };
     pub const Type = union(enum) {

@@ -140,12 +140,12 @@ fn drawSprite(
             .row = place_in_dungeon.row - viewport.region.top_left.row + 1,
             .col = place_in_dungeon.col - viewport.region.top_left.col + 1,
         };
-        const codepoint: u21 = self.actualCodepoint(sprite.codepoint, place_in_dungeon);
+        const codepoint: g.Codepoint = self.actualCodepoint(sprite.codepoint, place_in_dungeon);
         viewport.setSymbol(point_on_display, codepoint, mode, sprite.z_order);
     }
 }
 
-pub inline fn actualCodepoint(self: Render, codepoint: u21, place: p.Point) u21 {
+pub inline fn actualCodepoint(self: Render, codepoint: g.Codepoint, place: p.Point) g.Codepoint {
     return switch (self.visibility_strategy.isVisible(self.visibility_strategy.context, place)) {
         .visible => codepoint,
         .invisible => ' ',
@@ -153,7 +153,7 @@ pub inline fn actualCodepoint(self: Render, codepoint: u21, place: p.Point) u21 
             // always show this known sprites
             '#', ' ', '<', '>', '\'', '+' => codepoint,
             // all others should be shown as the floor
-            else => '.',
+            else => ' ',
         },
     };
 }
@@ -163,7 +163,7 @@ pub inline fn actualCodepoint(self: Render, codepoint: u21, place: p.Point) u21 
 fn drawChangedSymbols(self: Render, viewport: *g.Viewport) !void {
     var itr = viewport.changedSymbols();
     while (itr.next()) |tuple| {
-        try self.runtime.drawSprite(tuple[1].symbol, tuple[0], tuple[1].mode);
+        try self.runtime.drawSprite(tuple[1].codepoint, tuple[0], tuple[1].mode);
     }
 }
 

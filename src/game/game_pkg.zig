@@ -6,6 +6,8 @@ pub const entities = @import("entities.zig");
 pub const events = @import("events.zig");
 pub const primitives = @import("primitives.zig");
 
+// coz zig uses u21 for utf8 symbols
+pub const Codepoint = u21;
 pub const Entity = ecs.Entity;
 pub const Runtime = @import("Runtime.zig");
 pub const Button = @import("Button.zig");

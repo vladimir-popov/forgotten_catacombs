@@ -21,7 +21,7 @@ const VTable = struct {
     clearDisplay: *const fn (context: *anyopaque) anyerror!void,
     drawSprite: *const fn (
         context: *anyopaque,
-        symbol: u21,
+        codepoint: g.Codepoint,
         position_on_display: p.Point,
         mode: g.Render.DrawingMode,
     ) anyerror!void,
@@ -69,8 +69,8 @@ pub inline fn clearDisplay(self: Runtime) !void {
     try self.vtable.clearDisplay(self.context);
 }
 
-pub fn drawSprite(self: Runtime, symbol: u21, position_on_display: p.Point, mode: g.Render.DrawingMode) !void {
-    try self.vtable.drawSprite(self.context, symbol, position_on_display, mode);
+pub fn drawSprite(self: Runtime, codepoint: g.Codepoint, position_on_display: p.Point, mode: g.Render.DrawingMode) !void {
+    try self.vtable.drawSprite(self.context, codepoint, position_on_display, mode);
 }
 
 pub fn drawText(self: Runtime, text: []const u8, position_on_display: p.Point, mode: g.Render.DrawingMode) !void {

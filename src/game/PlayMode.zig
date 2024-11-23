@@ -73,8 +73,8 @@ pub fn refresh(self: *PlayMode, entity_in_focus: ?g.Entity) !void {
 fn handleInput(self: *PlayMode, button: g.Button) !void {
     if (button.state == .double_pressed) log.info("Double press of {any}", .{button});
     switch (button.game_button) {
-        .a => if (self.quick_action) |quick_action| {
-            try self.session.level.components.setToEntity(self.session.level.player, quick_action);
+        .a => if (self.quick_action) |action| {
+            try self.session.level.components.setToEntity(self.session.level.player, action);
         },
         .b => if (button.state == .pressed) {
             try self.session.explore();
@@ -84,7 +84,7 @@ fn handleInput(self: *PlayMode, button: g.Button) !void {
             try self.session.level.components.setToEntity(self.session.level.player, c.Action{
                 .type = .{
                     .move = .{
-                        .direction = button.toDirection().?,
+                        .target = .{ .direction = button.toDirection().? },
                         .keep_moving = false, // btn.state == .double_pressed,
                     },
                 },
@@ -94,50 +94,12 @@ fn handleInput(self: *PlayMode, button: g.Button) !void {
         .cheat => {
             if (self.session.runtime.getCheat()) |cheat| {
                 log.debug("Cheat {any}", .{cheat});
-                switch (cheat) {
-                    .refresh_screen => {
-                        self.session.viewport.centeredAround(self.session.level.playerPosition().point);
-                        try self.session.render.redraw(self.session, self.entity_in_focus);
-                    },
-                    .move_player_to_entrance => {
-                        var itr = self.session.level.query().get2(c.Ladder, c.Position);
-                        while (itr.next()) |tuple| {
-                            if (tuple[1].direction == .up) {
-                                try self.movePlayerToPoint(tuple[2].point);
-                            }
-                        }
-                    },
-                    .move_player_to_exit => {
-                        var itr = self.session.level.query().get2(c.Ladder, c.Position);
-                        while (itr.next()) |tuple| {
-                            if (tuple[1].direction == .down) {
-                                try self.movePlayerToPoint(tuple[2].point);
-                            }
-                        }
-                    },
-                    .move_player => |point_on_screen| {
-                        const screen_corner = self.session.viewport.region.top_left;
-                        try self.movePlayerToPoint(.{
-                            .row = point_on_screen.row + screen_corner.row,
-                            .col = point_on_screen.col + screen_corner.col,
-                        });
-                    },
+                if (cheat.toAction(self.session)) |action| {
+                    try self.session.level.components.setToEntity(self.session.level.player, action);
                 }
             }
         },
     }
-}
-
-// used in cheats only
-fn movePlayerToPoint(self: *PlayMode, point: p.Point) !void {
-    std.log.debug("Move player to {any}", .{point});
-    try self.session.level.components.setToEntity(
-        self.session.level.player,
-        c.Position{ .point = point },
-    );
-    try self.updateTarget();
-    self.session.viewport.centeredAround(point);
-    try self.session.render.redraw(self.session, self.entity_in_focus);
 }
 
 pub fn tick(self: *PlayMode) anyerror!void {
@@ -146,7 +108,7 @@ pub fn tick(self: *PlayMode) anyerror!void {
         return;
 
     try self.session.render.drawQuickActionButton(self.quick_action);
-    // we should update target only if player did some action at this tick
+    // we should update target only if the player did some action at this tick
     var should_update_target: bool = false;
 
     if (self.is_player_turn) {
@@ -158,16 +120,18 @@ pub fn tick(self: *PlayMode) anyerror!void {
             if (self.session.level.components.getForEntity(self.session.level.player, c.Action)) |action| {
                 self.is_player_turn = false;
                 should_update_target = true;
-                try self.updateEnemies(action.move_points);
+                // every action shout take some amount of points
+                std.debug.assert(action.move_points > 0);
+                try self.addMovePointsToEnemies(action.move_points);
             }
         }
     } else {
         if (self.current_enemy < self.enemies.items.len) {
-            const actor: *Enemy = &self.enemies.items[self.current_enemy];
-            if (try actor.doMove()) {
-                if (self.session.level.components.getForEntity(actor.entity, c.Action)) |action| {
+            const enemy: *Enemy = &self.enemies.items[self.current_enemy];
+            if (try enemy.doMove()) {
+                if (self.session.level.components.getForEntity(enemy.entity, c.Action)) |action| {
                     if (action.type == .hit) {
-                        self.attacking_entity = actor.entity;
+                        self.attacking_entity = enemy.entity;
                     }
                 }
                 self.moved_enemies += 1;
@@ -187,6 +151,7 @@ pub fn tick(self: *PlayMode) anyerror!void {
 fn runSystems(self: *PlayMode) !void {
     try ActionSystem.doActions(self.session);
     try CollisionSystem.handleCollisions(self.session);
+    // collision could lead to new actions
     // if the player had collision with enemy, that enemy should appear in focus
     if (self.session.level.components.getForEntity(self.session.level.player, c.Action)) |action| {
         switch (action.type) {
@@ -199,13 +164,11 @@ fn runSystems(self: *PlayMode) !void {
             else => {},
         }
     }
-    // collision could lead to new actions
-    try ActionSystem.doActions(self.session);
     try DamageSystem.handleDamage(self.session);
 }
 
 /// Collect NPC and set them move points
-fn updateEnemies(self: *PlayMode, move_points: u8) !void {
+fn addMovePointsToEnemies(self: *PlayMode, move_points: u8) !void {
     self.current_enemy = 0;
     self.enemies.clearRetainingCapacity();
     var itr = self.session.level.query().get(c.NPC);

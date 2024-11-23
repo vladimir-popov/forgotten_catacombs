@@ -6,14 +6,14 @@ const log = std.log.scoped(.viewport);
 
 const Viewport = @This();
 
-pub const Cell = struct {
-    symbol: u21,
+pub const DrawableSymbol = struct {
+    codepoint: g.Codepoint,
     mode: g.Render.DrawingMode,
 };
 
 const SceneBuffer = struct {
     const VersionedCell = struct {
-        cell: Cell,
+        symbol: DrawableSymbol,
         z_order: u2,
         ver: u1,
         is_changed: bool,
@@ -46,7 +46,7 @@ const SceneBuffer = struct {
         self.current_iteration = 1;
         for (0..self.rows.len) |r| {
             for (self.rows[r]) |*cell| {
-                cell.cell.symbol = 0;
+                cell.symbol.codepoint = 0;
                 cell.z_order = 0;
                 cell.ver = 0;
                 cell.is_changed = false;
@@ -73,10 +73,10 @@ const SceneBuffer = struct {
                     continue;
                 }
 
-                if (cell.cell.symbol < 255) {
-                    try writer.writeByte(@intCast(cell.cell.symbol));
+                if (cell.symbol.codepoint < 255) {
+                    try writer.writeByte(@intCast(cell.symbol.codepoint));
                 } else {
-                    const len = try std.unicode.utf8Encode(cell.cell.symbol, &buf);
+                    const len = try std.unicode.utf8Encode(cell.symbol.codepoint, &buf);
                     _ = try writer.write(buf[0..len]);
                 }
             }
@@ -91,7 +91,7 @@ pub const CellIterator = struct {
     r_idx: u8 = 0,
     c_idx: u8 = 0,
 
-    pub fn next(self: *CellIterator) ?struct { p.Point, Cell } {
+    pub fn next(self: *CellIterator) ?struct { p.Point, DrawableSymbol } {
         while (true) {
             defer self.c_idx += 1;
 
@@ -106,7 +106,7 @@ pub const CellIterator = struct {
 
             const cell = &self.buffer.rows[self.r_idx][self.c_idx];
             if (cell.is_changed) {
-                return .{ .{ .row = self.r_idx + 1, .col = self.c_idx + 1 }, cell.cell };
+                return .{ .{ .row = self.r_idx + 1, .col = self.c_idx + 1 }, cell.symbol };
             }
         }
     }
@@ -136,7 +136,7 @@ pub fn deinit(self: *Viewport) void {
 pub fn setSymbol(
     self: Viewport,
     point_on_viewport: p.Point,
-    codepoint: u21,
+    codepoint: g.Codepoint,
     mode: g.Render.DrawingMode,
     z_order: u2,
 ) void {
@@ -154,12 +154,12 @@ pub fn setSymbol(
 
     // if the symbol is not changed from the previous iteration, the version
     // of the cell should not be changed
-    if (cell.cell.symbol == codepoint and cell.cell.mode == mode) return;
+    if (cell.symbol.codepoint == codepoint and cell.symbol.mode == mode) return;
 
     // if the new symbol is under the existed at the same iteration, do nothing too
-    if (cell.ver == self.buffer.current_iteration and cell.z_order > z_order and cell.cell.mode == mode) return;
+    if (cell.ver == self.buffer.current_iteration and cell.z_order > z_order and cell.symbol.mode == mode) return;
 
-    cell.cell = .{ .symbol = codepoint, .mode = mode };
+    cell.symbol = .{ .codepoint = codepoint, .mode = mode };
     cell.z_order = z_order;
     cell.is_changed = true;
 }
@@ -180,15 +180,21 @@ fn onEntityMoved(ptr: *anyopaque, event: g.events.Event) !void {
     const entity_moved = event.entity_moved;
 
     // keep player on the screen:
-    const inner_region = self.innerRegion();
-    if (entity_moved.direction == .up and entity_moved.moved_to.row < inner_region.top_left.row)
-        self.move(entity_moved.direction);
-    if (entity_moved.direction == .down and entity_moved.moved_to.row > inner_region.bottomRightRow())
-        self.move(entity_moved.direction);
-    if (entity_moved.direction == .left and entity_moved.moved_to.col < inner_region.top_left.col)
-        self.move(entity_moved.direction);
-    if (entity_moved.direction == .right and entity_moved.moved_to.col > inner_region.bottomRightCol())
-        self.move(entity_moved.direction);
+    switch (entity_moved.target) {
+        .new_place => |place| self.centeredAround(place),
+        .direction => |direction| {
+            const inner_region = self.innerRegion();
+            const new_place = entity_moved.moved_from.movedTo(direction);
+            if (direction == .up and new_place.row < inner_region.top_left.row)
+                self.move(direction);
+            if (direction == .down and new_place.row > inner_region.bottomRightRow())
+                self.move(direction);
+            if (direction == .left and new_place.col < inner_region.top_left.col)
+                self.move(direction);
+            if (direction == .right and new_place.col > inner_region.bottomRightCol())
+                self.move(direction);
+        },
+    }
 }
 
 /// Moves the screen to have the point in the center.

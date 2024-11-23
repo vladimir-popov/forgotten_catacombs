@@ -14,12 +14,13 @@ pub fn doActions(session: *g.GameSession) !void {
         const position = components[2];
         log.debug("Do action {s} by the entity {d}", .{ @tagName(action.type), entity });
         switch (action.type) {
-            .move => |*move| {
-                _ = try handleMoveAction(session, entity, position, move);
+            .move => |move| {
+                _ = try handleMoveAction(session, entity, position, move.target);
             },
             .open => |door| {
                 try session.level.components.setComponentsToEntity(door, g.entities.OpenedDoor);
-                try session.level.setPlacementWithPlayer(session.level.player_placement);
+                // opening the door can change visible places
+                try session.level.updatePlacementWithPlayer(session.level.player_placement);
             },
             .close => |door| {
                 try session.level.components.setComponentsToEntity(door, g.entities.ClosedDoor);
@@ -49,13 +50,16 @@ fn handleMoveAction(
     session: *g.GameSession,
     entity: g.Entity,
     position: *c.Position,
-    move: *c.Action.Move,
+    target: c.Action.Move.Target,
 ) !bool {
-    const new_position = position.point.movedTo(move.direction);
-    if (checkCollision(session, new_position)) |obstacle| {
+    const new_place = switch (target) {
+        .direction => |direction| position.point.movedTo(direction),
+        .new_place => |place| place,
+    };
+    if (checkCollision(session, new_place)) |obstacle| {
         try session.level.components.setToEntity(
             entity,
-            c.Collision{ .entity = entity, .obstacle = obstacle, .at = new_position },
+            c.Collision{ .entity = entity, .obstacle = obstacle, .at = new_place },
         );
         return false;
     }
@@ -64,11 +68,10 @@ fn handleMoveAction(
             .entity = entity,
             .is_player = (entity == session.level.player),
             .moved_from = position.point,
-            .moved_to = new_position,
-            .direction = move.direction,
+            .target = target,
         },
     };
-    position.point.move(move.direction);
+    position.point = new_place;
     try session.events.sendEvent(event);
     return true;
 }

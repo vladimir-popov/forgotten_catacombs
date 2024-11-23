@@ -38,12 +38,13 @@ pub const Doorway = struct {
     placement_from: *Placement,
     placement_to: *Placement,
 
-    pub inline fn oppositePlacement(self: Doorway, placement: *const Placement) *Placement {
-        if (self.placement_from == placement)
-            return self.placement_to
-        else {
-            std.debug.assert(self.placement_to == placement);
+    pub inline fn oppositePlacement(self: Doorway, placement: *const Placement) ?*Placement {
+        if (self.placement_from == placement) {
+            return self.placement_to;
+        } else if (self.placement_to == placement) {
             return self.placement_from;
+        } else {
+            return null;
         }
     }
 };

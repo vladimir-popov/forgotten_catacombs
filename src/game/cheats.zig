@@ -1,9 +1,9 @@
 const std = @import("std");
 const g = @import("game_pkg.zig");
 const p = g.primitives;
+const c = g.components;
 
 pub const Cheat = union(enum) {
-    refresh_screen,
     move_player_to_entrance,
     move_player_to_exit,
     // Moves the player to the point on the screen
@@ -20,5 +20,41 @@ pub const Cheat = union(enum) {
             return .move_player_to_exit;
         }
         return null;
+    }
+
+    pub fn toAction(self: Cheat, session: *const g.GameSession) ?c.Action {
+        switch (self) {
+            .move_player_to_entrance => {
+                var itr = session.level.query().get2(c.Ladder, c.Position);
+                while (itr.next()) |tuple| {
+                    if (tuple[1].direction == .up) {
+                        return movePlayerToPoint(tuple[2].point);
+                    }
+                }
+            },
+            .move_player_to_exit => {
+                var itr = session.level.query().get2(c.Ladder, c.Position);
+                while (itr.next()) |tuple| {
+                    if (tuple[1].direction == .down) {
+                        return movePlayerToPoint(tuple[2].point);
+                    }
+                }
+            },
+            .move_player => |point_on_screen| {
+                const screen_corner = session.viewport.region.top_left;
+                return movePlayerToPoint(.{
+                    .row = point_on_screen.row + screen_corner.row,
+                    .col = point_on_screen.col + screen_corner.col,
+                });
+            },
+        }
+        return null;
+    }
+
+    inline fn movePlayerToPoint(place: p.Point) g.components.Action {
+        return .{
+            .type = .{ .move = g.components.Action.Move{ .target = .{ .new_place = place } } },
+            .move_points = 1,
+        };
     }
 };

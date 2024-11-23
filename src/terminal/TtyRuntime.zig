@@ -177,7 +177,6 @@ pub fn TtyRuntime(comptime ROWS: u8, comptime COLS: u8) type {
                         // handle mouse buttons only on press
                         if (m.is_released) return null;
                         switch (m.button) {
-                            .RIGHT => self.cheat = .refresh_screen,
                             .LEFT => {
                                 // -1 for border
                                 self.cheat = .{ .move_player = .{

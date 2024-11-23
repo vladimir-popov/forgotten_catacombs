@@ -70,7 +70,7 @@ pub fn generate(
     }
 
     self.player = try self.addNewEntity(player, entrance_place[1]);
-    try self.setPlacementWithPlayer(entrance_place[0]);
+    try self.updatePlacementWithPlayer(entrance_place[0]);
     log.debug("The Player entity id is {d}", .{self.player});
 
     var doors = self.dungeon.doorways.iterator();
@@ -99,8 +99,10 @@ pub fn isVisible(ptr: *anyopaque, place: p.Point) g.Render.Visibility {
             if (self.components.getForEntityUnsafe(doorway.door_id, c.Door).state == .closed)
                 continue;
 
-            if (doorway.oppositePlacement(self.player_placement).contains(place))
-                return .visible;
+            if (doorway.oppositePlacement(self.player_placement)) |placement| {
+                if (placement.contains(place))
+                    return .visible;
+            }
         }
     }
     if (self.map.visited_places.isSet(place.row, place.col))
@@ -147,16 +149,27 @@ fn updatePlacement(ptr: *anyopaque, event: g.events.Event) !void {
     const self: *Level = @ptrCast(@alignCast(ptr));
     const entity_moved = event.entity_moved;
 
-    if (self.player_placement.contains(entity_moved.moved_to)) return;
+    if (self.player_placement.contains(entity_moved.movedTo())) return;
 
     if (self.dungeon.doorways.getPtr(entity_moved.moved_from)) |doorway| {
-        const placement = doorway.oppositePlacement(self.player_placement);
-        std.debug.assert(placement.contains(entity_moved.moved_to));
-        try self.setPlacementWithPlayer(placement);
+        if (doorway.oppositePlacement(self.player_placement)) |placement| {
+            try self.updatePlacementWithPlayer(placement);
+            return;
+        }
     }
+    // should happens only on using cheat
+    log.warn("Full scan of the placements to find the player", .{});
+    for (self.dungeon.placements.items) |placement| {
+        if (placement.contains(entity_moved.movedTo())) {
+            try self.updatePlacementWithPlayer(placement);
+            return;
+        }
+    }
+    log.err("It looks like the player is outside of any placement", .{});
 }
 
-pub fn setPlacementWithPlayer(self: *Level, placement: *const g.Dungeon.Placement) !void {
+/// Updates the placement with player and changes visible places
+pub fn updatePlacementWithPlayer(self: *Level, placement: *const g.Dungeon.Placement) !void {
     log.debug("New placement with player: {any}", .{placement});
     self.player_placement = placement;
     try self.map.addVisitedPlacement(placement);
@@ -164,7 +177,7 @@ pub fn setPlacementWithPlayer(self: *Level, placement: *const g.Dungeon.Placemen
     while (doorways.next()) |door_place| {
         if (self.dungeon.doorways.getPtr(door_place.*)) |doorway| {
             if (self.components.getForEntity(doorway.door_id, c.Door)) |door| if (door.state == .opened)
-                try self.map.addVisitedPlacement(doorway.oppositePlacement(self.player_placement));
+                if (doorway.oppositePlacement(self.player_placement)) |pl| try self.map.addVisitedPlacement(pl);
         }
     }
 }

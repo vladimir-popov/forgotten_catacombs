@@ -64,7 +64,7 @@ pub fn initNew(
     const entrance = 0;
     try self.level.generate(
         self.level_arena.allocator(),
-        seed + self.level.depth,
+        seed,
         0,
         g.entities.Player,
         entrance,
