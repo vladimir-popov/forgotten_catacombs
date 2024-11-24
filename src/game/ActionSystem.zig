@@ -12,7 +12,9 @@ pub fn doActions(session: *g.GameSession) !void {
         const entity = components[0];
         const action = components[1];
         const position = components[2];
-        log.debug("Do action {s}({d}) by the entity {d}", .{ @tagName(action.type), action.move_points, entity });
+        if (std.log.logEnabled(.debug, .action_system) and action.type != .undefined) {
+            log.debug("Do action {s}({d}) by the entity {d}", .{ @tagName(action.type), action.move_points, entity });
+        }
         switch (action.type) {
             .move => |move| {
                 _ = try handleMoveAction(session, entity, position, move.target);
@@ -34,7 +36,7 @@ pub fn doActions(session: *g.GameSession) !void {
                 }
             },
             .move_to_level => |ladder| {
-                try session.level.components.removeFromEntity(entity, c.Action);
+                try session.level.components.setToEntity(entity, c.Action{ .type = .undefined, .move_points = 0 });
                 try session.moveToLevel(ladder);
                 // we have to break the function here, because of iterator is
                 // invalid now.
@@ -42,7 +44,7 @@ pub fn doActions(session: *g.GameSession) !void {
             },
             else => {},
         }
-        try session.level.components.removeFromEntity(entity, c.Action);
+        try session.level.components.setToEntity(entity, c.Action{ .type = .undefined, .move_points = 0 });
     }
 }
 

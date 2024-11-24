@@ -67,6 +67,8 @@ pub const Action = struct {
         keep_moving: bool = false,
     };
     pub const Type = union(enum) {
+        /// 
+        undefined,
         /// Skip the round
         wait,
         /// An entity is going to move in the direction
