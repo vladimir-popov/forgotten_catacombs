@@ -218,7 +218,7 @@ pub inline fn innerRegion(self: Viewport) p.Region {
 
 /// Gets the point in the dungeon and return its coordinates on the screen.
 pub inline fn relative(self: Viewport, point: p.Point) p.Point {
-    return .{ .row = point.row - self.region.top_left.row, .col = point.col - self.region.top_left.col };
+    return .{ .row = point.row - self.region.top_left.row + 1, .col = point.col - self.region.top_left.col + 1 };
 }
 
 pub fn move(self: *Viewport, direction: p.Direction) void {

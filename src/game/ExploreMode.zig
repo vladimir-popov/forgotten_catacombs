@@ -8,7 +8,7 @@ const p = g.primitives;
 const log = std.log.scoped(.pause_mode);
 
 const ExploreMode = @This();
-const ArrayOfEntitiesOnScreen = std.ArrayList(struct { g.Entity, p.Point, u21 });
+const ArrayOfEntitiesOnScreen = std.ArrayList(struct { g.Entity, p.Point, g.Codepoint });
 
 session: *g.GameSession,
 /// Arrays of entities and their positions on the screen

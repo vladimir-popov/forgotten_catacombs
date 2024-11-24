@@ -25,9 +25,7 @@ pub const EntityDied = struct {
     is_player: bool,
 };
 
-pub const PlayerHit = struct {
-    target: g.Entity
-};
+pub const PlayerHit = struct { target: g.Entity };
 
 pub const Event = union(enum) {
     const Tag = @typeInfo(Event).Union.tag_type.?;

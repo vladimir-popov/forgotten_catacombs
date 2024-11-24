@@ -10,8 +10,7 @@ pub const std_options: std.Options = .{
     .logFn = Logger.writeLog,
     .log_level = .info,
     .log_scope_levels = &[_]std.log.ScopeLevel{
-        .{ .scope = .action_system, .level = .debug },
-        .{ .scope = .play_mode, .level = .debug },
+        .{ .scope = .pause_mode, .level = .debug },
     },
 };
 
