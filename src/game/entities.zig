@@ -7,8 +7,8 @@ pub const Player = c.Components{
     .sprite = .{ .codepoint = '@', .z_order = 3 },
     .description = .{ .name = "You" },
     .health = .{ .max = 100, .current = 50 },
-    .melee_weapon = .{ .max_damage = 3, .move_points = 5 },
-    .speed = .{ .move_points = 10 },
+    .weapon = .{ .max_damage = 3, .move_scale = 0.5 },
+    .speed = .{ .move_speed = 10 },
 };
 
 pub fn Entrance(this_ladder: g.Entity, that_ladder: ?g.Entity) c.Components {
@@ -40,10 +40,10 @@ pub const ClosedDoor = c.Components{
 };
 
 pub const Rat = c.Components{
-    .npc = .{ .type = .melee },
+    .npc = .{},
     .sprite = .{ .codepoint = 'r', .z_order = 3 },
     .description = .{ .name = "Rat" },
     .health = .{ .max = 10, .current = 10 },
-    .melee_weapon = .{ .max_damage = 3, .move_points = 10 },
-    .speed = .{ .move_points = 10 },
+    .weapon = .{ .max_damage = 3 },
+    .speed = .{ .move_speed = 10 },
 };

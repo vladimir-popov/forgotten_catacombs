@@ -22,7 +22,7 @@ pub const Cheat = union(enum) {
         return null;
     }
 
-    pub fn toAction(self: Cheat, session: *const g.GameSession) ?c.Action {
+    pub fn toAction(self: Cheat, session: *const g.GameSession) ?g.Action {
         switch (self) {
             .move_player_to_entrance => {
                 var itr = session.level.query().get2(c.Ladder, c.Position);
@@ -51,10 +51,7 @@ pub const Cheat = union(enum) {
         return null;
     }
 
-    inline fn movePlayerToPoint(place: p.Point) g.components.Action {
-        return .{
-            .type = .{ .move = g.components.Action.Move{ .target = .{ .new_place = place } } },
-            .move_points = 1,
-        };
+    inline fn movePlayerToPoint(place: p.Point) g.Action {
+        return .{ .move = g.Action.Move{ .target = .{ .new_place = place } } };
     }
 };

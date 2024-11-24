@@ -214,6 +214,37 @@ pub fn ComponentsManager(comptime ComponentsStruct: type) type {
             return getForEntity(self, entity, C) orelse unreachable;
         }
 
+        pub fn getForEntity2(
+            self: *const Self,
+            entity: Entity,
+            comptime Cmp1: type,
+            comptime Cmp2: type,
+        ) ?struct { Entity, *Cmp1, *Cmp2 } {
+            if (self.getForEntity(entity, Cmp1)) |c1| {
+                if (self.getForEntity(entity, Cmp2)) |c2| {
+                    return .{ entity, c1, c2 };
+                }
+            }
+            return null;
+        }
+
+        pub fn getForEntity3(
+            self: *const Self,
+            entity: Entity,
+            comptime Cmp1: type,
+            comptime Cmp2: type,
+            comptime Cmp3: type,
+        ) ?struct { Entity, *Cmp1, *Cmp2, *Cmp3 } {
+            if (self.getForEntity(entity, Cmp1)) |c1| {
+                if (self.getForEntity(entity, Cmp2)) |c2| {
+                    if (self.getForEntity(entity, Cmp3)) |c3| {
+                        return .{ entity, c1, c2, c3 };
+                    }
+                }
+            }
+            return null;
+        }
+
         /// Adds the component of the type `C` to the entity, or replace existed.
         pub fn setToEntity(self: *Self, entity: Entity, component: anytype) !void {
             const C = @TypeOf(component);
@@ -383,10 +414,8 @@ pub fn ComponentsQuery(comptime ComponentsUnion: type) type {
                     while (self.idx < self.entities.len) {
                         const entity = self.entities[self.idx];
                         self.idx += 1;
-                        if (self.components.getForEntity(entity, Cmp1)) |c1| {
-                            if (self.components.getForEntity(entity, Cmp2)) |c2| {
-                                return .{ entity, c1, c2 };
-                            }
+                        if (self.components.getForEntity2(entity, Cmp1, Cmp2)) |res| {
+                            return res;
                         }
                     }
                     return null;
@@ -408,12 +437,8 @@ pub fn ComponentsQuery(comptime ComponentsUnion: type) type {
                     while (self.idx < self.entities.len) {
                         const entity = self.entities[self.idx];
                         self.idx += 1;
-                        if (self.components.getForEntity(entity, Cmp1)) |c1| {
-                            if (self.components.getForEntity(entity, Cmp2)) |c2| {
-                                if (self.components.getForEntity(entity, Cmp3)) |c3| {
-                                    return .{ entity, c1, c2, c3 };
-                                }
-                            }
+                        if (self.components.getForEntity3(entity, Cmp1, Cmp2, Cmp3)) |res| {
+                            return res;
                         }
                     }
                     return null;

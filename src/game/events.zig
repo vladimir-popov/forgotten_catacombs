@@ -10,7 +10,7 @@ pub const EntityMoved = struct {
     entity: g.Entity,
     is_player: bool,
     moved_from: p.Point,
-    target: g.components.Action.Move.Target,
+    target: g.Action.Move.Target,
 
     pub fn movedTo(self: EntityMoved) p.Point {
         return switch (self.target) {
@@ -25,11 +25,16 @@ pub const EntityDied = struct {
     is_player: bool,
 };
 
+pub const PlayerHit = struct {
+    target: g.Entity
+};
+
 pub const Event = union(enum) {
     const Tag = @typeInfo(Event).Union.tag_type.?;
 
     entity_moved: EntityMoved,
     entity_died: EntityDied,
+    player_hit: PlayerHit,
 
     pub fn get(self: Event, comptime tag: Tag) ?std.meta.TagPayload(Event, tag) {
         switch (self) {

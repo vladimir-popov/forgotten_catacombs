@@ -241,10 +241,10 @@ fn drawHorizontalBorderLine(self: Render, row_on_display: u8, length: u8) !void 
 }
 
 /// Draws quick action button, or hide it if quick_action is null.
-pub fn drawQuickActionButton(self: Render, quick_action: ?c.Action) !void {
+pub fn drawQuickActionButton(self: Render, quick_action: ?g.Action) !void {
     // Draw the quick action
     if (quick_action) |qa| {
-        switch (qa.type) {
+        switch (qa) {
             .wait => try self.drawZone(2, "Wait", .inverted),
             .open => try self.drawZone(2, "Open", .inverted),
             .close => try self.drawZone(2, "Close", .inverted),

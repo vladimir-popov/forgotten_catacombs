@@ -60,6 +60,7 @@ pub fn initNew(
     };
     try events.subscribeOn(.entity_moved, self.viewport.subscriber());
     try events.subscribeOn(.entity_moved, self.level.subscriber());
+    try events.subscribeOn(.player_hit, self.play_mode.subscriber());
 
     const entrance = 0;
     try self.level.generate(
