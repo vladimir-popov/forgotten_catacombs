@@ -59,7 +59,11 @@ pub fn init(
 /// Removes completed animations.
 pub fn drawScene(self: Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
     try self.drawDungeon(session.level.dungeon, session.viewport);
-    try self.drawSprites(session.level, session.viewport, entity_in_focus);
+    try self.drawSprites(session.level, session.viewport);
+    // to draw the entity in focus over the player (when the player is on the ladder as example)
+    if (entity_in_focus) |entity|
+        if (session.level.components.getForEntity2(entity, c.Position, c.Sprite)) |tuple|
+            try self.drawSprite(session.viewport, tuple[2].*, tuple[1].point, .inverted);
     try self.drawAnimationsFrame(session, entity_in_focus);
     try self.drawInfoBar(session, entity_in_focus);
     try self.drawChangedSymbols(&session.viewport);
@@ -115,16 +119,12 @@ fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order
     else
         return .gt;
 }
-/// Draw sprites inside the screen and highlights the sprite of the entity in focus.
-fn drawSprites(self: Render, level: g.Level, viewport: g.Viewport, entity_in_focus: ?g.Entity) !void {
+/// Draw sprites inside the screen
+fn drawSprites(self: Render, level: g.Level, viewport: g.Viewport) !void {
     var itr = level.query().get2(c.Position, c.Sprite);
     while (itr.next()) |tuple| {
         if (!viewport.region.containsPoint(tuple[1].point)) continue;
-        const mode: g.Render.DrawingMode = if (entity_in_focus == tuple[0])
-            .inverted
-        else
-            .normal;
-        try self.drawSprite(viewport, tuple[2].*, tuple[1].point, mode);
+        try self.drawSprite(viewport, tuple[2].*, tuple[1].point, .normal);
     }
 }
 

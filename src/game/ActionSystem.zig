@@ -43,40 +43,38 @@ pub const Action = union(enum) {
     move_to_level: c.Ladder,
 };
 
-session: *g.GameSession,
-
 /// Handles intentions to do some actions
-pub fn doAction(self: ActionSystem, entity: g.Entity, action: Action, move_speed: MovePoints) anyerror!MovePoints {
+pub fn doAction(session: *g.GameSession, entity: g.Entity, action: Action, move_speed: MovePoints) anyerror!MovePoints {
     if (std.log.logEnabled(.debug, .action_system) and action != .do_nothing) {
         log.debug("Do action {s} by the entity {d}", .{ @tagName(action), entity });
     }
     switch (action) {
         .wait => return move_speed,
         .move => |move| {
-            if (self.session.level.components.getForEntity(entity, c.Position)) |position|
-                return self.doMove(entity, position, move.target, move_speed);
+            if (session.level.components.getForEntity(entity, c.Position)) |position|
+                return doMove(session, entity, position, move.target, move_speed);
         },
         .open => |door| {
-            try self.session.level.components.setComponentsToEntity(door, g.entities.OpenedDoor);
+            try session.level.components.setComponentsToEntity(door, g.entities.OpenedDoor);
             // opening the door by player can change visible places
-            if (entity == self.session.level.player) {
-                try self.session.level.updatePlacementWithPlayer(self.session.level.player_placement);
+            if (entity == session.level.player) {
+                try session.level.updatePlacementWithPlayer(session.level.player_placement);
             }
             return move_speed;
         },
         .close => |door| {
-            try self.session.level.components.setComponentsToEntity(door, g.entities.ClosedDoor);
+            try session.level.components.setComponentsToEntity(door, g.entities.ClosedDoor);
             // closing the door by player can change visible places
-            if (entity == self.session.level.player) {
-                try self.session.level.updatePlacementWithPlayer(self.session.level.player_placement);
+            if (entity == session.level.player) {
+                try session.level.updatePlacementWithPlayer(session.level.player_placement);
             }
             return move_speed;
         },
         .hit => |hit| {
-            return self.doHit(entity, hit.by_weapon, move_speed, hit.target, hit.target_health);
+            return doHit(session, entity, hit.by_weapon, move_speed, hit.target, hit.target_health);
         },
         .move_to_level => |ladder| {
-            try self.session.moveToLevel(ladder);
+            try session.moveToLevel(ladder);
         },
         else => {},
     }
@@ -84,7 +82,7 @@ pub fn doAction(self: ActionSystem, entity: g.Entity, action: Action, move_speed
 }
 
 fn doMove(
-    self: ActionSystem,
+    session: *g.GameSession,
     entity: g.Entity,
     from_position: *c.Position,
     target: g.Action.Move.Target,
@@ -94,33 +92,33 @@ fn doMove(
         .direction => |direction| from_position.point.movedTo(direction),
         .new_place => |place| place,
     };
-    if (self.checkCollision(entity, new_place)) |action| {
-        return try self.doAction(entity, action, move_speed);
+    if (checkCollision(session, entity, new_place)) |action| {
+        return try doAction(session, entity, action, move_speed);
     }
     const event = g.events.Event{
         .entity_moved = .{
             .entity = entity,
-            .is_player = (entity == self.session.level.player),
+            .is_player = (entity == session.level.player),
             .moved_from = from_position.point,
             .target = target,
         },
     };
     from_position.point = new_place;
-    try self.session.events.sendEvent(event);
+    try session.events.sendEvent(event);
     return move_speed;
 }
 
-fn checkCollision(self: ActionSystem, actor: g.Entity, position: p.Point) ?Action {
-    switch (self.session.level.dungeon.cellAt(position)) {
+fn checkCollision(session: *g.GameSession, actor: g.Entity, position: p.Point) ?Action {
+    switch (session.level.dungeon.cellAt(position)) {
         .nothing, .wall => return .do_nothing,
-        .door => if (self.session.level.entityAt(position)) |entity| {
-            if (self.session.level.components.getForEntity(entity, c.Door)) |door|
+        .door => if (session.level.entityAt(position)) |entity| {
+            if (session.level.components.getForEntity(entity, c.Door)) |door|
                 if (door.state == .closed)
                     return .{ .open = entity };
         },
-        .floor => if (self.session.level.entityAt(position)) |entity| {
-            if (self.session.level.components.getForEntity(entity, c.Health)) |health|
-                if (self.session.level.components.getForEntity(actor, c.Weapon)) |weapon|
+        .floor => if (session.level.entityAt(position)) |entity| {
+            if (session.level.components.getForEntity(entity, c.Health)) |health|
+                if (session.level.components.getForEntity(actor, c.Weapon)) |weapon|
                     return .{ .hit = .{ .target = entity, .target_health = health, .by_weapon = weapon } };
         },
     }
@@ -128,29 +126,29 @@ fn checkCollision(self: ActionSystem, actor: g.Entity, position: p.Point) ?Actio
 }
 
 fn doHit(
-    self: ActionSystem,
+    session: *g.GameSession,
     actor: g.Entity,
     actor_weapon: *const c.Weapon,
     actor_speed: MovePoints,
     enemy: g.Entity,
     enemy_health: *c.Health,
 ) !MovePoints {
-    const damage = actor_weapon.generateDamage(self.session.prng.random());
+    const damage = actor_weapon.generateDamage(session.prng.random());
     log.debug("The entity {d} received damage {d} from {d}", .{ enemy, damage, actor });
     enemy_health.current -= @as(i16, @intCast(damage));
-    try self.session.level.components.setToEntity(
+    try session.level.components.setToEntity(
         enemy,
         c.Animation{ .frames = &c.Animation.Presets.hit },
     );
-    if (actor == self.session.level.player) {
-        try self.session.events.sendEvent(.{ .player_hit = .{ .target = enemy } });
+    if (actor == session.level.player) {
+        try session.events.sendEvent(.{ .player_hit = .{ .target = enemy } });
     }
     if (enemy_health.current <= 0) {
         log.debug("The entity {d} is died", .{enemy});
-        try self.session.level.removeEntity(enemy);
-        try self.session.events.sendEvent(
+        try session.level.removeEntity(enemy);
+        try session.events.sendEvent(
             g.events.Event{
-                .entity_died = .{ .entity = enemy, .is_player = (enemy == self.session.level.player) },
+                .entity_died = .{ .entity = enemy, .is_player = (enemy == session.level.player) },
             },
         );
     }

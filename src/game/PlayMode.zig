@@ -48,7 +48,7 @@ const EnemiesIterator = struct {
     /// Collects NPC and adds them move points
     fn addMovePoints(self: *EnemiesIterator, move_points: u8) !void {
         try self.resetNotCompleted();
-        var itr = self.session.level.query().get(c.NPC);
+        var itr = self.session.level.query().get(c.Initiative);
         while (itr.next()) |tuple| {
             var node = try self.arena.allocator().create(std.DoublyLinkedList(g.Entity).Node);
             node.data = tuple[0];
@@ -72,7 +72,7 @@ const EnemiesIterator = struct {
     }
 
     /// Returns the enemies circle back, till all of them complete their moves
-    fn next(self: *EnemiesIterator) ?struct { g.Entity, *c.NPC, *c.Position, *c.Speed } {
+    fn next(self: *EnemiesIterator) ?struct { g.Entity, *c.Initiative, *c.Position, *c.Speed } {
         if (self.next_enemy == null) {
             self.next_enemy = self.not_completed.first;
         }
@@ -83,7 +83,7 @@ const EnemiesIterator = struct {
             } else {
                 self.next_enemy = self.not_completed.first;
             }
-            if (self.session.level.components.getForEntity3(enemy, c.NPC, c.Position, c.Speed)) |res| {
+            if (self.session.level.components.getForEntity3(enemy, c.Initiative, c.Position, c.Speed)) |res| {
                 return res;
             } else {
                 log.debug("It looks like the entity {d} was removed. Remove it from enemies", .{enemy});
@@ -96,7 +96,6 @@ const EnemiesIterator = struct {
 
 session: *g.GameSession,
 enemies: EnemiesIterator,
-action_system: ActionSystem,
 /// Highlighted entity
 entity_in_focus: ?g.Entity,
 // An action which could be applied to the entity in focus
@@ -106,7 +105,6 @@ pub fn init(session: *g.GameSession, alloc: std.mem.Allocator) !PlayMode {
     return .{
         .session = session,
         .enemies = try EnemiesIterator.init(alloc, session),
-        .action_system = ActionSystem{ .session = session },
         .entity_in_focus = null,
         .quick_action = null,
     };
@@ -180,7 +178,7 @@ pub fn tick(self: *PlayMode) !void {
         const position = tuple[2];
         const speed = tuple[3];
         if (AI.action(self.session, enemy, position.point, speed.move_speed, npc.move_points)) |action| {
-            const mp = try self.action_system.doAction(enemy, action, speed.move_speed);
+            const mp = try ActionSystem.doAction(self.session, enemy, action, speed.move_speed);
             std.debug.assert(mp <= npc.move_points);
             tuple[1].move_points -= mp;
         } else {
@@ -193,7 +191,7 @@ pub fn tick(self: *PlayMode) !void {
         // If the player did some action
         if (maybe_action) |action| {
             const speed = self.session.level.components.getForEntityUnsafe(self.session.level.player, c.Speed);
-            const mp = try self.action_system.doAction(self.session.level.player, action, speed.move_speed);
+            const mp = try ActionSystem.doAction(self.session, self.session.level.player, action, speed.move_speed);
             if (mp > 0) {
                 try self.updateTarget();
                 // find all enemies and give them move points

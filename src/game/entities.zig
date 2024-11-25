@@ -40,7 +40,7 @@ pub const ClosedDoor = c.Components{
 };
 
 pub const Rat = c.Components{
-    .npc = .{},
+    .initiative = .{},
     .sprite = .{ .codepoint = 'r', .z_order = 3 },
     .description = .{ .name = "Rat" },
     .health = .{ .max = 10, .current = 10 },

@@ -80,7 +80,7 @@ pub const Weapon = struct {
     }
 };
 
-pub const NPC = struct {
+pub const Initiative = struct {
     move_points: g.MovePoints = 0,
 };
 
@@ -91,7 +91,7 @@ pub const Components = struct {
     health: ?Health = null,
     ladder: ?Ladder = null,
     weapon: ?Weapon = null,
-    npc: ?NPC = null,
+    initiative: ?Initiative = null,
     position: ?Position = null,
     speed: ?Speed = null,
     sprite: ?Sprite = null,
