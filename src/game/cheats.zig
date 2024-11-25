@@ -4,24 +4,24 @@ const p = g.primitives;
 const c = g.components;
 
 pub const Cheat = union(enum) {
-    move_player_to_entrance,
-    move_player_to_exit,
+    move_player_to_ladder_up,
+    move_player_to_ladder_down,
     // Moves the player to the point on the screen
     move_player: p.Point,
 
     pub fn parse(str: []const u8) ?Cheat {
         if (std.mem.eql(u8, "move to entrance", str)) {
-            return .move_player_to_entrance;
+            return .move_player_to_ladder_up;
         }
         if (std.mem.eql(u8, "move to exit", str)) {
-            return .move_player_to_exit;
+            return .move_player_to_ladder_down;
         }
         return null;
     }
 
     pub fn toAction(self: Cheat, session: *const g.GameSession) ?g.Action {
         switch (self) {
-            .move_player_to_entrance => {
+            .move_player_to_ladder_up => {
                 var itr = session.level.query().get2(c.Ladder, c.Position);
                 while (itr.next()) |tuple| {
                     if (tuple[1].direction == .up) {
@@ -29,7 +29,7 @@ pub const Cheat = union(enum) {
                     }
                 }
             },
-            .move_player_to_exit => {
+            .move_player_to_ladder_down => {
                 var itr = session.level.query().get2(c.Ladder, c.Position);
                 while (itr.next()) |tuple| {
                     if (tuple[1].direction == .down) {

@@ -11,7 +11,7 @@ pub const Player = c.Components{
     .speed = .{ .move_speed = 10 },
 };
 
-pub fn Entrance(this_ladder: g.Entity, that_ladder: ?g.Entity) c.Components {
+pub fn LadderUp(this_ladder: g.Entity, that_ladder: ?g.Entity) c.Components {
     return .{
         .ladder = .{ .this_ladder = this_ladder, .that_ladder = that_ladder, .direction = .up },
         .description = .{ .name = "Ladder up" },
@@ -19,7 +19,7 @@ pub fn Entrance(this_ladder: g.Entity, that_ladder: ?g.Entity) c.Components {
     };
 }
 
-pub fn Exit(this_ladder: g.Entity, that_ladder: ?g.Entity) c.Components {
+pub fn LadderDown(this_ladder: g.Entity, that_ladder: ?g.Entity) c.Components {
     return .{
         .ladder = .{ .this_ladder = this_ladder, .that_ladder = that_ladder, .direction = .down },
         .description = .{ .name = "Ladder down" },

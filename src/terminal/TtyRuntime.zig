@@ -184,8 +184,8 @@ pub fn TtyRuntime(comptime ROWS: u8, comptime COLS: u8) type {
                                     .col = m.col - cols_pad - 1,
                                 } };
                             },
-                            .WHEEL_UP => self.cheat = .move_player_to_entrance,
-                            .WHEEL_DOWN => self.cheat = .move_player_to_exit,
+                            .WHEEL_UP => self.cheat = .move_player_to_ladder_up,
+                            .WHEEL_DOWN => self.cheat = .move_player_to_ladder_down,
                             else => return null,
                         }
                         break :cheat .cheat;

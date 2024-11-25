@@ -13,7 +13,7 @@ const ecs = g.ecs;
 const PlayMode = @import("PlayMode.zig");
 const ExploreMode = @import("ExploreMode.zig");
 
-const log = std.log.scoped(.GameSession);
+const log = std.log.scoped(.game_session);
 
 const GameSession = @This();
 
@@ -62,17 +62,17 @@ pub fn initNew(
     try events.subscribeOn(.entity_moved, self.level.subscriber());
     try events.subscribeOn(.player_hit, self.play_mode.subscriber());
 
-    const entrance = 0;
+    const to_ladder = 0;
     try self.level.generate(
         self.level_arena.allocator(),
         seed,
         0,
         g.entities.Player,
-        entrance,
         null,
+        to_ladder,
         .down,
     );
-    try self.level.movePlayerToLadder(entrance);
+    try self.level.movePlayerToLadder(to_ladder);
     self.viewport.centeredAround(self.level.playerPosition().point);
 }
 
@@ -81,36 +81,31 @@ pub fn moveToLevel(self: *GameSession, ladder: c.Ladder) !void {
     // TODO persist the current level
     _ = self.level_arena.reset(.retain_capacity);
 
-    var this_ladder: g.Entity = undefined;
-    var that_ladder: ?g.Entity = undefined;
-    var new_depth: u8 = undefined;
-    switch (ladder.direction) {
-        .up => {
-            this_ladder = ladder.that_ladder orelse
-                std.debug.panic("Attempt to move up from the level {d}", .{self.level.depth});
-            that_ladder = ladder.this_ladder;
-            new_depth = self.level.depth - 1;
-        },
-        .down => {
-            this_ladder = ladder.this_ladder;
-            that_ladder = ladder.that_ladder;
-            new_depth = self.level.depth + 1;
-        },
-    }
-    std.log.debug(
-        "\n--------------------\nMove {s} from the level {d} to {d}\n--------------------",
-        .{ @tagName(ladder.direction), self.level.depth, new_depth },
+    const new_depth: u8 = switch (ladder.direction) {
+        .up => self.level.depth - 1,
+        .down => self.level.depth + 1,
+    };
+    std.log.info(
+        \\
+        \\--------------------
+        \\Move {s} from the level {d} to {d}
+        \\By the {any}
+        \\--------------------
+    ,
+        .{ @tagName(ladder.direction), self.level.depth, new_depth, ladder },
     );
+    const ladder_on_target_level = ladder.target_ladder orelse
+        std.debug.panic("Attempt to move up from the level {d}", .{self.level.depth});
     try self.level.generate(
         self.level_arena.allocator(),
         self.seed + new_depth,
         new_depth,
         player,
-        this_ladder,
-        that_ladder,
+        ladder.this_ladder,
+        ladder_on_target_level,
         ladder.direction,
     );
-    try self.level.movePlayerToLadder(this_ladder);
+    try self.level.movePlayerToLadder(ladder_on_target_level);
     self.viewport.centeredAround(self.level.playerPosition().point);
 }
 

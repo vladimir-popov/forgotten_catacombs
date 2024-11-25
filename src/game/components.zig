@@ -52,7 +52,15 @@ pub const Ladder = struct {
     /// The id of the ladder on this level.
     this_ladder: g.Entity,
     /// The id of the ladder on that level.
-    that_ladder: ?g.Entity,
+    target_ladder: ?g.Entity,
+
+    pub fn invert(self: Ladder) Ladder {
+        return .{
+            .direction = if (self.direction == .up) .down else .up,
+            .this_ladder = self.target_ladder,
+            .target_ladder = self.this_ladder,
+        };
+    }
 };
 
 pub const Health = struct {
