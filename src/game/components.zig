@@ -50,15 +50,15 @@ pub const Ladder = struct {
     /// Direction of the ladder
     direction: Direction,
     /// The id of the ladder on this level.
-    this_ladder: g.Entity,
+    id: g.Entity,
     /// The id of the ladder on that level.
-    target_ladder: ?g.Entity,
+    target_ladder: g.Entity,
 
-    pub fn invert(self: Ladder) Ladder {
+    pub fn inverted(self: Ladder) Ladder {
         return .{
             .direction = if (self.direction == .up) .down else .up,
-            .this_ladder = self.target_ladder,
-            .target_ladder = self.this_ladder,
+            .id = self.target_ladder,
+            .target_ladder = self.id,
         };
     }
 };

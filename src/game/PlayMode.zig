@@ -120,18 +120,25 @@ pub fn refresh(self: *PlayMode, entity_in_focus: ?g.Entity) !void {
     if (entity_in_focus) |ef| if (ef == self.session.level.player) {
         self.entity_in_focus = null;
     };
+    log.debug("Update target after refresh", .{});
     try self.updateTarget();
     try self.session.render.redraw(self.session, self.entity_in_focus);
 }
 
 pub fn subscriber(self: *PlayMode) g.events.Subscriber {
-    return .{ .context = self, .onEvent = changeTarget };
+    return .{ .context = self, .onEvent = handleEvent };
 }
 
-fn changeTarget(ptr: *anyopaque, event: g.events.Event) !void {
+fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
     const self: *PlayMode = @ptrCast(@alignCast(ptr));
-    self.entity_in_focus = event.player_hit.target;
-    try self.updateTarget();
+    switch (event) {
+        .player_hit => {
+            self.entity_in_focus = event.player_hit.target;
+            log.debug("Update target after player hit", .{});
+            try self.updateTarget();
+        },
+        else => {},
+    }
 }
 
 fn handleInput(self: *PlayMode, button: g.Button) !?g.Action {
@@ -193,6 +200,7 @@ pub fn tick(self: *PlayMode) !void {
             const speed = self.session.level.components.getForEntityUnsafe(self.session.level.player, c.Speed);
             const mp = try ActionSystem.doAction(self.session, self.session.level.player, action, speed.move_speed);
             if (mp > 0) {
+                log.debug("Update target after action {any}", .{action});
                 try self.updateTarget();
                 // find all enemies and give them move points
                 try self.enemies.addMovePoints(mp);
@@ -206,6 +214,7 @@ fn updateTarget(self: *PlayMode) anyerror!void {
         const qa_str = if (self.quick_action) |qa| @tagName(qa) else "not defined";
         log.debug("Entity in focus {any}; quick action {s}", .{ self.entity_in_focus, qa_str });
     }
+    log.debug("Update target. Current entity in focus is {any}", .{self.entity_in_focus});
 
     // check if quick action still available for target
     if (self.entity_in_focus) |target| if (self.calculateQuickActionForTarget(target)) |qa| {

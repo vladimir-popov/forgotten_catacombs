@@ -623,7 +623,7 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
             count: u8,
             value: bool,
         ) void {
-            if (row == 0  or row >= rows) return;
+            if (row == 0 or row >= rows) return;
             self.bitsets[row - 1].setRangeValue(
                 .{ .start = from_col - 1, .end = from_col + count - 1 },
                 value,

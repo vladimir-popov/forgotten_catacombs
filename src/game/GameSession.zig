@@ -62,26 +62,22 @@ pub fn initNew(
     try events.subscribeOn(.entity_moved, self.level.subscriber());
     try events.subscribeOn(.player_hit, self.play_mode.subscriber());
 
-    const to_ladder = 0;
     try self.level.generate(
         self.level_arena.allocator(),
         seed,
         0,
         g.entities.Player,
-        null,
-        to_ladder,
-        .down,
+        c.Ladder{ .direction = .down, .id = 0, .target_ladder = 1 },
     );
-    try self.level.movePlayerToLadder(to_ladder);
     self.viewport.centeredAround(self.level.playerPosition().point);
 }
 
-pub fn moveToLevel(self: *GameSession, ladder: c.Ladder) !void {
+pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
     const player = try self.level.components.entityToStruct(self.level.player);
     // TODO persist the current level
     _ = self.level_arena.reset(.retain_capacity);
 
-    const new_depth: u8 = switch (ladder.direction) {
+    const new_depth: u8 = switch (by_ladder.direction) {
         .up => self.level.depth - 1,
         .down => self.level.depth + 1,
     };
@@ -92,21 +88,18 @@ pub fn moveToLevel(self: *GameSession, ladder: c.Ladder) !void {
         \\By the {any}
         \\--------------------
     ,
-        .{ @tagName(ladder.direction), self.level.depth, new_depth, ladder },
+        .{ @tagName(by_ladder.direction), self.level.depth, new_depth, by_ladder },
     );
-    const ladder_on_target_level = ladder.target_ladder orelse
-        std.debug.panic("Attempt to move up from the level {d}", .{self.level.depth});
     try self.level.generate(
         self.level_arena.allocator(),
         self.seed + new_depth,
         new_depth,
         player,
-        ladder.this_ladder,
-        ladder_on_target_level,
-        ladder.direction,
+        by_ladder,
     );
-    try self.level.movePlayerToLadder(ladder_on_target_level);
     self.viewport.centeredAround(self.level.playerPosition().point);
+    self.play_mode.entity_in_focus = null;
+    self.play_mode.quick_action = null;
 }
 
 // TODO: Load session from file

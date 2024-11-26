@@ -15,14 +15,14 @@ const Error = error{RoomWasNotFound};
 const Level = @This();
 
 entities: std.ArrayList(g.Entity),
+/// The new new entity id
+next_entity: g.Entity = 0,
 /// Collection of the components of the entities
 components: ecs.ComponentsManager(c.Components),
 dungeon: g.Dungeon,
 map: g.LevelMap,
 /// The depth of the current level. The session_seed + depth is unique seed for the level.
 depth: u8,
-/// The new new entity id
-next_entity: g.Entity = 0,
 /// The entity id of the player
 player: g.Entity = undefined,
 player_placement: *const g.Dungeon.Placement = undefined,
@@ -35,7 +35,6 @@ pub fn generate(
     depth: u8,
     player: c.Components,
     from_ladder: c.Ladder,
-    direction: c.Ladder.Direction,
 ) !void {
     self.entities = std.ArrayList(g.Entity).init(alloc);
     self.components = try ecs.ComponentsManager(c.Components).init(alloc);
@@ -44,7 +43,7 @@ pub fn generate(
     self.depth = depth;
     log.debug(
         "Generate level {s} on depth {d} with seed {d} from ladder {any}",
-        .{ @tagName(direction), self.depth, seed, from_ladder },
+        .{ @tagName(from_ladder.direction), self.depth, seed, from_ladder },
     );
     // This prng is used to generate entity on this level. But the dungeon should have its own prng
     // to be able to be regenerated when the player travels from level to level.
@@ -53,18 +52,31 @@ pub fn generate(
     try bspGenerator.generateDungeon(alloc, prng.random(), &self.dungeon);
     log.debug("The dungeon has been generated", .{});
 
-    self.next_entity = from_ladder.target_ladder + 1;
-    var entrance_place: struct { *const g.Dungeon.Placement, p.Point } =
-        try self.addLadder(prng.random(), from_ladder.invert());
+    self.next_entity = @max(from_ladder.id, from_ladder.target_ladder) + 1;
+    // Add ladder by which the player has come to this level first time
+    const placement_and_place = try self.addLadder(prng.random(), from_ladder.inverted());
+    // Generate player on the ladder
+    self.player = try self.addNewEntity(player);
+    log.debug("The player entity id is {d}", .{self.player});
+    try self.components.setToEntity(self.player, c.Position{ .point = placement_and_place[1] });
+    // Add ladder to the next level
+    _ = try self.addLadder(prng.random(), .{
+        .direction = from_ladder.direction,
+        .id = self.newEntity(),
+        .target_ladder = self.newEntity(),
+    });
 
     var doors = self.dungeon.doorways.iterator();
     while (doors.next()) |entry| {
-        entry.value_ptr.door_id = try self.addNewEntity(g.entities.ClosedDoor, entry.key_ptr.*);
+        entry.value_ptr.door_id = try self.addNewEntity(g.entities.ClosedDoor);
+        try self.components.setToEntity(entry.value_ptr.door_id, c.Position{ .point = entry.key_ptr.* });
     }
 
     for (0..prng.random().uintLessThan(u8, 10) + 10) |_| {
         try self.addEnemy(prng.random(), g.entities.Rat);
     }
+    // move player to the entrance
+    try self.updatePlacementWithPlayer(placement_and_place[0]);
 }
 
 pub fn visibilityStrategy(self: *Level) g.Render.VisibilityStrategy {
@@ -104,21 +116,24 @@ pub fn playerPosition(self: *const Level) *c.Position {
     return self.components.getForEntityUnsafe(self.player, c.Position);
 }
 
-pub fn movePlayerToLadder(self: *Level, ladder: g.Entity) !void {
-    if (self.components.getForEntity2(ladder, c.Ladder, c.Position)) |tuple| {
-        log.debug("Move player to the ladder {d} {any} at {any}", .{ ladder, tuple[1], tuple[2].point });
-        try self.updatePlacementWithPlayer(entrance_place[0]);
-        try self.components.setToEntity(self.player, tuple[2].*);
-    }
-}
+pub const EntitiesOnPositionIterator = struct {
+    place: p.Point,
+    positions: *ecs.ArraySet(c.Position),
+    current: usize = 0,
 
-pub fn entityAt(self: Level, place: p.Point) ?g.Entity {
-    for (self.components.arrayOf(c.Position).components.items, 0..) |position, idx| {
-        if (position.point.eql(place)) {
-            return self.components.arrayOf(c.Position).index_entity.get(@intCast(idx));
+    pub fn next(self: *EntitiesOnPositionIterator) ?g.Entity {
+        defer self.current +|= 1;
+
+        if (self.current < self.positions.components.items.len) {
+            if (self.positions.components.items[self.current].point.eql(self.place))
+                return self.positions.index_entity.get(@intCast(self.current));
         }
+        return null;
     }
-    return null;
+};
+
+pub fn entityAt(self: Level, place: p.Point) EntitiesOnPositionIterator {
+    return .{ .place = place, .positions = self.components.arrayOf(c.Position) };
 }
 
 pub fn subscriber(self: *Level) g.events.Subscriber {
@@ -165,31 +180,30 @@ pub fn updatePlacementWithPlayer(self: *Level, placement: *const g.Dungeon.Place
     }
 }
 
-fn initPlayer(self: *Level) !void {
-    log.debug("Init player {d}", .{self.player});
-    var itr = self.query().get2(c.Position, c.Ladder);
-    while (itr.next()) |tuple| {
-        switch (tuple[2].direction) {
-            .up => {
-                try self.components.setToEntity(self.player, tuple[1].*);
-                break;
-            },
-            else => {},
-        }
-    }
-}
-
-fn addNewEntity(self: *Level, components: c.Components, place: p.Point) !g.Entity {
+fn addNewEntity(self: *Level, components: c.Components) !g.Entity {
     const entity = self.newEntity();
     try self.entities.append(entity);
     try self.components.setComponentsToEntity(entity, components);
-    try self.components.setToEntity(entity, c.Position{ .point = place });
     return entity;
+}
+
+fn addLadder(self: *Level, rand: std.Random, ladder: c.Ladder) !struct { *const g.Dungeon.Placement, p.Point } {
+    try self.entities.append(ladder.id);
+    try self.components.setComponentsToEntity(ladder.id, g.entities.Ladder(ladder));
+    const placement = switch (ladder.direction) {
+        .up => try getFirstRoom(self.dungeon),
+        .down => try getLastRoom(self.dungeon),
+    };
+    const place = self.randomEmptyPlace(rand, .{ .region = placement.room.region }) orelse
+        std.debug.panic("No empty space in the placement {any}", .{placement});
+    try self.components.setToEntity(ladder.id, c.Position{ .point = place });
+    return .{ placement, place };
 }
 
 fn addEnemy(self: *Level, rand: std.Random, enemy: c.Components) !void {
     if (self.randomEmptyPlace(rand, .anywhere)) |place| {
-        _ = try self.addNewEntity(enemy, place);
+        const id = try self.addNewEntity(enemy);
+        try self.components.setToEntity(id, c.Position{ .point = place });
     }
 }
 

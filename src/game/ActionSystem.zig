@@ -74,7 +74,8 @@ pub fn doAction(session: *g.GameSession, entity: g.Entity, action: Action, move_
             return doHit(session, entity, hit.by_weapon, move_speed, hit.target, hit.target_health);
         },
         .move_to_level => |ladder| {
-            try session.moveToLevel(ladder);
+            try session.movePlayerToLevel(ladder);
+            return move_speed;
         },
         else => {},
     }
@@ -92,6 +93,8 @@ fn doMove(
         .direction => |direction| from_position.point.movedTo(direction),
         .new_place => |place| place,
     };
+    if (from_position.point.eql(new_place)) return 0;
+
     if (checkCollision(session, entity, new_place)) |action| {
         return try doAction(session, entity, action, move_speed);
     }
@@ -111,15 +114,17 @@ fn doMove(
 fn checkCollision(session: *g.GameSession, actor: g.Entity, position: p.Point) ?Action {
     switch (session.level.dungeon.cellAt(position)) {
         .nothing, .wall => return .do_nothing,
-        .door => if (session.level.entityAt(position)) |entity| {
-            if (session.level.components.getForEntity(entity, c.Door)) |door|
-                if (door.state == .closed)
-                    return .{ .open = entity };
-        },
-        .floor => if (session.level.entityAt(position)) |entity| {
-            if (session.level.components.getForEntity(entity, c.Health)) |health|
-                if (session.level.components.getForEntity(actor, c.Weapon)) |weapon|
-                    return .{ .hit = .{ .target = entity, .target_health = health, .by_weapon = weapon } };
+        .door, .floor => {
+            var itr = session.level.entityAt(position);
+            while (itr.next()) |entity| {
+                if (session.level.components.getForEntity(entity, c.Health)) |health|
+                    if (session.level.components.getForEntity(actor, c.Weapon)) |weapon|
+                        return .{ .hit = .{ .target = entity, .target_health = health, .by_weapon = weapon } };
+
+                if (session.level.components.getForEntity(entity, c.Door)) |door|
+                    if (door.state == .closed)
+                        return .{ .open = entity };
+            }
         },
     }
     return null;

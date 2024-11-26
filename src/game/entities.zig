@@ -11,19 +11,18 @@ pub const Player = c.Components{
     .speed = .{ .move_speed = 10 },
 };
 
-pub fn LadderUp(this_ladder: g.Entity, that_ladder: ?g.Entity) c.Components {
-    return .{
-        .ladder = .{ .this_ladder = this_ladder, .that_ladder = that_ladder, .direction = .up },
-        .description = .{ .name = "Ladder up" },
-        .sprite = .{ .codepoint = '<', .z_order = 2 },
-    };
-}
-
-pub fn LadderDown(this_ladder: g.Entity, that_ladder: ?g.Entity) c.Components {
-    return .{
-        .ladder = .{ .this_ladder = this_ladder, .that_ladder = that_ladder, .direction = .down },
-        .description = .{ .name = "Ladder down" },
-        .sprite = .{ .codepoint = '>', .z_order = 2 },
+pub fn Ladder(ladder: c.Ladder) c.Components {
+    return switch (ladder.direction) {
+        .up => .{
+            .ladder = ladder,
+            .description = .{ .name = "Ladder up" },
+            .sprite = .{ .codepoint = '<', .z_order = 2 },
+        },
+        .down => .{
+            .ladder = ladder,
+            .description = .{ .name = "Ladder down" },
+            .sprite = .{ .codepoint = '>', .z_order = 2 },
+        },
     };
 }
 
