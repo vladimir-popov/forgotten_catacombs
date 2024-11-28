@@ -157,7 +157,7 @@ pub fn setSymbol(
     if (cell.symbol.codepoint == codepoint and cell.symbol.mode == mode) return;
 
     // if the new symbol is under the existed at the same iteration, do nothing too
-    if (cell.ver == self.buffer.current_iteration and cell.z_order > z_order and cell.symbol.mode == mode) return;
+    if (cell.ver == self.buffer.current_iteration and cell.z_order > z_order and mode == .normal) return;
 
     cell.symbol = .{ .codepoint = codepoint, .mode = mode };
     cell.z_order = z_order;

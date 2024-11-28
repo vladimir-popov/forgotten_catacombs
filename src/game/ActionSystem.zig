@@ -111,19 +111,21 @@ fn doMove(
     return move_speed;
 }
 
-fn checkCollision(session: *g.GameSession, actor: g.Entity, position: p.Point) ?Action {
-    switch (session.level.dungeon.cellAt(position)) {
+fn checkCollision(session: *g.GameSession, actor: g.Entity, place: p.Point) ?Action {
+    switch (session.level.dungeon.cellAt(place)) {
         .nothing, .wall => return .do_nothing,
         .door, .floor => {
-            var itr = session.level.entityAt(position);
+            var itr = session.level.entityAt(place);
             while (itr.next()) |entity| {
+                if (session.level.components.getForEntity(entity, c.Door)) |door| {
+                    log.warn("Door {any} at {any}", .{ door, place });
+                    if (door.state == .closed)
+                        return .{ .open = entity };
+                }
+
                 if (session.level.components.getForEntity(entity, c.Health)) |health|
                     if (session.level.components.getForEntity(actor, c.Weapon)) |weapon|
                         return .{ .hit = .{ .target = entity, .target_health = health, .by_weapon = weapon } };
-
-                if (session.level.components.getForEntity(entity, c.Door)) |door|
-                    if (door.state == .closed)
-                        return .{ .open = entity };
             }
         },
     }

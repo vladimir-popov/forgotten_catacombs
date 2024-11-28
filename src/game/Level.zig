@@ -119,14 +119,15 @@ pub fn playerPosition(self: *const Level) *c.Position {
 pub const EntitiesOnPositionIterator = struct {
     place: p.Point,
     positions: *ecs.ArraySet(c.Position),
-    current: usize = 0,
+    next_idx: u8 = 0,
 
     pub fn next(self: *EntitiesOnPositionIterator) ?g.Entity {
-        defer self.current +|= 1;
-
-        if (self.current < self.positions.components.items.len) {
-            if (self.positions.components.items[self.current].point.eql(self.place))
-                return self.positions.index_entity.get(@intCast(self.current));
+        while (self.next_idx < self.positions.components.items.len) {
+            const idx = self.next_idx;
+            self.next_idx +|= 1;
+            const place = self.positions.components.items[idx].point;
+            if (self.place.eql(place))
+                return self.positions.index_entity.get(idx);
         }
         return null;
     }
