@@ -119,7 +119,7 @@ pub fn explore(self: *GameSession) !void {
 
 pub fn lookAround(self: *GameSession) !void {
     self.mode = .looking_around;
-    try self.render.redraw(self, null);
+    try self.looking_around.refresh();
 }
 
 pub inline fn tick(self: *GameSession) !void {

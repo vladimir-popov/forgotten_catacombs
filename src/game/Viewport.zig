@@ -14,7 +14,7 @@ pub const DrawableSymbol = struct {
 const SceneBuffer = struct {
     const VersionedCell = struct {
         symbol: DrawableSymbol,
-        z_order: u2,
+        z_order: g.ZOrder,
         ver: u1,
         is_changed: bool,
     };
@@ -138,7 +138,7 @@ pub fn setSymbol(
     point_on_viewport: p.Point,
     codepoint: g.Codepoint,
     mode: g.Render.DrawingMode,
-    z_order: u2,
+    z_order: g.ZOrder,
 ) void {
     std.debug.assert(point_on_viewport.row > 0);
     std.debug.assert(point_on_viewport.col > 0);
@@ -249,6 +249,44 @@ pub fn moveNTimes(self: *Viewport, direction: p.Direction, n: u8) void {
             if (self.region.bottomRightCol() < g.Dungeon.COLS) {
                 const n0 = @min(n, g.Dungeon.COLS - self.region.bottomRightCol());
                 self.region.top_left.col += n0;
+            }
+        },
+    }
+}
+
+/// Sets the line of spaces as a board on the passed side. Inverts the draw mode
+/// for few symbols in the middle.
+pub fn setBorderWithArrow(
+    self: *g.Viewport,
+    side: p.Direction,
+) void {
+    const arrow: g.Codepoint = switch (side) {
+        .up => '^',
+        .down => 'v',
+        .left => '<',
+        .right => '>',
+    };
+    const filler: g.Codepoint = ' ';
+    switch (side) {
+        .left, .right => {
+            for (1..self.region.rows + 1) |r| {
+                const is_middle = r == 1 + self.region.rows / 2;
+                const codepoint: g.Codepoint = if (is_middle) arrow else filler;
+                var point: p.Point = .{ .row = @intCast(r), .col = if (side == .left) 1 else self.region.cols };
+                point.row = @intCast(r);
+                self.setSymbol(point, codepoint, if (is_middle) .inverted else .normal, std.math.maxInt(g.ZOrder));
+            }
+        },
+        .up, .down => {
+            var point: p.Point = .{
+                .row = if (side == .up) 1 else self.region.rows,
+                .col = 1,
+            };
+            for (1..self.region.cols + 1) |cl| {
+                const is_middle = (cl == self.region.cols / 2);
+                const codepoint = if (is_middle) arrow else filler;
+                point.col = @intCast(cl);
+                self.setSymbol(point, codepoint, if (is_middle) .inverted else .normal, std.math.maxInt(g.ZOrder));
             }
         },
     }

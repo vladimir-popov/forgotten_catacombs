@@ -145,6 +145,9 @@ fn drawSprite(
     }
 }
 
+/// This method validates visibility of the passed place, and
+/// return the passed codepoint if the place is visible, ' ' if the place
+/// invisible, or the codepoint for invisible but known place.
 pub inline fn actualCodepoint(self: Render, codepoint: g.Codepoint, place: p.Point) g.Codepoint {
     return switch (self.visibility_strategy.isVisible(self.visibility_strategy.context, place)) {
         .visible => codepoint,
@@ -196,16 +199,6 @@ fn drawAnimationsFrame(self: Render, session: *g.GameSession, entity_in_focus: ?
 
 /// Draws the hit points of the player, and the name and hit points of the entity in focus.
 pub fn drawInfoBar(self: Render, session: *const g.GameSession, entity_in_focus: ?g.Entity) !void {
-    // Draw player's health, or pause mode indicator
-    switch (session.mode) {
-        .explore => try self.drawZone(0, "Pause", .inverted), 
-        .looking_around => try self.drawZone(1, "Looking around", .normal),
-        .play => if (session.level.components.getForEntity(session.level.player, c.Health)) |health| {
-            var buf = [_]u8{0} ** 8;
-            const text = try std.fmt.bufPrint(&buf, "HP: {d}", .{health.current});
-            try self.drawZone(0, text, .normal);
-        },
-    }
     // Draw the name and health of the entity in focus
     if (entity_in_focus) |entity| {
         var buf: [MIDDLE_ZONE_LENGTH]u8 = undefined;
@@ -231,7 +224,22 @@ pub fn drawInfoBar(self: Render, session: *const g.GameSession, entity_in_focus:
         }
         try self.drawZone(1, buf[0..len], .normal);
     } else {
+        try self.cleanZone(0);
         try self.cleanZone(1);
+        try self.cleanZone(2);
+    }
+    // Draw player's health, or pause mode indicator
+    switch (session.mode) {
+        .explore => try self.drawZone(0, "Pause", .inverted),
+        .looking_around => {
+            try self.drawZone(1, "Looking around", .normal);
+            try self.drawZone(2, "Cancel", .inverted);
+        },
+        .play => if (session.level.components.getForEntity(session.level.player, c.Health)) |health| {
+            var buf = [_]u8{0} ** 8;
+            const text = try std.fmt.bufPrint(&buf, "HP: {d}", .{health.current});
+            try self.drawZone(0, text, .normal);
+        },
     }
 }
 
