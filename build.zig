@@ -4,7 +4,7 @@
 const std = @import("std");
 
 const os_tag = @import("builtin").os.tag;
-const name = "ForgottenCatacomb";
+const name = "forgotten_catacombs";
 const pdx_file_name = name ++ ".pdx";
 
 pub fn build(b: *std.Build) !void {
@@ -40,21 +40,33 @@ pub fn build(b: *std.Build) !void {
     // ------------------------------------------------------------
     //                  Forgotten Catacomb Game
     // ------------------------------------------------------------
+
+    const target_name = if (desktop_target.query.cpu_arch) |cpu_arch|
+        if (desktop_target.query.os_tag) |os|
+            try std.fmt.allocPrint(b.allocator, "{s}-{s}-{s}", .{
+                name,
+                @tagName(cpu_arch),
+                @tagName(os),
+            })
+        else
+            name
+    else
+        name;
     const terminal_game_exe = b.addExecutable(.{
-        .name = name,
+        .name = target_name,
         .root_source_file = b.path("src/terminal/main.zig"),
         .target = desktop_target,
         .optimize = optimize,
     });
+    terminal_game_exe.linkLibC();
     terminal_game_exe.root_module.addImport("game", game_module);
     b.installArtifact(terminal_game_exe);
 
-    // Step to build and run the game in terminal
+    const run_game_step = b.step("run", "Run the Forgotten Catacombs in the terminal");
     const run_game_cmd = b.addRunArtifact(terminal_game_exe);
     if (b.args) |args| {
         run_game_cmd.addArgs(args);
     }
-    const run_game_step = b.step("run", "Run the Forgotten Catacomb in the terminal");
     run_game_step.dependOn(&run_game_cmd.step);
 
     // ------------------------------------------------------------
@@ -66,6 +78,7 @@ pub fn build(b: *std.Build) !void {
         .target = desktop_target,
         .optimize = optimize,
     });
+    dungeons_exe.linkLibC();
     dungeons_exe.root_module.addImport("game", game_module);
     b.installArtifact(dungeons_exe);
 
@@ -180,6 +193,7 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
         .filters = test_filter,
     });
+    ut_terminal.linkLibC();
     ut_terminal.root_module.addImport("game", game_module);
 
     b.installArtifact(ut_terminal);
