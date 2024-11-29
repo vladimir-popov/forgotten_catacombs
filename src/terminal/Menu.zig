@@ -49,13 +49,17 @@ pub fn Menu(comptime ROWS: u8, comptime COLS: u8) type {
                 },
                 else => {},
             }
+            try self.drawMenuItems();
         }
 
         pub fn show(self: *Self) !void {
             log.debug("Show menu with {d} items", .{self.items_count});
             self.is_shown = true;
             self.buffer.cleanAndWrap();
-            // draw items
+            try self.drawMenuItems();
+        }
+
+        inline fn drawMenuItems(self: Self) !void {
             for (0..self.items_count) |i| {
                 try self.drawMenuItem(@intCast(i), i == self.selected_item);
             }

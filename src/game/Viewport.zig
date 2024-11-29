@@ -221,23 +221,35 @@ pub inline fn relative(self: Viewport, point: p.Point) p.Point {
     return .{ .row = point.row - self.region.top_left.row + 1, .col = point.col - self.region.top_left.col + 1 };
 }
 
-pub fn move(self: *Viewport, direction: p.Direction) void {
+pub inline fn move(self: *Viewport, direction: p.Direction) void {
+    self.moveNTimes(direction, 1);
+}
+
+pub fn moveNTimes(self: *Viewport, direction: p.Direction, n: u8) void {
     switch (direction) {
         .up => {
-            if (self.region.top_left.row > 1)
-                self.region.top_left.row -= 1;
+            if (self.region.top_left.row > 1) {
+                const n0 = @min(n, self.region.top_left.row - 1);
+                self.region.top_left.row -= n0;
+            }
         },
         .down => {
-            if (self.region.bottomRightRow() < g.Dungeon.ROWS)
-                self.region.top_left.row += 1;
+            if (self.region.bottomRightRow() < g.Dungeon.ROWS) {
+                const n0 = @min(n, g.Dungeon.ROWS - self.region.bottomRightRow());
+                self.region.top_left.row += n0;
+            }
         },
         .left => {
-            if (self.region.top_left.col > 1)
-                self.region.top_left.col -= 1;
+            if (self.region.top_left.col > 1) {
+                const n0 = @min(n, self.region.top_left.col - 1);
+                self.region.top_left.col -= n0;
+            }
         },
         .right => {
-            if (self.region.bottomRightCol() < g.Dungeon.COLS)
-                self.region.top_left.col += 1;
+            if (self.region.bottomRightCol() < g.Dungeon.COLS) {
+                const n0 = @min(n, g.Dungeon.COLS - self.region.bottomRightCol());
+                self.region.top_left.col += n0;
+            }
         },
     }
 }

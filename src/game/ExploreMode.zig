@@ -42,7 +42,7 @@ pub fn refresh(self: *ExploreMode) !void {
 }
 
 pub fn tick(self: *ExploreMode) anyerror!void {
-    // Nothing should happened until the player pushes a button
+    // Nothing should happened until the player push a button
     if (try self.session.runtime.readPushedButtons()) |btn| {
         switch (btn.game_button) {
             .a => {},

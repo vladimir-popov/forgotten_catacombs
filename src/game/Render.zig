@@ -18,6 +18,7 @@
 ///   ╚═══════════════════════════════════════╝-------
 ///   | Zone 0 |        Zone 1       | Zone 2 |
 ///   |             Stats            | Button |
+///
 const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
@@ -73,14 +74,13 @@ pub fn drawScene(self: Render, session: *g.GameSession, entity_in_focus: ?g.Enti
 pub fn drawLevelOnly(self: Render, level: g.Level, viewport: *g.Viewport) !void {
     viewport.buffer.reset();
     try self.drawDungeon(level.dungeon, viewport.*);
-    try self.drawSprites(level, viewport.*, null);
+    try self.drawSprites(level, viewport.*);
     try self.drawChangedSymbols(viewport);
 }
 
 /// Clears the screen and draw all from scratch.
 /// Removes completed animations.
 pub fn redraw(self: Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
-    log.debug("REDRAW", .{});
     try self.clearDisplay();
     session.viewport.buffer.reset();
     // separate dung and stats.
@@ -198,7 +198,8 @@ fn drawAnimationsFrame(self: Render, session: *g.GameSession, entity_in_focus: ?
 pub fn drawInfoBar(self: Render, session: *const g.GameSession, entity_in_focus: ?g.Entity) !void {
     // Draw player's health, or pause mode indicator
     switch (session.mode) {
-        .explore => try self.drawZone(0, "Pause", .inverted),
+        .explore => try self.drawZone(0, "Pause", .inverted), 
+        .looking_around => try self.drawZone(1, "Looking around", .normal),
         .play => if (session.level.components.getForEntity(session.level.player, c.Health)) |health| {
             var buf = [_]u8{0} ** 8;
             const text = try std.fmt.bufPrint(&buf, "HP: {d}", .{health.current});

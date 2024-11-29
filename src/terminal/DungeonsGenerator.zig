@@ -62,18 +62,15 @@ const DungeonsGenerator = struct {
 
     fn generate(self: *DungeonsGenerator, seed: u64) !void {
         log.info("\n====================\nGenerate level with seed {d}\n====================\n", .{seed});
-        const entrance = 0;
         _ = self.level_arena.reset(.retain_capacity);
         try self.level.generate(
             self.level_arena.allocator(),
             seed,
             0,
             g.entities.Player,
-            entrance,
-            null,
-            .down,
+            .{ .direction = .down, .id = 0, .target_ladder = 1 },
         );
-        try self.level.movePlayerToLadder(entrance);
+        self.viewport.centeredAround(self.level.playerPosition().point);
         try self.render.clearDisplay();
         try self.draw();
     }

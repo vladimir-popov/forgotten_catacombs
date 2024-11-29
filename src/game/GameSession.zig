@@ -12,12 +12,13 @@ const ecs = g.ecs;
 
 const PlayMode = @import("PlayMode.zig");
 const ExploreMode = @import("ExploreMode.zig");
+const LookingAround = @import("LookingAroundMode.zig");
 
 const log = std.log.scoped(.game_session);
 
 const GameSession = @This();
 
-const Mode = enum { play, explore };
+const Mode = enum { play, explore, looking_around };
 
 /// This seed should help to make all levels of the single game session reproducible.
 seed: u64,
@@ -37,6 +38,7 @@ mode: Mode = .play,
 // stateful modes:
 play_mode: PlayMode,
 explore_mode: ExploreMode,
+looking_around: LookingAround,
 
 pub fn initNew(
     self: *GameSession,
@@ -57,6 +59,7 @@ pub fn initNew(
         .level_arena = std.heap.ArenaAllocator.init(arena.allocator()),
         .play_mode = try PlayMode.init(self, arena.allocator()),
         .explore_mode = try ExploreMode.init(self, arena.allocator()),
+        .looking_around = LookingAround.init(self),
     };
     try events.subscribeOn(.entity_moved, self.viewport.subscriber());
     try events.subscribeOn(.entity_moved, self.level.subscriber());
@@ -114,9 +117,15 @@ pub fn explore(self: *GameSession) !void {
     try self.explore_mode.refresh();
 }
 
+pub fn lookAround(self: *GameSession) !void {
+    self.mode = .looking_around;
+    try self.render.redraw(self, null);
+}
+
 pub inline fn tick(self: *GameSession) !void {
     switch (self.mode) {
         .play => try self.play_mode.tick(),
         .explore => try self.explore_mode.tick(),
+        .looking_around => try self.looking_around.tick(),
     }
 }
