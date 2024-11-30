@@ -29,7 +29,13 @@ pub fn create(alloc: std.mem.Allocator, runtime: g.Runtime, seed: u64) !*Game {
     self.* = .{
         .alloc = alloc,
         .runtime = runtime,
-        .render = try g.Render.init(runtime, self.game_session.level.visibilityStrategy()),
+        .render = try g.Render.init(
+            alloc,
+            runtime,
+            self.game_session.level.visibilityStrategy(),
+            g.DISPLAY_ROWS - 2,
+            g.DISPLAY_COLS,
+        ),
         .seed = seed,
         .state = .welcome,
         .game_session_arena = std.heap.ArenaAllocator.init(alloc),
@@ -37,6 +43,7 @@ pub fn create(alloc: std.mem.Allocator, runtime: g.Runtime, seed: u64) !*Game {
     };
     try self.events.init(&self.events_arena);
     try self.events.subscribeOn(.entity_died, self.subscriber());
+    try self.events.subscribeOn(.entity_moved, self.render.viewport.subscriber());
     try self.welcome();
     return self;
 }
@@ -44,6 +51,7 @@ pub fn create(alloc: std.mem.Allocator, runtime: g.Runtime, seed: u64) !*Game {
 pub fn destroy(self: *Game) void {
     self.game_session_arena.deinit();
     self.events_arena.deinit();
+    self.render.deinit();
     self.alloc.destroy(self);
 }
 
@@ -62,7 +70,7 @@ inline fn newGame(self: *Game) !void {
         &self.game_session_arena,
         self.seed,
         self.runtime,
-        self.render,
+        &self.render,
         &self.events,
     );
     try self.game_session.play(null);

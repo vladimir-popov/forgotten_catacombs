@@ -213,7 +213,7 @@ fn drawSprite(ptr: *anyopaque, codepoint: g.Codepoint, position_on_display: p.Po
     // to draw the text. To avoid extra argument, we will pass 0 terminated string here.
     var buf: [5]u8 = .{0} ** 5;
     const len = try std.unicode.utf8Encode(codepoint, &buf);
-    try self.drawTextOnDisplay(buf[0..len + 1], mode, x, y);
+    try self.drawTextOnDisplay(buf[0 .. len + 1], mode, x, y);
 }
 
 fn drawText(ptr: *anyopaque, text: []const u8, position_on_display: p.Point, mode: g.Render.DrawingMode) !void {

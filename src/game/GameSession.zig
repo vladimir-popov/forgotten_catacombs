@@ -25,10 +25,8 @@ seed: u64,
 /// The PRNG initialized by the session's seed. This prng is used to make any dynamic decision by AI, or game events,
 /// and should not be used to generate any level objects, to keep the levels reproducible.
 prng: std.Random.DefaultPrng,
-render: g.Render,
-/// Visible area
-viewport: g.Viewport,
 runtime: g.Runtime,
+render: *g.Render,
 events: *g.events.EventBus,
 /// The current level
 level: g.Level = undefined,
@@ -45,7 +43,7 @@ pub fn initNew(
     arena: *std.heap.ArenaAllocator,
     seed: u64,
     runtime: g.Runtime,
-    render: g.Render,
+    render: *g.Render,
     events: *g.events.EventBus,
 ) !void {
     log.debug("Begin the new game session with the seed {d}", .{seed});
@@ -53,7 +51,6 @@ pub fn initNew(
         .seed = seed,
         .prng = std.Random.DefaultPrng.init(seed),
         .render = render,
-        .viewport = try g.Viewport.init(arena.allocator(), g.DISPLAY_ROWS - 2, g.DISPLAY_COLS),
         .runtime = runtime,
         .events = events,
         .level_arena = std.heap.ArenaAllocator.init(arena.allocator()),
@@ -61,7 +58,6 @@ pub fn initNew(
         .explore_mode = try ExploreMode.init(self, arena.allocator()),
         .looking_around = LookingAround.init(self),
     };
-    try events.subscribeOn(.entity_moved, self.viewport.subscriber());
     try events.subscribeOn(.entity_moved, self.level.subscriber());
     try events.subscribeOn(.player_hit, self.play_mode.subscriber());
 
@@ -72,7 +68,7 @@ pub fn initNew(
         g.entities.Player,
         c.Ladder{ .direction = .down, .id = 0, .target_ladder = 1 },
     );
-    self.viewport.centeredAround(self.level.playerPosition().point);
+    self.render.viewport.centeredAround(self.level.playerPosition().point);
 }
 
 pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
@@ -100,7 +96,7 @@ pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
         player,
         by_ladder,
     );
-    self.viewport.centeredAround(self.level.playerPosition().point);
+    self.render.viewport.centeredAround(self.level.playerPosition().point);
     self.play_mode.entity_in_focus = null;
     self.play_mode.quick_action = null;
 }

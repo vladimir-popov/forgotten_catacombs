@@ -1,5 +1,5 @@
 /// Set of methods to draw the game.
-/// Comparing with `AnyRuntime`, this module contains methods
+/// Comparing with `Runtime`, this module contains methods
 /// to draw objects from the game domain.
 ///
 ///   ╔═══════════════════════════════════════╗-------
@@ -7,17 +7,18 @@
 ///   ║                                       ║ V
 ///   ║                                       ║ i
 ///   ║                                       ║ e   D
-///   ║                                       ║ w   i
+///   ║             SceneBuffer               ║ w   i
 ///   ║                                       ║ p   s
 ///   ║                                       ║ o   p
 ///   ║                                       ║ r   l
 ///   ║                                       ║ t   a
 ///   ║                                       ║ |   y
 ///   ║═══════════════════════════════════════║---
-///   ║HP: 100     Rat:||||||||||||||| Attack ║     |
+///   ║HP: 100     Rat:||||||||||||||| Attack ║     | <- the InfoBar is not buffered
 ///   ╚═══════════════════════════════════════╝-------
 ///   | Zone 0 |        Zone 1       | Zone 2 |
-///   |             Stats            | Button |
+///   |             Stats            |
+///   |Button B|                     |Button A|
 ///
 const std = @import("std");
 const cp = @import("codepoints.zig");
@@ -36,6 +37,148 @@ const MIDDLE_ZONE_LENGTH = g.DISPLAY_COLS - (OUT_ZONE_LENGTH + 1) * 2 - 2;
 
 const Render = @This();
 
+pub const DrawableSymbol = struct {
+    codepoint: g.Codepoint,
+    mode: g.Render.DrawingMode,
+};
+
+const SceneBuffer = struct {
+    const VersionedCell = struct {
+        symbol: DrawableSymbol,
+        z_order: g.ZOrder,
+        ver: u1,
+        is_changed: bool,
+    };
+    pub const Row = []VersionedCell;
+
+    rows: []Row,
+    arena: *std.heap.ArenaAllocator,
+    current_iteration: u1 = 1,
+
+    pub fn init(alloc: std.mem.Allocator, rows: u8, cols: u8) !SceneBuffer {
+        const arena = try alloc.create(std.heap.ArenaAllocator);
+        arena.* = std.heap.ArenaAllocator.init(alloc);
+        const arena_alloc = arena.allocator();
+        var self = SceneBuffer{ .arena = arena, .rows = try arena_alloc.alloc(Row, rows) };
+        for (0..rows) |r| {
+            self.rows[r] = try arena_alloc.alloc(VersionedCell, cols);
+        }
+        self.reset();
+        return self;
+    }
+
+    pub fn deinit(self: *SceneBuffer) void {
+        const alloc = self.arena.child_allocator;
+        self.arena.deinit();
+        alloc.destroy(self.arena);
+    }
+
+    pub fn reset(self: *SceneBuffer) void {
+        self.current_iteration = 1;
+        for (0..self.rows.len) |r| {
+            for (self.rows[r]) |*cell| {
+                cell.symbol.codepoint = 0;
+                cell.z_order = 0;
+                cell.ver = 0;
+                cell.is_changed = false;
+            }
+        }
+    }
+
+    fn setSymbol(
+        self: *SceneBuffer,
+        point_in_buffer: p.Point,
+        codepoint: g.Codepoint,
+        mode: g.Render.DrawingMode,
+        z_order: g.ZOrder,
+    ) void {
+        std.debug.assert(point_in_buffer.row > 0);
+        std.debug.assert(point_in_buffer.col > 0);
+        std.debug.assert(point_in_buffer.row <= self.rows.len);
+        std.debug.assert(point_in_buffer.col <= self.rows[0].len);
+
+        const cell = &self.rows[point_in_buffer.row - 1][point_in_buffer.col - 1];
+        defer cell.ver = self.current_iteration;
+
+        if (cell.ver != self.current_iteration) {
+            cell.is_changed = false;
+        }
+
+        // if the symbol is not changed from the previous iteration, the version
+        // of the cell should not be changed
+        if (cell.symbol.codepoint == codepoint and cell.symbol.mode == mode) return;
+
+        // if the new symbol is under the existed at the same iteration, do nothing too
+        if (cell.ver == self.current_iteration and cell.z_order > z_order and mode == .normal) return;
+
+        cell.symbol = .{ .codepoint = codepoint, .mode = mode };
+        cell.z_order = z_order;
+        cell.is_changed = true;
+    }
+
+    const CellIterator = struct {
+        buffer: *SceneBuffer,
+        r_idx: u8 = 0,
+        c_idx: u8 = 0,
+
+        pub fn next(self: *CellIterator) ?struct { p.Point, DrawableSymbol } {
+            while (true) {
+                defer self.c_idx += 1;
+
+                if (self.c_idx == self.buffer.rows[0].len) {
+                    self.r_idx += 1;
+                    self.c_idx = 0;
+                }
+                if (self.r_idx == self.buffer.rows.len) {
+                    self.buffer.current_iteration +%= 1;
+                    return null;
+                }
+
+                const cell = &self.buffer.rows[self.r_idx][self.c_idx];
+                if (cell.is_changed) {
+                    return .{ .{ .row = self.r_idx + 1, .col = self.c_idx + 1 }, cell.symbol };
+                }
+            }
+        }
+    };
+
+    fn changedSymbols(self: *SceneBuffer) CellIterator {
+        // self.dumpToLog();
+        return .{ .buffer = self };
+    }
+
+    fn dumpToLog(self: SceneBuffer) void {
+        if (std.log.logEnabled(.debug, .viewport)) {
+            // the biggest possible size of the viewport (in case when all codepoints < 255)
+            var buf: [g.Dungeon.ROWS * (g.Dungeon.COLS + 1) + 1]u8 = undefined;
+            var writer = std.io.fixedBufferStream(&buf);
+            self.write(writer.writer().any()) catch unreachable;
+            log.debug("\n{s}", .{buf});
+        }
+    }
+
+    fn write(self: SceneBuffer, writer: std.io.AnyWriter) !void {
+        var buf: [4]u8 = undefined;
+        for (self.rows) |row| {
+            for (row) |cell| {
+                if (!cell.is_changed) {
+                    try writer.writeByte(' ');
+                    continue;
+                }
+
+                if (cell.symbol.codepoint < 255) {
+                    try writer.writeByte(@intCast(cell.symbol.codepoint));
+                } else {
+                    const len = try std.unicode.utf8Encode(cell.symbol.codepoint, &buf);
+                    _ = try writer.write(buf[0..len]);
+                }
+            }
+            try writer.writeByte('\n');
+        }
+        try writer.writeByte(0);
+    }
+};
+
 /// Usually provided by the Level, but the DungeonGenerator ha the different implementation
 /// to make whole dungeon visible.
 pub const VisibilityStrategy = struct {
@@ -46,57 +189,69 @@ pub const VisibilityStrategy = struct {
 
 runtime: g.Runtime,
 visibility_strategy: VisibilityStrategy,
+/// Visible area
+viewport: g.Viewport,
+/// Cache for the visible area
+buffer: SceneBuffer,
 
 pub fn init(
+    alloc: std.mem.Allocator,
     runtime: g.Runtime,
     visibility_strategy: VisibilityStrategy,
+    scene_rows: u8,
+    scene_cols: u8,
 ) !Render {
     return .{
         .runtime = runtime,
         .visibility_strategy = visibility_strategy,
+        .viewport = try g.Viewport.init(scene_rows, scene_cols),
+        .buffer = try SceneBuffer.init(alloc, scene_rows, scene_cols),
     };
+}
+
+pub fn deinit(self: *Render) void {
+    self.buffer.deinit();
 }
 
 /// Draws dungeon, sprites, animations, and stats on the screen.
 /// Removes completed animations.
-pub fn drawScene(self: Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
-    try self.drawDungeon(session.level.dungeon, session.viewport);
-    try self.drawSprites(session.level, session.viewport);
+pub fn drawScene(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
+    try self.drawDungeon(session.level.dungeon);
+    try self.drawSprites(session.level);
     // to draw the entity in focus over the player (when the player is on the ladder as example)
     if (entity_in_focus) |entity|
         if (session.level.components.getForEntity2(entity, c.Position, c.Sprite)) |tuple|
-            try self.drawSprite(session.viewport, tuple[2].*, tuple[1].point, .inverted);
+            try self.drawSprite(tuple[2].*, tuple[1].point, .inverted);
     try self.drawAnimationsFrame(session, entity_in_focus);
     try self.drawInfoBar(session, entity_in_focus);
-    try self.drawChangedSymbols(&session.viewport);
+    try self.drawChangedSymbols();
 }
 
 // Should be used in DungeonGenerator only
-pub fn drawLevelOnly(self: Render, level: g.Level, viewport: *g.Viewport) !void {
-    viewport.buffer.reset();
-    try self.drawDungeon(level.dungeon, viewport.*);
-    try self.drawSprites(level, viewport.*);
-    try self.drawChangedSymbols(viewport);
+pub fn drawLevelOnly(self: *Render, level: g.Level) !void {
+    self.buffer.reset();
+    try self.drawDungeon(level.dungeon);
+    try self.drawSprites(level);
+    try self.drawChangedSymbols();
 }
 
 /// Clears the screen and draw all from scratch.
 /// Removes completed animations.
-pub fn redraw(self: Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
+pub fn redraw(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
     try self.clearDisplay();
-    session.viewport.buffer.reset();
-    // separate dung and stats.
-    // do not part of the drawScene in performance purpose
-    try self.drawHorizontalBorderLine(session.viewport.region.rows + 1, session.viewport.region.cols);
+    self.buffer.reset();
     try self.drawScene(session, entity_in_focus);
+    try self.drawHorizontalBorderLine(self.viewport.region.rows + 1, self.viewport.region.cols);
 }
 
+/// Clears both scene and info bar.
 pub inline fn clearDisplay(self: Render) !void {
     try self.runtime.clearDisplay();
 }
 
-fn drawDungeon(self: Render, dungeon: g.Dungeon, viewport: g.Viewport) anyerror!void {
-    var itr = dungeon.cellsInRegion(viewport.region);
-    var place = viewport.region.top_left;
+fn drawDungeon(self: *Render, dungeon: g.Dungeon) anyerror!void {
+    var itr = dungeon.cellsInRegion(self.viewport.region);
+    var place = self.viewport.region.top_left;
     var sprite = c.Sprite{ .codepoint = undefined, .z_order = 0 };
     while (itr.next()) |cell| {
         sprite.codepoint = switch (cell) {
@@ -104,10 +259,10 @@ fn drawDungeon(self: Render, dungeon: g.Dungeon, viewport: g.Viewport) anyerror!
             .wall => cp.wall_visible,
             else => cp.nothing,
         };
-        try self.drawSprite(viewport, sprite, place, .normal);
+        try self.drawSprite(sprite, place, .normal);
         place.move(.right);
-        if (!viewport.region.containsPoint(place)) {
-            place.col = viewport.region.top_left.col;
+        if (!self.viewport.region.containsPoint(place)) {
+            place.col = self.viewport.region.top_left.col;
             place.move(.down);
         }
     }
@@ -121,28 +276,27 @@ fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order
         return .gt;
 }
 /// Draw sprites inside the screen
-fn drawSprites(self: Render, level: g.Level, viewport: g.Viewport) !void {
+fn drawSprites(self: *Render, level: g.Level) !void {
     var itr = level.query().get2(c.Position, c.Sprite);
     while (itr.next()) |tuple| {
-        if (!viewport.region.containsPoint(tuple[1].point)) continue;
-        try self.drawSprite(viewport, tuple[2].*, tuple[1].point, .normal);
+        if (!self.viewport.region.containsPoint(tuple[1].point)) continue;
+        try self.drawSprite(tuple[2].*, tuple[1].point, .normal);
     }
 }
 
 fn drawSprite(
-    self: Render,
-    viewport: g.Viewport,
+    self: *Render,
     sprite: c.Sprite,
     place_in_dungeon: p.Point,
     mode: g.Render.DrawingMode,
 ) anyerror!void {
-    if (viewport.region.containsPoint(place_in_dungeon)) {
+    if (self.viewport.region.containsPoint(place_in_dungeon)) {
         const point_on_display = p.Point{
-            .row = place_in_dungeon.row - viewport.region.top_left.row + 1,
-            .col = place_in_dungeon.col - viewport.region.top_left.col + 1,
+            .row = place_in_dungeon.row - self.viewport.region.top_left.row + 1,
+            .col = place_in_dungeon.col - self.viewport.region.top_left.col + 1,
         };
         const codepoint: g.Codepoint = self.actualCodepoint(sprite.codepoint, place_in_dungeon);
-        viewport.setSymbol(point_on_display, codepoint, mode, sprite.z_order);
+        self.buffer.setSymbol(point_on_display, codepoint, mode, sprite.z_order);
     }
 }
 
@@ -165,8 +319,8 @@ pub inline fn actualCodepoint(self: Render, codepoint: g.Codepoint, place: p.Poi
 
 /// Invokes the runtime to draw only changed symbols.
 /// After drawing all changes, the number of the viewport.buffer.iteration will be incremented.
-fn drawChangedSymbols(self: Render, viewport: *g.Viewport) !void {
-    var itr = viewport.changedSymbols();
+fn drawChangedSymbols(self: *Render) !void {
+    var itr = self.buffer.changedSymbols();
     while (itr.next()) |tuple| {
         try self.runtime.drawSprite(tuple[1].codepoint, tuple[0], tuple[1].mode);
     }
@@ -174,20 +328,19 @@ fn drawChangedSymbols(self: Render, viewport: *g.Viewport) !void {
 
 /// Draws a single frame from every animation.
 /// Removes the animation if the last frame was drawn.
-fn drawAnimationsFrame(self: Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
+fn drawAnimationsFrame(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
     const now: c_uint = self.runtime.currentMillis();
     var itr = session.level.query().get2(c.Position, c.Animation);
     while (itr.next()) |components| {
         const position = components[1];
         const animation = components[2];
         if (animation.frame(now)) |frame| {
-            if (frame > 0 and session.viewport.region.containsPoint(position.point)) {
+            if (frame > 0 and self.viewport.region.containsPoint(position.point)) {
                 const mode: DrawingMode = if (entity_in_focus == components[0])
                     .inverted
                 else
                     .normal;
                 try self.drawSprite(
-                    session.viewport,
                     .{ .codepoint = frame, .z_order = 3 },
                     position.point,
                     mode,
@@ -196,6 +349,12 @@ fn drawAnimationsFrame(self: Render, session: *g.GameSession, entity_in_focus: ?
         } else {
             try session.level.components.removeFromEntity(components[0], c.Animation);
         }
+    }
+}
+
+fn drawHorizontalBorderLine(self: Render, row_on_display: u8, length: u8) !void {
+    for (0..length) |col| {
+        try self.runtime.drawSprite('═', .{ .row = row_on_display, .col = @intCast(col + 1) }, .normal);
     }
 }
 
@@ -245,14 +404,8 @@ pub fn drawInfoBar(self: Render, session: *const g.GameSession, entity_in_focus:
     }
 }
 
-fn drawHorizontalBorderLine(self: Render, row_on_display: u8, length: u8) !void {
-    for (0..length) |col| {
-        try self.runtime.drawSprite('═', .{ .row = row_on_display, .col = @intCast(col + 1) }, .normal);
-    }
-}
-
-/// Draws quick action button, or hide it if quick_action is null.
-pub fn drawQuickActionButton(self: Render, quick_action: ?g.Action) !void {
+/// Draws quick action as the button, or hide the button it if quick_action is null.
+pub fn drawQuickAction(self: Render, quick_action: ?g.Action) !void {
     // Draw the quick action
     if (quick_action) |qa| {
         switch (qa) {
@@ -268,6 +421,44 @@ pub fn drawQuickActionButton(self: Render, quick_action: ?g.Action) !void {
         }
     } else {
         try self.cleanZone(2);
+    }
+}
+
+/// Sets the line of spaces as a board on the passed side. Inverts the draw mode
+/// for few symbols in the middle.
+pub fn setBorderWithArrow(
+    self: *Render,
+    side: p.Direction,
+) void {
+    const arrow: g.Codepoint = switch (side) {
+        .up => '^',
+        .down => 'v',
+        .left => '<',
+        .right => '>',
+    };
+    const filler: g.Codepoint = ' ';
+    switch (side) {
+        .left, .right => {
+            for (1..self.viewport.region.rows + 1) |r| {
+                const is_middle = r == 1 + self.viewport.region.rows / 2;
+                const codepoint: g.Codepoint = if (is_middle) arrow else filler;
+                var point: p.Point = .{ .row = @intCast(r), .col = if (side == .left) 1 else self.viewport.region.cols };
+                point.row = @intCast(r);
+                self.buffer.setSymbol(point, codepoint, if (is_middle) .inverted else .normal, std.math.maxInt(g.ZOrder));
+            }
+        },
+        .up, .down => {
+            var point: p.Point = .{
+                .row = if (side == .up) 1 else self.viewport.region.rows,
+                .col = 1,
+            };
+            for (1..self.viewport.region.cols + 1) |cl| {
+                const is_middle = (cl == self.viewport.region.cols / 2);
+                const codepoint = if (is_middle) arrow else filler;
+                point.col = @intCast(cl);
+                self.buffer.setSymbol(point, codepoint, if (is_middle) .inverted else .normal, std.math.maxInt(g.ZOrder));
+            }
+        },
     }
 }
 
@@ -328,7 +519,7 @@ fn drawText(
     var pos = absolut_position;
     switch (aln) {
         .left => {},
-        .center => pos.col += (max_length - text_length) / 2,
+        .center => pos.col += (max_length - text_length) / 2 - 1,
         .right => pos.col += (max_length - text_length),
     }
     try self.runtime.drawText(text[0..text_length], pos, mode);

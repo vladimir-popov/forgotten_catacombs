@@ -41,7 +41,6 @@ fn showAll(_: *anyopaque, _: p.Point) g.Render.Visibility {
 const DungeonsGenerator = struct {
     runtime: g.Runtime,
     render: g.Render,
-    viewport: g.Viewport,
     level: g.Level = undefined,
     level_arena: std.heap.ArenaAllocator,
     draw_dungeon: bool = true, // if false the map should be drawn
@@ -49,15 +48,20 @@ const DungeonsGenerator = struct {
     pub fn init(alloc: std.mem.Allocator, runtime: g.Runtime) !DungeonsGenerator {
         return .{
             .runtime = runtime,
-            .render = try g.Render.init(runtime, .{ .context = undefined, .isVisible = showAll }),
-            .viewport = try g.Viewport.init(alloc, g.Dungeon.ROWS, g.Dungeon.COLS),
+            .render = try g.Render.init(
+                alloc,
+                runtime,
+                .{ .context = undefined, .isVisible = showAll },
+                g.Dungeon.ROWS,
+                g.Dungeon.COLS,
+            ),
             .level_arena = std.heap.ArenaAllocator.init(alloc),
         };
     }
 
     pub fn deinit(self: *DungeonsGenerator) void {
         self.level_arena.deinit();
-        self.viewport.deinit();
+        self.render.deinit();
     }
 
     fn generate(self: *DungeonsGenerator, seed: u64) !void {
@@ -70,7 +74,7 @@ const DungeonsGenerator = struct {
             g.entities.Player,
             .{ .direction = .down, .id = 0, .target_ladder = 1 },
         );
-        self.viewport.centeredAround(self.level.playerPosition().point);
+        self.render.viewport.centeredAround(self.level.playerPosition().point);
         try self.render.clearDisplay();
         try self.draw();
     }
@@ -82,7 +86,7 @@ const DungeonsGenerator = struct {
 
     fn draw(self: *DungeonsGenerator) !void {
         if (self.draw_dungeon) {
-            try self.render.drawLevelOnly(self.level, &self.viewport);
+            try self.render.drawLevelOnly(self.level);
         } else {}
     }
 

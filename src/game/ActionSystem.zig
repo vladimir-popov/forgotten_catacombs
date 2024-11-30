@@ -118,7 +118,6 @@ fn checkCollision(session: *g.GameSession, actor: g.Entity, place: p.Point) ?Act
             var itr = session.level.entityAt(place);
             while (itr.next()) |entity| {
                 if (session.level.components.getForEntity(entity, c.Door)) |door| {
-                    log.warn("Door {any} at {any}", .{ door, place });
                     if (door.state == .closed)
                         return .{ .open = entity };
                 }

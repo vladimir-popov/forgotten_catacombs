@@ -174,7 +174,7 @@ fn handleInput(self: *PlayMode, button: g.Button) !?g.Action {
 
 pub fn tick(self: *PlayMode) !void {
     try self.session.render.drawScene(self.session, self.entity_in_focus);
-    try self.session.render.drawQuickActionButton(self.quick_action);
+    try self.session.render.drawQuickAction(self.quick_action);
     if (self.session.level.components.getAll(c.Animation).len > 0)
         return;
 
