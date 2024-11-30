@@ -20,6 +20,7 @@
 ///   |             Stats            | Button |
 ///
 const std = @import("std");
+const cp = @import("codepoints.zig");
 const g = @import("game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
@@ -99,9 +100,9 @@ fn drawDungeon(self: Render, dungeon: g.Dungeon, viewport: g.Viewport) anyerror!
     var sprite = c.Sprite{ .codepoint = undefined, .z_order = 0 };
     while (itr.next()) |cell| {
         sprite.codepoint = switch (cell) {
-            .floor => '.',
-            .wall => '#',
-            else => ' ',
+            .floor => cp.floor_visible,
+            .wall => cp.wall_visible,
+            else => cp.nothing,
         };
         try self.drawSprite(viewport, sprite, place, .normal);
         place.move(.right);
@@ -146,17 +147,18 @@ fn drawSprite(
 }
 
 /// This method validates visibility of the passed place, and
-/// return the passed codepoint if the place is visible, ' ' if the place
+/// return the passed codepoint if the place is visible, an  'nothing' if the place
 /// invisible, or the codepoint for invisible but known place.
 pub inline fn actualCodepoint(self: Render, codepoint: g.Codepoint, place: p.Point) g.Codepoint {
     return switch (self.visibility_strategy.isVisible(self.visibility_strategy.context, place)) {
         .visible => codepoint,
-        .invisible => ' ',
+        .invisible => cp.nothing,
         .known => switch (codepoint) {
             // always show this known sprites
-            '#', ' ', '<', '>', '\'', '+' => codepoint,
-            // all others should be shown as the floor
-            else => ' ',
+            cp.nothing, cp.ladder_up, cp.ladder_down, cp.door_opened, cp.door_closed => codepoint,
+            cp.wall_visible => cp.wall_known,
+            cp.floor_visible => cp.floor_known,
+            else => cp.nothing,
         },
     };
 }
