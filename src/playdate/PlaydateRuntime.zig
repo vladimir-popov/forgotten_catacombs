@@ -205,24 +205,15 @@ fn clearDisplay(ptr: *anyopaque) anyerror!void {
 
 fn drawSprite(ptr: *anyopaque, codepoint: g.Codepoint, position_on_display: p.Point, mode: g.Render.DrawingMode) !void {
     var self: *Self = @ptrCast(@alignCast(ptr));
-    if (codepoint == '═') {
-        self.drawHorizontalBorderSymbol(position_on_display.row, position_on_display.col);
-        return;
-    }
     // draw text:
     const x = @as(c_int, position_on_display.col - 1) * g.SPRITE_WIDTH;
     const y = @as(c_int, position_on_display.row - 1) * g.SPRITE_HEIGHT;
 
-    var buf: [4]u8 = undefined;
+    // the count of codepoints or 0 terminated string should be passed to the playdate api
+    // to draw the text. To avoid extra argument, we will pass 0 terminated string here.
+    var buf: [5]u8 = .{0} ** 5;
     const len = try std.unicode.utf8Encode(codepoint, &buf);
-    try self.drawTextOnDisplay(buf[0..len], mode, x, y);
-}
-
-fn drawHorizontalBorderSymbol(self: *Self, row: u8, col: u8) void {
-    const y: c_int = @as(c_int, @intCast(row - 1)) * g.SPRITE_HEIGHT + g.SPRITE_HEIGHT / 2;
-    const x: c_int = @as(c_int, @intCast(col - 1)) * g.SPRITE_WIDTH;
-    self.playdate.graphics.drawLine(x, y, x + g.SPRITE_WIDTH, y, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
-    self.playdate.graphics.drawLine(x, y + 2, x + g.SPRITE_WIDTH, y + 2, 1, @intFromEnum(api.LCDSolidColor.ColorWhite));
+    try self.drawTextOnDisplay(buf[0..len + 1], mode, x, y);
 }
 
 fn drawText(ptr: *anyopaque, text: []const u8, position_on_display: p.Point, mode: g.Render.DrawingMode) !void {

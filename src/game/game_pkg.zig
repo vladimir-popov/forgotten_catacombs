@@ -6,10 +6,10 @@ pub const entities = @import("entities.zig");
 pub const events = @import("events.zig");
 pub const primitives = @import("primitives.zig");
 
-// coz zig uses u21 for utf8 symbols
 pub const ActionSystem = @import("ActionSystem.zig");
 pub const Action = ActionSystem.Action;
 pub const MovePoints = ActionSystem.MovePoints;
+// coz zig uses u21 for utf8 symbols
 pub const Codepoint = u21;
 pub const ZOrder = u3;
 pub const Entity = ecs.Entity;

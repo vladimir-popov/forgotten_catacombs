@@ -69,7 +69,7 @@ pub inline fn clearDisplay(self: Runtime) !void {
     try self.vtable.clearDisplay(self.context);
 }
 
-pub fn drawSprite(self: Runtime, codepoint: g.Codepoint, position_on_display: p.Point, mode: g.Render.DrawingMode) !void {
+pub fn drawSprite(self: Runtime, codepoint: u21, position_on_display: p.Point, mode: g.Render.DrawingMode) !void {
     try self.vtable.drawSprite(self.context, codepoint, position_on_display, mode);
 }
 

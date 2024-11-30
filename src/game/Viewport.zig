@@ -1,4 +1,5 @@
 const std = @import("std");
+const cp = @import("codepoints.zig");
 const g = @import("game_pkg.zig");
 const p = g.primitives;
 
