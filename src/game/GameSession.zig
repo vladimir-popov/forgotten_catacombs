@@ -80,7 +80,7 @@ pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
         .up => self.level.depth - 1,
         .down => self.level.depth + 1,
     };
-    std.log.info(
+    std.log.debug(
         \\
         \\--------------------
         \\Move {s} from the level {d} to {d}
