@@ -221,9 +221,21 @@ fn drawText(ptr: *anyopaque, text: []const u8, position_on_display: p.Point, mod
     // choose the font for text:
     self.playdate.graphics.setFont(self.text_font);
     // draw text:
-    const x = @as(c_int, position_on_display.col) * g.SPRITE_WIDTH;
-    const y = @as(c_int, position_on_display.row) * g.SPRITE_HEIGHT;
-    try self.drawTextOnDisplay(text, mode, x, y);
+    const x = @as(c_int, position_on_display.col - 1) * g.SPRITE_WIDTH;
+    const y = @as(c_int, position_on_display.row - 1) * g.SPRITE_HEIGHT;
+    if (text[text.len - 1] == ' ') {
+        var buf: [g.DISPLAY_COLS]u8 = undefined;
+        std.mem.copyForwards(u8, &buf, text);
+        // to avoid trimming of the string with spaces at the end,
+        // here we replace the last one by the special symbol '¶'(0xC2 0xB6 in utf8).
+        buf[text.len - 1] = '\xC2';
+        // this is safe, because the text is sentinel-terminated slice and has one extra symbol.
+        buf[text.len] = '\xB6';
+        buf[text.len + 1] = 0;
+        try self.drawTextOnDisplay(buf[0 .. text.len + 1], mode, x, y);
+    } else {
+        try self.drawTextOnDisplay(text, mode, x, y);
+    }
     // revert font for sprites:
     self.playdate.graphics.setFont(self.sprites_font);
 }

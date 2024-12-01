@@ -38,7 +38,7 @@ pub fn refresh(self: *ExploreMode) !void {
             item.* = .{ tuple[0], self.session.render.viewport.relative(tuple[1].point), tuple[2].codepoint };
         }
     }
-    try self.session.render.redraw(self.session, self.entity_in_focus);
+    try self.session.render.redraw(self.session, self.entity_in_focus, null);
 }
 
 pub fn tick(self: *ExploreMode) anyerror!void {
@@ -52,7 +52,7 @@ pub fn tick(self: *ExploreMode) anyerror!void {
             },
             .left, .right, .up, .down => {
                 self.chooseNextEntity(btn.toDirection().?);
-                try self.session.render.drawScene(self.session, self.entity_in_focus);
+                try self.session.render.drawScene(self.session, self.entity_in_focus, null);
             },
             else => {},
         }

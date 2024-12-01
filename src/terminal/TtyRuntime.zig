@@ -232,7 +232,7 @@ pub fn TtyRuntime(comptime ROWS: u8, comptime COLS: u8) type {
             mode: g.Render.DrawingMode,
         ) !void {
             const self: *Self = @ptrCast(@alignCast(ptr));
-            self.buffer.setAsciiText(text, position_on_display.row + 1, position_on_display.col + 1, mode);
+            self.buffer.setAsciiText(text, position_on_display.row, position_on_display.col, mode);
         }
     };
 }

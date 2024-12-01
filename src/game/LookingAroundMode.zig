@@ -31,7 +31,7 @@ pub fn refresh(self: *LookingAroundMode) !void {
 pub fn tick(self: *LookingAroundMode) anyerror!void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         switch (btn.game_button) {
-            .a => {
+            .b => {
                 self.session.render.viewport.region.top_left = self.orig_viewport_top_left;
                 log.debug(
                     "Stop looking around. Top-left corner of the viewport is {any}",
@@ -65,5 +65,5 @@ fn draw(self: LookingAroundMode) !void {
     if (self.session.render.viewport.region.bottomRightCol() < g.Dungeon.COLS)
         self.session.render.setBorderWithArrow(.right);
 
-    try self.session.render.drawScene(self.session, null);
+    try self.session.render.drawScene(self.session, null, null);
 }

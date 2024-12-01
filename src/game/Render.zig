@@ -32,8 +32,11 @@ pub const DrawingMode = enum { normal, inverted };
 pub const Visibility = enum { visible, known, invisible };
 const TextAlign = enum { center, left, right };
 
-const OUT_ZONE_LENGTH = 8;
-const MIDDLE_ZONE_LENGTH = g.DISPLAY_COLS - (OUT_ZONE_LENGTH + 1) * 2 - 2;
+const SIDE_ZONE_LENGTH = 8;
+const MIDDLE_ZONE_LENGTH = g.DISPLAY_COLS - (SIDE_ZONE_LENGTH + 1) * 2 - 2;
+
+// this should be used to erase a symbol
+const filler = ' ';
 
 const Render = @This();
 
@@ -162,7 +165,7 @@ const SceneBuffer = struct {
         for (self.rows) |row| {
             for (row) |cell| {
                 if (!cell.is_changed) {
-                    try writer.writeByte(' ');
+                    try writer.writeByte(filler);
                     continue;
                 }
 
@@ -215,7 +218,7 @@ pub fn deinit(self: *Render) void {
 
 /// Draws dungeon, sprites, animations, and stats on the screen.
 /// Removes completed animations.
-pub fn drawScene(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
+pub fn drawScene(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Entity, quick_action: ?g.Action) !void {
     try self.drawDungeon(session.level.dungeon);
     try self.drawSprites(session.level);
     // to draw the entity in focus over the player (when the player is on the ladder as example)
@@ -223,7 +226,7 @@ pub fn drawScene(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Ent
         if (session.level.components.getForEntity2(entity, c.Position, c.Sprite)) |tuple|
             try self.drawSprite(tuple[2].*, tuple[1].point, .inverted);
     try self.drawAnimationsFrame(session, entity_in_focus);
-    try self.drawInfoBar(session, entity_in_focus);
+    try self.drawInfoBar(session, entity_in_focus, quick_action);
     try self.drawChangedSymbols();
 }
 
@@ -237,10 +240,10 @@ pub fn drawLevelOnly(self: *Render, level: g.Level) !void {
 
 /// Clears the screen and draw all from scratch.
 /// Removes completed animations.
-pub fn redraw(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
+pub fn redraw(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Entity, quick_action: ?g.Action) !void {
     try self.clearDisplay();
     self.buffer.reset();
-    try self.drawScene(session, entity_in_focus);
+    try self.drawScene(session, entity_in_focus, quick_action);
     try self.drawHorizontalBorderLine(self.viewport.region.rows + 1, self.viewport.region.cols);
 }
 
@@ -358,54 +361,31 @@ fn drawHorizontalBorderLine(self: Render, row_on_display: u8, length: u8) !void 
     }
 }
 
-/// Draws the hit points of the player, and the name and hit points of the entity in focus.
-pub fn drawInfoBar(self: Render, session: *const g.GameSession, entity_in_focus: ?g.Entity) !void {
-    // Draw the name and health of the entity in focus
-    if (entity_in_focus) |entity| {
-        var buf: [MIDDLE_ZONE_LENGTH]u8 = undefined;
-        inline for (0..MIDDLE_ZONE_LENGTH) |i| buf[i] = ' ';
-        var len: usize = 0;
-        // Draw entity's name
-        if (session.level.components.getForEntity(entity, c.Description)) |desc| {
-            len = (try std.fmt.bufPrint(&buf, "{s}", .{desc.name})).len;
-        }
-        // Draw enemy's health
-        if (entity != session.level.player) {
-            if (session.level.components.getForEntity(entity, c.Health)) |health| {
-                buf[len] = ':';
-                len += 1;
-                const hp = @max(health.current, 0);
-                const free_length = MIDDLE_ZONE_LENGTH - len;
-                const hp_length = @divFloor(free_length * hp, health.max);
-                for (0..hp_length) |i| {
-                    buf[len + i] = '|';
-                }
-                len += free_length;
-            }
-        }
-        try self.drawZone(1, buf[0..len], .normal);
-    } else {
-        try self.cleanZone(0);
-        try self.cleanZone(1);
-        try self.cleanZone(2);
-    }
-    // Draw player's health, or pause mode indicator
+pub fn drawInfoBar(
+    self: Render,
+    session: *const g.GameSession,
+    entity_in_focus: ?g.Entity,
+    quick_action: ?g.Action,
+) !void {
+    try self.drawLeftZone(session);
+    try self.drawMiddleZone(session, entity_in_focus);
+    try self.drawRightZone(quick_action);
+}
+
+fn drawLeftZone(self: Render, session: *const g.GameSession) !void {
     switch (session.mode) {
-        .explore => try self.drawZone(0, "Pause", .inverted),
-        .looking_around => {
-            try self.drawZone(1, "Looking around", .normal);
-            try self.drawZone(2, "Cancel", .inverted);
-        },
+        .explore => try self.drawZone(0, "Continue", .inverted),
         .play => if (session.level.components.getForEntity(session.level.player, c.Health)) |health| {
             var buf = [_]u8{0} ** 8;
             const text = try std.fmt.bufPrint(&buf, "HP: {d}", .{health.current});
             try self.drawZone(0, text, .normal);
         },
+        .looking_around => try self.drawZone(0, "Cancel", .inverted),
     }
 }
 
-/// Draws quick action as the button, or hide the button it if quick_action is null.
-pub fn drawQuickAction(self: Render, quick_action: ?g.Action) !void {
+/// Draws quick action as the right button, or clear the right zone if the quick_action is null.
+pub fn drawRightZone(self: Render, quick_action: ?g.Action) !void {
     // Draw the quick action
     if (quick_action) |qa| {
         switch (qa) {
@@ -424,6 +404,46 @@ pub fn drawQuickAction(self: Render, quick_action: ?g.Action) !void {
     }
 }
 
+fn drawMiddleZone(self: Render, session: *const g.GameSession, entity_in_focus: ?g.Entity) !void {
+    switch (session.mode) {
+        .looking_around => try self.drawZone(1, "Looking around", .normal),
+        .play, .explore => {
+            // Draw the name or health of the entity in focus
+            if (entity_in_focus) |entity| {
+                if (entity != session.level.player) {
+                    if (session.level.components.getForEntity2(entity, c.Sprite, c.Health)) |tuple| {
+                        try self.drawEnemyHealth(tuple[1].codepoint, tuple[2]);
+                        return;
+                    }
+                }
+                const name = if (session.level.components.getForEntity(entity, c.Description)) |desc| desc.name else "?";
+                try self.drawZone(1, name, .normal);
+            } else {
+                try self.cleanZone(1);
+            }
+        },
+    }
+}
+
+fn drawEnemyHealth(self: Render, codepoint: g.Codepoint, health: *const c.Health) !void {
+    var buf: [MIDDLE_ZONE_LENGTH]u8 = undefined;
+    inline for (0..MIDDLE_ZONE_LENGTH) |i| buf[i] = filler;
+    var len: u8 = try std.unicode.utf8Encode(codepoint, &buf);
+
+    buf[len] = ':';
+    // here should be exactly space, not the filler
+    buf[len + 1] = ' ';
+    len += 2;
+    const hp = @max(health.current, 0);
+    const free_length = MIDDLE_ZONE_LENGTH - 3; // codepoint + ':' + space
+    const hp_length = @divFloor(free_length * hp, health.max);
+    for (0..hp_length) |i| {
+        buf[len + i] = '|';
+    }
+    len += free_length;
+    try self.drawZone(1, buf[0..len], .normal);
+}
+
 /// Sets the line of spaces as a board on the passed side. Inverts the draw mode
 /// for few symbols in the middle.
 pub fn setBorderWithArrow(
@@ -436,7 +456,6 @@ pub fn setBorderWithArrow(
         .left => '<',
         .right => '>',
     };
-    const filler: g.Codepoint = ' ';
     switch (side) {
         .left, .right => {
             for (1..self.viewport.region.rows + 1) |r| {
@@ -464,19 +483,27 @@ pub fn setBorderWithArrow(
 
 pub fn drawWelcomeScreen(self: Render) !void {
     try self.clearDisplay();
-    const vertical_middle = g.DISPLAY_ROWS / 2 - 1;
-    try self.drawText(g.DISPLAY_COLS, "Welcome", .{ .row = vertical_middle - 1, .col = 1 }, .normal, .center);
-    try self.drawText(g.DISPLAY_COLS, "to", .{ .row = vertical_middle, .col = 1 }, .normal, .center);
-    try self.drawText(g.DISPLAY_COLS, "Forgotten catacombs", .{ .row = vertical_middle + 1, .col = 1 }, .normal, .center);
+    const vertical_middle = g.DISPLAY_ROWS / 2;
+    try self.drawTextWithAlign(g.DISPLAY_COLS, "Welcome", .{ .row = vertical_middle - 1, .col = 1 }, .normal, .center);
+    try self.drawTextWithAlign(g.DISPLAY_COLS, "to", .{ .row = vertical_middle, .col = 1 }, .normal, .center);
+    try self.drawTextWithAlign(
+        g.DISPLAY_COLS,
+        "Forgotten catacombs",
+        .{ .row = vertical_middle + 1, .col = 1 },
+        .normal,
+        .center,
+    );
 }
 
 pub fn drawGameOverScreen(self: Render) !void {
     try self.clearDisplay();
-    try self.drawText(g.DISPLAY_COLS, "You are dead", .{ .row = g.DISPLAY_ROWS / 2 - 1, .col = 1 }, .normal, .center);
-}
-
-inline fn cleanZone(self: Render, comptime zone: u8) !void {
-    try self.drawZone(zone, " ", .normal);
+    try self.drawTextWithAlign(
+        g.DISPLAY_COLS,
+        "You are dead",
+        .{ .row = g.DISPLAY_ROWS / 2, .col = 1 },
+        .normal,
+        .center,
+    );
 }
 
 inline fn drawZone(
@@ -485,42 +512,43 @@ inline fn drawZone(
     text: []const u8,
     mode: DrawingMode,
 ) !void {
-    var buf: [MIDDLE_ZONE_LENGTH]u8 = undefined;
-    var pos = p.Point{ .row = g.DISPLAY_ROWS - 1, .col = 1 };
-    const buf_len: u8 = switch (zone) {
-        0 => OUT_ZONE_LENGTH,
-        1 => blk: {
-            pos.col = OUT_ZONE_LENGTH + 2;
-            break :blk MIDDLE_ZONE_LENGTH;
-        },
-        2 => blk: {
-            pos.col = g.DISPLAY_COLS - OUT_ZONE_LENGTH;
-            break :blk OUT_ZONE_LENGTH;
-        },
+    const zone_len = if (zone == 1) MIDDLE_ZONE_LENGTH else SIDE_ZONE_LENGTH;
+    const pos = switch (zone) {
+        0 => p.Point{ .row = g.DISPLAY_ROWS, .col = 1 },
+        1 => p.Point{ .row = g.DISPLAY_ROWS, .col = SIDE_ZONE_LENGTH + 1 },
+        2 => p.Point{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS - SIDE_ZONE_LENGTH + 1 },
         else => unreachable,
     };
-    if (buf_len > 0) {
-        for (0..buf_len) |i| buf[i] = ' ';
-        const pad: u8 = (buf_len - @min(text.len, buf_len)) / 2;
-        std.mem.copyForwards(u8, buf[pad..], text);
-        try self.drawText(buf_len, buf[0..buf_len], pos, mode, .left);
-    }
+    try self.drawTextWithAlign(zone_len, text, pos, mode, .center);
 }
 
-fn drawText(
+inline fn cleanZone(self: Render, comptime zone: u8) !void {
+    const zone_len = if (zone == 1) MIDDLE_ZONE_LENGTH else SIDE_ZONE_LENGTH;
+    const pos = switch (zone) {
+        0 => p.Point{ .row = g.DISPLAY_ROWS, .col = 1 },
+        1 => p.Point{ .row = g.DISPLAY_ROWS, .col = SIDE_ZONE_LENGTH + 1 },
+        2 => p.Point{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS - SIDE_ZONE_LENGTH + 1 },
+        else => unreachable,
+    };
+    try self.drawTextWithAlign(zone_len, &.{filler}, pos, .normal, .left);
+}
+
+fn drawTextWithAlign(
     self: Render,
-    comptime max_length: u8,
+    comptime zone_length: u8,
     text: []const u8,
     absolut_position: p.Point,
     mode: g.Render.DrawingMode,
     aln: TextAlign,
 ) !void {
-    const text_length = @min(max_length, text.len);
-    var pos = absolut_position;
-    switch (aln) {
-        .left => {},
-        .center => pos.col += (max_length - text_length) / 2 - 1,
-        .right => pos.col += (max_length - text_length),
-    }
-    try self.runtime.drawText(text[0..text_length], pos, mode);
+    var buf: [zone_length]u8 = undefined;
+    inline for (0..zone_length) |i| buf[i] = filler;
+    const text_length = @min(zone_length, text.len);
+    const pad = switch (aln) {
+        .left => 0,
+        .center => (zone_length - text_length) / 2,
+        .right => zone_length - text_length,
+    };
+    std.mem.copyForwards(u8, buf[pad..], text[0..text_length]);
+    try self.runtime.drawText(&buf, absolut_position, mode);
 }

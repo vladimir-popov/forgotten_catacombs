@@ -122,7 +122,7 @@ pub fn refresh(self: *PlayMode, entity_in_focus: ?g.Entity) !void {
     };
     log.debug("Update target after refresh", .{});
     try self.updateTarget();
-    try self.session.render.redraw(self.session, self.entity_in_focus);
+    try self.session.render.redraw(self.session, self.entity_in_focus, self.quick_action);
 }
 
 pub fn subscriber(self: *PlayMode) g.events.Subscriber {
@@ -173,8 +173,7 @@ fn handleInput(self: *PlayMode, button: g.Button) !?g.Action {
 }
 
 pub fn tick(self: *PlayMode) !void {
-    try self.session.render.drawScene(self.session, self.entity_in_focus);
-    try self.session.render.drawQuickAction(self.quick_action);
+    try self.session.render.drawScene(self.session, self.entity_in_focus, self.quick_action);
     if (self.session.level.components.getAll(c.Animation).len > 0)
         return;
 

@@ -95,4 +95,6 @@ z	8
 }	8
 ~	8
 �	8
-
+-- we need one special invisible symbol
+-- for workaround of the trimming the drawing string
+¶   8
