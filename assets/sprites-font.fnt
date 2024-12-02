@@ -115,3 +115,6 @@ z	10
 ▓   10
 ▒   10
 ░   10
+-- we need one special invisible symbol
+-- for workaround of the trimming the drawing string
+¶   10

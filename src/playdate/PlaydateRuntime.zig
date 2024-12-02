@@ -88,30 +88,23 @@ var cheat: ?g.Cheat = null;
 
 playdate: *api.PlaydateAPI,
 alloc: std.mem.Allocator,
-text_font: ?*api.LCDFont,
-sprites_font: ?*api.LCDFont,
+font: ?*api.LCDFont,
 last_button: *LastButton,
 
 pub fn init(playdate: *api.PlaydateAPI) !Self {
     const err: ?*[*c]const u8 = null;
 
-    const text_font = playdate.graphics.loadFont("Roobert-11-Mono-Condensed.pft", err) orelse {
+    const font = playdate.graphics.loadFont("sprites-font.pft", err) orelse {
         const err_msg = err orelse "Unknown error.";
         std.debug.panic("Error on load font for text: {s}", .{err_msg});
     };
-    errdefer _ = playdate.system.realloc(text_font, 0);
-
-    const sprites_font = playdate.graphics.loadFont("sprites-font.pft", err) orelse {
-        const err_msg = err orelse "Unknown error.";
-        std.debug.panic("Error on load font for sprites: {s}", .{err_msg});
-    };
-    errdefer _ = playdate.system.realloc(sprites_font, 0);
+    errdefer _ = playdate.system.realloc(font, 0);
 
     const alloc = Allocator.allocator(playdate);
     const last_button = try alloc.create(LastButton);
     errdefer alloc.destroy(last_button);
 
-    playdate.graphics.setFont(sprites_font);
+    playdate.graphics.setFont(font);
     playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeCopy);
     playdate.system.setSerialMessageCallback(serialMessageCallback);
     playdate.system.setButtonCallback(LastButton.handleEvent, last_button, 4);
@@ -119,15 +112,13 @@ pub fn init(playdate: *api.PlaydateAPI) !Self {
     return .{
         .playdate = playdate,
         .alloc = alloc,
-        .text_font = text_font,
-        .sprites_font = sprites_font,
+        .font = font,
         .last_button = last_button,
     };
 }
 
 pub fn deinit(self: *Self) void {
-    self.playdate.realloc(0, self.text_font);
-    self.playdate.realloc(0, self.sprites_font);
+    self.playdate.realloc(0, self.font);
 }
 
 pub fn runtime(self: *Self) g.Runtime {
@@ -218,29 +209,26 @@ fn drawSprite(ptr: *anyopaque, codepoint: g.Codepoint, position_on_display: p.Po
 
 fn drawText(ptr: *anyopaque, text: []const u8, position_on_display: p.Point, mode: g.Render.DrawingMode) !void {
     var self: *Self = @ptrCast(@alignCast(ptr));
-    // choose the font for text:
-    self.playdate.graphics.setFont(self.text_font);
     // draw text:
     const x = @as(c_int, position_on_display.col - 1) * g.SPRITE_WIDTH;
     const y = @as(c_int, position_on_display.row - 1) * g.SPRITE_HEIGHT;
-    if (text[text.len - 1] == ' ') {
-        var buf: [g.DISPLAY_COLS]u8 = undefined;
-        std.mem.copyForwards(u8, &buf, text);
-        // to avoid trimming of the string with spaces at the end,
-        // here we replace the last one by the special symbol '¶'(0xC2 0xB6 in utf8).
-        buf[text.len - 1] = '\xC2';
-        // this is safe, because the text is sentinel-terminated slice and has one extra symbol.
-        buf[text.len] = '\xB6';
-        buf[text.len + 1] = 0;
-        try self.drawTextOnDisplay(buf[0 .. text.len + 1], mode, x, y);
-    } else {
+    // if (text[text.len - 1] == ' ') {
+    //     var buf: [g.DISPLAY_COLS]u8 = undefined;
+    //     std.mem.copyForwards(u8, &buf, text);
+    //     // to avoid trimming of the string with spaces at the end,
+    //     // here we replace the last one by the special symbol '¶'(0xC2 0xB6 in utf8).
+    //     buf[text.len - 1] = '\xC2';
+    //     // this is safe, because the text is sentinel-terminated slice and has one extra symbol.
+    //     buf[text.len] = '\xB6';
+    //     buf[text.len + 1] = 0;
+    //     try self.drawTextOnDisplay(buf[0 .. text.len + 1], mode, x, y);
+    // } else {
+    //     try self.drawTextOnDisplay(text, mode, x, y);
+    // }
         try self.drawTextOnDisplay(text, mode, x, y);
-    }
-    // revert font for sprites:
-    self.playdate.graphics.setFont(self.sprites_font);
 }
 
-inline fn drawTextOnDisplay(
+fn drawTextOnDisplay(
     self: *Self,
     text: []const u8,
     mode: g.Render.DrawingMode,
