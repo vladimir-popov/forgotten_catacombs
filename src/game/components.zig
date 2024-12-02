@@ -23,7 +23,7 @@ pub const Description = struct {
 
 pub const Animation = struct {
     pub const Presets = struct {
-        pub const hit: [3]g.Codepoint = [_]g.Codepoint{ 0, 'X', 0 };
+        pub const hit: [3]g.Codepoint = [_]g.Codepoint{ 0, '×', 0 };
         pub const miss: [1]g.Codepoint = [_]g.Codepoint{'.'};
     };
 

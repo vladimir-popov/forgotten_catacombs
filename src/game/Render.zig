@@ -377,7 +377,7 @@ fn drawLeftZone(self: Render, session: *const g.GameSession) !void {
         .explore => try self.drawZone(0, "Continue", .inverted),
         .play => if (session.level.components.getForEntity(session.level.player, c.Health)) |health| {
             var buf = [_]u8{0} ** 8;
-            const text = try std.fmt.bufPrint(&buf, "HP: {d}", .{health.current});
+            const text = try std.fmt.bufPrint(&buf, "HP:{d}", .{health.current});
             try self.drawZone(0, text, .normal);
         },
         .looking_around => try self.drawZone(0, "Cancel", .inverted),
@@ -431,11 +431,9 @@ fn drawEnemyHealth(self: Render, codepoint: g.Codepoint, health: *const c.Health
     var len: u8 = try std.unicode.utf8Encode(codepoint, &buf);
 
     buf[len] = ':';
-    // here should be exactly space, not the filler
-    buf[len + 1] = ' ';
-    len += 2;
+    len += 1;
     const hp = @max(health.current, 0);
-    const free_length = MIDDLE_ZONE_LENGTH - 3; // codepoint + ':' + space
+    const free_length = MIDDLE_ZONE_LENGTH - 2; // codepoint (usually 1 byte for enemies) + ':'
     const hp_length = @divFloor(free_length * hp, health.max);
     for (0..hp_length) |i| {
         buf[len + i] = '|';
