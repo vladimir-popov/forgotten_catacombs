@@ -315,7 +315,7 @@ pub inline fn actualCodepoint(self: Render, codepoint: g.Codepoint, place: p.Poi
             cp.nothing, cp.ladder_up, cp.ladder_down, cp.door_opened, cp.door_closed => codepoint,
             cp.wall_visible => cp.wall_known,
             cp.floor_visible => cp.floor_known,
-            else => cp.nothing,
+            else => cp.floor_known,
         },
     };
 }
@@ -428,12 +428,13 @@ fn drawMiddleZone(self: Render, session: *const g.GameSession, entity_in_focus: 
 fn drawEnemyHealth(self: Render, codepoint: g.Codepoint, health: *const c.Health) !void {
     var buf: [MIDDLE_ZONE_LENGTH]u8 = undefined;
     inline for (0..MIDDLE_ZONE_LENGTH) |i| buf[i] = filler;
-    var len: u8 = try std.unicode.utf8Encode(codepoint, &buf);
+    // +1 for padding between the right zone
+    var len: u8 = try std.unicode.utf8Encode(codepoint, buf[1..]) + 1;
 
     buf[len] = ':';
     len += 1;
     const hp = @max(health.current, 0);
-    const free_length = MIDDLE_ZONE_LENGTH - 2; // codepoint (usually 1 byte for enemies) + ':'
+    const free_length = MIDDLE_ZONE_LENGTH - 3; // padding + codepoint (usually 1 byte for enemies) + ':'
     const hp_length = @divFloor(free_length * hp, health.max);
     for (0..hp_length) |i| {
         buf[len + i] = '|';

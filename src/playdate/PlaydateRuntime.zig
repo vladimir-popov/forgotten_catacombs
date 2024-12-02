@@ -88,37 +88,39 @@ var cheat: ?g.Cheat = null;
 
 playdate: *api.PlaydateAPI,
 alloc: std.mem.Allocator,
-font: ?*api.LCDFont,
+bitmap_table: *api.LCDBitmapTable,
 last_button: *LastButton,
 
 pub fn init(playdate: *api.PlaydateAPI) !Self {
     const err: ?*[*c]const u8 = null;
 
-    const font = playdate.graphics.loadFont("sprites-font.pft", err) orelse {
-        const err_msg = err orelse "Unknown error.";
-        std.debug.panic("Error on load font for text: {s}", .{err_msg});
+    const bitmap_table: *api.LCDBitmapTable = playdate.graphics.loadBitmapTable("sprites", err) orelse {
+        const reason = err orelse "unknown reason";
+        std.debug.panic("Bitmap table was not created because of {s}", .{reason});
     };
-    errdefer _ = playdate.system.realloc(font, 0);
+    errdefer _ = playdate.system.realloc(bitmap_table, 0);
+
+    if (err) |err_msg| {
+        std.debug.panic("Error on loading image to the bitmap table: {s}", .{err_msg});
+    }
 
     const alloc = Allocator.allocator(playdate);
     const last_button = try alloc.create(LastButton);
     errdefer alloc.destroy(last_button);
 
-    playdate.graphics.setFont(font);
-    playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeCopy);
     playdate.system.setSerialMessageCallback(serialMessageCallback);
     playdate.system.setButtonCallback(LastButton.handleEvent, last_button, 4);
 
     return .{
         .playdate = playdate,
         .alloc = alloc,
-        .font = font,
+        .bitmap_table = bitmap_table,
         .last_button = last_button,
     };
 }
 
 pub fn deinit(self: *Self) void {
-    self.playdate.realloc(0, self.font);
+    self.playdate.realloc(0, self.bitmap_table);
 }
 
 pub fn runtime(self: *Self) g.Runtime {
@@ -196,52 +198,62 @@ fn clearDisplay(ptr: *anyopaque) anyerror!void {
 
 fn drawSprite(ptr: *anyopaque, codepoint: g.Codepoint, position_on_display: p.Point, mode: g.Render.DrawingMode) !void {
     var self: *Self = @ptrCast(@alignCast(ptr));
-    // draw text:
     const x = @as(c_int, position_on_display.col - 1) * g.SPRITE_WIDTH;
     const y = @as(c_int, position_on_display.row - 1) * g.SPRITE_HEIGHT;
-
-    // the count of codepoints or 0 terminated string should be passed to the playdate api
-    // to draw the text. To avoid extra argument, we will pass 0 terminated string here.
-    var buf: [5]u8 = .{0} ** 5;
-    const len = try std.unicode.utf8Encode(codepoint, &buf);
-    try self.drawTextOnDisplay(buf[0 .. len + 1], mode, x, y);
+    if (mode == .inverted)
+        self.playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeInverted)
+    else
+        self.playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeCopy);
+    self.playdate.graphics.drawBitmap(self.getBitmap(codepoint), x, y, .BitmapUnflipped);
 }
 
 fn drawText(ptr: *anyopaque, text: []const u8, position_on_display: p.Point, mode: g.Render.DrawingMode) !void {
-    var self: *Self = @ptrCast(@alignCast(ptr));
-    // draw text:
-    const x = @as(c_int, position_on_display.col - 1) * g.SPRITE_WIDTH;
-    const y = @as(c_int, position_on_display.row - 1) * g.SPRITE_HEIGHT;
-    // if (text[text.len - 1] == ' ') {
-    //     var buf: [g.DISPLAY_COLS]u8 = undefined;
-    //     std.mem.copyForwards(u8, &buf, text);
-    //     // to avoid trimming of the string with spaces at the end,
-    //     // here we replace the last one by the special symbol '¶'(0xC2 0xB6 in utf8).
-    //     buf[text.len - 1] = '\xC2';
-    //     // this is safe, because the text is sentinel-terminated slice and has one extra symbol.
-    //     buf[text.len] = '\xB6';
-    //     buf[text.len + 1] = 0;
-    //     try self.drawTextOnDisplay(buf[0 .. text.len + 1], mode, x, y);
-    // } else {
-    //     try self.drawTextOnDisplay(text, mode, x, y);
-    // }
-        try self.drawTextOnDisplay(text, mode, x, y);
+    var itr = std.unicode.Utf8View.initUnchecked(text).iterator();
+    var position = position_on_display;
+    while (itr.nextCodepoint()) |codepoint| {
+        try drawSprite(ptr, codepoint, position, mode);
+        position.move(.right);
+    }
 }
 
-fn drawTextOnDisplay(
-    self: *Self,
-    text: []const u8,
-    mode: g.Render.DrawingMode,
-    x: c_int,
-    y: c_int,
-) !void {
-    if (mode == .inverted) {
-        self.playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeInverted);
-        _ = self.playdate.graphics.drawText(text.ptr, text.len, .UTF8Encoding, x, y);
-        self.playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeCopy);
-    } else {
-        _ = self.playdate.graphics.drawText(text.ptr, text.len, .UTF8Encoding, x, y);
-    }
+fn getBitmap(self: Self, codepoint: g.Codepoint) *api.LCDBitmap {
+    const idx = getCodepointIdx(codepoint);
+    if (codepoint == 'F') log.warn("Getting bitmap for F on index {d}", .{idx});
+    return self.playdate.graphics.getTableBitmap(self.bitmap_table, idx) orelse {
+        std.debug.panic("Wrong index {d} for codepoint {d}", .{ idx, codepoint });
+    };
+}
+
+fn getCodepointIdx(codepoint: g.Codepoint) c_int {
+    return switch (codepoint) {
+        ' '...'~' => codepoint - ' ',
+        '─' => 95,
+        '│' => 96,
+        '┌' => 97,
+        '┐' => 98,
+        '└' => 99,
+        '┘' => 100,
+        '├' => 101,
+        '┤' => 102,
+        '┬' => 103,
+        '┴' => 104,
+        '┼' => 105,
+        '═' => 106,
+        '║' => 107,
+        '╔' => 108,
+        '╗' => 109,
+        '╚' => 110,
+        '╝' => 111,
+        '░' => 112,
+        '▒' => 113,
+        '▓' => 114,
+        '•' => 115,
+        '∞' => 116,
+        '…' => 117,
+        '¿' => 118,
+        '×' => 119,
+        else => getCodepointIdx('¿'),
+    };
 }
 
 fn getCheat(_: *anyopaque) ?g.Cheat {

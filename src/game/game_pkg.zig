@@ -34,10 +34,6 @@ pub const DISPLAY_WIDHT = 400;
 pub const SPRITE_HEIGHT = 20;
 pub const SPRITE_WIDTH = 10;
 
-// The size of the font for text in pixels:
-pub const FONT_HEIGHT = 16;
-pub const FONT_WIDTH = 8;
-
 /// 12
 pub const DISPLAY_ROWS = DISPLAY_HEIGHT / SPRITE_HEIGHT;
 /// 40

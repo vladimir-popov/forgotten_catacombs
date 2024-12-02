@@ -2,4 +2,4 @@ name=Forgotten Catacomb
 author=Valdimir Popov
 description=
 bundleID=ru.dokwork.forgotten_catacomb
-imagePath=images
+imagePath=assets/
