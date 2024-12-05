@@ -112,9 +112,14 @@ const SceneBuffer = struct {
         if (cell.symbol.codepoint == codepoint and cell.symbol.mode == mode) return;
 
         // if the new symbol is under the existed at the same iteration, do nothing too
-        if (cell.ver == self.current_iteration and cell.z_order > z_order and mode == .normal) return;
+        if (cell.ver == self.current_iteration and cell.z_order > z_order) return;
 
-        cell.symbol = .{ .codepoint = codepoint, .mode = mode };
+        cell.symbol.codepoint = codepoint;
+        // we should not override inverted mode at the same iteration
+        // to prevent case when an entity out of focus but with bigger z-order
+        // erases the backlight
+        if (cell.symbol.mode != .inverted or cell.ver != self.current_iteration)
+            cell.symbol.mode = mode;
         cell.z_order = z_order;
         cell.is_changed = true;
     }
@@ -220,11 +225,7 @@ pub fn deinit(self: *Render) void {
 /// Removes completed animations.
 pub fn drawScene(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Entity, quick_action: ?g.Action) !void {
     try self.drawDungeon(session.level.dungeon);
-    try self.drawSprites(session.level);
-    // to draw the entity in focus over the player (when the player is on the ladder as example)
-    if (entity_in_focus) |entity|
-        if (session.level.components.getForEntity2(entity, c.Position, c.Sprite)) |tuple|
-            try self.drawSprite(tuple[2].*, tuple[1].point, .inverted);
+    try self.drawSprites(session.level, entity_in_focus);
     try self.drawAnimationsFrame(session, entity_in_focus);
     try self.drawInfoBar(session, entity_in_focus, quick_action);
     try self.drawChangedSymbols();
@@ -279,11 +280,12 @@ fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order
         return .gt;
 }
 /// Draw sprites inside the screen
-fn drawSprites(self: *Render, level: g.Level) !void {
+fn drawSprites(self: *Render, level: g.Level, entity_in_focus: ?g.Entity) !void {
     var itr = level.query().get2(c.Position, c.Sprite);
     while (itr.next()) |tuple| {
         if (!self.viewport.region.containsPoint(tuple[1].point)) continue;
-        try self.drawSprite(tuple[2].*, tuple[1].point, .normal);
+        const mode: g.Render.DrawingMode = if (tuple[0] == entity_in_focus) .inverted else .normal;
+        try self.drawSprite(tuple[2].*, tuple[1].point, mode);
     }
 }
 
@@ -293,14 +295,12 @@ fn drawSprite(
     place_in_dungeon: p.Point,
     mode: g.Render.DrawingMode,
 ) anyerror!void {
-    if (self.viewport.region.containsPoint(place_in_dungeon)) {
-        const point_on_display = p.Point{
-            .row = place_in_dungeon.row - self.viewport.region.top_left.row + 1,
-            .col = place_in_dungeon.col - self.viewport.region.top_left.col + 1,
-        };
-        const codepoint: g.Codepoint = self.actualCodepoint(sprite.codepoint, place_in_dungeon);
-        self.buffer.setSymbol(point_on_display, codepoint, mode, sprite.z_order);
-    }
+    const point_on_display = p.Point{
+        .row = place_in_dungeon.row - self.viewport.region.top_left.row + 1,
+        .col = place_in_dungeon.col - self.viewport.region.top_left.col + 1,
+    };
+    const codepoint: g.Codepoint = self.actualCodepoint(sprite.codepoint, place_in_dungeon);
+    self.buffer.setSymbol(point_on_display, codepoint, mode, sprite.z_order);
 }
 
 /// This method validates visibility of the passed place, and

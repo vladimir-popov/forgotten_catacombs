@@ -66,7 +66,7 @@ fn chooseNextEntity(self: *ExploreMode, direction: p.Direction) void {
     );
     var min_distance: u8 = 255;
     for (self.entities_on_screen.items) |tuple| {
-        if (target_entity == tuple[0]) continue;
+        // if (target_entity == tuple[0]) continue;
         // we should follow the same logic as the render:
         // only entities, which should be drawn, can be in focus
         if (self.session.render.actualCodepoint(tuple[2], tuple[1]) != tuple[2]) continue;
