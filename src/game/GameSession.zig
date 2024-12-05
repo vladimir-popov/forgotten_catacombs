@@ -12,13 +12,13 @@ const ecs = g.ecs;
 
 const PlayMode = @import("PlayMode.zig");
 const ExploreMode = @import("ExploreMode.zig");
-const LookingAround = @import("LookingAroundMode.zig");
+const LookingAroundMode = @import("LookingAroundMode.zig");
 
 const log = std.log.scoped(.game_session);
 
 const GameSession = @This();
 
-const Mode = enum { play, explore, looking_around };
+pub const Mode = enum { play, explore, looking_around };
 
 /// This seed should help to make all levels of the single game session reproducible.
 seed: u64,
@@ -36,7 +36,7 @@ mode: Mode = .play,
 // stateful modes:
 play_mode: PlayMode,
 explore_mode: ExploreMode,
-looking_around: LookingAround,
+looking_around: LookingAroundMode,
 
 pub fn initNew(
     self: *GameSession,
@@ -55,8 +55,8 @@ pub fn initNew(
         .events = events,
         .level_arena = std.heap.ArenaAllocator.init(arena.allocator()),
         .play_mode = try PlayMode.init(self, arena.allocator()),
-        .explore_mode = try ExploreMode.init(self, arena.allocator()),
-        .looking_around = LookingAround.init(self),
+        .looking_around = try LookingAroundMode.init(self, arena.allocator()),
+        .explore_mode = ExploreMode.init(self),
     };
     try events.subscribeOn(.entity_moved, self.level.subscriber());
     try events.subscribeOn(.player_hit, self.play_mode.subscriber());

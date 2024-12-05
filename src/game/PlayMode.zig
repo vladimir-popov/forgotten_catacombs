@@ -148,7 +148,7 @@ fn handleInput(self: *PlayMode, button: g.Button) !?g.Action {
             return action;
         },
         .b => if (button.state == .pressed) {
-            try self.session.explore();
+            try self.session.lookAround();
             // we have to handle changing the state right after this function
             return null;
         },

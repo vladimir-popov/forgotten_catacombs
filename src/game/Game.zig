@@ -65,7 +65,7 @@ inline fn welcome(self: *Game) !void {
 inline fn newGame(self: *Game) !void {
     self.state = .game;
     _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
-    _ = self.runtime.addMenuItem("Look around", self, lookAround);
+    _ = self.runtime.addMenuItem("Explore level", self, exploreMenu);
     try self.game_session.initNew(
         &self.game_session_arena,
         self.seed,
@@ -82,10 +82,10 @@ fn goToMainMenu(ptr: ?*anyopaque) callconv(.C) void {
     self.welcome() catch @panic("Error when the Game went to the '.welcome' state");
 }
 
-fn lookAround(ptr: ?*anyopaque) callconv(.C) void {
+fn exploreMenu(ptr: ?*anyopaque) callconv(.C) void {
     if (ptr == null) return;
     const self: *Game = @ptrCast(@alignCast(ptr.?));
-    self.game_session.lookAround() catch @panic("Error on looking around");
+    self.game_session.explore() catch @panic("Error on looking around");
 }
 
 pub fn subscriber(self: *Game) g.events.Subscriber {

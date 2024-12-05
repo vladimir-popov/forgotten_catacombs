@@ -369,23 +369,27 @@ pub fn drawInfoBar(
 ) !void {
     try self.drawLeftZone(session);
     try self.drawMiddleZone(session, entity_in_focus);
-    try self.drawRightZone(quick_action);
+    try self.drawRightZone(session.mode, quick_action);
 }
 
 fn drawLeftZone(self: Render, session: *const g.GameSession) !void {
     switch (session.mode) {
-        .explore => try self.drawZone(0, "Continue", .inverted),
+        .looking_around => try self.drawZone(0, "Continue", .inverted),
         .play => if (session.level.components.getForEntity(session.level.player, c.Health)) |health| {
             var buf = [_]u8{0} ** 8;
             const text = try std.fmt.bufPrint(&buf, "HP:{d}", .{health.current});
             try self.drawZone(0, text, .normal);
         },
-        .looking_around => try self.drawZone(0, "Cancel", .inverted),
+        else => try self.cleanZone(0),
     }
 }
 
 /// Draws quick action as the right button, or clear the right zone if the quick_action is null.
-pub fn drawRightZone(self: Render, quick_action: ?g.Action) !void {
+pub fn drawRightZone(self: Render, mode: g.GameSession.Mode, quick_action: ?g.Action) !void {
+    if (mode == .explore) {
+        try self.drawZone(2, "Cancel", .inverted);
+        return;
+    }
     // Draw the quick action
     if (quick_action) |qa| {
         switch (qa) {
@@ -406,8 +410,8 @@ pub fn drawRightZone(self: Render, quick_action: ?g.Action) !void {
 
 fn drawMiddleZone(self: Render, session: *const g.GameSession, entity_in_focus: ?g.Entity) !void {
     switch (session.mode) {
-        .looking_around => try self.drawZone(1, "Looking around", .normal),
-        .play, .explore => {
+        .explore => try self.drawZone(1, "Explore the level", .normal),
+        .play, .looking_around => {
             // Draw the name or health of the entity in focus
             if (entity_in_focus) |entity| {
                 if (entity != session.level.player) {
