@@ -1,5 +1,6 @@
 const std = @import("std");
 const g = @import("game_pkg.zig");
+const d = g.dungeon;
 const p = g.primitives;
 
 const log = std.log.scoped(.level_map);
@@ -11,16 +12,16 @@ pub const cols = g.DISPLAY_COLS;
 
 /// Already visited places in the dungeon.
 /// It has only floor cells
-visited_places: p.BitMap(g.Dungeon.ROWS, g.Dungeon.COLS),
+visited_places: p.BitMap(g.DUNGEON_ROWS, g.DUNGEON_COLS),
 /// Index over visited placements
-visited_placements: std.AutoHashMap(*const g.Dungeon.Placement, void),
+visited_placements: std.AutoHashMap(*const d.Placement, void),
 /// All static objects (doors, ladders, items) met previously.
 remembered_objects: std.AutoHashMap(p.Point, g.Entity),
 
 pub fn init(alloc: std.mem.Allocator) !LevelMap {
     return .{
-        .visited_places = try p.BitMap(g.Dungeon.ROWS, g.Dungeon.COLS).initEmpty(alloc),
-        .visited_placements = std.AutoHashMap(*const g.Dungeon.Placement, void).init(alloc),
+        .visited_places = try p.BitMap(g.DUNGEON_ROWS, g.DUNGEON_COLS).initEmpty(alloc),
+        .visited_placements = std.AutoHashMap(*const d.Placement, void).init(alloc),
         .remembered_objects = std.AutoHashMap(p.Point, g.Entity).init(alloc),
     };
 }
@@ -47,9 +48,9 @@ pub fn format(
     _ = options;
 
     try writer.print("LevelMap(", .{});
-    for (1..g.Dungeon.ROWS + 1) |r| {
+    for (1..g.DUNGEON_ROWS + 1) |r| {
         try writer.writeByte('\n');
-        for (1..g.Dungeon.COLS + 1) |c| {
+        for (1..g.DUNGEON_COLS + 1) |c| {
             if (self.remembered_objects.get(.{ .row = @intCast(r), .col = @intCast(c) })) |entity|
                 try writer.print("{d}", .{entity})
             else if (self.visited_places.isSet(@intCast(r), @intCast(c)))
@@ -76,7 +77,7 @@ pub fn forgetObject(self: *LevelMap, place: p.Point) !void {
     log.debug("Forgotten object at {any}\n{any}", .{ place, self });
 }
 
-pub fn addVisitedPlacement(self: *LevelMap, placement: *const g.Dungeon.Placement) !void {
+pub fn addVisitedPlacement(self: *LevelMap, placement: *const d.Placement) !void {
     if (self.visited_placements.contains(placement)) return;
 
     switch (placement.*) {
@@ -86,11 +87,11 @@ pub fn addVisitedPlacement(self: *LevelMap, placement: *const g.Dungeon.Placemen
     log.debug("Added visited placement {any}\n{any}", .{ placement, self });
 }
 
-fn addVisitedRoom(self: *LevelMap, room: g.Dungeon.Room) void {
+fn addVisitedRoom(self: *LevelMap, room: d.Room) void {
     self.visited_places.setRegionValue(room.region, true);
 }
 
-fn addVisitedPassage(self: *LevelMap, passage: g.Dungeon.Passage) void {
+fn addVisitedPassage(self: *LevelMap, passage: d.Passage) void {
     var prev = passage.turns.items[0];
     for (passage.turns.items[1..]) |curr| {
         self.visited_places.setAt(curr.corner(prev.to_direction));
@@ -108,7 +109,7 @@ fn addVisitedPassage(self: *LevelMap, passage: g.Dungeon.Passage) void {
                     distance(prev.place.col, curr.place.col),
                     true,
                 );
-            if (prev.place.row < g.Dungeon.ROWS - 1)
+            if (prev.place.row < g.DUNGEON_ROWS - 1)
                 self.visited_places.setRowValue(
                     prev.place.row + 1,
                     @min(prev.place.col, curr.place.col),
@@ -120,7 +121,7 @@ fn addVisitedPassage(self: *LevelMap, passage: g.Dungeon.Passage) void {
                 self.visited_places.set(@intCast(r), prev.place.col);
                 if (prev.place.col > 1)
                     self.visited_places.set(@intCast(r), prev.place.col - 1);
-                if (prev.place.col < g.Dungeon.COLS - 1)
+                if (prev.place.col < g.DUNGEON_COLS - 1)
                     self.visited_places.set(@intCast(r), prev.place.col + 1);
             }
         }

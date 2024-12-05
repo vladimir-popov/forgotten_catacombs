@@ -24,6 +24,7 @@ const std = @import("std");
 const cp = @import("codepoints.zig");
 const g = @import("game_pkg.zig");
 const c = g.components;
+const d = g.dungeon;
 const p = g.primitives;
 
 const log = std.log.scoped(.render);
@@ -158,7 +159,7 @@ const SceneBuffer = struct {
     fn dumpToLog(self: SceneBuffer) void {
         if (std.log.logEnabled(.debug, .viewport)) {
             // the biggest possible size of the viewport (in case when all codepoints < 255)
-            var buf: [g.Dungeon.ROWS * (g.Dungeon.COLS + 1) + 1]u8 = undefined;
+            var buf: [g.DUNGEON_ROWS * (g.DUNGEON_COLS + 1) + 1]u8 = undefined;
             var writer = std.io.fixedBufferStream(&buf);
             self.write(writer.writer().any()) catch unreachable;
             log.debug("\n{s}", .{buf});
@@ -235,7 +236,7 @@ pub fn drawScene(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Ent
 pub fn drawLevelOnly(self: *Render, level: g.Level) !void {
     self.buffer.reset();
     try self.drawDungeon(level.dungeon);
-    try self.drawSprites(level);
+    try self.drawSprites(level, null);
     try self.drawChangedSymbols();
 }
 
@@ -253,7 +254,7 @@ pub inline fn clearDisplay(self: Render) !void {
     try self.runtime.clearDisplay();
 }
 
-fn drawDungeon(self: *Render, dungeon: g.Dungeon) anyerror!void {
+fn drawDungeon(self: *Render, dungeon: d.Dungeon) anyerror!void {
     var itr = dungeon.cellsInRegion(self.viewport.region);
     var place = self.viewport.region.top_left;
     var sprite = c.Sprite{ .codepoint = undefined, .z_order = 0 };

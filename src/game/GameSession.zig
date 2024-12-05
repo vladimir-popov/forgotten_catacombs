@@ -62,7 +62,7 @@ pub fn initNew(
     try events.subscribeOn(.player_hit, self.play_mode.subscriber());
 
     try self.level.generate(
-        self.level_arena.allocator(),
+        &self.level_arena,
         seed,
         0,
         g.entities.Player,
@@ -90,7 +90,7 @@ pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
         .{ @tagName(by_ladder.direction), self.level.depth, new_depth, by_ladder },
     );
     try self.level.generate(
-        self.level_arena.allocator(),
+        &self.level_arena,
         self.seed + new_depth,
         new_depth,
         player,

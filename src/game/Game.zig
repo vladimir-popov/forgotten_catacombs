@@ -65,7 +65,7 @@ inline fn welcome(self: *Game) !void {
 inline fn newGame(self: *Game) !void {
     self.state = .game;
     _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
-    _ = self.runtime.addMenuItem("Explore level", self, exploreMenu);
+    _ = self.runtime.addMenuItem("Explore the level", self, exploreMenu);
     try self.game_session.initNew(
         &self.game_session_arena,
         self.seed,

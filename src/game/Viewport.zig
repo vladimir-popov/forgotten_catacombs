@@ -88,8 +88,8 @@ pub fn moveNTimes(self: *Viewport, direction: p.Direction, n: u8) void {
             }
         },
         .down => {
-            if (self.region.bottomRightRow() < g.Dungeon.ROWS) {
-                const n0 = @min(n, g.Dungeon.ROWS - self.region.bottomRightRow());
+            if (self.region.bottomRightRow() < g.DUNGEON_ROWS) {
+                const n0 = @min(n, g.DUNGEON_ROWS - self.region.bottomRightRow());
                 self.region.top_left.row += n0;
             }
         },
@@ -100,8 +100,8 @@ pub fn moveNTimes(self: *Viewport, direction: p.Direction, n: u8) void {
             }
         },
         .right => {
-            if (self.region.bottomRightCol() < g.Dungeon.COLS) {
-                const n0 = @min(n, g.Dungeon.COLS - self.region.bottomRightCol());
+            if (self.region.bottomRightCol() < g.DUNGEON_COLS) {
+                const n0 = @min(n, g.DUNGEON_COLS - self.region.bottomRightCol());
                 self.region.top_left.col += n0;
             }
         },

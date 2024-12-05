@@ -218,7 +218,6 @@ fn drawText(ptr: *anyopaque, text: []const u8, position_on_display: p.Point, mod
 
 fn getBitmap(self: Self, codepoint: g.Codepoint) *api.LCDBitmap {
     const idx = getCodepointIdx(codepoint);
-    if (codepoint == 'F') log.warn("Getting bitmap for F on index {d}", .{idx});
     return self.playdate.graphics.getTableBitmap(self.bitmap_table, idx) orelse {
         std.debug.panic("Wrong index {d} for codepoint {d}", .{ idx, codepoint });
     };

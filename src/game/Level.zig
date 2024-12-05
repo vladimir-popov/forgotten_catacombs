@@ -3,14 +3,13 @@
 const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
+const d = g.dungeon;
 const ecs = g.ecs;
 const p = g.primitives;
 
 const BspDungeonGenerator = @import("dungeon/BspDungeonGenerator.zig");
 
 const log = std.log.scoped(.level);
-
-const Error = error{RoomWasNotFound};
 
 const Level = @This();
 
@@ -19,27 +18,26 @@ entities: std.ArrayList(g.Entity),
 next_entity: g.Entity = 0,
 /// Collection of the components of the entities
 components: ecs.ComponentsManager(c.Components),
-dungeon: g.Dungeon,
+dungeon: d.Dungeon,
 map: g.LevelMap,
 /// The depth of the current level. The session_seed + depth is unique seed for the level.
 depth: u8,
 /// The entity id of the player
 player: g.Entity = undefined,
-player_placement: *const g.Dungeon.Placement = undefined,
+player_placement: *const d.Placement = undefined,
 
 /// This methods generates a new Level. All fields of the passed level will be overwritten.
 pub fn generate(
     self: *Level,
-    alloc: std.mem.Allocator,
+    arena: *std.heap.ArenaAllocator,
     seed: u64,
     depth: u8,
     player: c.Components,
     from_ladder: c.Ladder,
 ) !void {
-    self.entities = std.ArrayList(g.Entity).init(alloc);
-    self.components = try ecs.ComponentsManager(c.Components).init(alloc);
-    self.dungeon = try g.Dungeon.init(alloc);
-    self.map = try g.LevelMap.init(alloc);
+    self.entities = std.ArrayList(g.Entity).init(arena.allocator());
+    self.components = try ecs.ComponentsManager(c.Components).init(arena.allocator());
+    self.map = try g.LevelMap.init(arena.allocator());
     self.depth = depth;
     log.debug(
         "Generate level {s} on depth {d} with seed {d} from ladder {any}",
@@ -49,18 +47,18 @@ pub fn generate(
     // to be able to be regenerated when the player travels from level to level.
     var prng = std.Random.DefaultPrng.init(seed);
     var bspGenerator = BspDungeonGenerator{};
-    try bspGenerator.generateDungeon(alloc, prng.random(), &self.dungeon);
+    self.dungeon = try bspGenerator.generateDungeon(arena, prng.random());
     log.debug("The dungeon has been generated", .{});
 
     self.next_entity = @max(from_ladder.id, from_ladder.target_ladder) + 1;
     // Add ladder by which the player has come to this level first time
-    const placement_and_place = try self.addLadder(prng.random(), from_ladder.inverted());
+    const entrance_place = try self.addLadder(from_ladder.inverted());
     // Generate player on the ladder
     self.player = try self.addNewEntity(player);
     log.debug("The player entity id is {d}", .{self.player});
-    try self.components.setToEntity(self.player, c.Position{ .point = placement_and_place[1] });
+    try self.components.setToEntity(self.player, c.Position{ .point = entrance_place });
     // Add ladder to the next level
-    _ = try self.addLadder(prng.random(), .{
+    _ = try self.addLadder(.{
         .direction = from_ladder.direction,
         .id = self.newEntity(),
         .target_ladder = self.newEntity(),
@@ -76,7 +74,9 @@ pub fn generate(
         try self.addEnemy(prng.random(), g.entities.Rat);
     }
     // move player to the entrance
-    try self.updatePlacementWithPlayer(placement_and_place[0]);
+    if (self.dungeon.placementWith(entrance_place)) |placement| {
+        try self.updatePlacementWithPlayer(placement);
+    }
 }
 
 pub fn visibilityStrategy(self: *Level) g.Render.VisibilityStrategy {
@@ -90,7 +90,7 @@ pub fn isVisible(ptr: *anyopaque, place: p.Point) g.Render.Visibility {
 
     var doorways = self.player_placement.doorways();
     while (doorways.next()) |door_place| {
-        if (self.dungeon.doorways.getPtr(door_place.*)) |doorway| {
+        if (self.dungeon.doorwayAt(door_place.*)) |doorway| {
             // skip the neighbor if the door between is closed
             if (self.components.getForEntityUnsafe(doorway.door_id, c.Door).state == .closed)
                 continue;
@@ -148,33 +148,29 @@ fn updatePlacement(ptr: *anyopaque, event: g.events.Event) !void {
     const self: *Level = @ptrCast(@alignCast(ptr));
     const entity_moved = event.entity_moved;
 
-    if (self.player_placement.contains(entity_moved.movedTo())) return;
+    if (self.player_placement.contains(entity_moved.targetPlace())) return;
 
-    if (self.dungeon.doorways.getPtr(entity_moved.moved_from)) |doorway| {
+    if (self.dungeon.doorwayAt(entity_moved.moved_from)) |doorway| {
         if (doorway.oppositePlacement(self.player_placement)) |placement| {
             try self.updatePlacementWithPlayer(placement);
             return;
         }
     }
-    // should happens only on using cheat
-    log.warn("Full scan of the placements to find the player", .{});
-    for (self.dungeon.placements.items) |placement| {
-        if (placement.contains(entity_moved.movedTo())) {
-            try self.updatePlacementWithPlayer(placement);
-            return;
-        }
+    if (self.dungeon.placementWith(entity_moved.targetPlace())) |placement| {
+        try self.updatePlacementWithPlayer(placement);
+        return;
     }
     log.err("It looks like the player is outside of any placement", .{});
 }
 
 /// Updates the placement with player and changes visible places
-pub fn updatePlacementWithPlayer(self: *Level, placement: *const g.Dungeon.Placement) !void {
+pub fn updatePlacementWithPlayer(self: *Level, placement: *const d.Placement) !void {
     log.debug("New placement with player: {any}", .{placement});
     self.player_placement = placement;
     try self.map.addVisitedPlacement(placement);
     var doorways = self.player_placement.doorways();
     while (doorways.next()) |door_place| {
-        if (self.dungeon.doorways.getPtr(door_place.*)) |doorway| {
+        if (self.dungeon.doorwayAt(door_place.*)) |doorway| {
             if (self.components.getForEntity(doorway.door_id, c.Door)) |door| if (door.state == .opened)
                 if (doorway.oppositePlacement(self.player_placement)) |pl| try self.map.addVisitedPlacement(pl);
         }
@@ -188,69 +184,21 @@ fn addNewEntity(self: *Level, components: c.Components) !g.Entity {
     return entity;
 }
 
-fn addLadder(self: *Level, rand: std.Random, ladder: c.Ladder) !struct { *const g.Dungeon.Placement, p.Point } {
+fn addLadder(self: *Level, ladder: c.Ladder) !p.Point {
     try self.entities.append(ladder.id);
     try self.components.setComponentsToEntity(ladder.id, g.entities.Ladder(ladder));
-    const placement = switch (ladder.direction) {
-        .up => try getFirstRoom(self.dungeon),
-        .down => try getLastRoom(self.dungeon),
+    const place = switch (ladder.direction) {
+        .up => self.dungeon.entrance,
+        .down => self.dungeon.exit,
     };
-    const place = self.randomEmptyPlace(rand, .{ .region = placement.room.region }) orelse
-        std.debug.panic("No empty space in the placement {any}", .{placement});
     try self.components.setToEntity(ladder.id, c.Position{ .point = place });
-    return .{ placement, place };
+    return place;
 }
 
 fn addEnemy(self: *Level, rand: std.Random, enemy: c.Components) !void {
-    if (self.randomEmptyPlace(rand, .anywhere)) |place| {
+    if (self.randomEmptyPlace(rand)) |place| {
         const id = try self.addNewEntity(enemy);
         try self.components.setToEntity(id, c.Position{ .point = place });
-    }
-}
-
-fn addLadderUp(
-    self: *Level,
-    rand: std.Random,
-    this_ladder: g.Entity,
-    that_ladder: ?g.Entity,
-) !struct { *const g.Dungeon.Placement, p.Point } {
-    try self.entities.append(this_ladder);
-    try self.components.setComponentsToEntity(this_ladder, g.entities.LadderUp(this_ladder, that_ladder));
-    const firstRoom = try getFirstRoom(self.dungeon);
-    const place = self.randomEmptyPlace(rand, .{ .region = firstRoom.room.region }) orelse
-        std.debug.panic("No empty space in the first room {any}", .{firstRoom});
-    try self.components.setToEntity(this_ladder, c.Position{ .point = place });
-    std.log.debug("Created entrance {any} at {any}", .{ this_ladder, place });
-    return .{ firstRoom, place };
-}
-
-fn addLadderDown(self: *Level, rand: std.Random, this_ladder: g.Entity, that_ladder: ?g.Entity) !void {
-    try self.entities.append(this_ladder);
-    try self.components.setComponentsToEntity(this_ladder, g.entities.LadderDown(this_ladder, that_ladder));
-    const lastRoom = try getLastRoom(self.dungeon);
-    const place = self.randomEmptyPlace(rand, .{ .region = lastRoom.room.region }) orelse
-        std.debug.panic("No empty space in the last room {any}", .{lastRoom});
-    try self.components.setToEntity(this_ladder, c.Position{ .point = place });
-    std.log.debug("Created exit {any} at {any}", .{ this_ladder, place });
-}
-
-fn getFirstRoom(dungeon: g.Dungeon) Error!*const g.Dungeon.Placement {
-    for (dungeon.placements.items) |placement| {
-        switch (placement.*) {
-            .room => return placement,
-            else => {},
-        }
-    }
-    return Error.RoomWasNotFound;
-}
-
-fn getLastRoom(dungeon: g.Dungeon) Error!*const g.Dungeon.Placement {
-    var i: usize = dungeon.placements.items.len - 1;
-    while (i >= 0) : (i -= 1) {
-        switch (dungeon.placements.items[i].*) {
-            .room => return dungeon.placements.items[i],
-            else => {},
-        }
     }
 }
 
@@ -270,13 +218,10 @@ pub fn removeEntity(self: *Level, entity: g.Entity) !void {
 
 const PlaceClarification = union(enum) { anywhere, region: p.Region };
 
-fn randomEmptyPlace(self: *Level, rand: std.Random, clarification: PlaceClarification) ?p.Point {
+fn randomEmptyPlace(self: *Level, rand: std.Random) ?p.Point {
     var attempt: u8 = 10;
     while (attempt > 0) : (attempt -= 1) {
-        const place = switch (clarification) {
-            .anywhere => self.randomPlace(rand),
-            .region => |region| randomPlaceInRegion(region, rand),
-        };
+        const place = self.dungeon.randomPlace(rand);
         var is_empty = true;
         var itr = self.query().get(c.Position);
         while (itr.next()) |tuple| {
@@ -287,19 +232,4 @@ fn randomEmptyPlace(self: *Level, rand: std.Random, clarification: PlaceClarific
         if (is_empty) return place;
     }
     return null;
-}
-
-fn randomPlace(self: *Level, rand: std.Random) p.Point {
-    const placement = self.dungeon.placements.items[rand.uintLessThan(usize, self.dungeon.placements.items.len)];
-    switch (placement.*) {
-        .room => |room| return randomPlaceInRegion(room.region, rand),
-        .passage => |passage| return passage.randomPlace(rand),
-    }
-}
-
-fn randomPlaceInRegion(region: p.Region, rand: std.Random) p.Point {
-    return .{
-        .row = region.top_left.row + rand.uintLessThan(u8, region.rows - 2) + 1,
-        .col = region.top_left.col + rand.uintLessThan(u8, region.cols - 2) + 1,
-    };
 }

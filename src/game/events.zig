@@ -12,7 +12,7 @@ pub const EntityMoved = struct {
     moved_from: p.Point,
     target: g.Action.Move.Target,
 
-    pub fn movedTo(self: EntityMoved) p.Point {
+    pub fn targetPlace(self: EntityMoved) p.Point {
         return switch (self.target) {
             .direction => |direction| self.moved_from.movedTo(direction),
             .new_place => |place| place,

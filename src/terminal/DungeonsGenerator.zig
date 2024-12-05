@@ -24,7 +24,7 @@ pub fn main() !void {
     defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK DETECTED!");
     const alloc = gpa.allocator();
 
-    var runtime = try TtyRuntime.TtyRuntime(g.Dungeon.ROWS + 2, g.Dungeon.COLS + 2).init(alloc, false, false, false);
+    var runtime = try TtyRuntime.TtyRuntime(g.DUNGEON_ROWS + 2, g.DUNGEON_COLS + 2).init(alloc, false, false, false);
     defer runtime.deinit();
 
     var generator = try DungeonsGenerator.init(alloc, runtime.runtime());
@@ -52,8 +52,8 @@ const DungeonsGenerator = struct {
                 alloc,
                 runtime,
                 .{ .context = undefined, .isVisible = showAll },
-                g.Dungeon.ROWS,
-                g.Dungeon.COLS,
+                g.DUNGEON_ROWS,
+                g.DUNGEON_COLS,
             ),
             .level_arena = std.heap.ArenaAllocator.init(alloc),
         };
@@ -68,7 +68,7 @@ const DungeonsGenerator = struct {
         log.info("\n====================\nGenerate level with seed {d}\n====================\n", .{seed});
         _ = self.level_arena.reset(.retain_capacity);
         try self.level.generate(
-            self.level_arena.allocator(),
+            &self.level_arena,
             seed,
             0,
             g.entities.Player,

@@ -5,6 +5,7 @@ pub const ecs = @import("ecs.zig");
 pub const entities = @import("entities.zig");
 pub const events = @import("events.zig");
 pub const primitives = @import("primitives.zig");
+pub const dungeon = @import("dungeon/dungeon_pkg.zig");
 
 pub const ActionSystem = @import("ActionSystem.zig");
 pub const Action = ActionSystem.Action;
@@ -16,7 +17,6 @@ pub const Entity = ecs.Entity;
 pub const Runtime = @import("Runtime.zig");
 pub const Button = @import("Button.zig");
 pub const Cheat = @import("cheats.zig").Cheat;
-pub const Dungeon = @import("dungeon/Dungeon.zig");
 pub const Game = @import("Game.zig");
 pub const GameSession = @import("GameSession.zig");
 pub const Level = @import("Level.zig");
@@ -38,6 +38,17 @@ pub const SPRITE_WIDTH = 10;
 pub const DISPLAY_ROWS = DISPLAY_HEIGHT / SPRITE_HEIGHT;
 /// 40
 pub const DISPLAY_COLS = DISPLAY_WIDHT / SPRITE_WIDTH;
+
+/// 36
+pub const DUNGEON_ROWS = DISPLAY_ROWS * 3;
+/// 120
+pub const DUNGEON_COLS = DISPLAY_COLS * 3;
+
+pub const DUNGEON_REGION: primitives.Region = .{
+    .top_left = .{ .row = 1, .col = 1 },
+    .rows = DUNGEON_ROWS,
+    .cols = DUNGEON_COLS,
+};
 
 pub const DOUBLE_PUSH_DELAY_MS = 250;
 pub const HOLD_DELAY_MS = 500;
