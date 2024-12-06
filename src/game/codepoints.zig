@@ -13,5 +13,5 @@ pub const ladder_up = '<';
 pub const ladder_down = '>';
 pub const player = '@';
 pub const rock = '#';
-pub const walls  = [_]u21{ '│', '┐', '┌', '─', '┘', '└', '├', '┤', '┬', '┴', '┼' };
+pub const walls = [_]u21{ '│', '┐', '┌', '─', '┘', '└', '├', '┤', '┬', '┴', '┼' };
 pub const water = '~';

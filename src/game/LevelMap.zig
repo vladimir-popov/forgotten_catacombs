@@ -13,7 +13,8 @@ pub const cols = g.DISPLAY_COLS;
 /// Already visited places in the dungeon.
 /// It has only floor cells
 visited_places: p.BitMap(g.DUNGEON_ROWS, g.DUNGEON_COLS),
-/// Index over visited placements
+/// Index over visited placements.
+/// Used to speed up adding already visited placement
 visited_placements: std.AutoHashMap(*const d.Placement, void),
 /// All static objects (doors, ladders, items) met previously.
 remembered_objects: std.AutoHashMap(p.Point, g.Entity),
@@ -89,6 +90,9 @@ pub fn addVisitedPlacement(self: *LevelMap, placement: *const d.Placement) !void
 
 fn addVisitedRoom(self: *LevelMap, room: d.Room) void {
     self.visited_places.setRegionValue(room.region, true);
+    for (room.inner_rooms.items) |ir| {
+        self.visited_places.setRegionValue(ir.innerRegion(), false);
+    }
 }
 
 fn addVisitedPassage(self: *LevelMap, passage: d.Passage) void {

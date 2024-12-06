@@ -205,9 +205,16 @@ pub const Region = struct {
         return reg;
     }
 
+    /// Returns true if the point is inside the region including the borders.
     pub inline fn containsPoint(self: Region, point: Point) bool {
         return self.top_left.row <= point.row and point.row <= self.bottomRightRow() and
             self.top_left.col <= point.col and point.col <= self.bottomRightCol();
+    }
+
+    /// Returns true if the point is inside the region excluding the borders.
+    pub inline fn containsPointInside(self: Region, point: Point) bool {
+        return self.top_left.row < point.row and point.row < self.bottomRightRow() and
+            self.top_left.col < point.col and point.col < self.bottomRightCol();
     }
 
     /// Returns true if the `other` region doesn't go beyond of this region.

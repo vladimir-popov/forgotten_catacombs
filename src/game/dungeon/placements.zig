@@ -15,7 +15,7 @@ pub const Placement = union(enum) {
     pub fn contains(self: Placement, place: p.Point) bool {
         switch (self) {
             .passage => |ps| return ps.isPartOfThisPassage(place),
-            .room => |r| return r.region.containsPoint(place),
+            .room => |r| return r.contains(place),
         }
     }
 
@@ -58,15 +58,24 @@ pub const Doorway = struct {
     }
 };
 
+/// The square placement including the border. Can contain the inner rooms,
+/// which should not cross each other or the border of this room.
 pub const Room = struct {
+    /// The region of the room including the borders
     region: p.Region,
     doorways: std.AutoHashMap(p.Point, void),
+    inner_rooms: std.ArrayList(*const Room),
 
     pub fn init(alloc: std.mem.Allocator, region: p.Region) Room {
-        return .{ .region = region, .doorways = std.AutoHashMap(p.Point, void).init(alloc) };
+        return .{
+            .region = region,
+            .doorways = std.AutoHashMap(p.Point, void).init(alloc),
+            .inner_rooms = std.ArrayList(*const Room).init(alloc),
+        };
     }
     pub fn deinit(self: *Room) void {
         self.doorways.deinit();
+        self.inner_rooms.deinit();
     }
 
     pub fn format(
@@ -77,12 +86,33 @@ pub const Room = struct {
     ) !void {
         _ = fmt;
         _ = options;
-
-        try writer.print("Room({any}; doorways: ", .{self.region});
+        try writer.print(
+            "Room({any}; inner rooms: {d}; doorways: [",
+            .{ self.region, self.inner_rooms.items.len },
+        );
         var itr = self.doorways.keyIterator();
         while (itr.next()) |doorway|
             try writer.print("{any};", .{doorway.*});
-        try writer.print(")", .{});
+        try writer.print("])", .{});
+    }
+
+    /// Returns the region inside the room (exclude borders).
+    pub fn innerRegion(self: Room) p.Region {
+        return .{
+            .top_left = .{ .row = self.region.top_left.row + 1, .col = self.region.top_left.col + 1 },
+            .rows = self.region.rows - 2,
+            .cols = self.region.cols - 2,
+        };
+    }
+
+    /// Returns true if the place is inside the room or on its border, but not
+    /// inside the inner rooms.
+    pub fn contains(self: Room, place: p.Point) bool {
+        if (!self.region.containsPoint(place)) return false;
+        for (self.inner_rooms.items) |ir| {
+            if (ir.region.containsPointInside(place)) return false;
+        }
+        return true;
     }
 
     pub fn randomPlace(self: Room, rand: std.Random) p.Point {
@@ -90,38 +120,6 @@ pub const Room = struct {
             .row = self.region.top_left.row + rand.uintLessThan(u8, self.region.rows - 2) + 1,
             .col = self.region.top_left.col + rand.uintLessThan(u8, self.region.cols - 2) + 1,
         };
-    }
-
-    pub fn cellAt(self: Room, place: p.Point) d.Dungeon.Cell {
-        if (!self.region.containsPoint(place)) return .nothing;
-
-        if (self.doorways.get(place)) |_| return .doorway;
-
-        if (self.region.top_left.row == place.row) {
-            if (self.region.top_left.col == place.col) {
-                return .@"┌";
-            }
-            if (self.region.bottomRightCol() == place.col) {
-                return .@"┐";
-            }
-            return .@"─";
-        }
-        if (self.region.bottomRightRow() == place.row) {
-            if (self.region.top_left.col == place.col) {
-                return .@"└";
-            }
-            if (self.region.bottomRightCol() == place.col) {
-                return .@"┘";
-            }
-            return .@"─";
-        }
-        if (self.region.top_left.col == place.col) {
-            return .@"│";
-        }
-        if (self.region.bottomRightCol() == place.col) {
-            return .@"│";
-        }
-        return .floor;
     }
 };
 

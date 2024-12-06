@@ -110,7 +110,7 @@ pub fn generateCatacomb(
         entry.value_ptr.door_id = try self.addNewEntity(g.entities.ClosedDoor);
         try self.components.setToEntity(entry.value_ptr.door_id, c.Position{ .point = entry.key_ptr.* });
     }
-
+    // Add enemies
     for (0..prng.random().uintLessThan(u8, 10) + 10) |_| {
         try self.addEnemy(prng.random(), g.entities.Rat);
     }

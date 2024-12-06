@@ -13,9 +13,9 @@ const d = @import("dungeon_pkg.zig");
 // ║#...└───┘••••••••••••••••••••••••└───┘.#║
 // ║#...┌───┐••••••••••••••••••••••••......#║
 // ║#...│.@.'••••••••••••••••••••••••......#║
-// ║#...└───┘••••••••••••••••••••••••......#║
-// ║#........••••••••••••••••@•••••••......#║
+// ║#...└───┘••••••••••••••••@•••••••......#║
 // ║~~~~~~~~~~~~~~~~~~~~~~~~│<│~~~~~~~~~~~~~║
+// ║~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~║
 // ║════════════════════════════════════════║
 const FirstLocation = @This();
 
@@ -29,7 +29,7 @@ const square: p.Region = .{ .top_left = .{ .row = 4, .col = 9 }, .rows = 6, .col
 const ladder: p.Point = .{ .row = 2, .col = 18 };
 const ladder_room: p.Region = .{ .top_left = .{ .row = 1, .col = 15 }, .rows = 3, .cols = 7 };
 /// This is the entrance to this level
-const wharf: p.Point = .{ .row = 10, .col = 25 };
+const wharf: p.Point = .{ .row = 9, .col = 25 };
 const traider_tent: p.Region = p.Region{ .top_left = .{ .row = 3, .col = 5 }, .rows = 3, .cols = 5 };
 const scientist_tent: p.Region = p.Region{ .top_left = .{ .row = 6, .col = 5 }, .rows = 3, .cols = 5 };
 const portal_tent: p.Region = p.Region{ .top_left = .{ .row = 3, .col = 33 }, .rows = 3, .cols = 5 };
@@ -67,6 +67,7 @@ fn createRoom(self: *FirstLocation, alloc: std.mem.Allocator, region: p.Region, 
     try placement.addDoor(door);
     const doorway = d.Doorway{ .placement_from = whole_level, .placement_to = placement };
     try self.doorways.put(door, doorway);
+    try whole_level.room.inner_rooms.append(&placement.room);
 }
 
 pub fn dungeon(self: *const FirstLocation) d.Dungeon {
@@ -91,16 +92,51 @@ fn cellAt(ptr: *const anyopaque, place: p.Point) d.Dungeon.Cell {
     for (self.rooms.items[1..], 1..) |room, i| {
         if (room.room.region.containsPoint(place)) {
             if (i == 1)
-                return replaceWallsByTheRock(room.room.cellAt(place))
+                return replaceWallsByTheRock(cellOfTheRoom(room.room, place))
             else
-                return room.room.cellAt(place);
+                return cellOfTheRoom(room.room, place);
         }
     }
-    if (place.row == whole_region.bottomRightRow()) {
+    if (place.row == whole_region.bottomRightRow() - 1) {
         if (place.col == wharf.col - 1 or place.col == wharf.col + 1) return .@"│";
         return .water;
     }
-    return replaceWallsByTheRock(self.rooms.items[0].room.cellAt(place));
+    if (place.row > whole_region.bottomRightRow() - 1) {
+        return .water;
+    }
+    return replaceWallsByTheRock(cellOfTheRoom(self.rooms.items[0].room, place));
+}
+
+fn cellOfTheRoom(room: d.Room, place: p.Point) d.Dungeon.Cell {
+    if (!room.region.containsPoint(place)) return .nothing;
+
+    if (room.doorways.get(place)) |_| return .doorway;
+
+    if (room.region.top_left.row == place.row) {
+        if (room.region.top_left.col == place.col) {
+            return .@"┌";
+        }
+        if (room.region.bottomRightCol() == place.col) {
+            return .@"┐";
+        }
+        return .@"─";
+    }
+    if (room.region.bottomRightRow() == place.row) {
+        if (room.region.top_left.col == place.col) {
+            return .@"└";
+        }
+        if (room.region.bottomRightCol() == place.col) {
+            return .@"┘";
+        }
+        return .@"─";
+    }
+    if (room.region.top_left.col == place.col) {
+        return .@"│";
+    }
+    if (room.region.bottomRightCol() == place.col) {
+        return .@"│";
+    }
+    return .floor;
 }
 
 inline fn replaceWallsByTheRock(cell: d.Dungeon.Cell) d.Dungeon.Cell {
