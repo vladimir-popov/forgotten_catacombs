@@ -56,6 +56,14 @@ pub fn generateFirstLevel(
     else
         try self.components.setToEntity(self.player, c.Position{ .point = self.dungeon.exit });
 
+    // Add the trader
+    _ = try self.addNewEntity(g.entities.trader(d.FirstLocation.trader_place));
+    // Add the scientist
+    _ = try self.addNewEntity(g.entities.scientist(d.FirstLocation.scientist_place));
+    // Add the teleport
+    _ = try self.addNewEntity(g.entities.teleport(d.FirstLocation.teleport_place));
+
+    // Add doors
     var doors = self.dungeon.doorways.iterator();
     while (doors.next()) |entry| {
         entry.value_ptr.door_id = try self.addNewEntity(g.entities.ClosedDoor);

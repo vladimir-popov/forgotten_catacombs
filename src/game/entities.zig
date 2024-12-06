@@ -5,7 +5,7 @@ const c = g.components;
 const p = g.primitives;
 
 pub const Player = c.Components{
-    .sprite = .{ .codepoint = cp.player, .z_order = 3 },
+    .sprite = .{ .codepoint = cp.human, .z_order = 3 },
     .description = .{ .name = "You" },
     .health = .{ .max = 100, .current = 50 },
     .weapon = .{ .max_damage = 3, .move_scale = 0.5 },
@@ -55,6 +55,30 @@ pub const ClosedDoor = c.Components{
     .sprite = .{ .codepoint = cp.door_closed, .z_order = 0 },
     .description = .{ .name = "Closed door" },
 };
+
+pub fn trader(place: p.Point) c.Components {
+    return .{
+        .position = .{ .point = place },
+        .sprite = .{ .codepoint = cp.human, .z_order = 3 },
+        .description = .{ .name = "Trader" },
+    };
+}
+
+pub fn scientist(place: p.Point) c.Components {
+    return .{
+        .position = .{ .point = place },
+        .sprite = .{ .codepoint = cp.human, .z_order = 3 },
+        .description = .{ .name = "Scientist" },
+    };
+}
+
+pub fn teleport(place: p.Point) c.Components {
+    return .{
+        .position = .{ .point = place },
+        .sprite = .{ .codepoint = cp.teleport, .z_order = 1 },
+        .description = .{ .name = "Teleport" },
+    };
+}
 
 pub const Rat = c.Components{
     .initiative = .{},

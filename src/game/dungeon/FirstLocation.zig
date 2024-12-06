@@ -31,8 +31,11 @@ const ladder_room: p.Region = .{ .top_left = .{ .row = 1, .col = 15 }, .rows = 3
 /// This is the entrance to this level
 const wharf: p.Point = .{ .row = 9, .col = 25 };
 const traider_tent: p.Region = p.Region{ .top_left = .{ .row = 3, .col = 5 }, .rows = 3, .cols = 5 };
+pub const trader_place: p.Point = traider_tent.center();
 const scientist_tent: p.Region = p.Region{ .top_left = .{ .row = 6, .col = 5 }, .rows = 3, .cols = 5 };
-const portal_tent: p.Region = p.Region{ .top_left = .{ .row = 3, .col = 33 }, .rows = 3, .cols = 5 };
+pub const scientist_place = scientist_tent.center();
+const teleport_tent: p.Region = p.Region{ .top_left = .{ .row = 3, .col = 33 }, .rows = 3, .cols = 5 };
+pub const teleport_place = teleport_tent.center();
 
 rooms: std.ArrayList(*d.Placement),
 doorways: std.AutoHashMap(p.Point, d.Doorway),
@@ -52,7 +55,7 @@ pub fn create(arena: *std.heap.ArenaAllocator) !*FirstLocation {
     try self.createRoom(alloc, ladder_room, ladder.movedTo(.down));
     try self.createRoom(alloc, traider_tent, traider_tent.bottomRight().movedTo(.up));
     try self.createRoom(alloc, scientist_tent, scientist_tent.bottomRight().movedTo(.up));
-    try self.createRoom(alloc, portal_tent, portal_tent.top_left.movedTo(.down));
+    try self.createRoom(alloc, teleport_tent, teleport_tent.top_left.movedTo(.down));
 
     return self;
 }
