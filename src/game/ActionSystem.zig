@@ -113,8 +113,7 @@ fn doMove(
 
 fn checkCollision(session: *g.GameSession, actor: g.Entity, place: p.Point) ?Action {
     switch (session.level.dungeon.cellAt(place)) {
-        .nothing, .wall => return .do_nothing,
-        .door, .floor => {
+        .doorway, .floor => {
             var itr = session.level.entityAt(place);
             while (itr.next()) |entity| {
                 if (session.level.components.getForEntity(entity, c.Door)) |door| {
@@ -127,6 +126,7 @@ fn checkCollision(session: *g.GameSession, actor: g.Entity, place: p.Point) ?Act
                         return .{ .hit = .{ .target = entity, .target_health = health, .by_weapon = weapon } };
             }
         },
+        else => return .do_nothing,
     }
     return null;
 }

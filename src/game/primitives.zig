@@ -172,6 +172,10 @@ pub const Region = struct {
         return self.top_left.col + self.cols - 1;
     }
 
+    pub inline fn bottomRight(self: Region) Point {
+        return .{ .row = self.bottomRightRow(), .col = self.bottomRightCol() };
+    }
+
     pub inline fn center(self: Region) Point {
         return .{ .row = self.top_left.row + self.rows / 2, .col = self.top_left.col + self.cols / 2 };
     }

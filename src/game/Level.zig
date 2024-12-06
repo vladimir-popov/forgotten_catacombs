@@ -26,8 +26,49 @@ depth: u8,
 player: g.Entity = undefined,
 player_placement: *const d.Placement = undefined,
 
-/// This methods generates a new Level. All fields of the passed level will be overwritten.
-pub fn generate(
+pub fn generateFirstLevel(
+    self: *Level,
+    arena: *std.heap.ArenaAllocator,
+    player: c.Components,
+    first_time: bool,
+) !void {
+    self.entities = std.ArrayList(g.Entity).init(arena.allocator());
+    self.components = try ecs.ComponentsManager(c.Components).init(arena.allocator());
+    self.depth = 0;
+    self.dungeon = (try d.FirstLocation.create(arena)).dungeon();
+    self.map = try g.LevelMap.init(arena.allocator());
+
+    // Add wharf
+    var id = self.newEntity();
+    try self.entities.append(id);
+    try self.components.setComponentsToEntity(id, g.entities.wharfEntrance(self.dungeon.entrance));
+
+    // Add the ladder leads to the bottom dungeons:
+    id = self.newEntity();
+    try self.entities.append(id);
+    try self.components.setComponentsToEntity(id, g.entities.catacombsEntrance(id, self.dungeon.exit));
+
+    // Generate player on the wharf
+    self.player = try self.addNewEntity(player);
+    log.debug("The player entity id is {d}", .{self.player});
+    if (first_time)
+        try self.components.setToEntity(self.player, c.Position{ .point = self.dungeon.entrance })
+    else
+        try self.components.setToEntity(self.player, c.Position{ .point = self.dungeon.exit });
+
+    var doors = self.dungeon.doorways.iterator();
+    while (doors.next()) |entry| {
+        entry.value_ptr.door_id = try self.addNewEntity(g.entities.ClosedDoor);
+        try self.components.setToEntity(entry.value_ptr.door_id, c.Position{ .point = entry.key_ptr.* });
+    }
+    // move player to the entrance
+    if (self.dungeon.placementWith(self.dungeon.entrance)) |placement| {
+        try self.updatePlacementWithPlayer(placement);
+    }
+}
+
+/// This methods generates a new level of the catacombs. All fields of the passed level will be overwritten.
+pub fn generateCatacomb(
     self: *Level,
     arena: *std.heap.ArenaAllocator,
     seed: u64,
@@ -185,8 +226,9 @@ fn addNewEntity(self: *Level, components: c.Components) !g.Entity {
 }
 
 fn addLadder(self: *Level, ladder: c.Ladder) !p.Point {
+    std.debug.assert(ladder.id < self.next_entity);
     try self.entities.append(ladder.id);
-    try self.components.setComponentsToEntity(ladder.id, g.entities.Ladder(ladder));
+    try self.components.setComponentsToEntity(ladder.id, g.entities.ladder(ladder));
     const place = switch (ladder.direction) {
         .up => self.dungeon.entrance,
         .down => self.dungeon.exit,

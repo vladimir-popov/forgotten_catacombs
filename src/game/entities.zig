@@ -12,15 +12,32 @@ pub const Player = c.Components{
     .speed = .{ .move_speed = 10 },
 };
 
-pub fn Ladder(ladder: c.Ladder) c.Components {
-    return switch (ladder.direction) {
+pub fn catacombsEntrance(id: g.Entity, place: p.Point) c.Components {
+    return .{
+        .ladder = .{ .direction = .down, .id = id, .target_ladder = id + 1 },
+        .description = .{ .name = "Ladder to catacombs" },
+        .sprite = .{ .codepoint = cp.ladder_down, .z_order = 2 },
+        .position = .{ .point = place },
+    };
+}
+
+pub fn wharfEntrance(place: p.Point) c.Components {
+    return .{
+        .description = .{ .name = "Wharf" },
+        .sprite = .{ .codepoint = cp.ladder_up, .z_order = 2 },
+        .position = .{ .point = place },
+    };
+}
+
+pub fn ladder(l: c.Ladder) c.Components {
+    return switch (l.direction) {
         .up => .{
-            .ladder = ladder,
+            .ladder = l,
             .description = .{ .name = "Ladder up" },
             .sprite = .{ .codepoint = cp.ladder_up, .z_order = 2 },
         },
         .down => .{
-            .ladder = ladder,
+            .ladder = l,
             .description = .{ .name = "Ladder down" },
             .sprite = .{ .codepoint = cp.ladder_down, .z_order = 2 },
         },

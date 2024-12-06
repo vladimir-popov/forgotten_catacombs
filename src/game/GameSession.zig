@@ -1,8 +1,11 @@
 //! This is the root object for the single game session,
-//! which contains the current level, all entities and components, and pointer to the
-//! Game object.
-//! The GameSession has two modes: the `PlayMode` and `ExploreMode`. See their documentations
-//! for more details.
+//! which contains the current level, all entities and components.
+//! The GameSession has three modes: the `PlayMode`, `LookingAroundMode` and `ExploreMode`.
+//! That modes are part of the GameSession extracted to the separate files to make their maintenance easier.
+//! The `Mode` enum shows in which exactly mode the GameSession right now, but all implementations of the modes
+//! are not union. Instead, they are permanent part of the GameSession. It makes memory management easier and effective,
+//! because usually player switch between modes very often.
+//! See their documentations for more details.
 
 const std = @import("std");
 const g = @import("game_pkg.zig");
@@ -61,26 +64,21 @@ pub fn initNew(
     try events.subscribeOn(.entity_moved, self.level.subscriber());
     try events.subscribeOn(.player_hit, self.play_mode.subscriber());
 
-    try self.level.generate(
-        &self.level_arena,
-        seed,
-        0,
-        g.entities.Player,
-        c.Ladder{ .direction = .down, .id = 0, .target_ladder = 1 },
-    );
-    self.render.viewport.centeredAround(self.level.playerPosition().point);
+    try self.level.generateFirstLevel(&self.level_arena, g.entities.Player, true);
 }
 
 pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
     const player = try self.level.components.entityToStruct(self.level.player);
     // TODO persist the current level
     _ = self.level_arena.reset(.retain_capacity);
+    self.play_mode.entity_in_focus = null;
+    self.play_mode.quick_action = null;
 
     const new_depth: u8 = switch (by_ladder.direction) {
         .up => self.level.depth - 1,
         .down => self.level.depth + 1,
     };
-    std.log.debug(
+    log.debug(
         \\
         \\--------------------
         \\Move {s} from the level {d} to {d}
@@ -89,16 +87,18 @@ pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
     ,
         .{ @tagName(by_ladder.direction), self.level.depth, new_depth, by_ladder },
     );
-    try self.level.generate(
-        &self.level_arena,
-        self.seed + new_depth,
-        new_depth,
-        player,
-        by_ladder,
-    );
+    if (new_depth == 0) {
+        try self.level.generateFirstLevel(&self.level_arena, player, false);
+    } else {
+        try self.level.generateCatacomb(
+            &self.level_arena,
+            self.seed + new_depth,
+            new_depth,
+            player,
+            by_ladder,
+        );
+    }
     self.render.viewport.centeredAround(self.level.playerPosition().point);
-    self.play_mode.entity_in_focus = null;
-    self.play_mode.quick_action = null;
 }
 
 // TODO: Load session from file

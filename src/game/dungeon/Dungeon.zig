@@ -7,11 +7,30 @@ const d = @import("dungeon_pkg.zig");
 const log = std.log.scoped(.dungeon);
 
 /// Possible types of objects inside the dungeon.
-pub const Cell = enum {
-    nothing,
-    floor,
-    wall,
-    door,
+/// This is not part of ecs, but the part of the landscape.
+pub const Cell = enum(u6) {
+    nothing = 0,
+    // '.'
+    floor = 1,
+    // '''
+    doorway = 2,
+    // '▒'
+    wall = 3,
+    // '#'
+    rock = 4,
+    // │┐┌─┘└├┤┬┴┼
+    @"│" = 5,
+    @"┐" = 6,
+    @"┌" = 7,
+    @"─" = 8,
+    @"┘" = 9,
+    @"└" = 10,
+    @"├" = 11,
+    @"┤" = 12,
+    @"┬" = 13,
+    @"┴" = 14,
+    @"┼" = 15,
+    water = 16,
 };
 
 const Dungeon = @This();
@@ -22,12 +41,14 @@ pub const VTable = struct {
     /// Should return the placement that contains the passed place, or nothing,
     /// if the place is outside of all placements.
     placementWithFn: *const fn (ptr: *const anyopaque, place: p.Point) ?*const d.Placement,
-    /// Should return random place inside random placement of the dungeon.
+    /// Should return random place to put an enemy.
     randomPlaceFn: *const fn (ptr: *const anyopaque, rand: std.Random) p.Point,
 };
 
 /// The pointer to the original implementation of the dungeon.
 parent: *const anyopaque,
+rows: u8,
+cols: u8,
 /// The place with entrance to the level. Usually, it's the place with ladder to
 /// an upper level.
 entrance: p.Point,
@@ -116,10 +137,10 @@ pub fn write(
             try writer.writeByte('\n');
         }
         const symbol: u8 = switch (cell) {
-            .wall => '#',
+            .nothing => ' ',
             .floor => '.',
-            .door => '\'',
-            else => ' ',
+            .doorway => '\'',
+            else => '#',
         };
         try writer.writeByte(symbol);
         row += 1;

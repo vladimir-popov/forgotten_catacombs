@@ -260,9 +260,15 @@ fn drawDungeon(self: *Render, dungeon: d.Dungeon) anyerror!void {
     var sprite = c.Sprite{ .codepoint = undefined, .z_order = 0 };
     while (itr.next()) |cell| {
         sprite.codepoint = switch (cell) {
+            .nothing => cp.nothing,
             .floor => cp.floor_visible,
             .wall => cp.wall_visible,
-            else => cp.nothing,
+            .rock => cp.rock,
+            .water => cp.water,
+            else => switch (@intFromEnum(cell)) {
+                5...15 => cp.walls[@intFromEnum(cell) - 5],
+                else => cp.unknown,
+            },
         };
         try self.drawSprite(sprite, place, .normal);
         place.move(.right);

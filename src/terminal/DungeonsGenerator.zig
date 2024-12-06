@@ -67,7 +67,7 @@ const DungeonsGenerator = struct {
     fn generate(self: *DungeonsGenerator, seed: u64) !void {
         log.info("\n====================\nGenerate level with seed {d}\n====================\n", .{seed});
         _ = self.level_arena.reset(.retain_capacity);
-        try self.level.generate(
+        try self.level.generateCatacomb(
             &self.level_arena,
             seed,
             0,

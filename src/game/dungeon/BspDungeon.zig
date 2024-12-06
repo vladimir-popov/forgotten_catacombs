@@ -1,3 +1,4 @@
+//! The Catacomb level
 const std = @import("std");
 const g = @import("../game_pkg.zig");
 const p = g.primitives;
@@ -18,6 +19,11 @@ pub const Error = error{
     RoomWasNotFound,
 };
 
+/// 36
+const rows = g.DUNGEON_ROWS;
+/// 120
+const cols = g.DUNGEON_COLS;
+
 const BspDungeon = @This();
 
 arena: *std.heap.ArenaAllocator,
@@ -29,9 +35,9 @@ placements: std.ArrayList(*Placement),
 /// Index of all doorways by their place
 doorways: std.AutoHashMap(p.Point, Doorway),
 /// The bit mask of the places with floor.
-floor: p.BitMap(g.DUNGEON_ROWS, g.DUNGEON_COLS),
+floor: p.BitMap(rows, cols),
 /// The bit mask of the places with walls. The floor under the walls is undefined, it can be set, or can be omitted.
-walls: p.BitMap(g.DUNGEON_ROWS, g.DUNGEON_COLS),
+walls: p.BitMap(rows, cols),
 entrance: p.Point = undefined,
 exit: p.Point = undefined,
 
@@ -46,8 +52,8 @@ pub fn create(arena: *std.heap.ArenaAllocator) !*BspDungeon {
         .arena_alloc = arena_alloc,
         .placements = std.ArrayList(*Placement).init(arena_alloc),
         .doorways = std.AutoHashMap(p.Point, Doorway).init(arena_alloc),
-        .floor = try p.BitMap(g.DUNGEON_ROWS, g.DUNGEON_COLS).initEmpty(arena_alloc),
-        .walls = try p.BitMap(g.DUNGEON_ROWS, g.DUNGEON_COLS).initEmpty(arena_alloc),
+        .floor = try p.BitMap(rows, cols).initEmpty(arena_alloc),
+        .walls = try p.BitMap(rows, cols).initEmpty(arena_alloc),
     };
     return self;
 }
@@ -55,6 +61,8 @@ pub fn create(arena: *std.heap.ArenaAllocator) !*BspDungeon {
 pub fn dungeon(self: *const BspDungeon) Dungeon {
     return .{
         .parent = self,
+        .rows = rows,
+        .cols = cols,
         .entrance = self.entrance,
         .exit = self.exit,
         .doorways = &self.doorways,
@@ -72,10 +80,10 @@ fn cellAtFn(ptr: *const anyopaque, place: p.Point) Dungeon.Cell {
 }
 
 fn cellAt(self: *const BspDungeon, place: p.Point) Dungeon.Cell {
-    if (place.row < 1 or place.row > g.DUNGEON_ROWS) {
+    if (place.row < 1 or place.row > rows) {
         return .nothing;
     }
-    if (place.col < 1 or place.col > g.DUNGEON_COLS) {
+    if (place.col < 1 or place.col > cols) {
         return .nothing;
     }
     if (self.walls.isSet(place.row, place.col)) {
@@ -85,7 +93,7 @@ fn cellAt(self: *const BspDungeon, place: p.Point) Dungeon.Cell {
         return .floor;
     }
     if (self.doorways.contains(place)) {
-        return .door;
+        return .doorway;
     }
     return .nothing;
 }
@@ -490,17 +498,15 @@ fn findPlaceForDoor(self: BspDungeon, direction: p.Direction, start: p.Point, re
                     return null;
                 }
                 // check that no one door near
-                if (self.isCellAt(place.movedTo(direction.rotatedClockwise(true)), .door)) {
+                if (self.isCellAt(place.movedTo(direction.rotatedClockwise(true)), .doorway)) {
                     return null;
                 }
-                if (self.isCellAt(place.movedTo(direction.rotatedClockwise(false)), .door)) {
+                if (self.isCellAt(place.movedTo(direction.rotatedClockwise(false)), .doorway)) {
                     return null;
                 }
                 return place;
             },
-            else => {
-                return null;
-            },
+            else => return null,
         }
         place.move(direction);
     }

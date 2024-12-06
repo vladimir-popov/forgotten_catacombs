@@ -3,6 +3,7 @@
 //! hard operation for the playdate.
 const std = @import("std");
 const g = @import("../game_pkg.zig");
+const d = g.dungeon;
 const p = g.primitives;
 
 pub const Placement = union(enum) {
@@ -89,6 +90,38 @@ pub const Room = struct {
             .row = self.region.top_left.row + rand.uintLessThan(u8, self.region.rows - 2) + 1,
             .col = self.region.top_left.col + rand.uintLessThan(u8, self.region.cols - 2) + 1,
         };
+    }
+
+    pub fn cellAt(self: Room, place: p.Point) d.Dungeon.Cell {
+        if (!self.region.containsPoint(place)) return .nothing;
+
+        if (self.doorways.get(place)) |_| return .doorway;
+
+        if (self.region.top_left.row == place.row) {
+            if (self.region.top_left.col == place.col) {
+                return .@"┌";
+            }
+            if (self.region.bottomRightCol() == place.col) {
+                return .@"┐";
+            }
+            return .@"─";
+        }
+        if (self.region.bottomRightRow() == place.row) {
+            if (self.region.top_left.col == place.col) {
+                return .@"└";
+            }
+            if (self.region.bottomRightCol() == place.col) {
+                return .@"┘";
+            }
+            return .@"─";
+        }
+        if (self.region.top_left.col == place.col) {
+            return .@"│";
+        }
+        if (self.region.bottomRightCol() == place.col) {
+            return .@"│";
+        }
+        return .floor;
     }
 };
 
