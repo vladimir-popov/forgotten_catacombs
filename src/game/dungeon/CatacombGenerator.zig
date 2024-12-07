@@ -12,11 +12,11 @@ const d = g.dungeon;
 const p = g.primitives;
 
 const BspTree = @import("BspTree.zig");
-const BspDungeon = @import("BspDungeon.zig");
+const Catacomb = @import("Catacomb.zig");
 
 const log = std.log.scoped(.bsp_generator);
 
-const BspDungeonGenerator = @This();
+const CatacombGenerator = @This();
 
 /// The minimal rows count in the final region after BSP splitting
 region_min_rows: u8 = 10,
@@ -31,7 +31,7 @@ square_ratio: f16 = 0.4,
 
 /// Creates the dungeon with BSP algorithm.
 pub fn generateDungeon(
-    self: BspDungeonGenerator,
+    self: CatacombGenerator,
     arena: *std.heap.ArenaAllocator,
     rand: std.Random,
 ) !d.Dungeon {
@@ -49,7 +49,7 @@ pub fn generateDungeon(
         .{ .min_rows = self.region_min_rows, .min_cols = self.region_min_cols, .square_ratio = self.square_ratio },
     );
 
-    const bsp_dungeon = try BspDungeon.create(arena);
+    const bsp_dungeon = try Catacomb.create(arena);
     // visit every BSP node and generate rooms in the leafs
     var createRooms: TraverseAndCreateRooms = .{
         .generator = &self,
@@ -75,8 +75,8 @@ pub fn generateDungeon(
 }
 
 const TraverseAndCreateRooms = struct {
-    generator: *const BspDungeonGenerator,
-    dungeon: *BspDungeon,
+    generator: *const CatacombGenerator,
+    dungeon: *Catacomb,
     rand: std.Random,
 
     fn handler(self: *TraverseAndCreateRooms) BspTree.Node.TraverseHandler {
@@ -92,7 +92,7 @@ const TraverseAndCreateRooms = struct {
 };
 
 const CreatePassageBetweenRegions = struct {
-    dungeon: *BspDungeon,
+    dungeon: *Catacomb,
     alloc: std.mem.Allocator,
     rand: std.Random,
 
@@ -121,7 +121,7 @@ const CreatePassageBetweenRegions = struct {
 /// |       |
 /// |       |
 /// ---------
-fn createRandomRegionInside(self: BspDungeonGenerator, region: p.Region, rand: std.Random) !p.Region {
+fn createRandomRegionInside(self: CatacombGenerator, region: p.Region, rand: std.Random) !p.Region {
     var room: p.Region = region;
     if (!std.math.approxEqAbs(f16, self.square_ratio, region.ratio(), 0.1)) {
         // make the region 'more square'
@@ -145,6 +145,6 @@ fn createRandomRegionInside(self: BspDungeonGenerator, region: p.Region, rand: s
 }
 
 /// Minimal area of the room
-inline fn minArea(self: BspDungeonGenerator) u16 {
+inline fn minArea(self: CatacombGenerator) u16 {
     return self.region_min_rows *| self.region_min_cols;
 }

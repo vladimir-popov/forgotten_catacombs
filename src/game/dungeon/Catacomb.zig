@@ -1,4 +1,5 @@
-//! The Catacomb level
+//! The Catacomb level. Catacombs are part of the shelter.
+//! They represent set of rooms connected by passages.
 const std = @import("std");
 const g = @import("../game_pkg.zig");
 const p = g.primitives;
@@ -24,7 +25,7 @@ const rows = g.DUNGEON_ROWS;
 /// 120
 const cols = g.DUNGEON_COLS;
 
-const BspDungeon = @This();
+const Catacomb = @This();
 
 arena: *std.heap.ArenaAllocator,
 arena_alloc: std.mem.Allocator,
@@ -43,10 +44,10 @@ exit: p.Point = undefined,
 
 /// Allocates an empty dungeon, and initializes all inner state with passed arena
 /// allocator. The returned instance should be additionally initialized by the
-/// BspDungeonGenerator. All memory can be freed by deinit arena.
-pub fn create(arena: *std.heap.ArenaAllocator) !*BspDungeon {
+/// CatacombGenerator. All memory can be freed by deinit arena.
+pub fn create(arena: *std.heap.ArenaAllocator) !*Catacomb {
     const arena_alloc = arena.allocator();
-    const self = try arena_alloc.create(BspDungeon);
+    const self = try arena_alloc.create(Catacomb);
     self.* = .{
         .arena = arena,
         .arena_alloc = arena_alloc,
@@ -58,7 +59,7 @@ pub fn create(arena: *std.heap.ArenaAllocator) !*BspDungeon {
     return self;
 }
 
-pub fn dungeon(self: *const BspDungeon) Dungeon {
+pub fn dungeon(self: *const Catacomb) Dungeon {
     return .{
         .parent = self,
         .rows = rows,
@@ -75,11 +76,11 @@ pub fn dungeon(self: *const BspDungeon) Dungeon {
 }
 
 fn cellAtFn(ptr: *const anyopaque, place: p.Point) Dungeon.Cell {
-    const self: *const BspDungeon = @ptrCast(@alignCast(ptr));
+    const self: *const Catacomb = @ptrCast(@alignCast(ptr));
     return self.cellAt(place);
 }
 
-fn cellAt(self: *const BspDungeon, place: p.Point) Dungeon.Cell {
+fn cellAt(self: *const Catacomb, place: p.Point) Dungeon.Cell {
     if (place.row < 1 or place.row > rows) {
         return .nothing;
     }
@@ -98,12 +99,12 @@ fn cellAt(self: *const BspDungeon, place: p.Point) Dungeon.Cell {
     return .nothing;
 }
 
-inline fn isCellAt(self: BspDungeon, place: p.Point, assumption: Dungeon.Cell) bool {
+inline fn isCellAt(self: Catacomb, place: p.Point, assumption: Dungeon.Cell) bool {
     return self.cellAt(place) == assumption;
 }
 
 pub fn findPlacementWith(ptr: *const anyopaque, place: p.Point) ?*const Placement {
-    const self: *const BspDungeon = @ptrCast(@alignCast(ptr));
+    const self: *const Catacomb = @ptrCast(@alignCast(ptr));
     for (self.placements.items) |placement| {
         if (placement.contains(place)) {
             return placement;
@@ -112,7 +113,7 @@ pub fn findPlacementWith(ptr: *const anyopaque, place: p.Point) ?*const Placemen
     return null;
 }
 
-pub fn firstRoom(self: BspDungeon) Error!Room {
+pub fn firstRoom(self: Catacomb) Error!Room {
     for (self.placements.items) |placement| {
         switch (placement.*) {
             .room => |room| return room,
@@ -122,7 +123,7 @@ pub fn firstRoom(self: BspDungeon) Error!Room {
     return Error.RoomWasNotFound;
 }
 
-pub fn lastRoom(self: BspDungeon) Error!Room {
+pub fn lastRoom(self: Catacomb) Error!Room {
     var i: usize = self.placements.items.len - 1;
     while (i >= 0) : (i -= 1) {
         switch (self.placements.items[i].*) {
@@ -133,7 +134,7 @@ pub fn lastRoom(self: BspDungeon) Error!Room {
 }
 
 fn randomPlace(ptr: *const anyopaque, rand: std.Random) p.Point {
-    const self: *const BspDungeon = @ptrCast(@alignCast(ptr));
+    const self: *const Catacomb = @ptrCast(@alignCast(ptr));
     const placement = self.placements.items[rand.uintLessThan(usize, self.placements.items.len)];
     switch (placement.*) {
         .room => |room| return room.randomPlace(rand),
@@ -141,7 +142,7 @@ fn randomPlace(ptr: *const anyopaque, rand: std.Random) p.Point {
     }
 }
 
-fn findPlacement(self: BspDungeon, place: p.Point) !*Placement {
+fn findPlacement(self: Catacomb, place: p.Point) !*Placement {
     for (self.placements.items) |placement| {
         if (placement.contains(place)) return placement;
     }
@@ -151,11 +152,11 @@ fn findPlacement(self: BspDungeon, place: p.Point) !*Placement {
 }
 
 /// For tests only
-pub fn parse(arena: *std.heap.ArenaAllocator, str: []const u8) !BspDungeon {
+pub fn parse(arena: *std.heap.ArenaAllocator, str: []const u8) !Catacomb {
     if (!@import("builtin").is_test) {
         @compileError("The function `parse` is for test purpose only");
     }
-    var dung = try BspDungeon.create(arena);
+    var dung = try Catacomb.create(arena);
     try dung.floor.parse('.', str);
     try dung.walls.parse('#', str);
     return dung;
@@ -166,7 +167,7 @@ pub fn parse(arena: *std.heap.ArenaAllocator, str: []const u8) !BspDungeon {
 //       Usually used by the dungeon generators.
 // ==================================================
 
-pub fn generateAndAddRoom(self: *BspDungeon, region: p.Region) !void {
+pub fn generateAndAddRoom(self: *Catacomb, region: p.Region) !void {
     // generate walls:
     for (region.top_left.row..(region.top_left.row + region.rows)) |r| {
         if (r == region.top_left.row or r == region.bottomRightRow()) {
@@ -183,7 +184,7 @@ pub fn generateAndAddRoom(self: *BspDungeon, region: p.Region) !void {
     try self.placements.append(placement);
 }
 
-inline fn addEmptyPassage(self: *BspDungeon) !*Placement {
+inline fn addEmptyPassage(self: *Catacomb) !*Placement {
     const pl = try self.arena_alloc.create(Placement);
     pl.* = .{ .passage = Passage.init(self.arena_alloc) };
     try self.placements.append(pl);
@@ -191,7 +192,7 @@ inline fn addEmptyPassage(self: *BspDungeon) !*Placement {
 }
 
 pub fn createAndAddPassageBetweenRegions(
-    self: *BspDungeon,
+    self: *Catacomb,
     rand: std.Random,
     r1: p.Region,
     r2: p.Region,
@@ -256,7 +257,7 @@ pub fn createAndAddPassageBetweenRegions(
 }
 
 /// Removes doors, floor and walls on the passed place.
-pub fn cleanAt(self: *BspDungeon, place: p.Point) void {
+pub fn cleanAt(self: *Catacomb, place: p.Point) void {
     if (!g.DUNGEON_REGION.containsPoint(place)) {
         return;
     }
@@ -266,7 +267,7 @@ pub fn cleanAt(self: *BspDungeon, place: p.Point) void {
 }
 
 /// Removes doors, floor and walls on the passed place, and create a new door.
-pub fn forceCreateFloorAt(self: *BspDungeon, place: p.Point) !void {
+pub fn forceCreateFloorAt(self: *Catacomb, place: p.Point) !void {
     if (!g.DUNGEON_REGION.containsPoint(place)) {
         return;
     }
@@ -275,8 +276,8 @@ pub fn forceCreateFloorAt(self: *BspDungeon, place: p.Point) !void {
 }
 
 /// Removes doors, floor and walls on the passed place, and create a new wall.
-pub fn forceCreateWallAt(self: BspDungeon, place: p.Point) !void {
-    if (!BspDungeon.REGION.containsPoint(place)) {
+pub fn forceCreateWallAt(self: Catacomb, place: p.Point) !void {
+    if (!Catacomb.REGION.containsPoint(place)) {
         return;
     }
     self.cleanAt(place);
@@ -285,7 +286,7 @@ pub fn forceCreateWallAt(self: BspDungeon, place: p.Point) !void {
 
 /// Removes doors, floor and walls on the passed place, and create a cell with floor.
 pub fn forceCreateDoorBetween(
-    self: *BspDungeon,
+    self: *Catacomb,
     placement_from: *Placement,
     placement_to: *Placement,
     place: p.Point,
@@ -302,7 +303,7 @@ pub fn forceCreateDoorBetween(
 }
 
 /// Creates the cell with wall only if nothing exists on the passed place.
-fn createWallAt(self: *BspDungeon, place: p.Point) void {
+fn createWallAt(self: *Catacomb, place: p.Point) void {
     if (!g.DUNGEON_REGION.containsPoint(place)) {
         return;
     }
@@ -312,7 +313,7 @@ fn createWallAt(self: *BspDungeon, place: p.Point) void {
 }
 
 /// Creates the cell with floor only if nothing exists on the passed place.
-pub fn createFloorAt(self: *BspDungeon, place: p.Point) void {
+pub fn createFloorAt(self: *Catacomb, place: p.Point) void {
     if (!g.DUNGEON_REGION.containsPoint(place)) {
         return;
     }
@@ -324,7 +325,7 @@ pub fn createFloorAt(self: *BspDungeon, place: p.Point) void {
 /// Trying to find a line between `from` and `to` with `nothing` cells only.
 /// Gives up after MAX_ATTEMPTS attempts to prevent long search.
 fn findPlaceForPassageTurn(
-    self: BspDungeon,
+    self: Catacomb,
     stack_arena: *std.heap.ArenaAllocator,
     init_from: p.Point,
     init_to: p.Point,
@@ -369,7 +370,7 @@ fn findPlaceForPassageTurn(
     return null;
 }
 
-fn isFreeLine(self: BspDungeon, from: p.Point, to: p.Point) bool {
+fn isFreeLine(self: Catacomb, from: p.Point, to: p.Point) bool {
     const direction: p.Direction = if (from.col == to.col and from.row < to.row)
         .down
     else if (from.col == to.col and from.row > to.row)
@@ -390,7 +391,7 @@ fn isFreeLine(self: BspDungeon, from: p.Point, to: p.Point) bool {
     return true;
 }
 
-fn digPassage(self: *BspDungeon, passage: Passage) !void {
+fn digPassage(self: *Catacomb, passage: Passage) !void {
     var prev: Passage.Turn = passage.turns.items[0];
     for (passage.turns.items[1 .. passage.turns.items.len - 1]) |turn| {
         try self.dig(prev.place, turn.place, prev.to_direction);
@@ -400,7 +401,7 @@ fn digPassage(self: *BspDungeon, passage: Passage) !void {
     try self.dig(prev.place, passage.turns.getLast().place, prev.to_direction);
 }
 
-fn dig(self: *BspDungeon, from: p.Point, to: p.Point, direction: p.Direction) !void {
+fn dig(self: *Catacomb, from: p.Point, to: p.Point, direction: p.Direction) !void {
     var point = from;
     while (true) {
         self.createWallAt(point.movedTo(direction.rotatedClockwise(false)));
@@ -412,7 +413,7 @@ fn dig(self: *BspDungeon, from: p.Point, to: p.Point, direction: p.Direction) !v
     }
 }
 
-fn digTurn(self: *BspDungeon, at: p.Point, from: p.Direction, to: p.Direction) !void {
+fn digTurn(self: *Catacomb, at: p.Point, from: p.Direction, to: p.Direction) !void {
     // wrap the corner by walls
     const reg: p.Region = .{ .top_left = at.movedTo(.up).movedTo(.left), .rows = 3, .cols = 3 };
     var itr = reg.cells();
@@ -426,7 +427,7 @@ fn digTurn(self: *BspDungeon, at: p.Point, from: p.Direction, to: p.Direction) !
 }
 
 fn findPlaceForDoorInRegionRnd(
-    self: BspDungeon,
+    self: Catacomb,
     stack_arena: *std.heap.ArenaAllocator,
     rand: std.Random,
     init_region: p.Region,
@@ -488,7 +489,7 @@ fn findPlaceForDoorInRegionRnd(
 /// Starting from the `start`, moves in the `direction` till the first floor cell right after the
 /// single wall.
 /// Returns the found place or null.
-fn findPlaceForDoor(self: BspDungeon, direction: p.Direction, start: p.Point, region: p.Region) ?p.Point {
+fn findPlaceForDoor(self: Catacomb, direction: p.Direction, start: p.Point, region: p.Region) ?p.Point {
     var place = start;
     while (region.containsPoint(place)) {
         switch (self.cellAt(place)) {
@@ -523,7 +524,7 @@ test "find a place for door inside the room starting outside" {
     ;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
-    var dung = try BspDungeon.parse(&arena, str);
+    var dung = try Catacomb.parse(&arena, str);
     const region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 4, .cols = 5 };
 
     // when:
@@ -553,7 +554,7 @@ test "find a place for door inside the room starting on the wall" {
     ;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
-    var dung = try BspDungeon.parse(&arena, str);
+    var dung = try Catacomb.parse(&arena, str);
     const region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 4, .cols = 5 };
 
     // when:
@@ -587,7 +588,7 @@ test "find a random place for the door on the left side" {
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
-    var dung = try BspDungeon.parse(&arena, str);
+    var dung = try Catacomb.parse(&arena, str);
     const region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 4, .cols = 5 };
 
     // when:
@@ -614,7 +615,7 @@ test "find a random place for the door on the bottom side" {
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
-    var dung = try BspDungeon.parse(&arena, str);
+    var dung = try Catacomb.parse(&arena, str);
     const region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 4, .cols = 5 };
 
     // when:
@@ -639,7 +640,7 @@ test "create passage between two rooms" {
     errdefer std.debug.print("{s}\n", .{str});
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
-    var dung = try BspDungeon.parse(&arena, str);
+    var dung = try Catacomb.parse(&arena, str);
     _ = try dung.addRoom(.{ .top_left = .{ .row = 1, .col = 1 }, .rows = Rows, .cols = 4 });
     _ = try dung.addRoom(.{ .top_left = .{ .row = 1, .col = 7 }, .rows = Rows, .cols = 4 });
 

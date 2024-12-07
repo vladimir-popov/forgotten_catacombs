@@ -7,7 +7,6 @@ const d = g.dungeon;
 const ecs = g.ecs;
 const p = g.primitives;
 
-
 const log = std.log.scoped(.level);
 
 const Level = @This();
@@ -94,7 +93,7 @@ pub fn generateCatacomb(
     // This prng is used to generate entity on this level. But the dungeon should have its own prng
     // to be able to be regenerated when the player travels from level to level.
     var prng = std.Random.DefaultPrng.init(seed);
-    var bspGenerator = d.BspDungeonGenerator{};
+    var bspGenerator = d.CatacombGenerator{};
     self.dungeon = try bspGenerator.generateDungeon(arena, prng.random());
     log.debug("The dungeon has been generated", .{});
 
@@ -146,8 +145,7 @@ pub fn generateCave(
     // This prng is used to generate entity on this level. But the dungeon should have its own prng
     // to be able to be regenerated when the player travels from level to level.
     var prng = std.Random.DefaultPrng.init(seed);
-    var generator = d.CelluralAutomataGenerator{};
-    self.dungeon = try generator.generateDungeon(arena, prng.random());
+    self.dungeon = try d.CavesGenerator.generateDungeon(arena, prng.random());
     log.debug("The dungeon has been generated", .{});
 
     self.next_entity = @max(from_ladder.id, from_ladder.target_ladder) + 1;

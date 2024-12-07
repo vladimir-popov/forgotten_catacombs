@@ -65,7 +65,7 @@ pub fn initNew(
     try events.subscribeOn(.player_hit, self.play_mode.subscriber());
 
     try self.level.generateFirstLevel(&self.level_arena, g.entities.Player, true);
-    render.viewport.region.top_left = .{ .row = 1, .col = 1};
+    render.viewport.region.top_left = .{ .row = 1, .col = 1 };
 }
 
 pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
@@ -90,6 +90,14 @@ pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
     );
     if (new_depth == 0) {
         try self.level.generateFirstLevel(&self.level_arena, player, false);
+    } else if (new_depth < 2) {
+        try self.level.generateCave(
+            &self.level_arena,
+            self.seed + new_depth,
+            new_depth,
+            player,
+            by_ladder,
+        );
     } else {
         try self.level.generateCatacomb(
             &self.level_arena,

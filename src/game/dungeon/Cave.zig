@@ -3,10 +3,10 @@ const g = @import("../game_pkg.zig");
 const d = @import("dungeon_pkg.zig");
 const p = g.primitives;
 
-const OneRoomDungeon = @This();
+const Cave = @This();
 
-pub const rows = g.DISPLAY_ROWS * 3;
-pub const cols = g.DISPLAY_COLS * 3;
+pub const rows = g.DISPLAY_ROWS * 2;
+pub const cols = g.DISPLAY_COLS * 2;
 
 const whole_region: p.Region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = rows, .cols = cols };
 
@@ -16,14 +16,14 @@ entrance: p.Point = undefined,
 exit: p.Point = undefined,
 placement: d.Placement,
 
-pub fn init(arena: *std.heap.ArenaAllocator) !OneRoomDungeon {
+pub fn init(arena: *std.heap.ArenaAllocator) !Cave {
     return .{
         .cells = try p.BitMap(rows, cols).initEmpty(arena.allocator()),
         .placement = .{ .room = d.Room.init(arena.allocator(), whole_region) },
     };
 }
 
-pub fn dungeon(self: *const OneRoomDungeon) d.Dungeon {
+pub fn dungeon(self: *const Cave) d.Dungeon {
     return .{
         .parent = self,
         .rows = rows,
@@ -41,7 +41,7 @@ pub fn dungeon(self: *const OneRoomDungeon) d.Dungeon {
 fn cellAt(ptr: *const anyopaque, place: p.Point) d.Dungeon.Cell {
     if (!whole_region.containsPoint(place)) return .nothing;
 
-    const self: *const OneRoomDungeon = @ptrCast(@alignCast(ptr));
+    const self: *const Cave = @ptrCast(@alignCast(ptr));
 
     return if (self.cells.isSet(place.row, place.col)) .rock else .floor;
 }
@@ -49,16 +49,16 @@ fn cellAt(ptr: *const anyopaque, place: p.Point) d.Dungeon.Cell {
 fn placementWith(ptr: *const anyopaque, place: p.Point) ?*const d.Placement {
     if (!whole_region.containsPoint(place)) return null;
 
-    const self: *const OneRoomDungeon = @ptrCast(@alignCast(ptr));
+    const self: *const Cave = @ptrCast(@alignCast(ptr));
     return &self.placement;
 }
 
 fn randomPlace(ptr: *const anyopaque, rand: std.Random) p.Point {
-    const self: *const OneRoomDungeon = @ptrCast(@alignCast(ptr));
+    const self: *const Cave = @ptrCast(@alignCast(ptr));
     return self.randomEmptyPlace(rand);
 }
 
-pub fn randomEmptyPlace(self: *const OneRoomDungeon, rand: std.Random) p.Point {
+pub fn randomEmptyPlace(self: *const Cave, rand: std.Random) p.Point {
     while (true) {
         const row = whole_region.top_left.row + rand.uintLessThan(u8, whole_region.rows - 2) + 1;
         const col = whole_region.top_left.col + rand.uintLessThan(u8, whole_region.cols - 2) + 1;

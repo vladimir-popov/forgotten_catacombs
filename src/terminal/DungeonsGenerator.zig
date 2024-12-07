@@ -14,7 +14,7 @@ pub const std_options: std.Options = .{
         // .{ .scope = .ai, .level = .debug },
         // .{ .scope = .play_mode, .level = .debug },
         // .{ .scope = .game_session, .level = .debug },
-        .{ .scope = .cellural_automata_generator, .level = .debug },
+        // .{ .scope = .cellural_automata, .level = .debug },
         // .{ .scope = .action_system, .level = .debug },
     },
 };
