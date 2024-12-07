@@ -2,7 +2,11 @@
 //! such as geometry primitives, which are not game domain objects.
 const std = @import("std");
 
-const log = std.log.scoped(.base);
+const log = std.log.scoped(.primitives);
+
+pub inline fn diff(comptime T: type, a: T, b: T) T {
+    return @max(a, b) - @min(a, b);
+}
 
 pub const Direction = enum {
     left,
@@ -560,6 +564,10 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
             self.bitsets = undefined;
         }
 
+        pub fn copyFrom(self: *BitMap(rows, cols), other: *const BitMap(rows, cols)) void {
+            std.mem.copyForwards(std.StaticBitSet(cols), self.bitsets, other.bitsets);
+        }
+
         pub fn clear(self: *Self) void {
             for (0..rows) |idx| {
                 self.bitsets[idx] = std.StaticBitSet(cols).initEmpty();
@@ -567,7 +575,11 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
         }
 
         inline fn isOutside(row: u8, col: u8) bool {
-            return (row == 0 or col == 0) or (row >= rows or col >= cols);
+            return (row == 0 or col == 0) or (row > rows or col > cols);
+        }
+
+        pub inline fn isOutside0(_: *Self, row_idx: usize, col_idx: usize) bool {
+            return row_idx >= rows or col_idx >= cols;
         }
 
         pub fn parse(self: *Self, comptime symbol: u8, str: []const u8) !void {
@@ -605,9 +617,17 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
             return self.bitsets[row - 1].isSet(col - 1);
         }
 
+        pub inline fn isSet0(self: Self, row_idx: usize, col_idx: usize) bool {
+            return self.bitsets[row_idx].isSet(col_idx);
+        }
+
         pub inline fn set(self: *Self, row: u8, col: u8) void {
             if (isOutside(row, col)) return;
             self.bitsets[row - 1].set(col - 1);
+        }
+
+        pub inline fn set0(self: *Self, row_idx: usize, col_idx: usize) void {
+            self.bitsets[row_idx].set(col_idx);
         }
 
         pub inline fn setAt(self: *Self, point: Point) void {
@@ -617,6 +637,10 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
         pub inline fn unset(self: *Self, row: u8, col: u8) void {
             if (isOutside(row, col)) return;
             self.bitsets[row - 1].unset(col - 1);
+        }
+
+        pub inline fn unset0(self: *Self, row_idx: usize, col_idx: usize) void {
+            self.bitsets[row_idx].unset(col_idx);
         }
 
         pub inline fn unsetAt(self: *Self, point: Point) void {

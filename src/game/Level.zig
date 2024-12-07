@@ -7,7 +7,6 @@ const d = g.dungeon;
 const ecs = g.ecs;
 const p = g.primitives;
 
-const BspDungeonGenerator = @import("dungeon/BspDungeonGenerator.zig");
 
 const log = std.log.scoped(.level);
 
@@ -64,7 +63,7 @@ pub fn generateFirstLevel(
     _ = try self.addNewEntity(g.entities.teleport(d.FirstLocation.teleport_place));
 
     // Add doors
-    var doors = self.dungeon.doorways.iterator();
+    var doors = self.dungeon.doorways.?.iterator();
     while (doors.next()) |entry| {
         entry.value_ptr.door_id = try self.addNewEntity(g.entities.ClosedDoor);
         try self.components.setToEntity(entry.value_ptr.door_id, c.Position{ .point = entry.key_ptr.* });
@@ -95,7 +94,7 @@ pub fn generateCatacomb(
     // This prng is used to generate entity on this level. But the dungeon should have its own prng
     // to be able to be regenerated when the player travels from level to level.
     var prng = std.Random.DefaultPrng.init(seed);
-    var bspGenerator = BspDungeonGenerator{};
+    var bspGenerator = d.BspDungeonGenerator{};
     self.dungeon = try bspGenerator.generateDungeon(arena, prng.random());
     log.debug("The dungeon has been generated", .{});
 
@@ -113,7 +112,7 @@ pub fn generateCatacomb(
         .target_ladder = self.newEntity(),
     });
 
-    var doors = self.dungeon.doorways.iterator();
+    var doors = self.dungeon.doorways.?.iterator();
     while (doors.next()) |entry| {
         entry.value_ptr.door_id = try self.addNewEntity(g.entities.ClosedDoor);
         try self.components.setToEntity(entry.value_ptr.door_id, c.Position{ .point = entry.key_ptr.* });
@@ -122,6 +121,53 @@ pub fn generateCatacomb(
     for (0..prng.random().uintLessThan(u8, 10) + 10) |_| {
         try self.addEnemy(prng.random(), g.entities.Rat);
     }
+    // move player to the entrance
+    if (self.dungeon.placementWith(entrance_place)) |placement| {
+        try self.updatePlacementWithPlayer(placement);
+    }
+}
+
+pub fn generateCave(
+    self: *Level,
+    arena: *std.heap.ArenaAllocator,
+    seed: u64,
+    depth: u8,
+    player: c.Components,
+    from_ladder: c.Ladder,
+) !void {
+    self.entities = std.ArrayList(g.Entity).init(arena.allocator());
+    self.components = try ecs.ComponentsManager(c.Components).init(arena.allocator());
+    self.map = try g.LevelMap.init(arena.allocator());
+    self.depth = depth;
+    log.debug(
+        "Generate level {s} on depth {d} with seed {d} from ladder {any}",
+        .{ @tagName(from_ladder.direction), self.depth, seed, from_ladder },
+    );
+    // This prng is used to generate entity on this level. But the dungeon should have its own prng
+    // to be able to be regenerated when the player travels from level to level.
+    var prng = std.Random.DefaultPrng.init(seed);
+    var generator = d.CelluralAutomataGenerator{};
+    self.dungeon = try generator.generateDungeon(arena, prng.random());
+    log.debug("The dungeon has been generated", .{});
+
+    self.next_entity = @max(from_ladder.id, from_ladder.target_ladder) + 1;
+    // Add ladder by which the player has come to this level first time
+    const entrance_place = try self.addLadder(from_ladder.inverted());
+    // Generate player on the ladder
+    self.player = try self.addNewEntity(player);
+    log.debug("The player entity id is {d}", .{self.player});
+    try self.components.setToEntity(self.player, c.Position{ .point = entrance_place });
+    // Add ladder to the next level
+    _ = try self.addLadder(.{
+        .direction = from_ladder.direction,
+        .id = self.newEntity(),
+        .target_ladder = self.newEntity(),
+    });
+
+    // Add enemies
+    // for (0..prng.random().uintLessThan(u8, 10) + 10) |_| {
+    //     try self.addEnemy(prng.random(), g.entities.Rat);
+    // }
     // move player to the entrance
     if (self.dungeon.placementWith(entrance_place)) |placement| {
         try self.updatePlacementWithPlayer(placement);

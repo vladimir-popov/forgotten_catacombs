@@ -7,8 +7,16 @@ const Args = @import("Args.zig");
 const Logger = @import("Logger.zig");
 const TtyRuntime = @import("TtyRuntime.zig");
 
-pub const std_options = .{
+pub const std_options: std.Options = .{
     .logFn = Logger.writeLog,
+    .log_level = .info,
+    .log_scope_levels = &[_]std.log.ScopeLevel{
+        // .{ .scope = .ai, .level = .debug },
+        // .{ .scope = .play_mode, .level = .debug },
+        // .{ .scope = .game_session, .level = .debug },
+        .{ .scope = .cellural_automata_generator, .level = .debug },
+        // .{ .scope = .action_system, .level = .debug },
+    },
 };
 
 const log = std.log.scoped(.DungeonsGenerator);
@@ -81,6 +89,13 @@ const DungeonsGenerator = struct {
         _ = self.level_arena.reset(.retain_capacity);
         switch (self.dungeon_type) {
             .first => try self.level.generateFirstLevel(&self.level_arena, g.entities.Player, true),
+            .cellural => try self.level.generateCave(
+                &self.level_arena,
+                seed,
+                0,
+                g.entities.Player,
+                .{ .direction = .down, .id = 0, .target_ladder = 1 },
+            ),
             else => try self.level.generateCatacomb(
                 &self.level_arena,
                 seed,

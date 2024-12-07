@@ -56,7 +56,7 @@ entrance: p.Point,
 /// a bottom level.
 exit: p.Point,
 /// Index of all doorways by their place
-doorways: *const std.AutoHashMap(p.Point, d.Doorway),
+doorways: ?*const std.AutoHashMap(p.Point, d.Doorway) = null,
 vtable: VTable,
 
 pub inline fn cellAt(self: Dungeon, place: p.Point) Cell {
@@ -104,7 +104,10 @@ pub fn cellsAround(self: Dungeon, place: p.Point) ?CellsIterator {
 }
 
 pub inline fn doorwayAt(self: Dungeon, place: p.Point) ?d.Doorway {
-    return self.doorways.get(place);
+    if (self.doorways) |dws|
+        return dws.get(place)
+    else
+        return null;
 }
 
 pub fn placementWith(self: Dungeon, place: p.Point) ?*const d.Placement {

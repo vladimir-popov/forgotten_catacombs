@@ -7,9 +7,6 @@ const log = std.log.scoped(.level_map);
 
 const LevelMap = @This();
 
-pub const rows = g.DISPLAY_ROWS;
-pub const cols = g.DISPLAY_COLS;
-
 /// Already visited places in the dungeon.
 /// It has only floor cells
 visited_places: p.BitMap(g.DUNGEON_ROWS, g.DUNGEON_COLS),
