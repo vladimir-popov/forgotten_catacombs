@@ -145,6 +145,6 @@ fn createRandomRegionInside(self: BspDungeonGenerator, region: p.Region, rand: s
 }
 
 /// Minimal area of the room
-inline fn minArea(self: BspDungeonGenerator) u8 {
-    return self.region_min_rows * self.region_min_cols;
+inline fn minArea(self: BspDungeonGenerator) u16 {
+    return self.region_min_rows *| self.region_min_cols;
 }

@@ -36,17 +36,17 @@ fn handleWindowResize(_: i32) callconv(.C) void {
     }
 }
 
-pub fn TtyRuntime(comptime ROWS: u8, comptime COLS: u8) type {
+pub fn TtyRuntime(comptime buffer_rows: u8, comptime buffer_cols: u8) type {
     return struct {
         const Self = @This();
 
-        const MENU_COLS = (COLS - 2) / 2;
+        const menu_cols = (buffer_cols - 2) / 2;
 
         termios: std.c.termios,
         alloc: std.mem.Allocator,
         // The main buffer to render the game
-        buffer: DisplayBuffer(ROWS, COLS),
-        menu: Menu(ROWS, MENU_COLS),
+        buffer: DisplayBuffer(buffer_rows, buffer_cols),
+        menu: Menu(buffer_rows, menu_cols),
         // the last read button through readButton function.
         // it is used as a buffer to check ESC outside the readButton function
         keyboard_buffer: ?tty.KeyboardAndMouse.Button = null,
@@ -63,8 +63,8 @@ pub fn TtyRuntime(comptime ROWS: u8, comptime COLS: u8) type {
         ) !Self {
             const instance = Self{
                 .alloc = alloc,
-                .buffer = try DisplayBuffer(ROWS, COLS).init(alloc),
-                .menu = try Menu(ROWS, MENU_COLS).init(alloc),
+                .buffer = try DisplayBuffer(buffer_rows, buffer_cols).init(alloc),
+                .menu = try Menu(buffer_rows, menu_cols).init(alloc),
                 .termios = tty.Display.enterRawMode(),
                 .draw_border = draw_border,
             };
@@ -85,7 +85,7 @@ pub fn TtyRuntime(comptime ROWS: u8, comptime COLS: u8) type {
             handleWindowResize(0);
             while (!self.is_exit) {
                 if (self.menu.is_shown) {
-                    try self.menu.buffer.writeBuffer(stdout, rows_pad, cols_pad + (COLS - MENU_COLS));
+                    try self.menu.buffer.writeBuffer(stdout, rows_pad, cols_pad + (buffer_cols - menu_cols));
                     if (try readPushedButtons(self)) |btn| {
                         try self.menu.handleKeyboardButton(btn);
                     }

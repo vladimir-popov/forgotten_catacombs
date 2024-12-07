@@ -33,10 +33,9 @@ pub fn main() !void {
     const seed = try Args.int(u64, "seed") orelse std.crypto.random.int(u64);
     log.info("\n====================\nSeed of the game is {d}\n====================", .{seed});
 
-    var use_cheats = false;
-    if (Args.key("mommys_cheater")) |_| {
+    const use_cheats = Args.key("mommys_cheater");
+    if (use_cheats) {
         log.warn("Mommy's cheater is in the room!", .{});
-        use_cheats = true;
     }
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};

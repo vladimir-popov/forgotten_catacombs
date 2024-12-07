@@ -65,6 +65,7 @@ pub fn initNew(
     try events.subscribeOn(.player_hit, self.play_mode.subscriber());
 
     try self.level.generateFirstLevel(&self.level_arena, g.entities.Player, true);
+    render.viewport.region.top_left = .{ .row = 1, .col = 1};
 }
 
 pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
