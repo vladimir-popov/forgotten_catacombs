@@ -7,10 +7,6 @@ const log = std.log.scoped(.cellural_automata);
 
 const CelluralAutomata = @This();
 
-/// This arena is used to create generations on generating bitmap.
-/// Note, this arena will be clean up at the beginning of the `generate` method.
-arena: *std.heap.ArenaAllocator,
-/// Chance for a given cell to be filled during initialization
 init_walls_percent: u8 = 45,
 /// Max count of generations
 generations_count: u8 = 6,
@@ -28,15 +24,15 @@ pub fn generate(
     self: CelluralAutomata,
     comptime rows: u8,
     comptime cols: u8,
+    arena: *std.heap.ArenaAllocator,
     rand: std.Random,
 ) !*p.BitMap(rows, cols) {
-    _ = self.arena.reset(.retain_capacity);
     var generations = [_]*p.BitMap(rows, cols){
-        try self.arena.allocator().create(p.BitMap(rows, cols)),
-        try self.arena.allocator().create(p.BitMap(rows, cols)),
+        try arena.allocator().create(p.BitMap(rows, cols)),
+        try arena.allocator().create(p.BitMap(rows, cols)),
     };
-    generations[0].* = try p.BitMap(rows, cols).initEmpty(self.arena.allocator());
-    generations[1].* = try p.BitMap(rows, cols).initFull(self.arena.allocator());
+    generations[0].* = try p.BitMap(rows, cols).initEmpty(arena.allocator());
+    generations[1].* = try p.BitMap(rows, cols).initFull(arena.allocator());
     var i: u1 = 0;
     // Generate noise and border for the first generation
     for (0..rows) |r0| {

@@ -102,6 +102,7 @@ entity_in_focus: ?g.Entity,
 quick_action: ?g.Action,
 
 pub fn init(session: *g.GameSession, alloc: std.mem.Allocator) !PlayMode {
+    log.debug("Init PlayMode", .{});
     return .{
         .session = session,
         .enemies = try EnemiesIterator.init(alloc, session),
@@ -136,6 +137,26 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
             self.entity_in_focus = event.player_hit.target;
             log.debug("Update target after player hit", .{});
             try self.updateTarget();
+        },
+        .entity_moved => |entity_moved| {
+            const level = self.session.level;
+            if (level.player_placement.contains(entity_moved.targetPlace())) return;
+
+            const place = level.playerPosition().point;
+
+            if (level.dungeon.doorwayAt(entity_moved.moved_from)) |doorway| {
+                if (doorway.oppositePlacement(level.player_placement)) |placement| {
+                    if (placement.contains(place)) {
+                        try level.updatePlacementWithPlayer(place, placement);
+                        return;
+                    }
+                }
+            }
+            if (level.dungeon.placementWith(entity_moved.targetPlace())) |placement| {
+                try level.updatePlacementWithPlayer(place, placement);
+                return;
+            }
+            log.err("It looks like the player at {any} is outside of any placement", .{place});
         },
         else => {},
     }
@@ -211,7 +232,7 @@ pub fn tick(self: *PlayMode) !void {
 fn updateTarget(self: *PlayMode) anyerror!void {
     defer {
         const qa_str = if (self.quick_action) |qa| @tagName(qa) else "not defined";
-        log.debug("Entity in focus {any}; quick action {s}", .{ self.entity_in_focus, qa_str });
+        log.debug("Entity in focus after update {any}; quick action {s}", .{ self.entity_in_focus, qa_str });
     }
     log.debug("Update target. Current entity in focus is {any}", .{self.entity_in_focus});
 

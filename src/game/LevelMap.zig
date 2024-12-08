@@ -7,33 +7,30 @@ const log = std.log.scoped(.level_map);
 
 const LevelMap = @This();
 
+rows: u8,
+cols: u8,
 /// Already visited places in the dungeon.
 /// It has only floor cells
-visited_places: p.BitMap(g.DUNGEON_ROWS, g.DUNGEON_COLS),
+visited_places: []std.DynamicBitSet,
 /// Index over visited placements.
 /// Used to speed up adding already visited placement
 visited_placements: std.AutoHashMap(*const d.Placement, void),
 /// All static objects (doors, ladders, items) met previously.
 remembered_objects: std.AutoHashMap(p.Point, g.Entity),
 
-pub fn init(alloc: std.mem.Allocator) !LevelMap {
+pub fn init(arena: *std.heap.ArenaAllocator, rows: u8, cols: u8) !LevelMap {
+    const alloc = arena.allocator();
+    var visited_places = try alloc.alloc(std.DynamicBitSet, rows);
+    for (0..rows) |r0| {
+        visited_places[r0] = try std.DynamicBitSet.initEmpty(alloc, cols);
+    }
     return .{
-        .visited_places = try p.BitMap(g.DUNGEON_ROWS, g.DUNGEON_COLS).initEmpty(alloc),
+        .rows = rows,
+        .cols = cols,
+        .visited_places = visited_places,
         .visited_placements = std.AutoHashMap(*const d.Placement, void).init(alloc),
         .remembered_objects = std.AutoHashMap(p.Point, g.Entity).init(alloc),
     };
-}
-
-pub fn deinit(self: *LevelMap) void {
-    self.visited_places.deinit();
-    self.visited_placements.deinit();
-    self.remembered_objects.deinit();
-}
-
-pub fn clearRetainingCapacity(self: *LevelMap) void {
-    self.visited_places.clear();
-    self.visited_placements.clearRetainingCapacity();
-    self.remembered_objects.clearRetainingCapacity();
 }
 
 pub fn format(
@@ -46,12 +43,12 @@ pub fn format(
     _ = options;
 
     try writer.print("LevelMap(", .{});
-    for (1..g.DUNGEON_ROWS + 1) |r| {
+    for (0..self.rows) |r0| {
         try writer.writeByte('\n');
-        for (1..g.DUNGEON_COLS + 1) |c| {
-            if (self.remembered_objects.get(.{ .row = @intCast(r), .col = @intCast(c) })) |entity|
+        for (0..self.cols) |c0| {
+            if (self.remembered_objects.get(.{ .row = @intCast(r0 + 1), .col = @intCast(c0 + 1) })) |entity|
                 try writer.print("{d}", .{entity})
-            else if (self.visited_places.isSet(@intCast(r), @intCast(c)))
+            else if (self.visited_places[r0].isSet(c0))
                 try writer.writeByte('#')
             else
                 try writer.writeByte(' ');
@@ -60,8 +57,13 @@ pub fn format(
     try writer.print("\n)", .{});
 }
 
+pub fn isVisited(self: LevelMap, place: p.Point) bool {
+    if (place.row > self.rows or place.col > self.cols) return false;
+    return self.visited_places[place.row - 1].isSet(place.col - 1);
+}
+
 pub fn addVisitedPlace(self: *LevelMap, visited_place: p.Point) !void {
-    try self.visited_places.set(visited_place.row, visited_place.col);
+    try self.visited_places[visited_place.row - 1].set(visited_place.col - 1);
     log.debug("Added visited place {any}\n{any}", .{ visited_place, self });
 }
 
@@ -86,44 +88,66 @@ pub fn addVisitedPlacement(self: *LevelMap, placement: *const d.Placement) !void
 }
 
 fn addVisitedRoom(self: *LevelMap, room: d.Room) void {
-    self.visited_places.setRegionValue(room.region, true);
+    self.setVisitedRegion(room.region, true);
     for (room.inner_rooms.items) |ir| {
-        self.visited_places.setRegionValue(ir.innerRegion(), false);
+        self.setVisitedRegion(ir.innerRegion(), false);
     }
+}
+
+fn setVisitedRegion(self: *LevelMap, region: p.Region, value: bool) void {
+    const to_row = @min(self.rows, region.bottomRightRow());
+    const to_col = @min(self.cols, region.bottomRightCol());
+    for (region.top_left.row - 1..to_row) |r0| {
+        self.visited_places[r0].setRangeValue(
+            .{ .start = region.top_left.col - 1, .end = to_col },
+            value,
+        );
+    }
+}
+
+inline fn setVisitedRowValue(self: *LevelMap, row: u8, from_col: u8, count: u8, value: bool) void {
+    self.visited_places[row - 1].setRangeValue(
+        .{ .start = from_col - 1, .end = from_col + count - 1 },
+        value,
+    );
+}
+
+inline fn setVisitedAt(self: *LevelMap, place: p.Point) void {
+    self.visited_places[place.row - 1].set(place.col - 1);
 }
 
 fn addVisitedPassage(self: *LevelMap, passage: d.Passage) void {
     var prev = passage.turns.items[0];
     for (passage.turns.items[1..]) |curr| {
-        self.visited_places.setAt(curr.corner(prev.to_direction));
+        self.setVisitedAt(curr.corner(prev.to_direction));
         if (prev.to_direction.isHorizontal()) {
-            self.visited_places.setRowValue(
+            self.setVisitedRowValue(
                 prev.place.row,
                 @min(prev.place.col, curr.place.col),
                 distance(prev.place.col, curr.place.col),
                 true,
             );
             if (prev.place.row > 1)
-                self.visited_places.setRowValue(
+                self.setVisitedRowValue(
                     prev.place.row - 1,
                     @min(prev.place.col, curr.place.col),
                     distance(prev.place.col, curr.place.col),
                     true,
                 );
-            if (prev.place.row < g.DUNGEON_ROWS - 1)
-                self.visited_places.setRowValue(
+            if (prev.place.row < self.rows - 1)
+                self.setVisitedRowValue(
                     prev.place.row + 1,
                     @min(prev.place.col, curr.place.col),
                     distance(prev.place.col, curr.place.col),
                     true,
                 );
         } else {
-            for (@min(prev.place.row, curr.place.row)..@max(prev.place.row, curr.place.row) + 1) |r| {
-                self.visited_places.set(@intCast(r), prev.place.col);
+            for (@min(prev.place.row, curr.place.row) - 1..@max(prev.place.row, curr.place.row)) |r0| {
+                self.visited_places[r0].set(prev.place.col - 1);
                 if (prev.place.col > 1)
-                    self.visited_places.set(@intCast(r), prev.place.col - 1);
-                if (prev.place.col < g.DUNGEON_COLS - 1)
-                    self.visited_places.set(@intCast(r), prev.place.col + 1);
+                    self.visited_places[r0].set(prev.place.col - 2);
+                if (prev.place.col < self.cols - 1)
+                    self.visited_places[r0].set(prev.place.col);
             }
         }
         prev = curr;

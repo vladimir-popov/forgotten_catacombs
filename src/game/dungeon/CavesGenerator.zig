@@ -8,7 +8,10 @@ const log = std.log.scoped(.caves_generator);
 
 const CavesGenerator = @This();
 
+cellural_automata: CelluralAutomata = .{},
+
 pub fn generateDungeon(
+    self: CavesGenerator,
     arena: *std.heap.ArenaAllocator,
     rand: std.Random,
 ) !d.Dungeon {
@@ -19,13 +22,13 @@ pub fn generateDungeon(
 
     generate_arena.* = std.heap.ArenaAllocator.init(alloc);
     defer generate_arena.deinit();
-    const cellural_automata = CelluralAutomata{ .arena = generate_arena };
 
     const dungeon = try arena.allocator().create(d.Cave);
     dungeon.* = try d.Cave.init(arena);
     dungeon.cells.copyFrom(
-        try cellural_automata.generate(d.Cave.rows, d.Cave.cols, rand),
+        try self.cellural_automata.generate(d.Cave.rows, d.Cave.cols, arena, rand),
     );
+    // TODO move this place far away of each other
     dungeon.entrance = dungeon.randomEmptyPlace(rand);
     dungeon.exit = dungeon.randomEmptyPlace(rand);
     return dungeon.dungeon();

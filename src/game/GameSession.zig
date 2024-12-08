@@ -31,11 +31,11 @@ prng: std.Random.DefaultPrng,
 runtime: g.Runtime,
 render: *g.Render,
 events: *g.events.EventBus,
-/// The current level
-level: g.Level = undefined,
 level_arena: std.heap.ArenaAllocator,
 /// The current mode of the game
 mode: Mode = .play,
+/// The current level
+level: *g.Level = undefined,
 // stateful modes:
 play_mode: PlayMode,
 explore_mode: ExploreMode,
@@ -49,32 +49,30 @@ pub fn initNew(
     render: *g.Render,
     events: *g.events.EventBus,
 ) !void {
-    log.debug("Begin the new game session with the seed {d}", .{seed});
+    const alloc = arena.allocator();
+    log.debug("Begin the new game session with seed {d}", .{seed});
     self.* = .{
         .seed = seed,
         .prng = std.Random.DefaultPrng.init(seed),
         .render = render,
         .runtime = runtime,
         .events = events,
-        .level_arena = std.heap.ArenaAllocator.init(arena.allocator()),
-        .play_mode = try PlayMode.init(self, arena.allocator()),
-        .looking_around = try LookingAroundMode.init(self, arena.allocator()),
+        .level_arena = std.heap.ArenaAllocator.init(alloc),
+        .play_mode = try PlayMode.init(self, alloc),
+        .looking_around = try LookingAroundMode.init(self, alloc),
         .explore_mode = ExploreMode.init(self),
     };
-    try events.subscribeOn(.entity_moved, self.level.subscriber());
+    self.level = try g.Levels.firstLevel(&self.level_arena, g.entities.Player, true);
+    log.debug("The first level has been created", .{});
+
+    try events.subscribeOn(.entity_moved, self.play_mode.subscriber());
     try events.subscribeOn(.player_hit, self.play_mode.subscriber());
 
-    try self.level.generateFirstLevel(&self.level_arena, g.entities.Player, true);
     render.viewport.region.top_left = .{ .row = 1, .col = 1 };
 }
 
 pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
     const player = try self.level.components.entityToStruct(self.level.player);
-    // TODO persist the current level
-    _ = self.level_arena.reset(.retain_capacity);
-    self.play_mode.entity_in_focus = null;
-    self.play_mode.quick_action = null;
-
     const new_depth: u8 = switch (by_ladder.direction) {
         .up => self.level.depth - 1,
         .down => self.level.depth + 1,
@@ -88,25 +86,28 @@ pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
     ,
         .{ @tagName(by_ladder.direction), self.level.depth, new_depth, by_ladder },
     );
-    if (new_depth == 0) {
-        try self.level.generateFirstLevel(&self.level_arena, player, false);
-    } else if (new_depth < 2) {
-        try self.level.generateCave(
+
+    // TODO persist the current level
+    _ = self.level_arena.reset(.retain_capacity);
+    self.play_mode.entity_in_focus = null;
+    self.play_mode.quick_action = null;
+    self.level = switch (new_depth) {
+        0 => try g.Levels.firstLevel(&self.level_arena, player, false),
+        1 => try g.Levels.cave(
             &self.level_arena,
             self.seed + new_depth,
             new_depth,
             player,
             by_ladder,
-        );
-    } else {
-        try self.level.generateCatacomb(
+        ),
+        else => try g.Levels.catacomb(
             &self.level_arena,
             self.seed + new_depth,
             new_depth,
             player,
             by_ladder,
-        );
-    }
+        ),
+    };
     self.render.viewport.centeredAround(self.level.playerPosition().point);
 }
 

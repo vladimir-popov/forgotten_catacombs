@@ -4,7 +4,7 @@ const g = @import("game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
-const log = std.log.scoped(.event_bus);
+const log = std.log.scoped(.events);
 
 pub const EntityMoved = struct {
     entity: g.Entity,

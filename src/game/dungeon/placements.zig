@@ -42,10 +42,22 @@ pub const Placement = union(enum) {
 };
 
 pub const Doorway = struct {
-    // will be overwritten late on level initialization
-    door_id: g.Entity = 0,
     placement_from: *const Placement,
     placement_to: *const Placement,
+    // must be set late on level initialization
+    door_id: g.Entity = 0,
+
+    pub fn format(
+        self: Doorway,
+        comptime _: []const u8,
+        _: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        try writer.print(
+            "Doorway(id: {d}; from {any}; to: {any})",
+            .{ self.door_id, self.placement_from, self.placement_to },
+        );
+    }
 
     pub inline fn oppositePlacement(self: Doorway, placement: *const Placement) ?*const Placement {
         if (self.placement_from == placement) {
@@ -80,12 +92,10 @@ pub const Room = struct {
 
     pub fn format(
         self: Room,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
+        comptime _: []const u8,
+        _: std.fmt.FormatOptions,
         writer: anytype,
     ) !void {
-        _ = fmt;
-        _ = options;
         try writer.print(
             "Room({any}; inner rooms: {d}; doorways: [",
             .{ self.region, self.inner_rooms.items.len },
@@ -129,13 +139,10 @@ pub const Passage = struct {
         to_direction: p.Direction,
         pub fn format(
             self: Turn,
-            comptime fmt: []const u8,
-            options: std.fmt.FormatOptions,
+            comptime _: []const u8,
+            _: std.fmt.FormatOptions,
             writer: anytype,
         ) !void {
-            _ = fmt;
-            _ = options;
-
             try writer.print("Turn(at {any} to {s})", .{ self.place, @tagName(self.to_direction) });
         }
 

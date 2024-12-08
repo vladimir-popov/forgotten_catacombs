@@ -12,8 +12,8 @@ const whole_region: p.Region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .r
 
 /// The bit mask of the places with floor and walls.
 cells: p.BitMap(rows, cols),
-entrance: p.Point = undefined,
-exit: p.Point = undefined,
+entrance: ?p.Point = null,
+exit: ?p.Point = null,
 placement: d.Placement,
 
 pub fn init(arena: *std.heap.ArenaAllocator) !Cave {
@@ -28,8 +28,8 @@ pub fn dungeon(self: *const Cave) d.Dungeon {
         .parent = self,
         .rows = rows,
         .cols = cols,
-        .entrance = self.entrance,
-        .exit = self.exit,
+        .entrance = self.entrance.?,
+        .exit = self.exit.?,
         .vtable = .{
             .cellAtFn = cellAt,
             .placementWithFn = placementWith,

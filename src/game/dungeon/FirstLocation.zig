@@ -19,8 +19,8 @@ const d = @import("dungeon_pkg.zig");
 // ║════════════════════════════════════════║
 const FirstLocation = @This();
 
-const rows = g.DISPLAY_ROWS - 2;
-const cols = g.DISPLAY_COLS - 1;
+pub const rows = g.DISPLAY_ROWS - 2;
+pub const cols = g.DISPLAY_COLS - 1;
 
 const whole_region: p.Region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = rows, .cols = cols };
 // The square - place between tents

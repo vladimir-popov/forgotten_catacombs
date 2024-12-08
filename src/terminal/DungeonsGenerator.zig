@@ -11,11 +11,9 @@ pub const std_options: std.Options = .{
     .logFn = Logger.writeLog,
     .log_level = .info,
     .log_scope_levels = &[_]std.log.ScopeLevel{
-        // .{ .scope = .ai, .level = .debug },
-        // .{ .scope = .play_mode, .level = .debug },
-        // .{ .scope = .game_session, .level = .debug },
-        // .{ .scope = .cellural_automata, .level = .debug },
-        // .{ .scope = .action_system, .level = .debug },
+        // .{ .scope = .levels, .level = .debug },
+        // .{ .scope = .level, .level = .debug },
+        // .{ .scope = .dungeon, .level = .debug },
     },
 };
 
@@ -52,15 +50,11 @@ pub fn main() !void {
     try runtime.run(&generator);
 }
 
-fn showAll(_: *anyopaque, _: p.Point) g.Render.Visibility {
-    return .visible;
-}
-
 const DungeonsGenerator = struct {
     runtime: g.Runtime,
     render: g.Render,
     dungeon_type: DungeonType,
-    level: g.Level = undefined,
+    level: *g.Level = undefined,
     level_arena: std.heap.ArenaAllocator,
     draw_dungeon: bool = true, // if false the map should be drawn
 
@@ -70,7 +64,7 @@ const DungeonsGenerator = struct {
             .render = try g.Render.init(
                 alloc,
                 runtime,
-                .{ .context = undefined, .isVisible = showAll },
+                g.VisibilityStrategy.showAll(),
                 g.DUNGEON_ROWS,
                 g.DUNGEON_COLS,
             ),
@@ -87,23 +81,23 @@ const DungeonsGenerator = struct {
     fn generate(self: *DungeonsGenerator, seed: u64) !void {
         log.info("\n====================\nGenerate level with seed {d}\n====================\n", .{seed});
         _ = self.level_arena.reset(.retain_capacity);
-        switch (self.dungeon_type) {
-            .first => try self.level.generateFirstLevel(&self.level_arena, g.entities.Player, true),
-            .cellural => try self.level.generateCave(
+        self.level = switch (self.dungeon_type) {
+            .first => try g.Levels.firstLevel(&self.level_arena, g.entities.Player, true),
+            .cellural => try g.Levels.cave(
                 &self.level_arena,
                 seed,
                 0,
                 g.entities.Player,
                 .{ .direction = .down, .id = 0, .target_ladder = 1 },
             ),
-            else => try self.level.generateCatacomb(
+            else => try g.Levels.catacomb(
                 &self.level_arena,
                 seed,
                 0,
                 g.entities.Player,
                 .{ .direction = .down, .id = 0, .target_ladder = 1 },
             ),
-        }
+        };
         try self.render.clearDisplay();
         try self.draw();
     }

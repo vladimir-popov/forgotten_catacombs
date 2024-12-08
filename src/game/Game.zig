@@ -32,7 +32,7 @@ pub fn create(alloc: std.mem.Allocator, runtime: g.Runtime, seed: u64) !*Game {
         .render = try g.Render.init(
             alloc,
             runtime,
-            self.game_session.level.visibilityStrategy(),
+            g.VisibilityStrategy.delegateToLevel(),
             g.DISPLAY_ROWS - 2,
             g.DISPLAY_COLS,
         ),

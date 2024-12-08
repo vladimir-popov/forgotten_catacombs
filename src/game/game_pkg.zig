@@ -21,8 +21,11 @@ pub const Game = @import("Game.zig");
 pub const GameSession = @import("GameSession.zig");
 pub const Level = @import("Level.zig");
 pub const LevelMap = @import("LevelMap.zig");
+pub const Levels = @import("Levels.zig");
 pub const Render = @import("Render.zig");
 pub const Viewport = @import("Viewport.zig");
+pub const VisibilityStrategy = @import("VisibilityStrategy.zig");
+pub const Visibility = VisibilityStrategy.Visibility;
 
 pub const RENDER_DELAY_MS = 150;
 

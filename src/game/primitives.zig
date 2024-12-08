@@ -48,13 +48,10 @@ pub const Point = struct {
 
     pub fn format(
         self: Point,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
+        comptime _: []const u8,
+        _: std.fmt.FormatOptions,
         writer: anytype,
     ) !void {
-        _ = fmt;
-        _ = options;
-
         try writer.print("Point(r:{d}, c:{d})", .{ self.row, self.col });
     }
 
@@ -668,10 +665,10 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
             if (region.top_left.col > cols) {
                 return;
             }
-            const to_row = @min(rows, region.bottomRightRow()) + 1;
+            const to_row = @min(rows, region.bottomRightRow());
             const to_col = @min(cols, region.bottomRightCol());
-            for (region.top_left.row..to_row) |r| {
-                self.bitsets[r - 1].setRangeValue(
+            for (region.top_left.row - 1..to_row) |r0| {
+                self.bitsets[r0].setRangeValue(
                     .{ .start = region.top_left.col - 1, .end = to_col },
                     value,
                 );

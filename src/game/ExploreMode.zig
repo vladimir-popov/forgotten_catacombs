@@ -14,6 +14,7 @@ vertical_step: u8,
 orig_viewport_top_left: p.Point = undefined,
 
 pub fn init(session: *g.GameSession) ExploreMode {
+    log.debug("Init ExploreMode", .{});
     return .{
         .session = session,
         .horizontal_step = session.render.viewport.region.cols / 5,

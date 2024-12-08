@@ -12,19 +12,19 @@ pub const Player = c.Components{
     .speed = .{ .move_speed = 10 },
 };
 
-pub fn catacombsEntrance(id: g.Entity, place: p.Point) c.Components {
-    return .{
-        .ladder = .{ .direction = .down, .id = id, .target_ladder = id + 1 },
-        .description = .{ .name = "Ladder to catacombs" },
-        .sprite = .{ .codepoint = cp.ladder_down, .z_order = 2 },
-        .position = .{ .point = place },
-    };
-}
-
 pub fn wharfEntrance(place: p.Point) c.Components {
     return .{
         .description = .{ .name = "Wharf" },
         .sprite = .{ .codepoint = cp.ladder_up, .z_order = 2 },
+        .position = .{ .point = place },
+    };
+}
+
+pub fn catacombsEntrance(id: g.Entity, target_ladder: g.Entity, place: p.Point) c.Components {
+    return .{
+        .ladder = .{ .direction = .down, .id = id, .target_ladder = target_ladder },
+        .description = .{ .name = "Ladder to catacombs" },
+        .sprite = .{ .codepoint = cp.ladder_down, .z_order = 2 },
         .position = .{ .point = place },
     };
 }

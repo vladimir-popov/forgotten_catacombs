@@ -17,10 +17,11 @@ entities_on_screen: ArrayOfEntitiesOnScreen,
 entity_in_focus: ?g.Entity,
 
 pub fn init(session: *g.GameSession, alloc: std.mem.Allocator) !LookingAroundMode {
+    log.debug("Init LookingAroundMode", .{});
     return .{
         .session = session,
         .entities_on_screen = ArrayOfEntitiesOnScreen.init(alloc),
-        .entity_in_focus = session.level.player,
+        .entity_in_focus = null,
     };
 }
 
@@ -69,7 +70,7 @@ fn chooseNextEntity(self: *LookingAroundMode, direction: p.Direction) void {
         // if (target_entity == tuple[0]) continue;
         // we should follow the same logic as the render:
         // only entities, which should be drawn, can be in focus
-        if (self.session.render.actualCodepoint(tuple[2], tuple[1]) != tuple[2]) continue;
+        if (self.session.render.actualCodepoint(self.session.level, tuple[2], tuple[1]) != tuple[2]) continue;
 
         const d = distance(target_point, tuple[1], direction);
         if (d < min_distance) {

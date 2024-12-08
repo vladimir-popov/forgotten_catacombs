@@ -21,9 +21,9 @@ pub const Error = error{
 };
 
 /// 36
-const rows = g.DUNGEON_ROWS;
+pub const rows = g.DUNGEON_ROWS;
 /// 120
-const cols = g.DUNGEON_COLS;
+pub const cols = g.DUNGEON_COLS;
 
 const Catacomb = @This();
 
@@ -39,8 +39,8 @@ doorways: std.AutoHashMap(p.Point, Doorway),
 floor: p.BitMap(rows, cols),
 /// The bit mask of the places with walls. The floor under the walls is undefined, it can be set, or can be omitted.
 walls: p.BitMap(rows, cols),
-entrance: p.Point = undefined,
-exit: p.Point = undefined,
+entrance: ?p.Point = null,
+exit: ?p.Point = null,
 
 /// Allocates an empty dungeon, and initializes all inner state with passed arena
 /// allocator. The returned instance should be additionally initialized by the
@@ -64,8 +64,8 @@ pub fn dungeon(self: *const Catacomb) Dungeon {
         .parent = self,
         .rows = rows,
         .cols = cols,
-        .entrance = self.entrance,
-        .exit = self.exit,
+        .entrance = self.entrance.?,
+        .exit = self.exit.?,
         .doorways = &self.doorways,
         .vtable = .{
             .cellAtFn = cellAtFn,
@@ -295,11 +295,11 @@ pub fn forceCreateDoorBetween(
         return Error.PlaceOutsideTheDungeon;
     }
     self.cleanAt(place);
-    const door = Doorway{ .placement_from = placement_from, .placement_to = placement_to };
-    try self.doorways.put(place, door);
+    const doorway = Doorway{ .placement_from = placement_from, .placement_to = placement_to };
+    try self.doorways.put(place, doorway);
     try placement_from.addDoor(place);
     try placement_to.addDoor(place);
-    log.debug("Created {any} at {any}", .{ door, place });
+    log.debug("Created {any} at {any}", .{ doorway, place });
 }
 
 /// Creates the cell with wall only if nothing exists on the passed place.

@@ -11,9 +11,13 @@ pub const std_options: std.Options = .{
     .log_level = .info,
     .log_scope_levels = &[_]std.log.ScopeLevel{
         // .{ .scope = .ai, .level = .debug },
-        // .{ .scope = .play_mode, .level = .debug },
-        // .{ .scope = .game_session, .level = .debug },
+        .{ .scope = .render, .level = .warn },
+        .{ .scope = .game, .level = .debug },
+        .{ .scope = .game_session, .level = .debug },
+        .{ .scope = .play_mode, .level = .debug },
+        .{ .scope = .levels, .level = .debug },
         .{ .scope = .level, .level = .debug },
+        .{ .scope = .events, .level = .debug },
         // .{ .scope = .action_system, .level = .debug },
     },
 };
@@ -49,8 +53,4 @@ pub fn main() !void {
     runtime.run(game) catch |e| {
         std.debug.panic("Fatal error {any}", .{e});
     };
-}
-
-test {
-    std.testing.refAllDecls(@This());
 }

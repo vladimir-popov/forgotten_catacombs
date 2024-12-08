@@ -49,29 +49,29 @@ pub fn generateDungeon(
         .{ .min_rows = self.region_min_rows, .min_cols = self.region_min_cols, .square_ratio = self.square_ratio },
     );
 
-    const bsp_dungeon = try Catacomb.create(arena);
+    const catacomb = try Catacomb.create(arena);
     // visit every BSP node and generate rooms in the leafs
     var createRooms: TraverseAndCreateRooms = .{
         .generator = &self,
-        .dungeon = bsp_dungeon,
+        .dungeon = catacomb,
         .rand = rand,
     };
     try root.traverse(&bsp_arena, createRooms.handler());
-    log.debug("The rooms has been created", .{});
+    log.debug("The rooms have been created", .{});
 
     // fold the BSP tree and binds nodes with the same parent:
     var createPassages: CreatePassageBetweenRegions = .{
-        .dungeon = bsp_dungeon,
+        .dungeon = catacomb,
         .alloc = arena.allocator(),
         .rand = rand,
     };
     _ = try root.foldModify(&bsp_arena, createPassages.handler());
-    log.debug("The passages has been created", .{});
+    log.debug("The passages have been created", .{});
 
-    bsp_dungeon.entrance = (try bsp_dungeon.firstRoom()).randomPlace(rand);
-    bsp_dungeon.exit = (try bsp_dungeon.lastRoom()).randomPlace(rand);
+    catacomb.entrance = (try catacomb.firstRoom()).randomPlace(rand);
+    catacomb.exit = (try catacomb.lastRoom()).randomPlace(rand);
 
-    return bsp_dungeon.dungeon();
+    return catacomb.dungeon();
 }
 
 const TraverseAndCreateRooms = struct {
