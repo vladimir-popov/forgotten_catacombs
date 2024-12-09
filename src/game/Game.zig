@@ -65,7 +65,7 @@ inline fn welcome(self: *Game) !void {
 inline fn newGame(self: *Game) !void {
     self.state = .game;
     _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
-    _ = self.runtime.addMenuItem("Explore the level", self, exploreMenu);
+    _ = self.runtime.addMenuItem("Explore lvl", self, exploreMenu);
     try self.game_session.initNew(
         &self.game_session_arena,
         self.seed,
@@ -111,12 +111,14 @@ pub fn tick(self: *Game) !void {
         .welcome => if (try self.runtime.readPushedButtons()) |btn| {
             switch (btn.game_button) {
                 .a => if (btn.state == .pressed) try self.newGame(),
+                .cheat => _ = self.runtime.getCheat(),
                 else => {},
             }
         },
         .game_over => if (try self.runtime.readPushedButtons()) |btn| {
             switch (btn.game_button) {
                 .a => if (btn.state == .pressed) try self.welcome(),
+                .cheat => _ = self.runtime.getCheat(),
                 else => {},
             }
         },

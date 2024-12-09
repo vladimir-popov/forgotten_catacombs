@@ -8,7 +8,7 @@ const Allocator = @import("Allocator.zig");
 
 const log = std.log.scoped(.playdate_runtime);
 
-const Self = @This();
+const PlaydateRuntime = @This();
 
 const LastButton = struct {
     const Btn = struct {
@@ -91,7 +91,7 @@ alloc: std.mem.Allocator,
 bitmap_table: *api.LCDBitmapTable,
 last_button: *LastButton,
 
-pub fn init(playdate: *api.PlaydateAPI) !Self {
+pub fn init(playdate: *api.PlaydateAPI) !PlaydateRuntime {
     const err: ?*[*c]const u8 = null;
 
     const bitmap_table: *api.LCDBitmapTable = playdate.graphics.loadBitmapTable("sprites", err) orelse {
@@ -119,11 +119,11 @@ pub fn init(playdate: *api.PlaydateAPI) !Self {
     };
 }
 
-pub fn deinit(self: *Self) void {
+pub fn deinit(self: *PlaydateRuntime) void {
     self.playdate.realloc(0, self.bitmap_table);
 }
 
-pub fn runtime(self: *Self) g.Runtime {
+pub fn runtime(self: *PlaydateRuntime) g.Runtime {
     return .{
         .context = self,
         .vtable = &.{
@@ -142,7 +142,7 @@ pub fn runtime(self: *Self) g.Runtime {
 // ======== Private methods: ==============
 
 fn currentMillis(ptr: *anyopaque) c_uint {
-    const self: *Self = @ptrCast(@alignCast(ptr));
+    const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
     return self.playdate.system.getCurrentTimeMilliseconds();
 }
 
@@ -152,19 +152,32 @@ fn addMenuItem(
     game_object: *anyopaque,
     callback: g.Runtime.MenuItemCallback,
 ) ?*anyopaque {
-    const self: *Self = @ptrCast(@alignCast(ptr));
+    const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
     return self.playdate.system.addMenuItem(title.ptr, callback, game_object).?;
 }
 
 fn removeAllMenuItems(ptr: *anyopaque) void {
-    const self: *Self = @ptrCast(@alignCast(ptr));
+    const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
     self.playdate.system.removeAllMenuItems();
 }
 
 fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
-    const self: *Self = @ptrCast(@alignCast(ptr));
+    const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
 
     if (cheat) |_| return .{ .game_button = .cheat, .state = .pressed };
+
+    if (self.playdate.system.isCrankDocked() == 0) {
+        const change = self.playdate.system.getCrankChange();
+        const angle =  self.playdate.system.getCrankAngle();
+        if (change > 2.0 and angle > 170.0 and angle < 190.0) {
+            cheat = .move_player_to_ladder_down;
+            return .{ .game_button = .cheat, .state = .pressed };
+        }
+        if (change < -2.0 and (angle > 350.0 or angle < 10.0)) {
+            cheat = .move_player_to_ladder_up;
+            return .{ .game_button = .cheat, .state = .pressed };
+        }
+    }
 
     if (self.last_button.button) |btn| {
         // handle only released button
@@ -192,12 +205,12 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
 }
 
 fn clearDisplay(ptr: *anyopaque) anyerror!void {
-    var self: *Self = @ptrCast(@alignCast(ptr));
+    var self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
     self.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
 }
 
 fn drawSprite(ptr: *anyopaque, codepoint: g.Codepoint, position_on_display: p.Point, mode: g.Render.DrawingMode) !void {
-    var self: *Self = @ptrCast(@alignCast(ptr));
+    var self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
     const x = @as(c_int, position_on_display.col - 1) * g.SPRITE_WIDTH;
     const y = @as(c_int, position_on_display.row - 1) * g.SPRITE_HEIGHT;
     if (mode == .inverted)
@@ -216,7 +229,7 @@ fn drawText(ptr: *anyopaque, text: []const u8, position_on_display: p.Point, mod
     }
 }
 
-fn getBitmap(self: Self, codepoint: g.Codepoint) *api.LCDBitmap {
+fn getBitmap(self: PlaydateRuntime, codepoint: g.Codepoint) *api.LCDBitmap {
     const idx = getCodepointIdx(codepoint);
     return self.playdate.graphics.getTableBitmap(self.bitmap_table, idx) orelse {
         std.debug.panic("Wrong index {d} for codepoint {d}", .{ idx, codepoint });

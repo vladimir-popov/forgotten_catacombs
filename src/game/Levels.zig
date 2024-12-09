@@ -36,7 +36,7 @@ pub fn firstLevel(
     // Add the ladder leads to the bottom dungeons:
     id = level.newEntity();
     try level.entities.append(id);
-    try level.components.setComponentsToEntity(id, g.entities.catacombsEntrance(id, level.newEntity(), dungeon.exit));
+    try level.components.setComponentsToEntity(id, g.entities.cavesEntrance(id, level.newEntity(), dungeon.exit));
 
     // Generate player on the wharf
     level.player = try level.addNewEntity(player);

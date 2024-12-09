@@ -20,10 +20,10 @@ pub fn wharfEntrance(place: p.Point) c.Components {
     };
 }
 
-pub fn catacombsEntrance(id: g.Entity, target_ladder: g.Entity, place: p.Point) c.Components {
+pub fn cavesEntrance(id: g.Entity, target_ladder: g.Entity, place: p.Point) c.Components {
     return .{
         .ladder = .{ .direction = .down, .id = id, .target_ladder = target_ladder },
-        .description = .{ .name = "Ladder to catacombs" },
+        .description = .{ .name = "Ladder to caves" },
         .sprite = .{ .codepoint = cp.ladder_down, .z_order = 2 },
         .position = .{ .point = place },
     };

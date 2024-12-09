@@ -193,7 +193,6 @@ visibility_strategy: g.VisibilityStrategy,
 viewport: g.Viewport,
 /// Cache for the visible area
 buffer: SceneBuffer,
-known_symbols_set: std.AutoHashMap(u21, void),
 
 pub fn init(
     alloc: std.mem.Allocator,
@@ -202,30 +201,16 @@ pub fn init(
     scene_rows: u8,
     scene_cols: u8,
 ) !Render {
-    // This codepoints should be changed for invisible, but known area
-    var known_symbols_set: std.AutoHashMap(u21, void) = std.AutoHashMap(u21, void).init(alloc);
-    try known_symbols_set.put(cp.nothing, {});
-    try known_symbols_set.put(cp.ladder_up, {});
-    try known_symbols_set.put(cp.ladder_down, {});
-    try known_symbols_set.put(cp.door_opened, {});
-    try known_symbols_set.put(cp.door_closed, {});
-    try known_symbols_set.put(cp.rock, {});
-    try known_symbols_set.put(cp.water, {});
-    for (cp.walls) |w|
-        try known_symbols_set.put(w, {});
-
     return .{
         .runtime = runtime,
         .visibility_strategy = visibility_strategy,
         .viewport = try g.Viewport.init(scene_rows, scene_cols),
         .buffer = try SceneBuffer.init(alloc, scene_rows, scene_cols),
-        .known_symbols_set = known_symbols_set,
     };
 }
 
 pub fn deinit(self: *Render) void {
     self.buffer.deinit();
-    self.known_symbols_set.deinit();
 }
 
 /// Draws dungeon, sprites, animations, and stats on the screen.
@@ -336,12 +321,13 @@ pub inline fn actualCodepoint(self: Render, level: *const g.Level, codepoint: g.
         .known => switch (codepoint) {
             cp.wall_visible => cp.wall_known,
             cp.floor_visible => cp.floor_known,
-            else =>
-            // always show this known sprites
-            if (self.known_symbols_set.contains(codepoint))
-                codepoint
-            else
-                cp.floor_known,
+            cp.nothing, cp.ladder_up, cp.ladder_down, cp.door_opened, cp.door_closed, cp.rock, cp.water => codepoint,
+            else => blk: {
+                inline for (cp.walls) |w| {
+                    if (w == codepoint) break :blk codepoint;
+                }
+                break :blk cp.floor_known;
+            },
         },
     };
 }
