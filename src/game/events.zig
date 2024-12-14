@@ -51,28 +51,22 @@ pub const EventBus = struct {
     const Ptr = usize;
 
     events: std.ArrayList(Event),
-    subscribers: std.AutoHashMap(Event.Tag, std.AutoHashMap(Ptr, Subscriber)),
+    subscribers: std.AutoHashMap(Ptr, Subscriber),
 
-    pub fn init(self: *EventBus, arena: *std.heap.ArenaAllocator) !void {
-        self.subscribers = std.AutoHashMap(Event.Tag, std.AutoHashMap(Ptr, Subscriber)).init(arena.allocator());
-        self.events = std.ArrayList(Event).init(arena.allocator());
+    pub fn create(arena: *std.heap.ArenaAllocator) !*EventBus {
+        const alloc = arena.allocator();
+        const self = try alloc.create(EventBus);
+        self.subscribers = std.AutoHashMap(Ptr, Subscriber).init(alloc);
+        self.events = std.ArrayList(Event).init(alloc);
+        return self;
     }
 
-    pub fn subscribeOn(self: *EventBus, event: Event.Tag, subscriber: Subscriber) !void {
-        const gop = try self.subscribers.getOrPut(event);
-        if (gop.found_existing) {
-            try gop.value_ptr.put(@intFromPtr(subscriber.context), subscriber);
-        } else {
-            gop.value_ptr.* = std.AutoHashMap(Ptr, Subscriber).init(self.subscribers.allocator);
-            try gop.value_ptr.put(@intFromPtr(subscriber.context), subscriber);
-        }
+    pub inline fn subscribe(self: *EventBus, subscriber: Subscriber) !void {
+        try self.subscribers.putNoClobber(@intFromPtr(subscriber.context), subscriber);
     }
 
-    pub fn unsubscribe(self: *EventBus, subscriber_context: *anyopaque, event: Event.Tag) !void {
-        const gop = try self.subscribers.getOrPut(event);
-        if (gop.found_existing) {
-            _ = gop.value_ptr.remove(@intFromPtr(subscriber_context));
-        }
+    pub fn unsubscribe(self: *EventBus, subscriber_context: *anyopaque) bool {
+        return self.subscribers.remove(@intFromPtr(subscriber_context));
     }
 
     pub fn sendEvent(self: *EventBus, event: Event) !void {
@@ -82,11 +76,9 @@ pub const EventBus = struct {
 
     pub fn notifySubscribers(self: *EventBus) !void {
         for (self.events.items) |event| {
-            if (self.subscribers.get(event)) |subscribers| {
-                var itr = subscribers.valueIterator();
-                while (itr.next()) |subscriber| {
-                    try subscriber.onEvent(subscriber.context, event);
-                }
+            var itr = self.subscribers.valueIterator();
+            while (itr.next()) |subscriber| {
+                try subscriber.onEvent(subscriber.context, event);
             }
             log.debug("Event handled: {any}", .{event});
         }
@@ -109,8 +101,7 @@ test "publish/consume" {
     };
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
-    var bus: EventBus = undefined;
-    try bus.init(&arena);
+    var bus: EventBus = try EventBus.create(&arena);
 
     var subscriber = TestSubscriber{};
     const event = Event{
@@ -123,7 +114,7 @@ test "publish/consume" {
     };
 
     // when:
-    try bus.subscribeOn(.entity_moved, subscriber.subscriber());
+    try bus.subscribe(subscriber.subscriber());
     try bus.sendEvent(event);
 
     // then:

@@ -65,17 +65,15 @@ pub fn create(
     self.level = try g.Levels.firstLevel(&self.level_arena, g.entities.Player, true);
     log.debug("The first level has been created", .{});
 
-    try events.subscribeOn(.entity_moved, self.play_mode.subscriber());
-    try events.subscribeOn(.player_hit, self.play_mode.subscriber());
+    try events.subscribe(self.play_mode.subscriber());
 
     render.viewport.region.top_left = .{ .row = 1, .col = 1 };
     try self.play_mode.update(null);
     return self;
 }
 
-pub fn unsubscribe(self: *GameSession) !void {
-    try self.events.unsubscribe(&self.play_mode, .entity_moved);
-    try self.events.unsubscribe(&self.play_mode, .player_hit);
+pub fn unsubscribe(self: *GameSession) void {
+    std.debug.assert(self.events.unsubscribe(&self.play_mode));
 }
 
 pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {

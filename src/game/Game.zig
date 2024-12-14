@@ -21,7 +21,7 @@ state: State,
 game_session: ?*g.GameSession = null,
 game_session_arena: std.heap.ArenaAllocator,
 ///
-events: g.events.EventBus = undefined,
+events: *g.events.EventBus = undefined,
 events_arena: std.heap.ArenaAllocator,
 
 pub fn create(alloc: std.mem.Allocator, runtime: g.Runtime, seed: u64) !*Game {
@@ -41,9 +41,9 @@ pub fn create(alloc: std.mem.Allocator, runtime: g.Runtime, seed: u64) !*Game {
         .game_session_arena = std.heap.ArenaAllocator.init(alloc),
         .events_arena = std.heap.ArenaAllocator.init(alloc),
     };
-    try self.events.init(&self.events_arena);
-    try self.events.subscribeOn(.entity_died, self.subscriber());
-    try self.events.subscribeOn(.entity_moved, self.render.viewport.subscriber());
+    self.events = try g.events.EventBus.create(&self.events_arena);
+    try self.events.subscribe(self.subscriber());
+    try self.events.subscribe(self.render.viewport.subscriber());
     try self.welcome();
     return self;
 }
@@ -66,7 +66,7 @@ inline fn newGame(self: *Game) !void {
     _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
     _ = self.runtime.addMenuItem("Explore lvl", self, exploreMenu);
     if (self.game_session) |gs| {
-        try gs.unsubscribe();
+        gs.unsubscribe();
     }
     _ = self.game_session_arena.reset(.retain_capacity);
     self.game_session = try g.GameSession.create(
@@ -74,7 +74,7 @@ inline fn newGame(self: *Game) !void {
         self.seed,
         self.runtime,
         &self.render,
-        &self.events,
+        self.events,
     );
 }
 
