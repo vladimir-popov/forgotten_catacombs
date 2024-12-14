@@ -14,6 +14,7 @@ const PlayMode = @This();
 const System = *const fn (play_mode: *PlayMode) anyerror!void;
 
 const EnemiesIterator = struct {
+    /// The GameSession has a pointer to the actual level
     session: *g.GameSession,
     /// The index of all enemies, which are potentially can perform an action.
     /// This list recreated every player's move.
@@ -116,7 +117,7 @@ pub fn deinit(self: PlayMode) void {
 }
 
 /// Updates the target entity after switching back to the play mode
-pub fn refresh(self: *PlayMode, entity_in_focus: ?g.Entity) !void {
+pub fn update(self: *PlayMode, entity_in_focus: ?g.Entity) !void {
     self.entity_in_focus = entity_in_focus;
     if (entity_in_focus) |ef| if (ef == self.session.level.player) {
         self.entity_in_focus = null;

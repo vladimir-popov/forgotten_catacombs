@@ -18,7 +18,7 @@ seed: u64,
 /// The current state of the game
 state: State,
 /// The current game session
-game_session: g.GameSession = undefined,
+game_session: ?*g.GameSession = null,
 game_session_arena: std.heap.ArenaAllocator,
 ///
 events: g.events.EventBus = undefined,
@@ -56,7 +56,6 @@ pub fn destroy(self: *Game) void {
 }
 
 inline fn welcome(self: *Game) !void {
-    _ = self.game_session_arena.reset(.retain_capacity);
     self.state = .welcome;
     self.runtime.removeAllMenuItems();
     try self.render.drawWelcomeScreen();
@@ -66,14 +65,17 @@ inline fn newGame(self: *Game) !void {
     self.state = .game;
     _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
     _ = self.runtime.addMenuItem("Explore lvl", self, exploreMenu);
-    try self.game_session.initNew(
+    if (self.game_session) |gs| {
+        try gs.unsubscribe();
+    }
+    _ = self.game_session_arena.reset(.retain_capacity);
+    self.game_session = try g.GameSession.create(
         &self.game_session_arena,
         self.seed,
         self.runtime,
         &self.render,
         &self.events,
     );
-    try self.game_session.play(null);
 }
 
 fn goToMainMenu(ptr: ?*anyopaque) callconv(.C) void {
@@ -85,7 +87,7 @@ fn goToMainMenu(ptr: ?*anyopaque) callconv(.C) void {
 fn exploreMenu(ptr: ?*anyopaque) callconv(.C) void {
     if (ptr == null) return;
     const self: *Game = @ptrCast(@alignCast(ptr.?));
-    self.game_session.explore() catch @panic("Error on looking around");
+    self.game_session.?.explore() catch @panic("Error on looking around");
 }
 
 pub fn subscriber(self: *Game) g.events.Subscriber {
@@ -122,7 +124,7 @@ pub fn tick(self: *Game) !void {
                 else => {},
             }
         },
-        .game => try self.game_session.tick(),
+        .game => try self.game_session.?.tick(),
     }
     try self.events.notifySubscribers();
 }

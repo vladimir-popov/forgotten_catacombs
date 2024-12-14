@@ -68,10 +68,10 @@ pub const EventBus = struct {
         }
     }
 
-    pub fn unsubscribe(self: *EventBus, subscriber_context: *anyopaque, event: Event.Tag) bool {
+    pub fn unsubscribe(self: *EventBus, subscriber_context: *anyopaque, event: Event.Tag) !void {
         const gop = try self.subscribers.getOrPut(event);
         if (gop.found_existing) {
-            _ = gop.value_ptr.remove(subscriber_context);
+            _ = gop.value_ptr.remove(@intFromPtr(subscriber_context));
         }
     }
 

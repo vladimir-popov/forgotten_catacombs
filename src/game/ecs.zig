@@ -377,12 +377,12 @@ test "ComponentsManager: set components to the entity" {
     try std.testing.expectEqual(null, bar);
 }
 
-pub fn ComponentsQuery(comptime ComponentsUnion: type) type {
+pub fn ComponentsQuery(comptime Components: type) type {
     return struct {
         const Self = @This();
 
         entities: std.ArrayList(Entity),
-        components_manager: ComponentsManager(ComponentsUnion),
+        components_manager: ComponentsManager(Components),
 
         pub fn Query1(comptime Cmp: type) type {
             return struct {
@@ -407,7 +407,7 @@ pub fn ComponentsQuery(comptime ComponentsUnion: type) type {
         pub fn Query2(comptime Cmp1: type, Cmp2: type) type {
             return struct {
                 entities: []const Entity,
-                components: ComponentsManager(ComponentsUnion),
+                components: ComponentsManager(Components),
                 idx: u8 = 0,
 
                 pub fn next(self: *@This()) ?struct { Entity, *Cmp1, *Cmp2 } {
@@ -430,7 +430,7 @@ pub fn ComponentsQuery(comptime ComponentsUnion: type) type {
         pub fn Query3(comptime Cmp1: type, Cmp2: type, Cmp3: type) type {
             return struct {
                 entities: []const Entity,
-                components: ComponentsManager(ComponentsUnion),
+                components: ComponentsManager(Components),
                 idx: u8 = 0,
 
                 pub fn next(self: *@This()) ?struct { Entity, *Cmp1, *Cmp2, *Cmp3 } {

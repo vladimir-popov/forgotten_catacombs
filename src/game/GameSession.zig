@@ -41,16 +41,16 @@ play_mode: PlayMode,
 explore_mode: ExploreMode,
 looking_around: LookingAroundMode,
 
-pub fn initNew(
-    self: *GameSession,
+pub fn create(
     arena: *std.heap.ArenaAllocator,
     seed: u64,
     runtime: g.Runtime,
     render: *g.Render,
     events: *g.events.EventBus,
-) !void {
+) !*GameSession {
     const alloc = arena.allocator();
     log.debug("Begin the new game session with seed {d}", .{seed});
+    const self = try alloc.create(GameSession);
     self.* = .{
         .seed = seed,
         .prng = std.Random.DefaultPrng.init(seed),
@@ -69,6 +69,13 @@ pub fn initNew(
     try events.subscribeOn(.player_hit, self.play_mode.subscriber());
 
     render.viewport.region.top_left = .{ .row = 1, .col = 1 };
+    try self.play_mode.update(null);
+    return self;
+}
+
+pub fn unsubscribe(self: *GameSession) !void {
+    try self.events.unsubscribe(&self.play_mode, .entity_moved);
+    try self.events.unsubscribe(&self.play_mode, .player_hit);
 }
 
 pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
@@ -115,7 +122,7 @@ pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
 
 pub fn play(self: *GameSession, entity_in_focus: ?g.Entity) !void {
     self.mode = .play;
-    try self.play_mode.refresh(entity_in_focus);
+    try self.play_mode.update(entity_in_focus);
 }
 
 pub fn explore(self: *GameSession) !void {
