@@ -12,26 +12,10 @@ const VisibilityStrategy = @This();
 
 context: *anyopaque,
 /// Custom function to decide should the place be drawn or not.
-isVisibleFn: *const fn (context: *anyopaque, level: *const g.Level, place: p.Point) Visibility,
-/// Should mark the visited places with same logic that used for isVisibleFn
-markVisitedPlacesFn: *const fn (
-    context: *anyopaque,
-    level: *g.Level,
-    point_of_view: p.Point,
-    placement: *const d.Placement,
-) anyerror!void,
+checkVisibilityFn: *const fn (context: *anyopaque, level: *const g.Level, place: p.Point) Visibility,
 
-pub inline fn isVisible(self: VisibilityStrategy, level: *const g.Level, place: p.Point) Visibility {
-    return self.isVisibleFn(self.context, level, place);
-}
-
-pub inline fn markVisitedPlaces(
-    self: VisibilityStrategy,
-    level: *g.Level,
-    point_of_view: p.Point,
-    placement: *const d.Placement,
-) !void {
-    try self.markVisitedPlacesFn(self.context, level, point_of_view, placement);
+pub inline fn checkVisibility(self: VisibilityStrategy, level: *const g.Level, place: p.Point) Visibility {
+    return self.checkVisibilityFn(self.context, level, place);
 }
 
 //
@@ -39,76 +23,53 @@ pub inline fn markVisitedPlaces(
 //
 
 // Used by the DungeonGenerator program
-pub fn showAll() VisibilityStrategy {
-    return .{ .context = undefined, .isVisibleFn = visibleAll, .markVisitedPlacesFn = markNothing };
+pub fn showWholeDungeon() VisibilityStrategy {
+    return .{ .context = undefined, .checkVisibilityFn = visibleWholeDungeon };
 }
 
-fn visibleAll(_: *anyopaque, _: *const g.Level, _: p.Point) g.Visibility {
-    return .visible;
+fn visibleWholeDungeon(_: *anyopaque, level: *const g.Level, place: p.Point) g.Visibility {
+    return if (level.dungeon.rows < place.row or level.dungeon.cols < place.col) .invisible else .visible;
 }
-fn markNothing(_: *anyopaque, _: *g.Level, _: p.Point, _: *const d.Placement) anyerror!void {}
 
 /// This is strategy for the Render only
 pub fn delegateToLevel() g.VisibilityStrategy {
-    return .{ .context = undefined, .isVisibleFn = isVisibleFromLevel, .markVisitedPlacesFn = markVisibleOnLevel };
+    return .{ .context = undefined, .checkVisibilityFn = checkVisibilityOnLevel };
 }
 
-fn isVisibleFromLevel(_: *anyopaque, level: *const g.Level, place: p.Point) g.Visibility {
-    return level.visibility_strategy.isVisible(level, place);
-}
-
-fn markVisibleOnLevel(_: *anyopaque, level: *g.Level, place: p.Point, placement: *const d.Placement) anyerror!void {
-    try level.visibility_strategy.markVisitedPlaces(level, place, placement);
+fn checkVisibilityOnLevel(_: *anyopaque, level: *const g.Level, place: p.Point) g.Visibility {
+    return level.visibility_strategy.checkVisibility(level, place);
 }
 
 /// Marks as visible the whole placement and optionally its nearest neighbors
 pub fn visibleWholePlacements() VisibilityStrategy {
-    return .{ .context = undefined, .isVisibleFn = isVisibleInPlacements, .markVisitedPlacesFn = markVisitedPlacements };
+    return .{ .context = undefined, .checkVisibilityFn = checkVisibilityInPlacement };
 }
 
-fn isVisibleInPlacements(_: *anyopaque, level: *const g.Level, place: p.Point) Visibility {
-    if (level.player_placement.contains(place))
-        return .visible;
+fn checkVisibilityInPlacement(_: *anyopaque, level: *const g.Level, place: p.Point) Visibility {
+    if (level.player_placement.contains(place)) return .visible;
 
+    // check visibility of the nearest placement if the player is in the doorway:
+    const player_position = level.playerPosition().point;
     var doorways = level.player_placement.doorways();
     while (doorways.next()) |door_place| {
+        if (!door_place.eql(player_position)) continue;
         if (level.dungeon.doorwayAt(door_place.*)) |doorway| {
-            // skip the neighbor if the door between is closed
-            if (level.components.getForEntity(doorway.door_id, c.Door)) |door| {
-                if (door.state == .closed) continue;
-            } else {
-                std.debug.panic(
-                    \\Error on checking visibility of the {any}: 
-                    \\Component Door was not found for the doorway.door_id {d} on the level {d}
-                ,
-                    .{ place, doorway.door_id, level.depth },
-                );
-            }
-
             if (doorway.oppositePlacement(level.player_placement)) |placement| {
-                if (placement.contains(place))
-                    return .visible;
+                if (placement.contains(place)) return .visible;
             }
         }
     }
-    if (level.map.isVisited(place))
+
+    // check known places
+    if (level.map.isVisited(place)) {
+        switch (level.player_placement) {
+            // mark invisible everything inside the inner rooms
+            .area => |area| if (area.isInsideInnerRoom(place)) return .invisible,
+            .room => |room| if (room.host_area) |area| if (area.isInsideInnerRoom(place)) return .invisible,
+            else => {},
+        }
         return .known;
+    }
 
     return .invisible;
-}
-
-fn markVisitedPlacements(
-    _: *anyopaque,
-    level: *g.Level,
-    _: p.Point,
-    placement: *const d.Placement,
-) anyerror!void {
-    try level.map.addVisitedPlacement(placement);
-    var doorways = level.player_placement.doorways();
-    while (doorways.next()) |door_place| {
-        if (level.dungeon.doorwayAt(door_place.*)) |doorway| {
-            if (level.components.getForEntity(doorway.door_id, c.Door)) |door| if (door.state == .opened)
-                if (doorway.oppositePlacement(level.player_placement)) |pl| try level.map.addVisitedPlacement(pl);
-        }
-    }
 }

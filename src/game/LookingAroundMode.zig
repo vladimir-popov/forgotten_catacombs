@@ -67,10 +67,9 @@ fn chooseNextEntity(self: *LookingAroundMode, direction: p.Direction) void {
     );
     var min_distance: u8 = 255;
     for (self.entities_on_screen.items) |tuple| {
-        // if (target_entity == tuple[0]) continue;
         // we should follow the same logic as the render:
         // only entities, which should be drawn, can be in focus
-        if (self.session.render.actualCodepoint(self.session.level, tuple[2], tuple[1]) != tuple[2]) continue;
+        if (self.session.render.visibility_strategy.checkVisibility(self.session.level, tuple[1]) != .visible) continue;
 
         const d = distance(target_point, tuple[1], direction);
         if (d < min_distance) {

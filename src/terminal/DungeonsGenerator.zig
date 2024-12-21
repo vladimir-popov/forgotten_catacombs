@@ -11,6 +11,7 @@ pub const std_options: std.Options = .{
     .logFn = Logger.writeLog,
     .log_level = .info,
     .log_scope_levels = &[_]std.log.ScopeLevel{
+        .{ .scope = .render, .level = .debug },
         // .{ .scope = .levels, .level = .debug },
         // .{ .scope = .level, .level = .debug },
         // .{ .scope = .dungeon, .level = .debug },
@@ -19,7 +20,7 @@ pub const std_options: std.Options = .{
 
 const log = std.log.scoped(.DungeonsGenerator);
 
-const DungeonType = enum { first, dungeon, cellural };
+const DungeonType = enum { first, dungeon, cave };
 
 pub fn main() !void {
     const seed = try Args.int(u64, "seed") orelse std.crypto.random.int(u64);
@@ -31,8 +32,8 @@ pub fn main() !void {
         if (std.mem.eql(u8, @tagName(.dungeon), arg_value)) {
             dungeon_type = .dungeon;
         }
-        if (std.mem.eql(u8, @tagName(.cellural), arg_value)) {
-            dungeon_type = .cellural;
+        if (std.mem.eql(u8, @tagName(.cave), arg_value)) {
+            dungeon_type = .cave;
         }
     }
 
@@ -56,7 +57,6 @@ const DungeonsGenerator = struct {
     dungeon_type: DungeonType,
     level: *g.Level = undefined,
     level_arena: std.heap.ArenaAllocator,
-    draw_dungeon: bool = true, // if false the map should be drawn
 
     pub fn init(alloc: std.mem.Allocator, runtime: g.Runtime, dungeon_type: DungeonType) !DungeonsGenerator {
         return .{
@@ -64,7 +64,7 @@ const DungeonsGenerator = struct {
             .render = try g.Render.init(
                 alloc,
                 runtime,
-                g.VisibilityStrategy.showAll(),
+                g.VisibilityStrategy.showWholeDungeon(),
                 g.DUNGEON_ROWS,
                 g.DUNGEON_COLS,
             ),
@@ -83,7 +83,7 @@ const DungeonsGenerator = struct {
         _ = self.level_arena.reset(.retain_capacity);
         self.level = switch (self.dungeon_type) {
             .first => try g.Levels.firstLevel(&self.level_arena, g.entities.Player, true),
-            .cellural => try g.Levels.cave(
+            .cave => try g.Levels.cave(
                 &self.level_arena,
                 seed,
                 0,
@@ -107,10 +107,8 @@ const DungeonsGenerator = struct {
         try self.draw();
     }
 
-    fn draw(self: *DungeonsGenerator) !void {
-        if (self.draw_dungeon) {
-            try self.render.drawLevelOnly(self.level);
-        } else {}
+    inline fn draw(self: *DungeonsGenerator) !void {
+        try self.render.drawLevelOnly(self.level);
     }
 
     fn handleInput(self: *DungeonsGenerator) !bool {
@@ -118,10 +116,6 @@ const DungeonsGenerator = struct {
         if (btn.game_button == .a) {
             const seed = std.crypto.random.int(u64);
             try self.generate(seed);
-        }
-        if (btn.game_button == .b) {
-            self.draw_dungeon = !self.draw_dungeon;
-            try self.render.clearDisplay();
         }
         return true;
     }

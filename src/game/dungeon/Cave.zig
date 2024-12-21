@@ -10,20 +10,21 @@ pub const cols = g.DISPLAY_COLS * 2;
 
 const whole_region: p.Region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = rows, .cols = cols };
 
+// The room of this cave with rocks inside
+room: d.Room,
 /// The bit mask of the places with floor and walls.
 cells: p.BitMap(rows, cols),
 entrance: ?p.Point = null,
 exit: ?p.Point = null,
-placement: d.Placement,
 
 pub fn init(arena: *std.heap.ArenaAllocator) !Cave {
     return .{
         .cells = try p.BitMap(rows, cols).initEmpty(arena.allocator()),
-        .placement = .{ .room = d.Room.init(arena.allocator(), whole_region) },
+        .room = d.Room.init(arena.allocator(), whole_region),
     };
 }
 
-pub fn dungeon(self: *const Cave) d.Dungeon {
+pub fn dungeon(self: *Cave) d.Dungeon {
     return .{
         .parent = self,
         .rows = rows,
@@ -46,11 +47,11 @@ fn cellAt(ptr: *const anyopaque, place: p.Point) d.Dungeon.Cell {
     return if (self.cells.isSet(place.row, place.col)) .rock else .floor;
 }
 
-fn placementWith(ptr: *const anyopaque, place: p.Point) ?*const d.Placement {
+fn placementWith(ptr: *anyopaque, place: p.Point) ?d.Placement {
     if (!whole_region.containsPoint(place)) return null;
 
-    const self: *const Cave = @ptrCast(@alignCast(ptr));
-    return &self.placement;
+    const self: *Cave = @ptrCast(@alignCast(ptr));
+    return .{ .room = &self.room };
 }
 
 fn randomPlace(ptr: *const anyopaque, rand: std.Random) p.Point {

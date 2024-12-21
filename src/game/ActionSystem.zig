@@ -56,24 +56,10 @@ pub fn doAction(session: *g.GameSession, entity: g.Entity, action: Action, move_
         },
         .open => |door| {
             try session.level.components.setComponentsToEntity(door, g.entities.OpenedDoor);
-            // opening the door by player can change visible places
-            if (entity == session.level.player) {
-                try session.level.updatePlacementWithPlayer(
-                    session.level.playerPosition().point,
-                    session.level.player_placement,
-                );
-            }
             return move_speed;
         },
         .close => |door| {
             try session.level.components.setComponentsToEntity(door, g.entities.ClosedDoor);
-            // closing the door by player can change visible places
-            if (entity == session.level.player) {
-                try session.level.updatePlacementWithPlayer(
-                    session.level.playerPosition().point,
-                    session.level.player_placement,
-                );
-            }
             return move_speed;
         },
         .hit => |hit| {

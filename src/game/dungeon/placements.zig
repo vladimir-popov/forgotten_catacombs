@@ -1,49 +1,16 @@
 //! The placement abstraction is used to calculate visibility of the objects on
 //! the level. It's kind of compromise, because of true ray trace is a very
 //! hard operation for the playdate.
+//! All placements of the level are stored as a graph, where nodes are placements, and
+//! edges are doorways.
 const std = @import("std");
 const g = @import("../game_pkg.zig");
 const d = g.dungeon;
 const p = g.primitives;
 
-pub const Placement = union(enum) {
-    pub const DoorwaysIterator = std.AutoHashMap(p.Point, void).KeyIterator;
-
-    passage: Passage,
-    room: Room,
-
-    pub fn contains(self: Placement, place: p.Point) bool {
-        switch (self) {
-            .passage => |ps| return ps.isPartOfThisPassage(place),
-            .room => |r| return r.contains(place),
-        }
-    }
-
-    pub inline fn doorways(self: Placement) DoorwaysIterator {
-        return switch (self) {
-            .room => |room| room.doorways.keyIterator(),
-            .passage => |ps| ps.doorways.keyIterator(),
-        };
-    }
-
-    pub fn addDoor(self: *Placement, place: p.Point) !void {
-        switch (self.*) {
-            .passage => try self.passage.doorways.put(place, {}),
-            .room => try self.room.doorways.put(place, {}),
-        }
-    }
-
-    pub fn deinit(self: *Placement) void {
-        switch (self.*) {
-            .room => self.room.deinit(),
-            .passage => self.passage.deinit(),
-        }
-    }
-};
-
 pub const Doorway = struct {
-    placement_from: *const Placement,
-    placement_to: *const Placement,
+    placement_from: Placement,
+    placement_to: Placement,
     // must be set late on level initialization
     door_id: g.Entity = 0,
 
@@ -59,10 +26,10 @@ pub const Doorway = struct {
         );
     }
 
-    pub inline fn oppositePlacement(self: Doorway, placement: *const Placement) ?*const Placement {
-        if (self.placement_from == placement) {
+    pub inline fn oppositePlacement(self: Doorway, placement: Placement) ?Placement {
+        if (self.placement_from.eql(placement)) {
             return self.placement_to;
-        } else if (self.placement_to == placement) {
+        } else if (self.placement_to.eql(placement)) {
             return self.placement_from;
         } else {
             return null;
@@ -70,24 +37,169 @@ pub const Doorway = struct {
     }
 };
 
+/// The tagged union of the pointers to the possible placement implementations.
+pub const Placement = union(enum) {
+    pub const DoorwaysIterator = std.AutoHashMap(p.Point, void).KeyIterator;
+
+    area: *Area,
+    passage: *Passage,
+    room: *Room,
+
+    pub fn createArea(arena: *std.heap.ArenaAllocator, region: p.Region) !*Area {
+        const alloc = arena.allocator();
+        const area = try alloc.create(Area);
+        area.* = Area.init(alloc, region);
+        return area;
+    }
+
+    pub fn createRoom(arena: *std.heap.ArenaAllocator, region: p.Region) !*Room {
+        const alloc = arena.allocator();
+        const room = try alloc.create(Room);
+        room.* = .{
+            .region = region,
+            .doorways = std.AutoHashMap(p.Point, void).init(alloc),
+        };
+        return room;
+    }
+
+    pub fn createPassage(arena: *std.heap.ArenaAllocator) !*Passage {
+        const alloc = arena.allocator();
+        const passage = try alloc.create(Passage);
+        passage.* = .{
+            .turns = std.ArrayList(Passage.Turn).init(alloc),
+            .doorways = std.AutoHashMap(p.Point, void).init(alloc),
+        };
+        return passage;
+    }
+
+    pub inline fn eql(self: Placement, other: Placement) bool {
+        if (@intFromEnum(self) != @intFromEnum(other)) return false;
+        return switch (self) {
+            .area => self.area == other.area,
+            .room => self.room == other.room,
+            .passage => self.passage == other.passage,
+        };
+    }
+
+    /// Returns true if this placement contains the passed place.
+    /// The borders are included, but the inner rooms of the area are not.
+    pub fn contains(self: Placement, place: p.Point) bool {
+        switch (self) {
+            .area => |a| return a.contains(place),
+            .room => |r| return r.region.containsPoint(place),
+            .passage => |ps| return ps.isPartOfThisPassage(place),
+        }
+    }
+
+    pub inline fn doorways(self: Placement) DoorwaysIterator {
+        return switch (self) {
+            .area => |area| area.doorways.keyIterator(),
+            .room => |room| room.doorways.keyIterator(),
+            .passage => |ps| ps.doorways.keyIterator(),
+        };
+    }
+
+    pub fn addDoor(self: Placement, place: p.Point) !void {
+        switch (self) {
+            .area => try self.area.doorways.put(place, {}),
+            .room => try self.room.doorways.put(place, {}),
+            .passage => try self.passage.doorways.put(place, {}),
+        }
+    }
+
+    pub fn randomPlace(self: Placement, rand: std.Random) p.Point {
+        return switch (self) {
+            .area => self.area.randomPlace(rand),
+            .room => self.room.randomPlace(rand),
+            .passage => self.passage.randomPlace(rand),
+        };
+    }
+};
+
 /// The square placement including the border. Can contain the inner rooms,
-/// which should not cross each other or the border of this room.
+/// which should not cross each other or the border of this area.
+pub const Area = struct {
+    /// The region of this area including the borders
+    region: p.Region,
+    doorways: std.AutoHashMap(p.Point, void),
+    inner_rooms: std.ArrayList(*Room),
+
+    pub fn init(arena: *std.heap.ArenaAllocator, region: p.Region) Area {
+        return .{
+            .region = region,
+            .doorways = std.AutoHashMap(p.Point, void).init(arena.allocator()),
+            .inner_rooms = std.ArrayList(*Room).init(arena.allocator()),
+        };
+    }
+
+    pub fn format(
+        self: Area,
+        comptime _: []const u8,
+        _: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        try writer.print("Area({any}; inner rooms: [", .{self.region});
+        for (self.inner_rooms.items) |ir|
+            try writer.print("{any};", .{ir});
+        try writer.print("])", .{});
+    }
+
+    /// Returns true if the place is inside the area or on its border, but not
+    /// inside the inner rooms.
+    pub fn contains(self: Area, place: p.Point) bool {
+        if (!self.region.containsPoint(place)) return false;
+        for (self.inner_rooms.items) |ir| {
+            if (ir.region.containsPointInside(place)) return false;
+        }
+        return true;
+    }
+
+    /// Returns true if the place is inside one of the inner room of the area.
+    pub fn isInsideInnerRoom(self: Area, place: p.Point) bool {
+        for (self.inner_rooms.items) |ir| {
+            if (ir.innerRegion().containsPoint(place)) return true;
+        }
+        return false;
+    }
+
+    // TODO: should not return places from the inner rooms
+    pub fn randomPlace(self: Area, rand: std.Random) p.Point {
+        return .{
+            .row = self.region.top_left.row + rand.uintLessThan(u8, self.region.rows - 2) + 1,
+            .col = self.region.top_left.col + rand.uintLessThan(u8, self.region.cols - 2) + 1,
+        };
+    }
+
+    pub fn addRoom(self: *Area, region: p.Region, door: p.Point) !*Room {
+        const alloc = self.inner_rooms.allocator;
+        const room = try alloc.create(Room);
+        room.* = Room.initInner(alloc, region, self);
+        try room.doorways.put(door, {});
+        try self.inner_rooms.append(room);
+        try self.doorways.put(door, {});
+        return room;
+    }
+};
+
 pub const Room = struct {
     /// The region of the room including the borders
     region: p.Region,
     doorways: std.AutoHashMap(p.Point, void),
-    inner_rooms: std.ArrayList(*const Room),
+    host_area: ?*const Area = null,
 
     pub fn init(alloc: std.mem.Allocator, region: p.Region) Room {
         return .{
             .region = region,
             .doorways = std.AutoHashMap(p.Point, void).init(alloc),
-            .inner_rooms = std.ArrayList(*const Room).init(alloc),
         };
     }
-    pub fn deinit(self: *Room) void {
-        self.doorways.deinit();
-        self.inner_rooms.deinit();
+
+    pub fn initInner(alloc: std.mem.Allocator, region: p.Region, host: *const Area) Room {
+        return .{
+            .region = region,
+            .doorways = std.AutoHashMap(p.Point, void).init(alloc),
+            .host_area = host,
+        };
     }
 
     pub fn format(
@@ -96,10 +208,7 @@ pub const Room = struct {
         _: std.fmt.FormatOptions,
         writer: anytype,
     ) !void {
-        try writer.print(
-            "Room({any}; inner rooms: {d}; doorways: [",
-            .{ self.region, self.inner_rooms.items.len },
-        );
+        try writer.print("Room({any}; doorways: [", .{self.region});
         var itr = self.doorways.keyIterator();
         while (itr.next()) |doorway|
             try writer.print("{any};", .{doorway.*});
@@ -113,16 +222,6 @@ pub const Room = struct {
             .rows = self.region.rows - 2,
             .cols = self.region.cols - 2,
         };
-    }
-
-    /// Returns true if the place is inside the room or on its border, but not
-    /// inside the inner rooms.
-    pub fn contains(self: Room, place: p.Point) bool {
-        if (!self.region.containsPoint(place)) return false;
-        for (self.inner_rooms.items) |ir| {
-            if (ir.region.containsPointInside(place)) return false;
-        }
-        return true;
     }
 
     pub fn randomPlace(self: Room, rand: std.Random) p.Point {
@@ -154,18 +253,6 @@ pub const Passage = struct {
     // the last turn - is a place where the passage is ended, the turn direction is not important there.
     turns: std.ArrayList(Turn),
     doorways: std.AutoHashMap(p.Point, void),
-
-    pub fn init(alloc: std.mem.Allocator) Passage {
-        return .{
-            .turns = std.ArrayList(Turn).init(alloc),
-            .doorways = std.AutoHashMap(p.Point, void).init(alloc),
-        };
-    }
-
-    pub fn deinit(self: *Passage) void {
-        self.turns.deinit();
-        self.doorways.deinit();
-    }
 
     pub fn format(
         self: Passage,
@@ -286,8 +373,10 @@ test "places iterator" {
     //              |
     //              o
     //            Exit
-    var passage = Passage.init(std.testing.allocator);
-    defer passage.deinit();
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const passage = Placement.createPassage(&arena);
+
     _ = try passage.turnAt(.{ .row = 1, .col = 1 }, .right);
     _ = try passage.turnAt(.{ .row = 1, .col = 3 }, .down);
     _ = try passage.turnAt(.{ .row = 3, .col = 3 }, .down);

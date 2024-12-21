@@ -17,7 +17,7 @@ next_entity: g.Entity = 0,
 /// Collection of the components of the entities
 components: ecs.ComponentsManager(c.Components),
 dungeon: d.Dungeon,
-player_placement: *const d.Placement,
+player_placement: d.Placement,
 map: g.LevelMap,
 /// The depth of the current level. The session_seed + depth is unique seed for the level.
 depth: u8,
@@ -33,17 +33,15 @@ pub fn create(
     visibility_strategy: g.VisibilityStrategy,
 ) !*Level {
     const level = try arena.allocator().create(Level);
-    const init_placement = dungeon.placementWith(player_place).?;
     level.* = .{
         .depth = depth,
         .entities = std.ArrayList(g.Entity).init(arena.allocator()),
         .components = try ecs.ComponentsManager(c.Components).init(arena.allocator()),
         .map = try g.LevelMap.init(arena, dungeon.rows, dungeon.cols),
         .dungeon = dungeon,
-        .player_placement = init_placement,
+        .player_placement = dungeon.placementWith(player_place).?,
         .visibility_strategy = visibility_strategy,
     };
-    try level.updatePlacementWithPlayer(player_place, init_placement);
     return level;
 }
 
@@ -126,13 +124,4 @@ pub fn randomEmptyPlace(self: *Level, rand: std.Random) ?p.Point {
         if (is_empty) return place;
     }
     return null;
-}
-
-/// Updates the placement with player and changes the visited places.
-// Note: The player_position can't be taken from the Position component, because this method is used
-// before adding any components.
-pub fn updatePlacementWithPlayer(self: *Level, player_position: p.Point, placement: *const d.Placement) !void {
-    log.debug("New placement with player at {any}: {any}. Mark it as visited.", .{ player_position, placement });
-    self.player_placement = placement;
-    try self.visibility_strategy.markVisitedPlaces(self, player_position, placement);
 }

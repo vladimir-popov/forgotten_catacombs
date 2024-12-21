@@ -156,13 +156,10 @@ const SceneBuffer = struct {
     }
 
     fn dumpToLog(self: SceneBuffer) void {
-        if (std.log.logEnabled(.debug, .viewport)) {
-            // the biggest possible size of the viewport (in case when all codepoints < 255)
-            var buf: [g.DUNGEON_ROWS * (g.DUNGEON_COLS + 1) + 1]u8 = undefined;
-            var writer = std.io.fixedBufferStream(&buf);
-            self.write(writer.writer().any()) catch unreachable;
-            log.debug("\n{s}", .{buf});
-        }
+        var buf: [10000]u8 = undefined;
+        var writer = std.io.fixedBufferStream(&buf);
+        self.write(writer.writer().any()) catch unreachable;
+        log.debug("\n{s}", .{buf});
     }
 
     fn write(self: SceneBuffer, writer: std.io.AnyWriter) !void {
@@ -233,7 +230,7 @@ pub fn drawScene(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Ent
 }
 
 // Should be used in DungeonGenerator only
-pub fn drawLevelOnly(self: *Render, level: *const g.Level) !void {
+pub fn drawLevelOnly(self: *Render, level: *g.Level) !void {
     self.buffer.reset();
     try self.drawDungeon(level);
     try self.drawSprites(level, null);
@@ -254,11 +251,14 @@ pub inline fn clearDisplay(self: Render) !void {
     try self.runtime.clearDisplay();
 }
 
-fn drawDungeon(self: *Render, level: *const g.Level) anyerror!void {
+fn drawDungeon(self: *Render, level: *g.Level) anyerror!void {
     var itr = level.dungeon.cellsInRegion(self.viewport.region);
     var place = self.viewport.region.top_left;
     var sprite = c.Sprite{ .codepoint = undefined, .z_order = 0 };
     while (itr.next()) |cell| {
+        const visibility = self.visibility_strategy.checkVisibility(level, place);
+        if (visibility == .visible and !level.map.isVisited(place))
+            try level.map.addVisitedPlace(place);
         sprite.codepoint = switch (cell) {
             .nothing => cp.nothing,
             .floor => cp.floor_visible,
@@ -266,11 +266,11 @@ fn drawDungeon(self: *Render, level: *const g.Level) anyerror!void {
             .rock => cp.rock,
             .water => cp.water,
             else => switch (@intFromEnum(cell)) {
-                5...15 => cp.walls[@intFromEnum(cell) - 5],
+                1...11 => cp.walls[@intFromEnum(cell) - 1],
                 else => cp.unknown,
             },
         };
-        try self.drawSprite(level, sprite, place, .normal);
+        try self.drawSprite(sprite, place, .normal, visibility);
         place.move(.right);
         if (!self.viewport.region.containsPoint(place)) {
             place.col = self.viewport.region.top_left.col;
@@ -292,36 +292,37 @@ fn drawSprites(self: *Render, level: *const g.Level, entity_in_focus: ?g.Entity)
     while (itr.next()) |tuple| {
         if (!self.viewport.region.containsPoint(tuple[1].point)) continue;
         const mode: g.Render.DrawingMode = if (tuple[0] == entity_in_focus) .inverted else .normal;
-        try self.drawSprite(level, tuple[2].*, tuple[1].point, mode);
+        const visibility = self.visibility_strategy.checkVisibility(level, tuple[1].point);
+        try self.drawSprite(tuple[2].*, tuple[1].point, mode, visibility);
     }
 }
 
 fn drawSprite(
     self: *Render,
-    level: *const g.Level,
     sprite: c.Sprite,
     place_in_dungeon: p.Point,
     mode: g.Render.DrawingMode,
+    visibility: g.Visibility,
 ) anyerror!void {
     const point_on_display = p.Point{
         .row = place_in_dungeon.row - self.viewport.region.top_left.row + 1,
         .col = place_in_dungeon.col - self.viewport.region.top_left.col + 1,
     };
-    const codepoint: g.Codepoint = self.actualCodepoint(level, sprite.codepoint, place_in_dungeon);
-    self.buffer.setSymbol(point_on_display, codepoint, mode, sprite.z_order);
+    self.buffer.setSymbol(point_on_display, actualCodepoint(sprite.codepoint, visibility), mode, sprite.z_order);
 }
 
 /// This method validates visibility of the passed place, and
 /// return the passed codepoint if the place is visible, an  'nothing' if the place
 /// invisible, or the codepoint for invisible but known place.
-pub inline fn actualCodepoint(self: Render, level: *const g.Level, codepoint: g.Codepoint, place: p.Point) g.Codepoint {
-    return switch (self.visibility_strategy.isVisible(level, place)) {
+inline fn actualCodepoint(codepoint: g.Codepoint, visibility: g.Visibility) g.Codepoint {
+    return switch (visibility) {
         .visible => codepoint,
         .invisible => cp.nothing,
         .known => switch (codepoint) {
             cp.wall_visible => cp.wall_known,
             cp.floor_visible => cp.floor_known,
-            cp.nothing, cp.ladder_up, cp.ladder_down, cp.door_opened, cp.door_closed, cp.rock, cp.water => codepoint,
+            cp.nothing, cp.ladder_up, cp.ladder_down, cp.door_opened, cp.door_closed => codepoint,
+            cp.rock, cp.water, cp.teleport => codepoint,
             else => blk: {
                 inline for (cp.walls) |w| {
                     if (w == codepoint) break :blk codepoint;
@@ -356,10 +357,10 @@ fn drawAnimationsFrame(self: *Render, session: *g.GameSession, entity_in_focus: 
                 else
                     .normal;
                 try self.drawSprite(
-                    session.level,
                     .{ .codepoint = frame, .z_order = 3 },
                     position.point,
                     mode,
+                    .visible,
                 );
             }
         } else {

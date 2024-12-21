@@ -168,7 +168,7 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
 
     if (self.playdate.system.isCrankDocked() == 0) {
         const change = self.playdate.system.getCrankChange();
-        const angle =  self.playdate.system.getCrankAngle();
+        const angle = self.playdate.system.getCrankAngle();
         if (change > 2.0 and angle > 170.0 and angle < 190.0) {
             cheat = .move_player_to_ladder_down;
             return .{ .game_button = .cheat, .state = .pressed };

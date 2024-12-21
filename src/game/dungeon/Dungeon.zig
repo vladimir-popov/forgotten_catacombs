@@ -9,28 +9,30 @@ const log = std.log.scoped(.dungeon);
 /// Possible types of objects inside the dungeon.
 /// This is not part of ecs, but the part of the landscape.
 pub const Cell = enum(u6) {
-    nothing = 0,
-    // '.'
-    floor = 1,
-    // '''
-    doorway = 2,
-    // '▒'
-    wall = 3,
-    // '#'
-    rock = 4,
+    // ' '
+    nothing,
     // │┐┌─┘└├┤┬┴┼
-    @"│" = 5,
-    @"┐" = 6,
-    @"┌" = 7,
-    @"─" = 8,
-    @"┘" = 9,
-    @"└" = 10,
-    @"├" = 11,
-    @"┤" = 12,
-    @"┬" = 13,
-    @"┴" = 14,
-    @"┼" = 15,
-    water = 16,
+    @"│" = 1,
+    @"┐",
+    @"┌",
+    @"─",
+    @"┘",
+    @"└",
+    @"├",
+    @"┤",
+    @"┬",
+    @"┴",
+    @"┼",
+    // '.'
+    floor,
+    // '''
+    doorway,
+    // '▒'
+    wall,
+    // '#'
+    rock,
+    // '~'
+    water,
 };
 
 const Dungeon = @This();
@@ -40,13 +42,13 @@ pub const VTable = struct {
     cellAtFn: *const fn (ptr: *const anyopaque, place: p.Point) Cell,
     /// Should return the placement that contains the passed place, or nothing,
     /// if the place is outside of all placements.
-    placementWithFn: *const fn (ptr: *const anyopaque, place: p.Point) ?*const d.Placement,
+    placementWithFn: *const fn (ptr: *anyopaque, place: p.Point) ?d.Placement,
     /// Should return random place to put an enemy.
     randomPlaceFn: *const fn (ptr: *const anyopaque, rand: std.Random) p.Point,
 };
 
 /// The pointer to the original implementation of the dungeon.
-parent: *const anyopaque,
+parent: *anyopaque,
 rows: u8,
 cols: u8,
 /// The place with entrance to the level. Usually, it's the place with ladder to
@@ -110,7 +112,7 @@ pub inline fn doorwayAt(self: Dungeon, place: p.Point) ?d.Doorway {
         return null;
 }
 
-pub fn placementWith(self: Dungeon, place: p.Point) ?*const d.Placement {
+pub fn placementWith(self: Dungeon, place: p.Point) ?d.Placement {
     return self.vtable.placementWithFn(self.parent, place);
 }
 

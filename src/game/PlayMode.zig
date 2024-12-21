@@ -139,25 +139,26 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
             log.debug("Update target after player hit", .{});
             try self.updateTarget();
         },
-        .entity_moved => |entity_moved| {
+        .entity_moved => |entity_moved| if (entity_moved.entity == self.session.level.player) {
             const level = self.session.level;
-            if (level.player_placement.contains(entity_moved.targetPlace())) return;
+            const target_place = entity_moved.targetPlace();
 
-            const place = level.playerPosition().point;
+            if (level.player_placement.contains(target_place)) return;
 
             if (level.dungeon.doorwayAt(entity_moved.moved_from)) |doorway| {
-                if (doorway.oppositePlacement(level.player_placement)) |placement| {
-                    if (placement.contains(place)) {
-                        try level.updatePlacementWithPlayer(place, placement);
+                if (doorway.oppositePlacement(level.player_placement)) |opposite_placement| {
+                    if (opposite_placement.contains(target_place)) {
+                        level.player_placement = opposite_placement;
+                        log.debug("Placement with player is {any}", .{opposite_placement});
                         return;
                     }
                 }
             }
             if (level.dungeon.placementWith(entity_moved.targetPlace())) |placement| {
-                try level.updatePlacementWithPlayer(place, placement);
+                level.player_placement = placement;
                 return;
             }
-            log.err("It looks like the player at {any} is outside of any placement", .{place});
+            log.err("It looks like the player at {any} is outside of any placement", .{target_place});
         },
         else => {},
     }

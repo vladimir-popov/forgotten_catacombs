@@ -32,7 +32,7 @@ arena_alloc: std.mem.Allocator,
 /// The index over all placements in the dungeon.
 // we can't store the placements in the array, because of invalidation of the
 // inner state of the array
-placements: std.ArrayList(*Placement),
+placements: std.ArrayList(Placement),
 /// Index of all doorways by their place
 doorways: std.AutoHashMap(p.Point, Doorway),
 /// The bit mask of the places with floor.
@@ -51,7 +51,7 @@ pub fn create(arena: *std.heap.ArenaAllocator) !*Catacomb {
     self.* = .{
         .arena = arena,
         .arena_alloc = arena_alloc,
-        .placements = std.ArrayList(*Placement).init(arena_alloc),
+        .placements = std.ArrayList(Placement).init(arena_alloc),
         .doorways = std.AutoHashMap(p.Point, Doorway).init(arena_alloc),
         .floor = try p.BitMap(rows, cols).initEmpty(arena_alloc),
         .walls = try p.BitMap(rows, cols).initEmpty(arena_alloc),
@@ -59,7 +59,7 @@ pub fn create(arena: *std.heap.ArenaAllocator) !*Catacomb {
     return self;
 }
 
-pub fn dungeon(self: *const Catacomb) Dungeon {
+pub fn dungeon(self: *Catacomb) Dungeon {
     return .{
         .parent = self,
         .rows = rows,
@@ -103,7 +103,7 @@ inline fn isCellAt(self: Catacomb, place: p.Point, assumption: Dungeon.Cell) boo
     return self.cellAt(place) == assumption;
 }
 
-pub fn findPlacementWith(ptr: *const anyopaque, place: p.Point) ?*const Placement {
+pub fn findPlacementWith(ptr: *const anyopaque, place: p.Point) ?Placement {
     const self: *const Catacomb = @ptrCast(@alignCast(ptr));
     for (self.placements.items) |placement| {
         if (placement.contains(place)) {
@@ -113,9 +113,9 @@ pub fn findPlacementWith(ptr: *const anyopaque, place: p.Point) ?*const Placemen
     return null;
 }
 
-pub fn firstRoom(self: Catacomb) Error!Room {
+pub fn firstRoom(self: Catacomb) Error!*Room {
     for (self.placements.items) |placement| {
-        switch (placement.*) {
+        switch (placement) {
             .room => |room| return room,
             else => {},
         }
@@ -123,10 +123,10 @@ pub fn firstRoom(self: Catacomb) Error!Room {
     return Error.RoomWasNotFound;
 }
 
-pub fn lastRoom(self: Catacomb) Error!Room {
+pub fn lastRoom(self: Catacomb) Error!*Room {
     var i: usize = self.placements.items.len - 1;
     while (i >= 0) : (i -= 1) {
-        switch (self.placements.items[i].*) {
+        switch (self.placements.items[i]) {
             .room => |room| return room,
             else => {},
         }
@@ -136,18 +136,14 @@ pub fn lastRoom(self: Catacomb) Error!Room {
 fn randomPlace(ptr: *const anyopaque, rand: std.Random) p.Point {
     const self: *const Catacomb = @ptrCast(@alignCast(ptr));
     const placement = self.placements.items[rand.uintLessThan(usize, self.placements.items.len)];
-    switch (placement.*) {
-        .room => |room| return room.randomPlace(rand),
-        .passage => |passage| return passage.randomPlace(rand),
-    }
+    return placement.randomPlace(rand);
 }
 
-fn findPlacement(self: Catacomb, place: p.Point) !*Placement {
+fn findPlacement(self: Catacomb, place: p.Point) !Placement {
     for (self.placements.items) |placement| {
         if (placement.contains(place)) return placement;
     }
     log.err("No one placement was found with {any}", .{place});
-    self.dungeon().dumpToLog();
     return Error.PlaceOutsideTheDungeon;
 }
 
@@ -179,16 +175,13 @@ pub fn generateAndAddRoom(self: *Catacomb, region: p.Region) !void {
     }
     // generate floor:
     self.floor.setRegionValue(region, true);
-    const placement = try self.arena_alloc.create(Placement);
-    placement.* = .{ .room = Room.init(self.arena_alloc, region) };
-    try self.placements.append(placement);
+    try self.placements.append(.{ .room = try Placement.createRoom(self.arena, region) });
 }
 
-inline fn addEmptyPassage(self: *Catacomb) !*Placement {
-    const pl = try self.arena_alloc.create(Placement);
-    pl.* = .{ .passage = Passage.init(self.arena_alloc) };
-    try self.placements.append(pl);
-    return pl;
+inline fn addEmptyPassage(self: *Catacomb) !*Passage {
+    const passage = try Placement.createPassage(self.arena);
+    try self.placements.append(.{ .passage = passage });
+    return passage;
 }
 
 pub fn createAndAddPassageBetweenRegions(
@@ -209,7 +202,7 @@ pub fn createAndAddPassageBetweenRegions(
     const passage = try self.addEmptyPassage();
 
     log.debug("Found places for doors: {any}; {any}. Prepare the passage between them...", .{ doorPlace1, doorPlace2 });
-    _ = try passage.passage.turnAt(doorPlace1, direction);
+    _ = try passage.turnAt(doorPlace1, direction);
     if (doorPlace1.row != doorPlace2.row and doorPlace1.col != doorPlace2.col) {
         // intersection of the passage from the door 1 and region 1
         var middle1: p.Point = if (direction.isHorizontal())
@@ -233,22 +226,22 @@ pub fn createAndAddPassageBetweenRegions(
             middle2 = places[1];
         }
 
-        _ = try passage.passage.turnToPoint(middle1, middle2);
-        _ = try passage.passage.turnToPoint(middle2, doorPlace2);
+        _ = try passage.turnToPoint(middle1, middle2);
+        _ = try passage.turnToPoint(middle2, doorPlace2);
     }
-    _ = try passage.passage.turnAt(doorPlace2, direction);
+    _ = try passage.turnAt(doorPlace2, direction);
     log.debug("The passage was prepared: {any}", .{passage});
 
-    try self.digPassage(passage.passage);
+    try self.digPassage(passage);
     const placement1 = try self.findPlacement(doorPlace1.movedTo(direction.opposite()));
     try self.forceCreateDoorBetween(
-        passage,
+        .{ .passage = passage },
         placement1,
         doorPlace1,
     );
     const placement2 = try self.findPlacement(doorPlace2.movedTo(direction));
     try self.forceCreateDoorBetween(
-        passage,
+        .{ .passage = passage },
         placement2,
         doorPlace2,
     );
@@ -287,8 +280,8 @@ pub fn forceCreateWallAt(self: Catacomb, place: p.Point) !void {
 /// Removes doors, floor and walls on the passed place, and create a cell with floor.
 pub fn forceCreateDoorBetween(
     self: *Catacomb,
-    placement_from: *Placement,
-    placement_to: *Placement,
+    placement_from: Placement,
+    placement_to: Placement,
     place: p.Point,
 ) !void {
     if (!g.DUNGEON_REGION.containsPoint(place)) {
@@ -391,7 +384,7 @@ fn isFreeLine(self: Catacomb, from: p.Point, to: p.Point) bool {
     return true;
 }
 
-fn digPassage(self: *Catacomb, passage: Passage) !void {
+fn digPassage(self: *Catacomb, passage: *const Passage) !void {
     var prev: Passage.Turn = passage.turns.items[0];
     for (passage.turns.items[1 .. passage.turns.items.len - 1]) |turn| {
         try self.dig(prev.place, turn.place, prev.to_direction);
