@@ -10,6 +10,7 @@ pub const Player = c.Components{
     .health = .{ .max = 100, .current = 50 },
     .weapon = .{ .max_damage = 3, .move_scale = 0.5 },
     .speed = .{ .move_speed = 10 },
+    .source_of_light = .{ .radius = 2 },
 };
 
 pub fn wharfEntrance(place: p.Point) c.Components {

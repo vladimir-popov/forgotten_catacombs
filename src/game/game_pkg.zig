@@ -1,31 +1,29 @@
 const std = @import("std");
 
 pub const components = @import("components.zig");
+pub const dungeon = @import("dungeon/dungeon_pkg.zig");
 pub const ecs = @import("ecs.zig");
 pub const entities = @import("entities.zig");
 pub const events = @import("events.zig");
 pub const primitives = @import("primitives.zig");
-pub const dungeon = @import("dungeon/dungeon_pkg.zig");
+pub const visibility = @import("visibility_strategies.zig");
 
-pub const ActionSystem = @import("ActionSystem.zig");
 pub const Action = ActionSystem.Action;
-pub const MovePoints = ActionSystem.MovePoints;
-// coz zig uses u21 for utf8 symbols
-pub const Codepoint = u21;
-pub const ZOrder = u3;
-pub const Entity = ecs.Entity;
-pub const Runtime = @import("Runtime.zig");
+pub const ActionSystem = @import("ActionSystem.zig");
 pub const Button = @import("Button.zig");
 pub const Cheat = @import("cheats.zig").Cheat;
+pub const Codepoint = u21;
+pub const Entity = ecs.Entity;
 pub const Game = @import("Game.zig");
 pub const GameSession = @import("GameSession.zig");
 pub const Level = @import("Level.zig");
 pub const LevelMap = @import("LevelMap.zig");
 pub const Levels = @import("Levels.zig");
+pub const MovePoints = ActionSystem.MovePoints;
 pub const Render = @import("Render.zig");
+pub const Runtime = @import("Runtime.zig");
 pub const Viewport = @import("Viewport.zig");
-pub const VisibilityStrategy = @import("VisibilityStrategy.zig");
-pub const Visibility = VisibilityStrategy.Visibility;
+pub const ZOrder = u3;
 
 pub const RENDER_DELAY_MS = 150;
 

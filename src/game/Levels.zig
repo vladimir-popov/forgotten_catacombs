@@ -24,7 +24,7 @@ pub fn firstLevel(
         0,
         dungeon,
         dungeon.entrance,
-        g.VisibilityStrategy.visibleWholePlacements(),
+        g.visibility.showTheCurrentPlacement,
     );
     log.debug("The level is initialized. Start adding the content.", .{});
 
@@ -64,6 +64,24 @@ pub fn firstLevel(
     return level;
 }
 
+pub inline fn cave(
+    arena: *std.heap.ArenaAllocator,
+    seed: u64,
+    depth: u8,
+    player: c.Components,
+    from_ladder: c.Ladder,
+) !*g.Level {
+    return try generate(
+        arena,
+        seed,
+        depth,
+        d.CavesGenerator{},
+        g.visibility.showInRadiusOfSourceOfLight,
+        player,
+        from_ladder,
+    );
+}
+
 /// This methods generates a new level of the catacombs.
 pub inline fn catacomb(
     arena: *std.heap.ArenaAllocator,
@@ -77,30 +95,10 @@ pub inline fn catacomb(
         seed,
         depth,
         d.CatacombGenerator{},
-        // g.VisibilityStrategy.visibleWholePlacements(),
-        caves_visibility_strategy.strategy(),
-        player,
-        from_ladder,
-    );
-}
-
-const caves_visibility_strategy = g.VisibilityStrategy.VisibleCirle{
-    .underlying = g.VisibilityStrategy.visibleWholePlacements(),
-    .radius = 2,
-};
-pub inline fn cave(
-    arena: *std.heap.ArenaAllocator,
-    seed: u64,
-    depth: u8,
-    player: c.Components,
-    from_ladder: c.Ladder,
-) !*g.Level {
-    return try generate(
-        arena,
-        seed,
-        depth,
-        d.CavesGenerator{},
-        caves_visibility_strategy.strategy(),
+        if (depth > 3)
+            g.visibility.showTheCurrentPlacement
+        else
+            g.visibility.showInRadiusOfSourceOfLight,
         player,
         from_ladder,
     );
@@ -111,7 +109,7 @@ fn generate(
     seed: u64,
     depth: u8,
     generator: anytype,
-    visibility_strategy: g.VisibilityStrategy,
+    visibility_strategy: *const fn (level: *const g.Level, place: p.Point) g.Render.Visibility,
     player: c.Components,
     from_ladder: c.Ladder,
 ) !*g.Level {

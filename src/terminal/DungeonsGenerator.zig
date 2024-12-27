@@ -64,7 +64,7 @@ const DungeonsGenerator = struct {
             .render = try g.Render.init(
                 alloc,
                 runtime,
-                g.VisibilityStrategy.showWholeDungeon(),
+                g.visibility.showTheWholeDungeon,
                 g.DUNGEON_ROWS,
                 g.DUNGEON_COLS,
             ),

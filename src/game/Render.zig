@@ -30,6 +30,7 @@ const p = g.primitives;
 const log = std.log.scoped(.render);
 
 pub const DrawingMode = enum { normal, inverted };
+pub const Visibility = enum { visible, known, invisible };
 const TextAlign = enum { center, left, right };
 
 const SIDE_ZONE_LENGTH = 8;
@@ -185,7 +186,8 @@ const SceneBuffer = struct {
 };
 
 runtime: g.Runtime,
-visibility_strategy: g.VisibilityStrategy,
+/// The custom function to decide should the place be drawn or not.
+visibility_strategy: *const fn (level: *const g.Level, place: p.Point) Visibility,
 /// Visible area
 viewport: g.Viewport,
 /// Cache for the visible area
@@ -194,7 +196,7 @@ buffer: SceneBuffer,
 pub fn init(
     alloc: std.mem.Allocator,
     runtime: g.Runtime,
-    visibility_strategy: g.VisibilityStrategy,
+    visibility_strategy: *const fn (level: *const g.Level, place: p.Point) Visibility,
     scene_rows: u8,
     scene_cols: u8,
 ) !Render {
@@ -256,7 +258,7 @@ fn drawDungeon(self: *Render, level: *g.Level) anyerror!void {
     var place = self.viewport.region.top_left;
     var sprite = c.Sprite{ .codepoint = undefined, .z_order = 0 };
     while (itr.next()) |cell| {
-        const visibility = self.visibility_strategy.checkVisibility(level, place);
+        const visibility = self.visibility_strategy(level, place);
         if (visibility == .visible and !level.map.isVisited(place))
             try level.map.addVisitedPlace(place);
         sprite.codepoint = switch (cell) {
@@ -292,7 +294,7 @@ fn drawSprites(self: *Render, level: *const g.Level, entity_in_focus: ?g.Entity)
     while (itr.next()) |tuple| {
         if (!self.viewport.region.containsPoint(tuple[1].point)) continue;
         const mode: g.Render.DrawingMode = if (tuple[0] == entity_in_focus) .inverted else .normal;
-        const visibility = self.visibility_strategy.checkVisibility(level, tuple[1].point);
+        const visibility = self.visibility_strategy(level, tuple[1].point);
         try self.drawSprite(tuple[2].*, tuple[1].point, mode, visibility);
     }
 }
@@ -302,7 +304,7 @@ fn drawSprite(
     sprite: c.Sprite,
     place_in_dungeon: p.Point,
     mode: g.Render.DrawingMode,
-    visibility: g.Visibility,
+    visibility: g.Render.Visibility,
 ) anyerror!void {
     const point_on_display = p.Point{
         .row = place_in_dungeon.row - self.viewport.region.top_left.row + 1,
@@ -314,7 +316,7 @@ fn drawSprite(
 /// This method validates visibility of the passed place, and
 /// return the passed codepoint if the place is visible, an  'nothing' if the place
 /// invisible, or the codepoint for invisible but known place.
-inline fn actualCodepoint(codepoint: g.Codepoint, visibility: g.Visibility) g.Codepoint {
+inline fn actualCodepoint(codepoint: g.Codepoint, visibility: g.Render.Visibility) g.Codepoint {
     return switch (visibility) {
         .visible => codepoint,
         .invisible => cp.nothing,

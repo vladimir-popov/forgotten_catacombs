@@ -23,14 +23,14 @@ map: g.LevelMap,
 depth: u8,
 /// The entity id of the player
 player: g.Entity = undefined,
-visibility_strategy: g.VisibilityStrategy,
+visibility_strategy: *const fn (level: *const g.Level, place: p.Point) g.Render.Visibility,
 
 pub fn create(
     arena: *std.heap.ArenaAllocator,
     depth: u8,
     dungeon: d.Dungeon,
     player_place: p.Point,
-    visibility_strategy: g.VisibilityStrategy,
+    visibility_strategy: *const fn (level: *const g.Level, place: p.Point) g.Render.Visibility,
 ) !*Level {
     const level = try arena.allocator().create(Level);
     level.* = .{
@@ -43,6 +43,10 @@ pub fn create(
         .visibility_strategy = visibility_strategy,
     };
     return level;
+}
+
+pub inline fn checkVisibility(self: *const g.Level, place: p.Point) g.Render.Visibility {
+    return self.visibility_strategy(self, place);
 }
 
 /// Aggregates requests of few components for the same entities at once

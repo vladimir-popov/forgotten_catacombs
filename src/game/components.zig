@@ -92,6 +92,10 @@ pub const Initiative = struct {
     move_points: g.MovePoints = 0,
 };
 
+pub const SourceOfLight = struct {
+    radius: f16,
+};
+
 pub const Components = struct {
     animation: ?Animation = null,
     description: ?Description = null,
@@ -103,4 +107,5 @@ pub const Components = struct {
     position: ?Position = null,
     speed: ?Speed = null,
     sprite: ?Sprite = null,
+    source_of_light: ?SourceOfLight = null,
 };

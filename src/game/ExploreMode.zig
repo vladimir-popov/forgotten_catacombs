@@ -4,7 +4,7 @@ const g = @import("game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
-const log = std.log.scoped(.looking_around_mode);
+const log = std.log.scoped(.explore_mode);
 
 const ExploreMode = @This();
 

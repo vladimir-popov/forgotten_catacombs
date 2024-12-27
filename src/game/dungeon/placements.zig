@@ -173,7 +173,7 @@ pub const Area = struct {
     pub fn addRoom(self: *Area, region: p.Region, door: p.Point) !*Room {
         const alloc = self.inner_rooms.allocator;
         const room = try alloc.create(Room);
-        room.* = Room.initInner(alloc, region, self);
+        room.* = Room.initAsInner(alloc, region, self);
         try room.doorways.put(door, {});
         try self.inner_rooms.append(room);
         try self.doorways.put(door, {});
@@ -194,7 +194,7 @@ pub const Room = struct {
         };
     }
 
-    pub fn initInner(alloc: std.mem.Allocator, region: p.Region, host: *const Area) Room {
+    pub fn initAsInner(alloc: std.mem.Allocator, region: p.Region, host: *const Area) Room {
         return .{
             .region = region,
             .doorways = std.AutoHashMap(p.Point, void).init(alloc),

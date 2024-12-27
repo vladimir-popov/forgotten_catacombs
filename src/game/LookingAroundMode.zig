@@ -1,11 +1,11 @@
-//! This is the mode in which player are able to look around, get info about
-//! entities on the screen, and change the target entity.
+//! This is the mode in which the player is able to look around,
+//! get the info about entities on the screen, and change the target entity.
 const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
-const log = std.log.scoped(.pause_mode);
+const log = std.log.scoped(.looking_around_mode);
 
 const LookingAroundMode = @This();
 const ArrayOfEntitiesOnScreen = std.ArrayList(struct { g.Entity, p.Point, g.Codepoint });
@@ -40,6 +40,7 @@ pub fn refresh(self: *LookingAroundMode) !void {
         }
     }
     try self.session.render.redraw(self.session, self.entity_in_focus, null);
+    log.debug("Refresh the LookingAroundMode. {d} entities on screen", .{self.entities_on_screen.items.len});
 }
 
 pub fn tick(self: *LookingAroundMode) anyerror!void {
@@ -66,10 +67,20 @@ fn chooseNextEntity(self: *LookingAroundMode, direction: p.Direction) void {
         self.session.level.components.getForEntityUnsafe(target_entity, c.Position).point,
     );
     var min_distance: u8 = 255;
+    log.debug(
+        "Choose an entity from {d} on the screen in {s} direction",
+        .{ self.entities_on_screen.items.len, @tagName(direction) },
+    );
     for (self.entities_on_screen.items) |tuple| {
         // we should follow the same logic as the render:
         // only entities, which should be drawn, can be in focus
-        if (self.session.render.visibility_strategy.checkVisibility(self.session.level, tuple[1]) != .visible) continue;
+        if (self.session.level.checkVisibility(tuple[1]) == .invisible) {
+            log.debug(
+                "The entity {d} '{u}' at {any} is invisible. Skip it.",
+                .{ tuple[0], tuple[2], tuple[1] },
+            );
+            continue;
+        }
 
         const d = distance(target_point, tuple[1], direction);
         if (d < min_distance) {
