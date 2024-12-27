@@ -77,12 +77,17 @@ pub inline fn catacomb(
         seed,
         depth,
         d.CatacombGenerator{},
-        g.VisibilityStrategy.visibleWholePlacements(),
+        // g.VisibilityStrategy.visibleWholePlacements(),
+        caves_visibility_strategy.strategy(),
         player,
         from_ladder,
     );
 }
 
+const caves_visibility_strategy = g.VisibilityStrategy.VisibleCirle{
+    .underlying = g.VisibilityStrategy.visibleWholePlacements(),
+    .radius = 2,
+};
 pub inline fn cave(
     arena: *std.heap.ArenaAllocator,
     seed: u64,
@@ -95,7 +100,7 @@ pub inline fn cave(
         seed,
         depth,
         d.CavesGenerator{},
-        g.VisibilityStrategy.visibleWholePlacements(),
+        caves_visibility_strategy.strategy(),
         player,
         from_ladder,
     );

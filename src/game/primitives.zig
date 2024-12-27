@@ -105,6 +105,12 @@ pub const Point = struct {
         return @max(self.row, other.row) - @min(self.row, other.row) < 2 and
             @max(self.col, other.col) - @min(self.col, other.col) < 2;
     }
+
+    pub fn distanceTo(self: Point, other: Point) f16 {
+        const a: f16 = @floatFromInt(diff(u8, self.row, other.row));
+        const b: f16 = @floatFromInt(diff(u8, self.col, other.col));
+        return @sqrt(a * a + b * b);
+    }
 };
 
 /// The region described as its top left corner
