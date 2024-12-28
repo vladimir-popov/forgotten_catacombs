@@ -101,7 +101,7 @@ test "publish/consume" {
     };
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
-    var bus: EventBus = try EventBus.create(&arena);
+    var bus: *EventBus = try EventBus.create(&arena);
 
     var subscriber = TestSubscriber{};
     const event = Event{

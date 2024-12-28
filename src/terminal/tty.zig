@@ -2,7 +2,7 @@ const std = @import("std");
 const fmt = std.fmt;
 const c = std.c;
 
-const log = std.log.scoped(.TTY);
+const log = std.log.scoped(.tty);
 
 pub var original_termios: c.termios = undefined;
 
@@ -239,9 +239,10 @@ pub const KeyboardAndMouse = struct {
 
     /// The not printable control buttons
     pub const ControlButton = enum(u8) {
+        BACKSPACE = 127,
         ENTER = 13,
         ESC = 27,
-        BACKSPACE = 127,
+        TAB = 9,
         UP = 'A',
         DOWN = 'B',
         LEFT = 'D',
@@ -265,11 +266,13 @@ pub const KeyboardAndMouse = struct {
         len: usize,
 
         pub fn button(self: @This()) Button {
+            log.debug("Button: '{any}'", .{self});
             if (self.len == 1) {
                 switch (self.bytes[0]) {
                     ControlButton.ESC.code() => return Button{ .control = .ESC },
                     ControlButton.ENTER.code() => return Button{ .control = .ENTER },
                     ControlButton.BACKSPACE.code() => return Button{ .control = .BACKSPACE },
+                    ControlButton.TAB.code() => return Button{ .control = .TAB },
                     ' '...'~' => return Button{ .char = CharButton{ .char = self.bytes[0] } },
                     else => return Button{ .unknown = self },
                 }

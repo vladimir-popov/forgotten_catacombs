@@ -11,6 +11,7 @@ pub const std_options: std.Options = .{
     .log_level = .info,
     .log_scope_levels = &[_]std.log.ScopeLevel{
         .{ .scope = .render, .level = .warn },
+        // .{ .scope = .tty_runtime, .level = .debug },
         // .{ .scope = .ai, .level = .debug },
         // .{ .scope = .game, .level = .debug },
         // .{ .scope = .game_session, .level = .debug },

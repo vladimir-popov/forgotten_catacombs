@@ -54,6 +54,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
         keyboard_buffer: ?tty.KeyboardAndMouse.Button = null,
         // The border should not be drawn for DungeonGenerator
         draw_border: bool = true,
+        use_cheats: bool = false,
         cheat: ?g.Cheat = null,
         // true means that program should be closed
         is_exit: bool = false,
@@ -71,6 +72,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                 .cmd = try Cmd(display_cols - 2).init(alloc),
                 .termios = tty.Display.enterRawMode(),
                 .draw_border = draw_border,
+                .use_cheats = use_cheats,
             };
             try enableGameMode(use_cheats);
             should_render_in_center = render_in_center;
@@ -134,8 +136,8 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                             self.menu.close()
                         else
                             try self.menu.show();
-                    } else if (ch.char == ':') {
-                        try self.cmd.showCmd();
+                    } else if (self.use_cheats and ch.char == ':') {
+                        self.cmd.cleanCmd();
                     },
                     else => {},
                 }
@@ -164,6 +166,10 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
 
         fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
             var self: *Self = @ptrCast(@alignCast(ptr));
+            if (self.cheat) |cheat| {
+                log.debug("Cheat {any} as pushed button", .{cheat});
+                return .{ .game_button = .cheat, .state = .pressed };
+            }
             if (try self.readKeyboardInput()) |key| {
                 const game_button: ?g.Button.GameButton = switch (key) {
                     .char => switch (key.char.char) {
@@ -214,7 +220,9 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
 
         fn getCheat(ptr: *anyopaque) ?g.Cheat {
             const self: *Self = @ptrCast(@alignCast(ptr));
-            return self.cheat;
+            const cheat = self.cheat;
+            self.cheat = null;
+            return cheat;
         }
 
         fn clearDisplay(ptr: *anyopaque) !void {
