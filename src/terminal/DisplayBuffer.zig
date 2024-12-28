@@ -39,8 +39,8 @@ pub fn DisplayBuffer(comptime ROWS: u8, comptime COLS: u8) type {
         pub inline fn setSymbol(
             self: Self,
             symbol: u21,
-            row_idx: u8,
-            col_idx: u8,
+            row_idx: usize,
+            col_idx: usize,
             mode: g.Render.DrawingMode,
         ) void {
             self.lines[row_idx][col_idx] = .{ .symbol = symbol, .mode = mode };
@@ -49,27 +49,27 @@ pub fn DisplayBuffer(comptime ROWS: u8, comptime COLS: u8) type {
         pub fn setAsciiText(
             self: Self,
             text: []const u8,
-            row: u8,
-            col: u8,
+            row_idx: usize,
+            col_idx: usize,
             mode: g.Render.DrawingMode,
         ) void {
             for (text, 0..) |s, i| {
-                self.lines[row][col + i] = .{ .symbol = s, .mode = mode };
+                self.lines[row_idx][col_idx + i] = .{ .symbol = s, .mode = mode };
             }
         }
 
         pub fn setUtf8Text(
             self: Self,
             comptime text: []const u8,
-            row: u8,
-            col: u8,
+            row_idx: usize,
+            col_idx: usize,
             mode: g.Render.DrawingMode,
         ) void {
             const view = std.unicode.Utf8View.initComptime(text);
             var itr = view.iterator();
-            var i = col;
+            var i = col_idx;
             while (itr.nextCodepoint()) |u| {
-                self.lines[row][i] = .{ .symbol = u, .mode = mode };
+                self.lines[row_idx][i] = .{ .symbol = u, .mode = mode };
                 i += 1;
             }
         }

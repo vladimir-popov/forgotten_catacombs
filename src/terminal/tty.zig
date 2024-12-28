@@ -176,10 +176,6 @@ pub const Display = struct {
         try write(Text.ED_FROM_START);
     }
 
-    pub inline fn setCursorPosition(row: u8, col: u8) void {
-        _ = c.printf("\x1b[%d;%dH", row, col);
-    }
-
     pub fn hideCursor() !void {
         try write(Text.RM_HIDE_CU);
     }
@@ -211,6 +207,11 @@ pub const Display = struct {
         } else {
             return error.GettingCursoreError;
         }
+    }
+
+    pub fn setCursorPosition(row: u16, col: u16) !void {
+        var buf: [20]u8 = undefined;
+        try write(try std.fmt.bufPrint(&buf, "\x1b[{d};{d}H", .{ row, col }));
     }
 
     /// Returns count of rows and cols of the current window

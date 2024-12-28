@@ -6,6 +6,7 @@ const tty = @import("tty.zig");
 const log = std.log.scoped(.tty_runtime);
 
 pub const Menu = @import("Menu.zig").Menu;
+const Cmd = @import("Cmd.zig").Cmd;
 pub const DisplayBuffer = @import("DisplayBuffer.zig").DisplayBuffer;
 
 var window_size: tty.Display.RowsCols = undefined;
@@ -36,23 +37,25 @@ fn handleWindowResize(_: i32) callconv(.C) void {
     }
 }
 
-pub fn TtyRuntime(comptime buffer_rows: u8, comptime buffer_cols: u8) type {
+pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
     return struct {
         const Self = @This();
 
-        const menu_cols = (buffer_cols - 2) / 2;
+        const menu_cols = (display_cols - 2) / 2;
 
         termios: std.c.termios,
         alloc: std.mem.Allocator,
         // The main buffer to render the game
-        buffer: DisplayBuffer(buffer_rows, buffer_cols),
-        menu: Menu(buffer_rows, menu_cols),
+        buffer: DisplayBuffer(display_rows, display_cols),
+        menu: Menu(display_rows, menu_cols),
+        cmd: Cmd(display_cols - 2),
         // the last read button through readButton function.
         // it is used as a buffer to check ESC outside the readButton function
         keyboard_buffer: ?tty.KeyboardAndMouse.Button = null,
         // The border should not be drawn for DungeonGenerator
         draw_border: bool = true,
         cheat: ?g.Cheat = null,
+        // true means that program should be closed
         is_exit: bool = false,
 
         pub fn init(
@@ -63,8 +66,9 @@ pub fn TtyRuntime(comptime buffer_rows: u8, comptime buffer_cols: u8) type {
         ) !Self {
             const instance = Self{
                 .alloc = alloc,
-                .buffer = try DisplayBuffer(buffer_rows, buffer_cols).init(alloc),
-                .menu = try Menu(buffer_rows, menu_cols).init(alloc),
+                .buffer = try DisplayBuffer(display_rows, display_cols).init(alloc),
+                .menu = try Menu(display_rows, menu_cols).init(alloc),
+                .cmd = try Cmd(display_cols - 2).init(alloc),
                 .termios = tty.Display.enterRawMode(),
                 .draw_border = draw_border,
             };
@@ -76,7 +80,24 @@ pub fn TtyRuntime(comptime buffer_rows: u8, comptime buffer_cols: u8) type {
         pub fn deinit(self: *Self) void {
             self.buffer.deinit();
             self.menu.deinit();
+            self.cmd.deinit();
             disableGameMode() catch unreachable;
+        }
+
+        pub fn runtime(self: *Self) g.Runtime {
+            return .{
+                .context = self,
+                .vtable = &.{
+                    .getCheat = getCheat,
+                    .addMenuItem = addMenuItem,
+                    .removeAllMenuItems = removeAllMenuItems,
+                    .currentMillis = currentMillis,
+                    .readPushedButtons = readPushedButtons,
+                    .clearDisplay = clearDisplay,
+                    .drawSprite = drawSprite,
+                    .drawText = drawText,
+                },
+            };
         }
 
         /// Run the main loop of the game
@@ -85,10 +106,13 @@ pub fn TtyRuntime(comptime buffer_rows: u8, comptime buffer_cols: u8) type {
             handleWindowResize(0);
             while (!self.is_exit) {
                 if (self.menu.is_shown) {
-                    try self.menu.buffer.writeBuffer(stdout, rows_pad, cols_pad + (buffer_cols - menu_cols));
+                    try self.menu.buffer.writeBuffer(stdout, rows_pad, cols_pad + (display_cols - menu_cols));
                     if (try readPushedButtons(self)) |btn| {
                         try self.menu.handleKeyboardButton(btn);
                     }
+                } else if (self.cmd.cursor_idx > 0) {
+                    self.cheat = try self.cmd.readCheat();
+                    try self.cmd.buffer.writeBuffer(stdout, rows_pad + display_rows - 2, cols_pad + 1);
                 } else {
                     try game.tick();
                     try self.buffer.writeBuffer(stdout, rows_pad, cols_pad);
@@ -110,27 +134,13 @@ pub fn TtyRuntime(comptime buffer_rows: u8, comptime buffer_cols: u8) type {
                             self.menu.close()
                         else
                             try self.menu.show();
+                    } else if (ch.char == ':') {
+                        try self.cmd.showCmd();
                     },
                     else => {},
                 }
             }
             return self.keyboard_buffer;
-        }
-
-        pub fn runtime(self: *Self) g.Runtime {
-            return .{
-                .context = self,
-                .vtable = &.{
-                    .getCheat = getCheat,
-                    .addMenuItem = addMenuItem,
-                    .removeAllMenuItems = removeAllMenuItems,
-                    .currentMillis = currentMillis,
-                    .readPushedButtons = readPushedButtons,
-                    .clearDisplay = clearDisplay,
-                    .drawSprite = drawSprite,
-                    .drawText = drawText,
-                },
-            };
         }
 
         fn currentMillis(_: *anyopaque) c_uint {
