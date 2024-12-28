@@ -6,6 +6,8 @@ const c = g.components;
 pub const Cheat = union(enum) {
     move_player_to_ladder_up,
     move_player_to_ladder_down,
+    turn_light_on,
+    turn_light_off,
     // Moves the player to the point on the screen
     move_player: p.Point,
 
@@ -44,6 +46,7 @@ pub const Cheat = union(enum) {
                     .col = point_on_screen.col + screen_corner.col,
                 });
             },
+            else => return null,
         }
         return null;
     }

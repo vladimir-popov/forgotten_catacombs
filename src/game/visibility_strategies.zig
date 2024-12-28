@@ -6,20 +6,13 @@ const c = g.components;
 const d = g.dungeon;
 const p = g.primitives;
 
-/// Marks every cell in the dungeon as visible.
-pub fn showTheWholeDungeon(level: *const g.Level, place: p.Point) g.Render.Visibility {
-    return if (level.dungeon.rows < place.row or level.dungeon.cols < place.col) .invisible else .visible;
-}
+/// This global flag is used for cheating
+var turn_light_on: bool = false;
 
-/// This is strategy for the Render only.
-/// It delegates decision to the visibility_strategy of the current level.
-pub fn delegateToLevel(level: *const g.Level, place: p.Point) g.Render.Visibility {
-    return level.checkVisibility(place);
-}
 
 /// Marks as visible the whole placement and optionally its nearest neighbors
 pub fn showTheCurrentPlacement(level: *const g.Level, place: p.Point) g.Render.Visibility {
-    if (level.player_placement.contains(place)) return .visible;
+    if (turn_light_on or level.player_placement.contains(place)) return .visible;
 
     // check visibility of the nearest placement if the player is in the doorway:
     const player_position = level.playerPosition().point;
@@ -40,6 +33,8 @@ pub fn showTheCurrentPlacement(level: *const g.Level, place: p.Point) g.Render.V
 /// If the distance more than the radius of the player's source of light,
 /// it marks that place as invisible (or known).
 pub fn showInRadiusOfSourceOfLight(level: *const g.Level, place: p.Point) g.Render.Visibility {
+    if (turn_light_on) return .visible;
+
     const radius = if (level.components.getForEntity(level.player, c.SourceOfLight)) |sol|
         sol.radius
     else

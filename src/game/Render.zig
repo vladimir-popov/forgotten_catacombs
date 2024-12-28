@@ -186,8 +186,6 @@ const SceneBuffer = struct {
 };
 
 runtime: g.Runtime,
-/// The custom function to decide should the place be drawn or not.
-visibility_strategy: *const fn (level: *const g.Level, place: p.Point) Visibility,
 /// Visible area
 viewport: g.Viewport,
 /// Cache for the visible area
@@ -196,13 +194,11 @@ buffer: SceneBuffer,
 pub fn init(
     alloc: std.mem.Allocator,
     runtime: g.Runtime,
-    visibility_strategy: *const fn (level: *const g.Level, place: p.Point) Visibility,
     scene_rows: u8,
     scene_cols: u8,
 ) !Render {
     return .{
         .runtime = runtime,
-        .visibility_strategy = visibility_strategy,
         .viewport = try g.Viewport.init(scene_rows, scene_cols),
         .buffer = try SceneBuffer.init(alloc, scene_rows, scene_cols),
     };
@@ -258,7 +254,7 @@ fn drawDungeon(self: *Render, level: *g.Level) anyerror!void {
     var place = self.viewport.region.top_left;
     var sprite = c.Sprite{ .codepoint = undefined, .z_order = 0 };
     while (itr.next()) |cell| {
-        const visibility = self.visibility_strategy(level, place);
+        const visibility = level.checkVisibility(place);
         if (visibility == .visible and !level.map.isVisited(place))
             try level.map.addVisitedPlace(place);
         sprite.codepoint = switch (cell) {
@@ -294,7 +290,7 @@ fn drawSprites(self: *Render, level: *const g.Level, entity_in_focus: ?g.Entity)
     while (itr.next()) |tuple| {
         if (!self.viewport.region.containsPoint(tuple[1].point)) continue;
         const mode: g.Render.DrawingMode = if (tuple[0] == entity_in_focus) .inverted else .normal;
-        const visibility = self.visibility_strategy(level, tuple[1].point);
+        const visibility = level.checkVisibility(tuple[1].point);
         try self.drawSprite(tuple[2].*, tuple[1].point, mode, visibility);
     }
 }
