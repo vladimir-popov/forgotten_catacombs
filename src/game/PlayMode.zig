@@ -186,8 +186,12 @@ fn handleInput(self: *PlayMode, button: g.Button) !?g.Action {
         .cheat => {
             if (self.session.runtime.getCheat()) |cheat| {
                 log.debug("Cheat {any}", .{cheat});
-                if (cheat.toAction(self.session)) |action| {
-                    return action;
+                switch (cheat) {
+                    .turn_light_on => g.visibility.turn_light_on = true,
+                    .turn_light_off => g.visibility.turn_light_on = false,
+                    else => if (cheat.toAction(self.session)) |action| {
+                        return action;
+                    },
                 }
             }
         },

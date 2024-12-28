@@ -53,7 +53,7 @@ pub fn Cmd(comptime cols: u8) type {
                             self.buffer.setSymbol(' ', 0, self.cursor_idx, .normal);
                         },
                         .TAB => {
-                            if (self.suggestion_idx < self.suggestions.len)
+                            if (self.suggestion_idx < self.suggestions.len - 1)
                                 self.suggestion_idx += 1
                             else
                                 self.suggestion_idx = 0;
@@ -86,8 +86,9 @@ pub fn Cmd(comptime cols: u8) type {
                     else => {},
                 }
                 if (self.cursor_idx > 1) {
-                    if (self.findSuggestion()) |sug| {
-                        self.showSuggestion(sug);
+                    if (self.findSuggestion(self.suggestion_idx)) |i| {
+                        self.suggestion_idx = i;
+                        self.showSuggestion(self.suggestions[i]);
                     }
                 } else {
                     self.cleanCmd();
@@ -96,25 +97,27 @@ pub fn Cmd(comptime cols: u8) type {
             return null;
         }
 
-        fn findSuggestion(self: *Self) ?[]const u8 {
+        fn findSuggestion(self: Self, idx: usize) ?u8 {
             var buf: [cols]u8 = undefined;
             for (0..self.cursor_idx) |col| {
                 buf[col] = @truncate(self.buffer.lines[0][col + 1].symbol);
             }
-            for (self.suggestion_idx..self.suggestions.len) |i| {
+            var i: usize = idx;
+            while (true) {
                 if (std.mem.startsWith(u8, self.suggestions[i], buf[0 .. self.cursor_idx - 1])) {
-                    self.suggestion_idx = @intCast(i);
                     log.debug(
                         "Suggestion: '{s}' at index {d}",
                         .{ self.suggestions[i], self.suggestion_idx },
                     );
-                    return self.suggestions[i];
+                    return @intCast(i);
                 } else {
                     log.debug(
                         "Skip suggestion '{s}' for the input '{s}'",
                         .{ self.suggestions[i], buf[0 .. self.cursor_idx - 1] },
                     );
                 }
+                i = if (i < self.suggestions.len - 1) i + 1 else 0;
+                if (i == idx) break;
             }
             return null;
         }

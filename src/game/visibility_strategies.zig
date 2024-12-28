@@ -7,7 +7,7 @@ const d = g.dungeon;
 const p = g.primitives;
 
 /// This global flag is used for cheating
-var turn_light_on: bool = false;
+pub var turn_light_on: bool = false;
 
 /// Marks as visible the whole placement and optionally its nearest neighbors
 pub fn showTheCurrentPlacement(level: *const g.Level, place: p.Point) g.Render.Visibility {
