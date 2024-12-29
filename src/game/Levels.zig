@@ -75,7 +75,7 @@ pub inline fn cave(
         arena,
         seed,
         depth,
-        d.CavesGenerator{},
+        d.CavesGenerator(g.DISPLAY_ROWS * 2, g.DISPLAY_COLS * 2){},
         g.visibility.showInRadiusOfSourceOfLight,
         player,
         from_ladder,
