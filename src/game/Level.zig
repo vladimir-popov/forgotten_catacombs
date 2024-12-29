@@ -19,6 +19,7 @@ components: ecs.ComponentsManager(c.Components),
 dungeon: d.Dungeon,
 player_placement: d.Placement,
 map: g.LevelMap,
+directions_map: g.VectorField,
 /// The depth of the current level. The session_seed + depth is unique seed for the level.
 depth: u8,
 /// The entity id of the player
@@ -38,6 +39,10 @@ pub fn create(
         .entities = std.ArrayList(g.Entity).init(arena.allocator()),
         .components = try ecs.ComponentsManager(c.Components).init(arena.allocator()),
         .map = try g.LevelMap.init(arena, dungeon.rows, dungeon.cols),
+        .directions_map = g.VectorField.init(
+            arena.allocator(),
+            .{ .top_left = .{ .row = 1, .col = 1 }, .rows = 15, .cols = 15 },
+        ),
         .dungeon = dungeon,
         .player_placement = dungeon.placementWith(player_place).?,
         .visibility_strategy = visibility_strategy,
@@ -128,4 +133,30 @@ pub fn randomEmptyPlace(self: *Level, rand: std.Random) ?p.Point {
         if (is_empty) return place;
     }
     return null;
+}
+
+// The level doesn't subscribe to event directly to avoid unsubscription.
+// Instead, the PlayMode delegates events to the actual level.
+pub fn onPlayerMoved(self: *Level, player_moved: g.events.EntityMoved) !void {
+    std.debug.assert(player_moved.is_player);
+    self.updatePlacement(player_moved.moved_from, player_moved.targetPlace());
+}
+
+fn updatePlacement(self: *Level, player_moved_from: p.Point, player_moved_to: p.Point) void {
+    if (self.player_placement.contains(player_moved_to)) return;
+
+    if (self.dungeon.doorwayAt(player_moved_from)) |doorway| {
+        if (doorway.oppositePlacement(self.player_placement)) |opposite_placement| {
+            if (opposite_placement.contains(player_moved_to)) {
+                self.player_placement = opposite_placement;
+                log.debug("Placement with player is {any}", .{opposite_placement});
+                return;
+            }
+        }
+    }
+    if (self.dungeon.placementWith(player_moved_to)) |placement| {
+        self.player_placement = placement;
+        return;
+    }
+    log.err("It looks like the player at {any} is outside of any placement", .{player_moved_to});
 }

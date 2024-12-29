@@ -22,6 +22,7 @@ pub const Levels = @import("Levels.zig");
 pub const MovePoints = ActionSystem.MovePoints;
 pub const Render = @import("Render.zig");
 pub const Runtime = @import("Runtime.zig");
+pub const VectorField = @import("VectorField.zig");
 pub const Viewport = @import("Viewport.zig");
 pub const ZOrder = u3;
 
