@@ -6,6 +6,8 @@ const c = g.components;
 const d = g.dungeon;
 const p = g.primitives;
 
+const log = std.log.scoped(.visibility);
+
 /// This global flag is used for cheating
 pub var turn_light_on: bool = false;
 
@@ -40,6 +42,7 @@ pub fn showInRadiusOfSourceOfLight(level: *const g.Level, place: p.Point) g.Rend
         2.0;
 
     if (level.playerPosition().point.distanceTo(place) > radius) {
+        log.debug("The place {any} is out of the light radius {d:.2}", .{ place, radius });
         return chechKnownPlaces(level, place);
     } else {
         return .visible;
@@ -51,11 +54,19 @@ fn chechKnownPlaces(level: *const g.Level, place: p.Point) g.Render.Visibility {
     if (level.map.isVisited(place)) {
         switch (level.player_placement) {
             // mark invisible everything inside the inner rooms
-            .area => |area| if (area.isInsideInnerRoom(place)) return .invisible,
-            .room => |room| if (room.host_area) |area| if (area.isInsideInnerRoom(place)) return .invisible,
+            .area => |area| if (area.isInsideInnerRoom(place)) {
+                log.debug("The place {any} is inside the inner room. Mark it as invisible", .{place});
+                return .invisible;
+            },
+            .room => |room| if (room.host_area) |area| if (area.isInsideInnerRoom(place)) {
+                log.debug("The place {any} is inside the inner room. Mark it as invisible", .{place});
+                return .invisible;
+            },
             else => {},
         }
+        log.debug("The place {any} is visited. Mark is as known", .{place});
         return .known;
     }
+    // log.debug("The place {any} is unknown. Mark it as invisible", .{place});
     return .invisible;
 }

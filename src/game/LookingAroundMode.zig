@@ -36,7 +36,7 @@ pub fn refresh(self: *LookingAroundMode) !void {
     while (itr.next()) |tuple| {
         if (self.session.render.viewport.region.containsPoint(tuple[1].point)) {
             const item = try self.entities_on_screen.addOne();
-            item.* = .{ tuple[0], self.session.render.viewport.relative(tuple[1].point), tuple[2].codepoint };
+            item.* = .{ tuple[0], tuple[1].point, tuple[2].codepoint };
         }
     }
     try self.session.render.redraw(self.session, self.entity_in_focus, null);
@@ -63,9 +63,7 @@ pub fn tick(self: *LookingAroundMode) anyerror!void {
 
 fn chooseNextEntity(self: *LookingAroundMode, direction: p.Direction) void {
     const target_entity = self.entity_in_focus orelse self.session.level.player;
-    const target_point = self.session.render.viewport.relative(
-        self.session.level.components.getForEntityUnsafe(target_entity, c.Position).point,
-    );
+    const target_point = self.session.level.components.getForEntityUnsafe(target_entity, c.Position).point;
     var min_distance: u8 = 255;
     log.debug(
         "Choose an entity from {d} on the screen in {s} direction",
@@ -112,46 +110,3 @@ inline fn distance(from: p.Point, to: p.Point, direction: p.Direction) u8 {
 inline fn sub(x: u8, y: u8) u8 {
     return if (y > x) y - x else x - y;
 }
-
-/// Iterates over points in follow way:
-///      0
-///  5 3 1 2 4
-/// 10 8 6 7 9
-const Iterator = struct {
-    init_position: p.Point,
-    current_position: p.Point,
-    direction: p.Direction,
-    region: p.Region,
-    side_direction: p.Direction,
-    // how far from init_position in the direction
-    distance: u8 = 1,
-    // how far from the init_position in the side_direction
-    range: u8 = 0,
-
-    fn init(init_position: p.Point, direction: p.Direction, region: p.Region) Iterator {
-        return .{
-            .init_position = init_position,
-            .current_position = init_position,
-            .direction = direction,
-            .side_direction = direction.rotatedClockwise(true),
-            .region = region,
-        };
-    }
-
-    fn next(self: *Iterator) ?p.Point {
-        if (self.range == 0) {
-            self.current_position = self.init_position;
-            self.current_position.moveNTimes(self.direction, self.distance);
-            self.range += 1;
-        } else {
-            self.current_position.moveNTimes(self.side_direction, self.range);
-            self.side_direction = self.side_direction.opposite();
-            self.range += 1;
-        }
-        if (!self.region.containsPoint(self.current_position.movedToNTimes(self.side_direction, self.range))) {
-            self.distance += 1;
-            self.range = 0;
-        }
-        if (self.region.containsPoint(self.current_position)) return self.current_position else return null;
-    }
-};
