@@ -93,7 +93,7 @@ fn ComponentsMap(comptime ComponentsStruct: anytype) type {
         .Struct => {},
         else => @compileError(
             std.fmt.comptimePrint(
-                "Wrong `{s}` type. The components have to be grouped to the struct with optional types, but found `{any}`",
+                "Wrong `{s}` type. The components must be grouped to the struct with optional types, but found `{any}`",
                 .{ @typeName(ComponentsStruct), type_info },
             ),
         ),
@@ -239,6 +239,26 @@ pub fn ComponentsManager(comptime ComponentsStruct: type) type {
                 if (self.getForEntity(entity, Cmp2)) |c2| {
                     if (self.getForEntity(entity, Cmp3)) |c3| {
                         return .{ entity, c1, c2, c3 };
+                    }
+                }
+            }
+            return null;
+        }
+
+        pub fn getForEntity4(
+            self: *const Self,
+            entity: Entity,
+            comptime Cmp1: type,
+            comptime Cmp2: type,
+            comptime Cmp3: type,
+            comptime Cmp4: type,
+        ) ?struct { Entity, *Cmp1, *Cmp2, *Cmp3, *Cmp4 } {
+            if (self.getForEntity(entity, Cmp1)) |c1| {
+                if (self.getForEntity(entity, Cmp2)) |c2| {
+                    if (self.getForEntity(entity, Cmp3)) |c3| {
+                        if (self.getForEntity(entity, Cmp4)) |c4| {
+                            return .{ entity, c1, c2, c3, c4 };
+                        }
                     }
                 }
             }

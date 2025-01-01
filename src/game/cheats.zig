@@ -7,6 +7,7 @@ pub const Cheat = union(enum) {
     pub const Tag = std.meta.Tag(Cheat);
     pub const count = std.meta.fields(Tag).len;
 
+    dump_vector_field,
     move_player_to_ladder_up,
     move_player_to_ladder_down,
     turn_light_on,
@@ -30,6 +31,7 @@ pub const Cheat = union(enum) {
     pub inline fn toString(comptime self: Cheat.Tag) []const u8 {
         comptime {
             return switch (self) {
+                .dump_vector_field => "dump vectors",
                 .move_player => "go to",
                 .move_player_to_ladder_down => "go down",
                 .move_player_to_ladder_up => "go up",

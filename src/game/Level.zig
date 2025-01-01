@@ -42,6 +42,7 @@ pub fn create(
         .directions_map = g.VectorField.init(
             arena.allocator(),
             .{ .top_left = .{ .row = 1, .col = 1 }, .rows = 15, .cols = 15 },
+            level.obstacles(),
         ),
         .dungeon = dungeon,
         .player_placement = dungeon.placementWith(player_place).?,
@@ -119,18 +120,39 @@ pub fn addEnemy(level: *Level, rand: std.Random, enemy: c.Components) !void {
     }
 }
 
-pub fn randomEmptyPlace(self: *Level, rand: std.Random) ?p.Point {
+pub fn randomEmptyPlace(self: Level, rand: std.Random) ?p.Point {
     var attempt: u8 = 10;
     while (attempt > 0) : (attempt -= 1) {
         const place = self.dungeon.randomPlace(rand);
-        var is_empty = true;
-        var itr = self.query().get(c.Position);
-        while (itr.next()) |tuple| {
-            if (tuple[1].point.eql(place)) {
-                is_empty = false;
+        if (self.obstacleAt(place) == null) return place;
+    }
+    return null;
+}
+
+pub fn obstacles(self: *const Level) g.VectorField.Obstacles {
+    return .{ .context = self, .isObstacleFn = isObstacle };
+}
+
+fn isObstacle(ptr: *const anyopaque, place: p.Point) bool {
+    const self: *const Level = @ptrCast(@alignCast(ptr));
+    return self.obstacleAt(place) != null;
+}
+
+// TODO improve
+pub fn obstacleAt(self: *const Level, place: p.Point) ?union(enum) { cell: d.Dungeon.Cell, entity: g.Entity } {
+    switch (self.dungeon.cellAt(place)) {
+        .floor, .doorway => {},
+        else => |cell| return .{ .cell = cell },
+    }
+
+    var itr = self.query().get(c.Position);
+    while (itr.next()) |tuple| {
+        if (tuple[1].point.eql(place)) {
+            if (self.components.getForEntity(tuple[0], c.Door)) |door| {
+                if (door.state == .opened) return null;
             }
+            return .{ .entity = tuple[0] };
         }
-        if (is_empty) return place;
     }
     return null;
 }
@@ -140,6 +162,7 @@ pub fn randomEmptyPlace(self: *Level, rand: std.Random) ?p.Point {
 pub fn onPlayerMoved(self: *Level, player_moved: g.events.EntityMoved) !void {
     std.debug.assert(player_moved.is_player);
     self.updatePlacement(player_moved.moved_from, player_moved.targetPlace());
+    try self.directions_map.calculate(self.playerPosition().point);
 }
 
 fn updatePlacement(self: *Level, player_moved_from: p.Point, player_moved_to: p.Point) void {

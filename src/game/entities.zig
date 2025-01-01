@@ -88,4 +88,5 @@ pub const Rat = c.Components{
     .health = .{ .max = 10, .current = 10 },
     .weapon = .{ .max_damage = 3 },
     .speed = .{ .move_speed = 10 },
+    .enemy = .{ .state = .sleep },
 };

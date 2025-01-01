@@ -92,6 +92,16 @@ pub const Initiative = struct {
     move_points: g.MovePoints = 0,
 };
 
+pub const Enemy = struct {
+    pub const State = enum {
+        sleep,
+        chill,
+        hunt,
+    };
+
+    state: State,
+};
+
 pub const SourceOfLight = struct {
     radius: f16,
 };
@@ -100,12 +110,13 @@ pub const Components = struct {
     animation: ?Animation = null,
     description: ?Description = null,
     door: ?Door = null,
+    enemy: ?Enemy = null,
     health: ?Health = null,
-    ladder: ?Ladder = null,
-    weapon: ?Weapon = null,
     initiative: ?Initiative = null,
+    ladder: ?Ladder = null,
     position: ?Position = null,
+    source_of_light: ?SourceOfLight = null,
     speed: ?Speed = null,
     sprite: ?Sprite = null,
-    source_of_light: ?SourceOfLight = null,
+    weapon: ?Weapon = null,
 };
