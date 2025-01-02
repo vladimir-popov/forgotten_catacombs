@@ -4,7 +4,6 @@ const g = @import("game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
-const AI = @import("AI.zig");
 const ActionSystem = @import("ActionSystem.zig");
 
 const log = std.log.scoped(.play_mode);
@@ -71,7 +70,7 @@ const EnemiesIterator = struct {
     }
 
     /// Returns the enemies circle back, till all of them complete their moves
-    fn next(self: *EnemiesIterator) ?struct { g.Entity, *c.Initiative, *c.Position, *c.Speed, *c.Enemy } {
+    fn next(self: *EnemiesIterator) ?struct { g.Entity, *c.Initiative, *c.Position, *c.Speed } {
         if (self.next_enemy == null) {
             self.next_enemy = self.not_completed.first;
         }
@@ -82,7 +81,7 @@ const EnemiesIterator = struct {
             } else {
                 self.next_enemy = self.not_completed.first;
             }
-            if (self.session.level.components.getForEntity4(enemy, c.Initiative, c.Position, c.Speed, c.Enemy)) |res| {
+            if (self.session.level.components.getForEntity3(enemy, c.Initiative, c.Position, c.Speed)) |res| {
                 return res;
             } else {
                 log.debug("It looks like the entity {d} was removed. Remove it from enemies", .{enemy});
@@ -95,16 +94,18 @@ const EnemiesIterator = struct {
 
 session: *g.GameSession,
 enemies: EnemiesIterator,
+ai: g.AI,
 /// Highlighted entity
 entity_in_focus: ?g.Entity,
 // An action which could be applied to the entity in focus
 quick_action: ?g.Action,
 
-pub fn init(session: *g.GameSession, alloc: std.mem.Allocator) !PlayMode {
+pub fn init(session: *g.GameSession, alloc: std.mem.Allocator, rand: std.Random) !PlayMode {
     log.debug("Init PlayMode", .{});
     return .{
         .session = session,
         .enemies = try EnemiesIterator.init(alloc, session),
+        .ai = g.AI{ .session = session, .rand = rand },
         .entity_in_focus = null,
         .quick_action = null,
     };
@@ -168,7 +169,7 @@ fn handleInput(self: *PlayMode, button: g.Button) !?g.Action {
             if (self.session.runtime.getCheat()) |cheat| {
                 log.debug("Cheat {any}", .{cheat});
                 switch (cheat) {
-                    .dump_vector_field => self.session.level.directions_map.dumpToLog(),
+                    .dump_vector_field => self.session.level.dijkstra_map.dumpToLog(),
                     .turn_light_on => g.visibility.turn_light_on = true,
                     .turn_light_off => g.visibility.turn_light_on = false,
                     else => if (cheat.toAction(self.session)) |action| {
@@ -189,17 +190,17 @@ pub fn tick(self: *PlayMode) !void {
     // the list of enemies is empty at the start
     if (self.enemies.next()) |tuple| {
         const entity = tuple[0];
-        const npc = tuple[1];
+        const initiative = tuple[1];
         const position = tuple[2];
         const speed = tuple[3];
-        const enemy = tuple[4];
-        if (AI.action(self.session, entity, position.point, speed.move_speed, enemy, npc.move_points)) |action| {
-            const mp = try ActionSystem.doAction(self.session, entity, action, speed.move_speed);
-            std.debug.assert(mp <= npc.move_points);
-            tuple[1].move_points -= mp;
-        } else {
+        if (speed.move_points > initiative.move_points) {
             self.enemies.completeMove(entity);
+            return;
         }
+        const action = self.ai.action(entity, position.point);
+        const mp = try ActionSystem.doAction(self.session, entity, action, speed.move_points);
+        std.debug.assert(0 < mp and mp <= initiative.move_points);
+        tuple[1].move_points -= mp;
     } else if (try self.session.runtime.readPushedButtons()) |buttons| {
         const maybe_action = try self.handleInput(buttons);
         // break this function if the mode was changed
@@ -207,7 +208,7 @@ pub fn tick(self: *PlayMode) !void {
         // If the player did some action
         if (maybe_action) |action| {
             const speed = self.session.level.components.getForEntityUnsafe(self.session.level.player, c.Speed);
-            const mp = try ActionSystem.doAction(self.session, self.session.level.player, action, speed.move_speed);
+            const mp = try ActionSystem.doAction(self.session, self.session.level.player, action, speed.move_points);
             if (mp > 0) {
                 log.debug("Update target after action {any}", .{action});
                 try self.updateTarget();

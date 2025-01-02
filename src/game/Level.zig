@@ -19,7 +19,8 @@ components: ecs.ComponentsManager(c.Components),
 dungeon: d.Dungeon,
 player_placement: d.Placement,
 map: g.LevelMap,
-directions_map: g.VectorField,
+/// Dijkstra Map to the player
+dijkstra_map: g.DijkstraMap,
 /// The depth of the current level. The session_seed + depth is unique seed for the level.
 depth: u8,
 /// The entity id of the player
@@ -39,9 +40,9 @@ pub fn create(
         .entities = std.ArrayList(g.Entity).init(arena.allocator()),
         .components = try ecs.ComponentsManager(c.Components).init(arena.allocator()),
         .map = try g.LevelMap.init(arena, dungeon.rows, dungeon.cols),
-        .directions_map = g.VectorField.init(
+        .dijkstra_map = g.DijkstraMap.init(
             arena.allocator(),
-            .{ .top_left = .{ .row = 1, .col = 1 }, .rows = 15, .cols = 15 },
+            .{ .top_left = .{ .row = 1, .col = 1 }, .rows = 12, .cols = 25 },
             level.obstacles(),
         ),
         .dungeon = dungeon,
@@ -117,6 +118,8 @@ pub fn addEnemy(level: *Level, rand: std.Random, enemy: c.Components) !void {
     if (level.randomEmptyPlace(rand)) |place| {
         const id = try level.addNewEntity(enemy);
         try level.components.setToEntity(id, c.Position{ .point = place });
+        const state: c.EnemyState = if (rand.uintLessThan(u8, 5) == 0) .sleep else .chill;
+        try level.components.setToEntity(id, state);
     }
 }
 
@@ -124,22 +127,32 @@ pub fn randomEmptyPlace(self: Level, rand: std.Random) ?p.Point {
     var attempt: u8 = 10;
     while (attempt > 0) : (attempt -= 1) {
         const place = self.dungeon.randomPlace(rand);
-        if (self.obstacleAt(place) == null) return place;
+        if (self.collisionAt(place) == null) return place;
     }
     return null;
 }
 
-pub fn obstacles(self: *const Level) g.VectorField.Obstacles {
+pub fn obstacles(self: *const Level) g.DijkstraMap.Obstacles {
     return .{ .context = self, .isObstacleFn = isObstacle };
 }
 
+// TODO improve
 fn isObstacle(ptr: *const anyopaque, place: p.Point) bool {
     const self: *const Level = @ptrCast(@alignCast(ptr));
-    return self.obstacleAt(place) != null;
+    if (self.collisionAt(place)) |collision| {
+        return switch (collision) {
+            .cell, .door => true,
+            else => false,
+        };
+    }
+    return false;
 }
 
 // TODO improve
-pub fn obstacleAt(self: *const Level, place: p.Point) ?union(enum) { cell: d.Dungeon.Cell, entity: g.Entity } {
+pub fn collisionAt(
+    self: *const Level,
+    place: p.Point,
+) ?union(enum) { cell: d.Dungeon.Cell, door: g.Entity, entity: g.Entity } {
     switch (self.dungeon.cellAt(place)) {
         .floor, .doorway => {},
         else => |cell| return .{ .cell = cell },
@@ -149,9 +162,10 @@ pub fn obstacleAt(self: *const Level, place: p.Point) ?union(enum) { cell: d.Dun
     while (itr.next()) |tuple| {
         if (tuple[1].point.eql(place)) {
             if (self.components.getForEntity(tuple[0], c.Door)) |door| {
-                if (door.state == .opened) return null;
+                return if (door.state == .closed) .{ .door = tuple[0] } else null;
+            } else {
+                return .{ .entity = tuple[0] };
             }
-            return .{ .entity = tuple[0] };
         }
     }
     return null;
@@ -162,7 +176,9 @@ pub fn obstacleAt(self: *const Level, place: p.Point) ?union(enum) { cell: d.Dun
 pub fn onPlayerMoved(self: *Level, player_moved: g.events.EntityMoved) !void {
     std.debug.assert(player_moved.is_player);
     self.updatePlacement(player_moved.moved_from, player_moved.targetPlace());
-    try self.directions_map.calculate(self.playerPosition().point);
+    const player_place = self.playerPosition().point;
+    self.dijkstra_map.region.centralizeAround(player_place);
+    try self.dijkstra_map.calculate(player_place);
 }
 
 fn updatePlacement(self: *Level, player_moved_from: p.Point, player_moved_to: p.Point) void {

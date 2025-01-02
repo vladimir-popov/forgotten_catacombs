@@ -5,7 +5,7 @@ const p = g.primitives;
 
 const log = std.log.scoped(.vector_field);
 
-const VectorField = @This();
+const DijkstraMap = @This();
 
 const VectorsMap = std.AutoHashMap(p.Point, struct { p.Direction, u8 });
 
@@ -19,22 +19,24 @@ pub const Obstacles = struct {
 };
 
 region: p.Region,
+/// The Dijkstra map that provides an optimal direction to the player, and counts of moves
+/// needed to achieve the player in that direction.
+/// The weight == 0 means that the place is unreachable and has some obstacle.
 vectors: VectorsMap,
 obstacles: Obstacles,
 
-pub fn init(alloc: std.mem.Allocator, region: p.Region, obstacles: Obstacles) VectorField {
+pub fn init(alloc: std.mem.Allocator, region: p.Region, obstacles: Obstacles) DijkstraMap {
     return .{ .vectors = VectorsMap.init(alloc), .region = region, .obstacles = obstacles };
 }
 
-pub fn deinit(self: *VectorField) void {
+pub fn deinit(self: *DijkstraMap) void {
     self.vectors.deinit();
 }
 
-pub fn calculate(self: *VectorField, target: p.Point) !void {
+pub fn calculate(self: *DijkstraMap, target: p.Point) !void {
     var openned = std.ArrayList(struct { p.Point, u8 }).init(self.vectors.allocator);
     defer openned.deinit();
     self.vectors.clearRetainingCapacity();
-    self.region.centralizeAround(target);
 
     try openned.append(.{ target, 0 });
     while (openned.popOrNull()) |tuple| {
@@ -53,7 +55,7 @@ pub fn calculate(self: *VectorField, target: p.Point) !void {
     }
 }
 
-pub fn dumpToLog(self: VectorField) void {
+pub fn dumpToLog(self: DijkstraMap) void {
     var buf: [2048]u8 = [_]u8{0} ** 2048;
     var writer = std.io.fixedBufferStream(&buf);
     self.write(writer.writer().any()) catch unreachable;
@@ -61,7 +63,7 @@ pub fn dumpToLog(self: VectorField) void {
 }
 
 fn write(
-    self: VectorField,
+    self: DijkstraMap,
     writer: std.io.AnyWriter,
 ) !void {
     for (0..self.region.rows) |row_idx| {
@@ -102,7 +104,7 @@ test "vectors for the middle of the empty region 5x5" {
         .context = undefined,
         .isObstacleFn = clojure.noObstacles,
     };
-    var field = VectorField.init(std.testing.allocator, region, obstacles);
+    var field = DijkstraMap.init(std.testing.allocator, region, obstacles);
     defer field.deinit();
 
     try field.calculate(.{ .row = 3, .col = 3 });
@@ -139,7 +141,7 @@ test "vectors for the region with obstacles" {
         .context = undefined,
         .isObstacleFn = clojure.isObstacle,
     };
-    var field = VectorField.init(std.testing.allocator, region, obstacles);
+    var field = DijkstraMap.init(std.testing.allocator, region, obstacles);
     defer field.deinit();
 
     try field.calculate(.{ .row = 3, .col = 3 });

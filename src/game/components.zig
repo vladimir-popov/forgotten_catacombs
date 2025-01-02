@@ -22,9 +22,12 @@ pub const Description = struct {
 };
 
 pub const Animation = struct {
-    pub const Presets = struct {
+    pub const FramesPresets = struct {
         pub const hit: [3]g.Codepoint = [_]g.Codepoint{ 0, '×', 0 };
         pub const miss: [1]g.Codepoint = [_]g.Codepoint{'.'};
+        pub const go_sleep: [6]g.Codepoint = [_]g.Codepoint{ 'z', 'z', 'z', 'z', 'z', 'z' };
+        pub const relax: [6]g.Codepoint = [_]g.Codepoint{ '?', '?', '?', '?', '?', '?' };
+        pub const get_angry: [6]g.Codepoint = [_]g.Codepoint{ 0, '!', '!', 0, '!', '!' };
     };
 
     /// Frames of the animation. One frame per render circle will be shown.
@@ -72,19 +75,14 @@ pub const Health = struct {
 
 pub const Speed = struct {
     /// How many move points are needed for moving on the neighbor position
-    move_speed: u8 = 10,
+    move_points: u8 = 10,
 };
 
 pub const Weapon = struct {
     max_damage: u8,
-    move_scale: f16 = 1.0,
 
     pub inline fn generateDamage(self: Weapon, rand: std.Random) u8 {
         return rand.uintLessThan(u8, self.max_damage) + 1;
-    }
-
-    pub inline fn actualSpeed(self: Weapon, move_speed: g.MovePoints) g.MovePoints {
-        return @intFromFloat(self.move_scale * @as(f16, @floatFromInt(move_speed)));
     }
 };
 
@@ -92,14 +90,10 @@ pub const Initiative = struct {
     move_points: g.MovePoints = 0,
 };
 
-pub const Enemy = struct {
-    pub const State = enum {
-        sleep,
-        chill,
-        hunt,
-    };
-
-    state: State,
+pub const EnemyState = enum {
+    sleep,
+    chill,
+    hunt,
 };
 
 pub const SourceOfLight = struct {
@@ -110,7 +104,7 @@ pub const Components = struct {
     animation: ?Animation = null,
     description: ?Description = null,
     door: ?Door = null,
-    enemy: ?Enemy = null,
+    state: ?EnemyState = null,
     health: ?Health = null,
     initiative: ?Initiative = null,
     ladder: ?Ladder = null,
