@@ -29,6 +29,12 @@ pub const Action = union(enum) {
     do_nothing,
     /// Skip the round
     wait,
+    /// Change the state of the entity to sleep
+    go_sleep: g.Entity,
+    /// Change the state of the entity to chill
+    chill: g.Entity,
+    /// Change the state of the entity to hunt
+    get_angry: g.Entity,
     /// An entity is going to move in the direction
     move: Move,
     /// An entity is going to open a door
@@ -44,34 +50,51 @@ pub const Action = union(enum) {
 };
 
 /// Handles intentions to do some actions
-pub fn doAction(session: *g.GameSession, entity: g.Entity, action: Action, move_speed: MovePoints) anyerror!MovePoints {
+pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action, move_speed: MovePoints) anyerror!MovePoints {
     if (std.log.logEnabled(.debug, .action_system) and action != .do_nothing) {
-        log.debug("Do action {s} by the entity {d}", .{ @tagName(action), entity });
+        log.debug("Do action {s} by the entity {d}", .{ @tagName(action), actor });
     }
     switch (action) {
-        .wait => return move_speed,
         .move => |move| {
-            if (session.level.components.getForEntity(entity, c.Position)) |position|
-                return doMove(session, entity, position, move.target, move_speed);
+            if (session.level.components.getForEntity(actor, c.Position)) |position|
+                return doMove(session, actor, position, move.target, move_speed);
+        },
+        .hit => |hit| {
+            return doHit(session, actor, hit.by_weapon, move_speed, hit.target, hit.target_health);
         },
         .open => |door| {
             try session.level.components.setComponentsToEntity(door, g.entities.OpenedDoor);
-            return move_speed;
         },
         .close => |door| {
             try session.level.components.setComponentsToEntity(door, g.entities.ClosedDoor);
-            return move_speed;
-        },
-        .hit => |hit| {
-            return doHit(session, entity, hit.by_weapon, move_speed, hit.target, hit.target_health);
         },
         .move_to_level => |ladder| {
             try session.movePlayerToLevel(ladder);
-            return move_speed;
+        },
+        .go_sleep => |target| {
+            session.level.components.getForEntityUnsafe(target, c.EnemyState).* = .sleep;
+            try session.level.components.setToEntity(
+                target,
+                c.Animation{ .frames = &c.Animation.FramesPresets.go_sleep },
+            );
+        },
+        .chill => |target| {
+            session.level.components.getForEntityUnsafe(target, c.EnemyState).* = .chill;
+            try session.level.components.setToEntity(
+                target,
+                c.Animation{ .frames = &c.Animation.FramesPresets.relax },
+            );
+        },
+        .get_angry => |target| {
+            session.level.components.getForEntityUnsafe(target, c.EnemyState).* = .hunt;
+            try session.level.components.setToEntity(
+                target,
+                c.Animation{ .frames = &c.Animation.FramesPresets.get_angry },
+            );
         },
         else => {},
     }
-    return 0;
+    return move_speed;
 }
 
 fn doMove(
@@ -104,15 +127,11 @@ fn doMove(
 }
 
 fn checkCollision(session: *g.GameSession, actor: g.Entity, place: p.Point) ?Action {
-    if (session.level.obstacleAt(place)) |obstacle| {
+    if (session.level.collisionAt(place)) |obstacle| {
         switch (obstacle) {
             .cell => return .do_nothing,
+            .door => |door| return .{ .open = door },
             .entity => |entity| {
-                if (session.level.components.getForEntity(entity, c.Door)) |door| {
-                    if (door.state == .closed)
-                        return .{ .open = entity };
-                }
-
                 if (session.level.components.getForEntity(entity, c.Health)) |health|
                     if (session.level.components.getForEntity(actor, c.Weapon)) |weapon|
                         return .{ .hit = .{ .target = entity, .target_health = health, .by_weapon = weapon } };
@@ -135,7 +154,7 @@ fn doHit(
     enemy_health.current -= @as(i16, @intCast(damage));
     try session.level.components.setToEntity(
         enemy,
-        c.Animation{ .frames = &c.Animation.Presets.hit },
+        c.Animation{ .frames = &c.Animation.FramesPresets.hit },
     );
     if (actor == session.level.player) {
         try session.events.sendEvent(.{ .player_hit = .{ .target = enemy } });
@@ -149,5 +168,5 @@ fn doHit(
             },
         );
     }
-    return actor_weapon.actualSpeed(actor_speed);
+    return actor_speed;
 }

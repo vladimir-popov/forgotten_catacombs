@@ -58,7 +58,7 @@ pub fn create(
         .runtime = runtime,
         .events = events,
         .level_arena = std.heap.ArenaAllocator.init(alloc),
-        .play_mode = try PlayMode.init(self, alloc),
+        .play_mode = try PlayMode.init(self, alloc, self.prng.random()),
         .looking_around = try LookingAroundMode.init(self, alloc),
         .explore_mode = ExploreMode.init(self),
     };
@@ -74,6 +74,31 @@ pub fn create(
 
 pub fn unsubscribe(self: *GameSession) void {
     std.debug.assert(self.events.unsubscribe(&self.play_mode));
+}
+
+// TODO: Load session from file
+
+pub fn play(self: *GameSession, entity_in_focus: ?g.Entity) !void {
+    self.mode = .play;
+    try self.play_mode.update(entity_in_focus);
+}
+
+pub fn explore(self: *GameSession) !void {
+    self.mode = .explore;
+    try self.explore_mode.refresh();
+}
+
+pub fn lookAround(self: *GameSession) !void {
+    self.mode = .looking_around;
+    try self.looking_around.refresh();
+}
+
+pub inline fn tick(self: *GameSession) !void {
+    switch (self.mode) {
+        .play => try self.play_mode.tick(),
+        .explore => try self.explore_mode.tick(),
+        .looking_around => try self.looking_around.tick(),
+    }
 }
 
 pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
@@ -114,29 +139,4 @@ pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
         ),
     };
     self.render.viewport.centeredAround(self.level.playerPosition().point);
-}
-
-// TODO: Load session from file
-
-pub fn play(self: *GameSession, entity_in_focus: ?g.Entity) !void {
-    self.mode = .play;
-    try self.play_mode.update(entity_in_focus);
-}
-
-pub fn explore(self: *GameSession) !void {
-    self.mode = .explore;
-    try self.explore_mode.refresh();
-}
-
-pub fn lookAround(self: *GameSession) !void {
-    self.mode = .looking_around;
-    try self.looking_around.refresh();
-}
-
-pub inline fn tick(self: *GameSession) !void {
-    switch (self.mode) {
-        .play => try self.play_mode.tick(),
-        .explore => try self.explore_mode.tick(),
-        .looking_around => try self.looking_around.tick(),
-    }
 }

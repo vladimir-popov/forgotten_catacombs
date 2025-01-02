@@ -8,8 +8,8 @@ pub const Player = c.Components{
     .sprite = .{ .codepoint = cp.human, .z_order = 3 },
     .description = .{ .name = "You" },
     .health = .{ .max = 100, .current = 50 },
-    .weapon = .{ .max_damage = 3, .move_scale = 0.5 },
-    .speed = .{ .move_speed = 10 },
+    .weapon = .{ .max_damage = 3 },
+    .speed = .{ .move_points = 10 },
     .source_of_light = .{ .radius = 2 },
 };
 
@@ -87,6 +87,6 @@ pub const Rat = c.Components{
     .description = .{ .name = "Rat" },
     .health = .{ .max = 10, .current = 10 },
     .weapon = .{ .max_damage = 3 },
-    .speed = .{ .move_speed = 10 },
-    .enemy = .{ .state = .sleep },
+    .speed = .{ .move_points = 14 },
+    .state = .sleep,
 };

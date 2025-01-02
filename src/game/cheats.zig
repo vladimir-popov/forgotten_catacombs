@@ -33,8 +33,8 @@ pub const Cheat = union(enum) {
             return switch (self) {
                 .dump_vector_field => "dump vectors",
                 .move_player => "go to",
-                .move_player_to_ladder_down => "go down",
-                .move_player_to_ladder_up => "go up",
+                .move_player_to_ladder_down => "down ladder",
+                .move_player_to_ladder_up => "up ladder",
                 .turn_light_off => "light off",
                 .turn_light_on => "light on",
             };

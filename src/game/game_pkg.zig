@@ -10,9 +10,11 @@ pub const visibility = @import("visibility_strategies.zig");
 
 pub const Action = ActionSystem.Action;
 pub const ActionSystem = @import("ActionSystem.zig");
+pub const AI = @import("AI.zig");
 pub const Button = @import("Button.zig");
 pub const Cheat = @import("cheats.zig").Cheat;
 pub const Codepoint = u21;
+pub const DijkstraMap = @import("DijkstraMap.zig");
 pub const Entity = ecs.Entity;
 pub const Game = @import("Game.zig");
 pub const GameSession = @import("GameSession.zig");
@@ -22,7 +24,6 @@ pub const Levels = @import("Levels.zig");
 pub const MovePoints = ActionSystem.MovePoints;
 pub const Render = @import("Render.zig");
 pub const Runtime = @import("Runtime.zig");
-pub const VectorField = @import("VectorField.zig");
 pub const Viewport = @import("Viewport.zig");
 pub const ZOrder = u3;
 
