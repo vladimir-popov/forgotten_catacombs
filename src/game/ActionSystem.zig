@@ -72,21 +72,21 @@ pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action, move_s
             try session.movePlayerToLevel(ladder);
         },
         .go_sleep => |target| {
-            session.level.components.getForEntityUnsafe(target, c.EnemyState).* = .sleep;
+            session.level.components.getForEntityUnsafe(target, c.EnemyState).* = .sleeping;
             try session.level.components.setToEntity(
                 target,
                 c.Animation{ .frames = &c.Animation.FramesPresets.go_sleep },
             );
         },
         .chill => |target| {
-            session.level.components.getForEntityUnsafe(target, c.EnemyState).* = .chill;
+            session.level.components.getForEntityUnsafe(target, c.EnemyState).* = .walking;
             try session.level.components.setToEntity(
                 target,
                 c.Animation{ .frames = &c.Animation.FramesPresets.relax },
             );
         },
         .get_angry => |target| {
-            session.level.components.getForEntityUnsafe(target, c.EnemyState).* = .hunt;
+            session.level.components.getForEntityUnsafe(target, c.EnemyState).* = .aggressive;
             try session.level.components.setToEntity(
                 target,
                 c.Animation{ .frames = &c.Animation.FramesPresets.get_angry },

@@ -118,7 +118,7 @@ pub fn addEnemy(level: *Level, rand: std.Random, enemy: c.Components) !void {
     if (level.randomEmptyPlace(rand)) |place| {
         const id = try level.addNewEntity(enemy);
         try level.components.setToEntity(id, c.Position{ .point = place });
-        const state: c.EnemyState = if (rand.uintLessThan(u8, 5) == 0) .sleep else .chill;
+        const state: c.EnemyState = if (rand.uintLessThan(u8, 5) == 0) .sleeping else .walking;
         try level.components.setToEntity(id, state);
     }
 }

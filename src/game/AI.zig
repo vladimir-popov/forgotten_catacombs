@@ -21,9 +21,9 @@ pub fn action(
 
     if (self.session.level.components.getForEntity(entity, c.EnemyState)) |state| {
         const act = switch (state.*) {
-            .sleep => self.actionForSleepingEnemy(entity, entity_place, player_place),
-            .chill => self.actionForChillingEnemy(entity, entity_place, player_place),
-            .hunt => self.actionForHuntingEnemy(entity, entity_place, player_place),
+            .sleeping => self.actionForSleepingEnemy(entity, entity_place, player_place),
+            .walking => self.actionForWalkingEnemy(entity, entity_place, player_place),
+            .aggressive => self.actionForAggressiveEnemy(entity, entity_place, player_place),
         };
         log.debug("The action for the entity {d} in state {s} is {any}", .{ entity, @tagName(state.*), act });
         return act;
@@ -41,7 +41,7 @@ inline fn actionForSleepingEnemy(
     return .wait;
 }
 
-inline fn actionForChillingEnemy(
+inline fn actionForWalkingEnemy(
     self: AI,
     entity: g.Entity,
     entity_place: p.Point,
@@ -64,7 +64,7 @@ inline fn actionForChillingEnemy(
     return .wait;
 }
 
-inline fn actionForHuntingEnemy(
+inline fn actionForAggressiveEnemy(
     self: AI,
     entity: g.Entity,
     entity_place: p.Point,

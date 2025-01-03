@@ -42,6 +42,7 @@ pub const DISPLAY_ROWS = DISPLAY_HEIGHT / SPRITE_HEIGHT;
 /// 40
 pub const DISPLAY_COLS = DISPLAY_WIDHT / SPRITE_WIDTH;
 
+/// 36
 pub const DUNGEON_ROWS = DISPLAY_ROWS * 3;
 /// 120
 pub const DUNGEON_COLS = DISPLAY_COLS * 3;
@@ -51,6 +52,10 @@ pub const DUNGEON_REGION: primitives.Region = .{
     .rows = DUNGEON_ROWS,
     .cols = DUNGEON_COLS,
 };
+
+// The size of the description window
+pub const DESCRIPTION_ROWS = 10;
+pub const DESCRIPTION_COLS = 36;
 
 pub const DOUBLE_PUSH_DELAY_MS = 250;
 pub const HOLD_DELAY_MS = 500;

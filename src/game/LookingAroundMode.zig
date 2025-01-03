@@ -10,15 +10,18 @@ const log = std.log.scoped(.looking_around_mode);
 const LookingAroundMode = @This();
 const ArrayOfEntitiesOnScreen = std.ArrayList(struct { g.Entity, p.Point, g.Codepoint });
 
+alloc: std.mem.Allocator,
 session: *g.GameSession,
 /// Arrays of entities and their positions on the screen
 entities_on_screen: ArrayOfEntitiesOnScreen,
 /// Highlighted entity
 entity_in_focus: ?g.Entity,
+window: ?*g.Render.WindowWithDescription = null,
 
 pub fn init(session: *g.GameSession, alloc: std.mem.Allocator) !LookingAroundMode {
     log.debug("Init LookingAroundMode", .{});
     return .{
+        .alloc = alloc,
         .session = session,
         .entities_on_screen = ArrayOfEntitiesOnScreen.init(alloc),
         .entity_in_focus = null,
@@ -47,7 +50,16 @@ pub fn tick(self: *LookingAroundMode) anyerror!void {
     // Nothing should happened until the player push a button
     if (try self.session.runtime.readPushedButtons()) |btn| {
         switch (btn.game_button) {
-            .a => {},
+            .a => if (self.window) |window| {
+                window.destroy();
+                self.window = null;
+                try self.session.render.redraw(self.session, self.entity_in_focus, null);
+            } else {
+                if (self.entity_in_focus) |entity| {
+                    self.window = try self.createWindowWithDescription(entity);
+                    try self.session.render.drawWindowWithDescription(self.window.?);
+                }
+            },
             .b => if (btn.state == .pressed) {
                 try self.session.play(self.entity_in_focus);
                 return;
@@ -56,7 +68,8 @@ pub fn tick(self: *LookingAroundMode) anyerror!void {
                 self.chooseNextEntity(btn.toDirection().?);
                 try self.session.render.drawScene(self.session, self.entity_in_focus, null);
             },
-            else => {},
+            // ignore cheats in the LookingAroundMode
+            .cheat => _ = self.session.runtime.getCheat(),
         }
     }
 }
@@ -109,4 +122,36 @@ inline fn distance(from: p.Point, to: p.Point, direction: p.Direction) u8 {
 /// Returns y - x if y > x, or x - y otherwise.
 inline fn sub(x: u8, y: u8) u8 {
     return if (y > x) y - x else x - y;
+}
+
+fn createWindowWithDescription(
+    self: LookingAroundMode,
+    entity: g.Entity,
+) !*g.Render.WindowWithDescription {
+    const window = try g.Render.WindowWithDescription.create(self.alloc);
+    var len: usize = 1;
+    var line = try window.addOneLine();
+    if (self.session.level.components.getForEntity(entity, c.Description)) |description| {
+        len += (try std.fmt.bufPrint(line[len..], "{s}", .{description.name})).len;
+
+        if (self.session.level.components.getForEntity(entity, c.EnemyState)) |state| {
+            len += (try std.fmt.bufPrint(line[len..], " (is {s})", .{@tagName(state.*)})).len;
+        }
+    }
+    if (true) {
+        len += (try std.fmt.bufPrint(line[len..], " [id: {d}]", .{entity})).len;
+    }
+    line = try window.addOneLine();
+    for (1..len + 1) |i| {
+        line[i] = '-';
+    }
+    if (self.session.level.components.getForEntity(entity, c.Health)) |health| {
+        line = try window.addOneLine();
+        _ = try std.fmt.bufPrint(line[1..], "Health: {d}/{d}", .{ health.current, health.max });
+    }
+    if (self.session.level.components.getForEntity(entity, c.Speed)) |speed| {
+        line = try window.addOneLine();
+        _ = try std.fmt.bufPrint(line[1..], "Speed: {d}", .{ speed.move_points });
+    }
+    return window;
 }
