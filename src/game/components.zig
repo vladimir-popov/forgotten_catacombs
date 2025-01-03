@@ -91,9 +91,9 @@ pub const Initiative = struct {
 };
 
 pub const EnemyState = enum {
-    sleep,
-    chill,
-    hunt,
+    sleeping,
+    walking,
+    aggressive,
 };
 
 pub const SourceOfLight = struct {
