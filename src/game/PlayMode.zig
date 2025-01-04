@@ -123,7 +123,49 @@ pub fn update(self: *PlayMode, entity_in_focus: ?g.Entity) !void {
     };
     log.debug("Update target after refresh", .{});
     try self.updateTarget();
+    try self.redraw();
+}
+
+fn draw(self: *const PlayMode) !void {
+    try self.session.render.drawScene(self.session, self.entity_in_focus, self.quick_action);
+    try self.drawInfoBar();
+}
+
+fn redraw(self: *const PlayMode) !void {
     try self.session.render.redraw(self.session, self.entity_in_focus, self.quick_action);
+    try self.drawInfoBar();
+}
+
+fn drawInfoBar(self: *const PlayMode) !void {
+    if (self.session.level.components.getForEntity(self.session.level.player, c.Health)) |health| {
+        try self.session.render.drawPlayerHp(health);
+    }
+    if (self.quick_action) |qa| {
+        switch (qa) {
+            .wait => try self.session.render.drawRightButton("Wait"),
+            .open => try self.session.render.drawRightButton("Open"),
+            .close => try self.session.render.drawRightButton("Close"),
+            .hit => try self.session.render.drawRightButton("Attack"),
+            .move_to_level => |ladder| switch (ladder.direction) {
+                .up => try self.session.render.drawRightButton("Go up"),
+                .down => try self.session.render.drawRightButton("Go down"),
+            },
+            else => try self.session.render.hideRightButton(),
+        }
+    }
+    // Draw the name or health of the entity in focus
+    if (self.entity_in_focus) |entity| {
+        if (entity != self.session.level.player) {
+            if (self.session.level.components.getForEntity2(entity, c.Sprite, c.Health)) |tuple| {
+                try self.session.render.drawEnemyHealth(tuple[1].codepoint, tuple[2]);
+                return;
+            }
+        }
+        const name = if (self.session.level.components.getForEntity(entity, c.Description)) |desc| desc.name else "?";
+        try self.session.render.drawInfo(name);
+    } else {
+        try self.session.render.cleanInfo();
+    }
 }
 
 pub fn subscriber(self: *PlayMode) g.events.Subscriber {
@@ -183,7 +225,7 @@ fn handleInput(self: *PlayMode, button: g.Button) !?g.Action {
 }
 
 pub fn tick(self: *PlayMode) !void {
-    try self.session.render.drawScene(self.session, self.entity_in_focus, self.quick_action);
+    try self.draw();
     if (self.session.level.components.getAll(c.Animation).len > 0)
         return;
 

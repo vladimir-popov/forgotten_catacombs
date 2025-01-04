@@ -28,6 +28,25 @@ pub fn refresh(self: *ExploreMode) !void {
     try self.draw();
 }
 
+fn draw(self: ExploreMode) !void {
+    try self.session.render.hideLeftButton();
+    try self.session.render.drawInfo("Explore the level");
+    try self.session.render.drawRightButton("Cancel");
+    if (self.session.render.viewport.region.top_left.row > 1)
+        self.session.render.setBorderWithArrow(.up);
+
+    if (self.session.render.viewport.region.top_left.col > 1)
+        self.session.render.setBorderWithArrow(.left);
+
+    if (self.session.render.viewport.region.bottomRightRow() < g.DUNGEON_ROWS)
+        self.session.render.setBorderWithArrow(.down);
+
+    if (self.session.render.viewport.region.bottomRightCol() < g.DUNGEON_COLS)
+        self.session.render.setBorderWithArrow(.right);
+
+    try self.session.render.drawScene(self.session, null, null);
+}
+
 pub fn tick(self: *ExploreMode) anyerror!void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         switch (btn.game_button) {
@@ -50,20 +69,4 @@ pub fn tick(self: *ExploreMode) anyerror!void {
         }
         try self.draw();
     }
-}
-
-fn draw(self: ExploreMode) !void {
-    if (self.session.render.viewport.region.top_left.row > 1)
-        self.session.render.setBorderWithArrow(.up);
-
-    if (self.session.render.viewport.region.top_left.col > 1)
-        self.session.render.setBorderWithArrow(.left);
-
-    if (self.session.render.viewport.region.bottomRightRow() < g.DUNGEON_ROWS)
-        self.session.render.setBorderWithArrow(.down);
-
-    if (self.session.render.viewport.region.bottomRightCol() < g.DUNGEON_COLS)
-        self.session.render.setBorderWithArrow(.right);
-
-    try self.session.render.drawScene(self.session, null, null);
 }

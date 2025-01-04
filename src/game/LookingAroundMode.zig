@@ -18,7 +18,7 @@ entities_on_screen: ArrayOfEntitiesOnScreen,
 entity_in_focus: ?g.Entity,
 /// The max length of the visible content of the window
 /// -2 for borders; -1 for scroll.
-window: ?*g.Render.WindowWithDescription = null,
+window: ?*g.Render.WindowWithDescription,
 
 pub fn init(session: *g.GameSession, alloc: std.mem.Allocator) !LookingAroundMode {
     log.debug("Init LookingAroundMode", .{});
@@ -27,6 +27,7 @@ pub fn init(session: *g.GameSession, alloc: std.mem.Allocator) !LookingAroundMod
         .session = session,
         .entities_on_screen = ArrayOfEntitiesOnScreen.init(alloc),
         .entity_in_focus = null,
+        .window = null,
     };
 }
 
@@ -44,8 +45,52 @@ pub fn refresh(self: *LookingAroundMode) !void {
             item.* = .{ tuple[0], tuple[1].point, tuple[2].codepoint };
         }
     }
-    try self.session.render.redraw(self.session, self.entity_in_focus, null);
+    try self.redraw();
     log.debug("Refresh the LookingAroundMode. {d} entities on screen", .{self.entities_on_screen.items.len});
+}
+
+fn draw(self: *const LookingAroundMode) !void {
+    try self.session.render.drawScene(self.session, self.entity_in_focus, null);
+    try self.drawInfoBar();
+}
+
+fn redraw(self: *const LookingAroundMode) !void {
+    try self.session.render.redraw(self.session, self.entity_in_focus, null);
+    try self.drawInfoBar();
+}
+
+fn drawInfoBar(self: *const LookingAroundMode) !void {
+    if (self.window) |_| {
+        try self.session.render.hideLeftButton();
+        try self.session.render.drawRightButton("Close");
+    } else {
+        try self.session.render.drawLeftButton("Continue");
+        try self.session.render.drawRightButton("Describe");
+    }
+    // Draw the name or health of the entity in focus
+    if (self.entity_in_focus) |entity| {
+        if (entity != self.session.level.player) {
+            if (self.session.level.components.getForEntity2(entity, c.Sprite, c.Health)) |tuple| {
+                try self.session.render.drawEnemyHealth(tuple[1].codepoint, tuple[2]);
+                return;
+            }
+        }
+        const name = if (self.session.level.components.getForEntity(entity, c.Description)) |desc| desc.name else "?";
+        try self.session.render.drawInfo(name);
+    } else {
+        try self.session.render.cleanInfo();
+    }
+}
+
+fn drawWindowWithDescription(self: *const LookingAroundMode) !void {
+    const window = self.window.?;
+    const max_rows = g.Render.MAX_WINDOW_HEIGHT - 2;
+    const top_left: p.Point = if (window.lines.items.len > max_rows)
+        .{ .row = 1, .col = 2 }
+    else
+        .{ .row = @intCast(1 + (max_rows - window.lines.items.len) / 2), .col = 2 };
+
+    try self.session.render.drawWindow(g.Render.MAX_WINDOW_WIDTH, window, top_left);
 }
 
 pub fn tick(self: *LookingAroundMode) anyerror!void {
@@ -55,11 +100,12 @@ pub fn tick(self: *LookingAroundMode) anyerror!void {
             .a => if (self.window) |window| {
                 window.destroy();
                 self.window = null;
-                try self.session.render.redraw(self.session, self.entity_in_focus, null);
+                try self.redraw();
             } else {
                 if (self.entity_in_focus) |entity| {
                     self.window = try self.createWindowWithDescription(entity);
-                    try self.session.render.drawWindowWithDescription(self.window.?);
+                    try self.drawWindowWithDescription();
+                    try self.drawInfoBar();
                 }
             },
             .b => if (btn.state == .pressed) {
@@ -68,7 +114,7 @@ pub fn tick(self: *LookingAroundMode) anyerror!void {
             },
             .left, .right, .up, .down => {
                 self.chooseNextEntity(btn.toDirection().?);
-                try self.session.render.drawScene(self.session, self.entity_in_focus, null);
+                try self.draw();
             },
             // ignore cheats in the LookingAroundMode
             .cheat => _ = self.session.runtime.getCheat(),

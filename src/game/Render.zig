@@ -34,9 +34,9 @@ pub const Window = @import("Window.zig").Window;
 const SIDE_ZONE_LENGTH = 8;
 const MIDDLE_ZONE_LENGTH = g.DISPLAY_COLS - (SIDE_ZONE_LENGTH + 1) * 2 - 2;
 /// The maximum count of rows including borders needed to draw a window
-const MAX_WINDOW_HEIGHT = g.DISPLAY_ROWS - 2;
+pub const MAX_WINDOW_HEIGHT = g.DISPLAY_ROWS - 2;
 /// The maximum count of columns including borders needed to draw a window
-const MAX_WINDOW_WIDTH = g.DISPLAY_COLS - 2;
+pub const MAX_WINDOW_WIDTH = g.DISPLAY_COLS - 2;
 
 pub const DrawingMode = enum { normal, inverted };
 pub const Visibility = enum { visible, known, invisible };
@@ -228,8 +228,8 @@ pub fn drawScene(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Ent
     try self.drawSprites(session.level, entity_in_focus);
     log.debug("Draw animations", .{});
     try self.drawAnimationsFrame(session, entity_in_focus);
-    log.debug("Draw info bar", .{});
-    try self.drawInfoBar(session, entity_in_focus, quick_action);
+    log.debug("Draw the horizontal line of the border", .{});
+    try self.drawHorizontalBorderLine(self.viewport.region.rows + 1, self.viewport.region.cols);
     log.debug("Draw changed symbols", .{});
     try self.drawChangedSymbols();
 }
@@ -248,7 +248,6 @@ pub fn redraw(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Entity
     try self.clearDisplay();
     self.scene_buffer.reset();
     try self.drawScene(session, entity_in_focus, quick_action);
-    try self.drawHorizontalBorderLine(self.viewport.region.rows + 1, self.viewport.region.cols);
 }
 
 /// Clears both scene and info bar.
@@ -347,16 +346,7 @@ fn drawChangedSymbols(self: *Render) !void {
     }
 }
 
-pub inline fn drawWindowWithDescription(self: Render, window: *const WindowWithDescription) !void {
-    const top_left: p.Point = if (window.lines.items.len > MAX_WINDOW_HEIGHT - 2)
-        .{ .row = 1, .col = 2 }
-    else
-        .{ .row = @intCast(1 + (MAX_WINDOW_HEIGHT - 2 - window.lines.items.len) / 2), .col = 2 };
-
-    try self.drawWindow(MAX_WINDOW_WIDTH, window, top_left);
-}
-
-fn drawWindow(
+pub fn drawWindow(
     self: Render,
     comptime width: u8,
     window: *const Window(width),
@@ -440,72 +430,33 @@ fn drawHorizontalBorderLine(self: Render, row_on_display: u8, length: u8) !void 
     }
 }
 
-pub fn drawInfoBar(
-    self: Render,
-    session: *const g.GameSession,
-    entity_in_focus: ?g.Entity,
-    quick_action: ?g.Action,
-) !void {
-    try self.drawLeftZone(session);
-    try self.drawMiddleZone(session, entity_in_focus);
-    try self.drawRightZone(session.mode, quick_action);
+pub inline fn drawLeftButton(self: Render, text: []const u8) !void {
+    try self.drawZone(0, text, .inverted);
 }
 
-fn drawLeftZone(self: Render, session: *const g.GameSession) !void {
-    switch (session.mode) {
-        .looking_around => try self.drawZone(0, "Continue", .inverted),
-        .play => if (session.level.components.getForEntity(session.level.player, c.Health)) |health| {
-            var buf = [_]u8{0} ** 8;
-            const text = try std.fmt.bufPrint(&buf, "HP:{d}", .{health.current});
-            try self.drawZone(0, text, .normal);
-        },
-        else => try self.cleanZone(0),
-    }
+pub fn drawPlayerHp(self: Render, health: *const c.Health) !void {
+    var buf = [_]u8{0} ** SIDE_ZONE_LENGTH;
+    const text = try std.fmt.bufPrint(&buf, "HP:{d}", .{health.current});
+    try self.drawZone(0, text, .normal);
 }
 
-/// Draws quick action as the right button, or clear the right zone if the quick_action is null.
-pub fn drawRightZone(self: Render, mode: g.GameSession.Mode, quick_action: ?g.Action) !void {
-    switch (mode) {
-        .play => if (quick_action) |qa| {
-            switch (qa) {
-                .wait => try self.drawZone(2, "Wait", .inverted),
-                .open => try self.drawZone(2, "Open", .inverted),
-                .close => try self.drawZone(2, "Close", .inverted),
-                .hit => try self.drawZone(2, "Attack", .inverted),
-                .move_to_level => |ladder| switch (ladder.direction) {
-                    .up => try self.drawZone(2, "Go up", .inverted),
-                    .down => try self.drawZone(2, "Go down", .inverted),
-                },
-                else => try self.cleanZone(2),
-            }
-        },
-        .explore => try self.drawZone(2, "Cancel", .inverted),
-        .looking_around => try self.drawZone(2, "Describe", .inverted),
-    }
+pub inline fn hideLeftButton(self: Render) !void {
+    try self.cleanZone(0);
 }
 
-fn drawMiddleZone(self: Render, session: *const g.GameSession, entity_in_focus: ?g.Entity) !void {
-    switch (session.mode) {
-        .explore => try self.drawZone(1, "Explore the level", .normal),
-        .play, .looking_around => {
-            // Draw the name or health of the entity in focus
-            if (entity_in_focus) |entity| {
-                if (entity != session.level.player) {
-                    if (session.level.components.getForEntity2(entity, c.Sprite, c.Health)) |tuple| {
-                        try self.drawEnemyHealth(tuple[1].codepoint, tuple[2]);
-                        return;
-                    }
-                }
-                const name = if (session.level.components.getForEntity(entity, c.Description)) |desc| desc.name else "?";
-                try self.drawZone(1, name, .normal);
-            } else {
-                try self.cleanZone(1);
-            }
-        },
-    }
+pub inline fn drawRightButton(self: Render, text: []const u8) !void {
+    try self.drawZone(2, text, .inverted);
 }
 
-fn drawEnemyHealth(self: Render, codepoint: g.Codepoint, health: *const c.Health) !void {
+pub inline fn hideRightButton(self: Render) !void {
+    try self.cleanZone(2);
+}
+
+pub inline fn drawInfo(self: Render, text: []const u8) !void {
+    try self.drawZone(1, text, .normal);
+}
+
+pub fn drawEnemyHealth(self: Render, codepoint: g.Codepoint, health: *const c.Health) !void {
     var buf: [MIDDLE_ZONE_LENGTH]u8 = undefined;
     inline for (0..MIDDLE_ZONE_LENGTH) |i| buf[i] = filler;
     // +1 for padding between the right zone
@@ -521,6 +472,10 @@ fn drawEnemyHealth(self: Render, codepoint: g.Codepoint, health: *const c.Health
     }
     len += free_length;
     try self.drawZone(1, buf[0..len], .normal);
+}
+
+pub inline fn cleanInfo(self: Render) !void {
+    try self.cleanZone(1);
 }
 
 /// Sets the line of spaces as a board on the passed side. Inverts the draw mode
