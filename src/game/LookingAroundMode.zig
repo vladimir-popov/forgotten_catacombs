@@ -16,6 +16,8 @@ session: *g.GameSession,
 entities_on_screen: ArrayOfEntitiesOnScreen,
 /// Highlighted entity
 entity_in_focus: ?g.Entity,
+/// The max length of the visible content of the window
+/// -2 for borders; -1 for scroll.
 window: ?*g.Render.WindowWithDescription = null,
 
 pub fn init(session: *g.GameSession, alloc: std.mem.Allocator) !LookingAroundMode {
@@ -129,8 +131,30 @@ fn createWindowWithDescription(
     entity: g.Entity,
 ) !*g.Render.WindowWithDescription {
     const window = try g.Render.WindowWithDescription.create(self.alloc);
-    var len: usize = 1;
-    var line = try window.addOneLine();
+    var len: usize = 0;
+    if (self.session.level.components.getForEntity(entity, c.Description)) |description| {
+        len += (try std.fmt.bufPrint(&window.title, "{s}", .{description.name})).len;
+    }
+    if (true) {
+        len += (try std.fmt.bufPrint(window.title[len..], " [id: {d}]", .{entity})).len;
+    }
+    if (self.session.level.components.getForEntity(entity, c.EnemyState)) |state| {
+        const line = try window.addOneLine();
+        _ = try std.fmt.bufPrint(line[1..], "State: is {s}", .{@tagName(state.*)});
+    }
+    if (self.session.level.components.getForEntity(entity, c.Health)) |health| {
+        const line = try window.addOneLine();
+        _ = try std.fmt.bufPrint(line[1..], "Health: {d}/{d}", .{ health.current, health.max });
+    }
+    if (self.session.level.components.getForEntity(entity, c.Speed)) |speed| {
+        const line = try window.addOneLine();
+        _ = try std.fmt.bufPrint(line[1..], "Speed: {d}", .{speed.move_points});
+    }
+    return window;
+}
+
+fn statusLine(self: LookingAroundMode, entity: g.Entity, line: []u8) !usize {
+    var len: usize = 0;
     if (self.session.level.components.getForEntity(entity, c.Description)) |description| {
         len += (try std.fmt.bufPrint(line[len..], "{s}", .{description.name})).len;
 
@@ -141,17 +165,5 @@ fn createWindowWithDescription(
     if (true) {
         len += (try std.fmt.bufPrint(line[len..], " [id: {d}]", .{entity})).len;
     }
-    line = try window.addOneLine();
-    for (1..len + 1) |i| {
-        line[i] = '-';
-    }
-    if (self.session.level.components.getForEntity(entity, c.Health)) |health| {
-        line = try window.addOneLine();
-        _ = try std.fmt.bufPrint(line[1..], "Health: {d}/{d}", .{ health.current, health.max });
-    }
-    if (self.session.level.components.getForEntity(entity, c.Speed)) |speed| {
-        line = try window.addOneLine();
-        _ = try std.fmt.bufPrint(line[1..], "Speed: {d}", .{ speed.move_points });
-    }
-    return window;
+    return len;
 }

@@ -29,14 +29,19 @@ const p = g.primitives;
 
 const log = std.log.scoped(.render);
 
-pub const DrawingMode = enum { normal, inverted };
-pub const Visibility = enum { visible, known, invisible };
 pub const Window = @import("Window.zig").Window;
-pub const WindowWithDescription = Window(g.DESCRIPTION_ROWS, g.DESCRIPTION_COLS);
-const TextAlign = enum { center, left, right };
 
 const SIDE_ZONE_LENGTH = 8;
 const MIDDLE_ZONE_LENGTH = g.DISPLAY_COLS - (SIDE_ZONE_LENGTH + 1) * 2 - 2;
+/// The maximum count of rows including borders needed to draw a window
+const MAX_WINDOW_HEIGHT = g.DISPLAY_ROWS - 2;
+/// The maximum count of columns including borders needed to draw a window
+const MAX_WINDOW_WIDTH = g.DISPLAY_COLS - 2;
+
+pub const DrawingMode = enum { normal, inverted };
+pub const Visibility = enum { visible, known, invisible };
+pub const WindowWithDescription = Window(MAX_WINDOW_WIDTH);
+const TextAlign = enum { center, left, right };
 
 // this should be used to erase a symbol
 const filler = ' ';
@@ -343,27 +348,39 @@ fn drawChangedSymbols(self: *Render) !void {
 }
 
 pub inline fn drawWindowWithDescription(self: Render, window: *const WindowWithDescription) !void {
-    try self.drawWindow(g.DESCRIPTION_ROWS, g.DESCRIPTION_COLS, window, .{ .row = 1, .col = 3 });
+    const top_left: p.Point = if (window.lines.items.len > MAX_WINDOW_HEIGHT - 2)
+        .{ .row = 1, .col = 2 }
+    else
+        .{ .row = @intCast(1 + (MAX_WINDOW_HEIGHT - 2 - window.lines.items.len) / 2), .col = 2 };
+
+    try self.drawWindow(MAX_WINDOW_WIDTH, window, top_left);
 }
 
 fn drawWindow(
     self: Render,
-    comptime rows: u8,
-    comptime cols: u8,
-    window: *const Window(rows, cols),
+    comptime width: u8,
+    window: *const Window(width),
     top_left: p.Point,
 ) !void {
+    const is_scrolled = window.lines.items.len > MAX_WINDOW_HEIGHT - 2;
+    const lines: [][Window(width).cols]u8 = if (is_scrolled)
+        window.lines.items[window.scroll .. window.scroll + MAX_WINDOW_HEIGHT - 2]
+    else
+        window.lines.items;
+    // Count of rows including borders
+    const rows: u8 = @intCast(lines.len + 2);
+
     for (0..rows) |i| {
-        for (0..cols) |j| {
+        for (0..width) |j| {
             const point = top_left.movedToNTimes(.down, @intCast(i)).movedToNTimes(.right, @intCast(j));
             if (i == 0 or i == rows - 1) {
                 try self.runtime.drawSprite('─', point, .normal);
-            } else if (j == 0 or j == cols - 1) {
+            } else if (j == 0 or j == width - 1) {
                 try self.runtime.drawSprite('│', point, .normal);
             } else {
                 const row_idx = point.row - top_left.row - 1 + window.scroll;
                 const col_idx = point.col - top_left.col - 1;
-                if (row_idx < window.lines.items.len and col_idx < cols - 3) {
+                if (row_idx < window.lines.items.len and col_idx < width - 3) {
                     try self.runtime.drawSprite(window.lines.items[row_idx][col_idx], point, .normal);
                 } else {
                     try self.runtime.drawSprite(' ', point, .normal);
@@ -371,10 +388,23 @@ fn drawWindow(
             }
         }
     }
+    //
+    // Draw the title
+    //
+    const title = std.mem.sliceTo(&window.title, 0);
+    const padding: u8 = @intCast(width - title.len);
+    var point = top_left.movedToNTimes(.right, padding / 2);
+    for (title) |char| {
+        try self.runtime.drawSprite(char, point, .normal);
+        point.move(.right);
+    }
+    //
+    // Draw the corners
+    //
     try self.runtime.drawSprite('┌', top_left, .normal);
     try self.runtime.drawSprite('└', top_left.movedToNTimes(.down, rows - 1), .normal);
-    try self.runtime.drawSprite('┐', top_left.movedToNTimes(.right, cols - 1), .normal);
-    try self.runtime.drawSprite('┘', top_left.movedToNTimes(.down, rows - 1).movedToNTimes(.right, cols - 1), .normal);
+    try self.runtime.drawSprite('┐', top_left.movedToNTimes(.right, width - 1), .normal);
+    try self.runtime.drawSprite('┘', top_left.movedToNTimes(.down, rows - 1).movedToNTimes(.right, width - 1), .normal);
 }
 
 /// Draws a single frame from every animation.

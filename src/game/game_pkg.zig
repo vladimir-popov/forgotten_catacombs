@@ -53,10 +53,6 @@ pub const DUNGEON_REGION: primitives.Region = .{
     .cols = DUNGEON_COLS,
 };
 
-// The size of the description window
-pub const DESCRIPTION_ROWS = 10;
-pub const DESCRIPTION_COLS = 36;
-
 pub const DOUBLE_PUSH_DELAY_MS = 250;
 pub const HOLD_DELAY_MS = 500;
 

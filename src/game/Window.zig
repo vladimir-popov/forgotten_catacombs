@@ -2,15 +2,18 @@ const std = @import("std");
 const g = @import("game_pkg.zig");
 const p = g.primitives;
 
-/// The rows and columns include the borders
-pub fn Window(comptime rows: u8, cols: u8) type {
+/// The width of the window including the borders and optional scroll.
+pub fn Window(width: u8) type {
     return struct {
         const Self = @This();
-
-        const Line = [cols - 3]u8;
+        /// The max length of the visible content of the window
+        /// -2 for borders; -1 for scroll.
+        pub const cols = width - 3;
+        const Line = [cols]u8;
 
         arena: *std.heap.ArenaAllocator,
-        /// The scrollable content of the window, EXCEPT the border and one line for scroll.
+        title: [cols]u8,
+        /// The scrollable content of the window
         lines: std.ArrayList(Line),
         scroll: u8,
 
@@ -21,7 +24,8 @@ pub fn Window(comptime rows: u8, cols: u8) type {
             const self = try arena.allocator().create(Self);
             self.arena = arena;
             self.scroll = 0;
-            self.lines = try std.ArrayList(Line).initCapacity(arena.allocator(), rows - 2);
+            self.title = [1]u8{0} ** cols;
+            self.lines = std.ArrayList(Line).init(arena.allocator());
             std.log.debug("The window was created", .{});
             return self;
         }
@@ -34,7 +38,7 @@ pub fn Window(comptime rows: u8, cols: u8) type {
 
         pub fn addOneLine(self: *Self) !*Line {
             const line = try self.lines.addOne();
-            line.* = [1]u8{' '} ** (cols - 3);
+            line.* = [1]u8{' '} ** cols;
             return line;
         }
     };
