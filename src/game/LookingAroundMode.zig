@@ -70,8 +70,14 @@ fn drawInfoBar(self: *const LookingAroundMode) !void {
     // Draw the name or health of the entity in focus
     if (self.entity_in_focus) |entity| {
         if (entity != self.session.level.player) {
-            if (self.session.level.components.getForEntity2(entity, c.Sprite, c.Health)) |tuple| {
-                try self.session.render.drawEnemyHealth(tuple[1].codepoint, tuple[2]);
+            if (self.session.level.components.getForEntity3(entity, c.Sprite, c.Health, c.Position)) |tuple| {
+                if (tuple[3].point.eql(self.session.level.playerPosition().point)) {
+                    try self.session.render.drawEnemyHealth(tuple[1].codepoint, tuple[2]);
+                } else {
+                    var buf: [g.DISPLAY_COLS]u8 = undefined;
+                    const len = @min(try self.statusLine(entity, &buf), g.Render.MIDDLE_ZONE_LENGTH);
+                    try self.session.render.drawInfo(buf[0..len]);
+                }
                 return;
             }
         }
@@ -80,6 +86,21 @@ fn drawInfoBar(self: *const LookingAroundMode) !void {
     } else {
         try self.session.render.cleanInfo();
     }
+}
+
+fn statusLine(self: LookingAroundMode, entity: g.Entity, line: []u8) !usize {
+    var len: usize = 0;
+    if (self.session.level.components.getForEntity(entity, c.Description)) |description| {
+        len += (try std.fmt.bufPrint(line[len..], "{s}", .{description.name})).len;
+
+        if (self.session.level.components.getForEntity(entity, c.EnemyState)) |state| {
+            len += (try std.fmt.bufPrint(line[len..], " ({s})", .{@tagName(state.*)})).len;
+        }
+    }
+    if (true) {
+        len += (try std.fmt.bufPrint(line[len..], " [{d}]", .{entity})).len;
+    }
+    return len;
 }
 
 fn drawWindowWithDescription(self: *const LookingAroundMode) !void {
@@ -197,19 +218,4 @@ fn createWindowWithDescription(
         _ = try std.fmt.bufPrint(line[1..], "Speed: {d}", .{speed.move_points});
     }
     return window;
-}
-
-fn statusLine(self: LookingAroundMode, entity: g.Entity, line: []u8) !usize {
-    var len: usize = 0;
-    if (self.session.level.components.getForEntity(entity, c.Description)) |description| {
-        len += (try std.fmt.bufPrint(line[len..], "{s}", .{description.name})).len;
-
-        if (self.session.level.components.getForEntity(entity, c.EnemyState)) |state| {
-            len += (try std.fmt.bufPrint(line[len..], " (is {s})", .{@tagName(state.*)})).len;
-        }
-    }
-    if (true) {
-        len += (try std.fmt.bufPrint(line[len..], " [id: {d}]", .{entity})).len;
-    }
-    return len;
 }

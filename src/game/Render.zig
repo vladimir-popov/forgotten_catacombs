@@ -31,8 +31,8 @@ const log = std.log.scoped(.render);
 
 pub const Window = @import("Window.zig").Window;
 
-const SIDE_ZONE_LENGTH = 8;
-const MIDDLE_ZONE_LENGTH = g.DISPLAY_COLS - (SIDE_ZONE_LENGTH + 1) * 2 - 2;
+pub const SIDE_ZONE_LENGTH = 8;
+pub const MIDDLE_ZONE_LENGTH = g.DISPLAY_COLS - (SIDE_ZONE_LENGTH + 1) * 2 - 2;
 /// The maximum count of rows including borders needed to draw a window
 pub const MAX_WINDOW_HEIGHT = g.DISPLAY_ROWS - 2;
 /// The maximum count of columns including borders needed to draw a window
