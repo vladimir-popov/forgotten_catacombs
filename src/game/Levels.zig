@@ -98,7 +98,7 @@ pub inline fn catacomb(
         if (depth > 3)
             g.visibility.showTheCurrentPlacement
         else
-            g.visibility.showInRadiusOfSourceOfLight,
+            g.visibility.showTheCurrentPlacementInLight,
         player,
         from_ladder,
     );

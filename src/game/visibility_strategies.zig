@@ -11,7 +11,33 @@ const log = std.log.scoped(.visibility);
 /// This global flag is used for cheating
 pub var turn_light_on: bool = false;
 
-/// Marks as visible the whole placement and optionally its nearest neighbors
+/// Marks as visible the whole placement with player, and all nearest neighbors with opened doors
+/// leads to them.
+///
+/// Additionally, this function checks the light source.
+pub fn showTheCurrentPlacementInLight(level: *const g.Level, place: p.Point) g.Render.Visibility {
+    if (turn_light_on) return .visible;
+    if (level.player_placement.contains(place)) return showInRadiusOfSourceOfLight(level, place);
+
+    var doorways = level.player_placement.doorways();
+    while (doorways.next()) |door_place| {
+        if (level.dungeon.doorwayAt(door_place.*)) |doorway| {
+            if (level.components.getForEntity(doorway.door_id, c.Door)) |door| {
+                if (door.state == .closed) continue;
+                if (doorway.oppositePlacement(level.player_placement)) |placement| {
+                    if (placement.contains(place)) return showInRadiusOfSourceOfLight(level, place);
+                }
+            }
+        }
+    }
+
+    return chechKnownPlaces(level, place);
+}
+
+/// Marks as visible the whole placement with player, and optionally its nearest neighbors, if the player is
+/// in the doorway.
+///
+/// Ignores the light source.
 pub fn showTheCurrentPlacement(level: *const g.Level, place: p.Point) g.Render.Visibility {
     if (turn_light_on or level.player_placement.contains(place)) return .visible;
 
