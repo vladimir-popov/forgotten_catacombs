@@ -25,8 +25,8 @@ pub const Animation = struct {
     pub const FramesPresets = struct {
         pub const hit: [3]g.Codepoint = [_]g.Codepoint{ 0, '×', 0 };
         pub const miss: [1]g.Codepoint = [_]g.Codepoint{'.'};
-        pub const go_sleep: [6]g.Codepoint = [_]g.Codepoint{ 'z', 'z', 'z', 'z', 'z', 'z' };
-        pub const relax: [6]g.Codepoint = [_]g.Codepoint{ '?', '?', '?', '?', '?', '?' };
+        pub const go_sleep: [6]g.Codepoint = [_]g.Codepoint{ 0, 'z', 'z', 0, 'z', 'z' };
+        pub const relax: [6]g.Codepoint = [_]g.Codepoint{ 0, '?', '?', 0, '?', '?' };
         pub const get_angry: [6]g.Codepoint = [_]g.Codepoint{ 0, '!', '!', 0, '!', '!' };
     };
 

@@ -119,7 +119,7 @@ pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
 
     // TODO persist the current level
     _ = self.level_arena.reset(.retain_capacity);
-    self.play_mode.entity_in_focus = null;
+    self.play_mode.target_entity = null;
     self.play_mode.quick_action = null;
     self.level = switch (new_depth) {
         0 => try g.Levels.firstLevel(&self.level_arena, player, false),

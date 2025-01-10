@@ -25,7 +25,6 @@ pub const std_options: std.Options = .{
         // .{ .scope = .level_map, .level = .debug },
         // .{ .scope = .events, .level = .debug },
         // .{ .scope = .action_system, .level = .debug },
-        .{ .scope = .vector_field, .level = .debug },
     },
 };
 

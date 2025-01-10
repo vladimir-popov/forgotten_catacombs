@@ -95,8 +95,8 @@ const EnemiesIterator = struct {
 session: *g.GameSession,
 enemies: EnemiesIterator,
 ai: g.AI,
-/// Highlighted entity
-entity_in_focus: ?g.Entity,
+/// The object of player's actions
+target_entity: ?g.Entity,
 // An action which could be applied to the entity in focus
 quick_action: ?g.Action,
 
@@ -106,7 +106,7 @@ pub fn init(session: *g.GameSession, alloc: std.mem.Allocator, rand: std.Random)
         .session = session,
         .enemies = try EnemiesIterator.init(alloc, session),
         .ai = g.AI{ .session = session, .rand = rand },
-        .entity_in_focus = null,
+        .target_entity = null,
         .quick_action = null,
     };
 }
@@ -116,10 +116,10 @@ pub fn deinit(self: PlayMode) void {
 }
 
 /// Updates the target entity after switching back to the play mode
-pub fn update(self: *PlayMode, entity_in_focus: ?g.Entity) !void {
-    self.entity_in_focus = entity_in_focus;
-    if (entity_in_focus) |ef| if (ef == self.session.level.player) {
-        self.entity_in_focus = null;
+pub fn update(self: *PlayMode, target_entity: ?g.Entity) !void {
+    self.target_entity = target_entity;
+    if (target_entity) |ef| if (ef == self.session.level.player) {
+        self.target_entity = null;
     };
     log.debug("Update target after refresh", .{});
     try self.updateTarget();
@@ -127,12 +127,12 @@ pub fn update(self: *PlayMode, entity_in_focus: ?g.Entity) !void {
 }
 
 fn draw(self: *const PlayMode) !void {
-    try self.session.render.drawScene(self.session, self.entity_in_focus, self.quick_action);
+    try self.session.render.drawScene(self.session, self.target_entity, self.quick_action);
     try self.drawInfoBar();
 }
 
 fn redraw(self: *const PlayMode) !void {
-    try self.session.render.redraw(self.session, self.entity_in_focus, self.quick_action);
+    try self.session.render.redraw(self.session, self.target_entity, self.quick_action);
     try self.drawInfoBar();
 }
 
@@ -153,8 +153,8 @@ fn drawInfoBar(self: *const PlayMode) !void {
             else => try self.session.render.hideRightButton(),
         }
     }
-    // Draw the name or health of the entity in focus
-    if (self.entity_in_focus) |entity| {
+    // Draw the name or health of the target entity
+    if (self.target_entity) |entity| {
         if (entity != self.session.level.player) {
             if (self.session.level.components.getForEntity2(entity, c.Sprite, c.Health)) |tuple| {
                 try self.session.render.drawEnemyHealth(tuple[1].codepoint, tuple[2]);
@@ -176,7 +176,7 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
     const self: *PlayMode = @ptrCast(@alignCast(ptr));
     switch (event) {
         .player_hit => {
-            self.entity_in_focus = event.player_hit.target;
+            self.target_entity = event.player_hit.target;
             log.debug("Update target after player hit", .{});
             try self.updateTarget();
         },
@@ -264,22 +264,22 @@ pub fn tick(self: *PlayMode) !void {
 fn updateTarget(self: *PlayMode) anyerror!void {
     defer {
         const qa_str = if (self.quick_action) |qa| @tagName(qa) else "not defined";
-        log.debug("Entity in focus after update {any}; quick action {s}", .{ self.entity_in_focus, qa_str });
+        log.debug("The target entity after update {any}; quick action {s}", .{ self.target_entity, qa_str });
     }
-    log.debug("Update target. Current entity in focus is {any}", .{self.entity_in_focus});
+    log.debug("Update target. Current target is {any}", .{self.target_entity});
 
     // check if quick action still available for target
-    if (self.entity_in_focus) |target| if (self.calculateQuickActionForTarget(target)) |qa| {
+    if (self.target_entity) |target| if (self.calculateQuickActionForTarget(target)) |qa| {
         self.quick_action = qa;
         return;
     };
-    // If we're not able to do any action with previous entity in focus
-    // we should try to change the focus
+    // If we're not able to do any action with previous target
+    // we should try to change the target
     try self.tryToFindNewTarget();
 }
 
 fn tryToFindNewTarget(self: *PlayMode) !void {
-    self.entity_in_focus = null;
+    self.target_entity = null;
     self.quick_action = null;
     const player_position = self.session.level.playerPosition();
     // Check the nearest entities:
@@ -298,7 +298,7 @@ fn tryToFindNewTarget(self: *PlayMode) !void {
             if (positions.index_entity.get(@intCast(idx))) |entity| {
                 if (entity == self.session.level.player) continue;
                 if (self.calculateQuickActionForTarget(entity)) |qa| {
-                    self.entity_in_focus = entity;
+                    self.target_entity = entity;
                     self.quick_action = qa;
                     return;
                 }

@@ -3,8 +3,6 @@ const std = @import("std");
 const g = @import("game_pkg.zig");
 const p = g.primitives;
 
-const log = std.log.scoped(.vector_field);
-
 const DijkstraMap = @This();
 
 const VectorsMap = std.AutoHashMap(p.Point, struct { p.Direction, u8 });
@@ -59,7 +57,7 @@ pub fn dumpToLog(self: DijkstraMap) void {
     var buf: [2048]u8 = [_]u8{0} ** 2048;
     var writer = std.io.fixedBufferStream(&buf);
     self.write(writer.writer().any()) catch unreachable;
-    log.debug("VectorField:\n{s}", .{std.mem.sliceTo(&buf, 0)});
+    std.log.debug("Dijkstra Map:\n{s}", .{std.mem.sliceTo(&buf, 0)});
 }
 
 fn write(

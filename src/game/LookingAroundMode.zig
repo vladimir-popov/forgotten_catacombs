@@ -90,15 +90,15 @@ fn drawInfoBar(self: *const LookingAroundMode) !void {
 
 fn statusLine(self: LookingAroundMode, entity: g.Entity, line: []u8) !usize {
     var len: usize = 0;
+    if (true) {
+        len += (try std.fmt.bufPrint(line[len..], "{d}:", .{entity})).len;
+    }
     if (self.session.level.components.getForEntity(entity, c.Description)) |description| {
         len += (try std.fmt.bufPrint(line[len..], "{s}", .{description.name})).len;
 
         if (self.session.level.components.getForEntity(entity, c.EnemyState)) |state| {
-            len += (try std.fmt.bufPrint(line[len..], " ({s})", .{@tagName(state.*)})).len;
+            len += (try std.fmt.bufPrint(line[len..], "({s})", .{@tagName(state.*)})).len;
         }
-    }
-    if (true) {
-        len += (try std.fmt.bufPrint(line[len..], " [{d}]", .{entity})).len;
     }
     return len;
 }

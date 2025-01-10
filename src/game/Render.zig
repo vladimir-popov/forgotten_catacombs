@@ -546,10 +546,10 @@ inline fn drawZone(
     text: []const u8,
     mode: DrawingMode,
 ) !void {
-    const zone_len = if (zone == 1) MIDDLE_ZONE_LENGTH else SIDE_ZONE_LENGTH;
+    const zone_len = if (zone == 1) MIDDLE_ZONE_LENGTH - 2 else SIDE_ZONE_LENGTH;
     const pos = switch (zone) {
         0 => p.Point{ .row = g.DISPLAY_ROWS, .col = 1 },
-        1 => p.Point{ .row = g.DISPLAY_ROWS, .col = SIDE_ZONE_LENGTH + 1 },
+        1 => p.Point{ .row = g.DISPLAY_ROWS, .col = SIDE_ZONE_LENGTH + 2 },
         2 => p.Point{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS - SIDE_ZONE_LENGTH + 1 },
         else => unreachable,
     };

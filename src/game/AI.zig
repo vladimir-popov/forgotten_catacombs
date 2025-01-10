@@ -32,12 +32,16 @@ pub fn action(
 }
 
 inline fn actionForSleepingEnemy(
-    _: AI,
+    self: AI,
     entity: g.Entity,
     entity_place: p.Point,
     player_place: p.Point,
 ) g.Action {
     if (entity_place.near(player_place)) return .{ .get_angry = entity };
+    if (self.isPlayerIsInSight(entity_place)) {
+        // TODO Probability of waking up should depends on player's skills
+        if (self.rand.uintLessThan(u8, 10) == 0) return .{ .get_angry = entity };
+    }
     return .wait;
 }
 
@@ -49,8 +53,9 @@ inline fn actionForWalkingEnemy(
 ) g.Action {
     if (entity_place.near(player_place)) return .{ .get_angry = entity };
 
-    if (!self.session.level.dijkstra_map.region.containsPointInside(entity_place)) {
-        return .wait;
+    if (self.isPlayerIsInSight(entity_place)) {
+        // TODO Probability of become aggressive should depends on player's skills
+        if (self.rand.uintLessThan(u8, 10) > 3) return .{ .get_angry = entity };
     }
 
     var directions = [4]p.Direction{ .left, .up, .right, .down };
@@ -61,7 +66,8 @@ inline fn actionForWalkingEnemy(
             return .{ .move = .{ .target = .{ .direction = direction } } };
         }
     }
-    return .wait;
+    log.err("Entity {d} is stuck at {any}", .{ entity, entity_place });
+    return .{ .go_sleep = entity };
 }
 
 inline fn actionForAggressiveEnemy(
@@ -87,4 +93,9 @@ inline fn actionForAggressiveEnemy(
     } else {
         return .{ .chill = entity };
     }
+}
+
+fn isPlayerIsInSight(self: AI, entity_place: p.Point) bool {
+    if (!self.session.level.dijkstra_map.region.containsPointInside(entity_place)) return false;
+    return self.session.level.checkVisibility(entity_place) == .visible;
 }
