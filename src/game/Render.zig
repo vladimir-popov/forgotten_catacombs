@@ -415,7 +415,7 @@ fn drawAnimationsFrame(self: *Render, session: *g.GameSession, entity_in_focus: 
                     .{ .codepoint = frame, .z_order = 3 },
                     position.point,
                     mode,
-                    .visible,
+                    session.level.checkVisibility(position.point),
                 );
             }
         } else {
