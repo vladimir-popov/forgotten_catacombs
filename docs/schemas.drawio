@@ -554,7 +554,7 @@
             <mxPoint x="-5" y="-16" as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="dTx5JJAOd3eoJocpGkvk-9" value="current enemy" style="shape=umlFrame;whiteSpace=wrap;html=1;pointerEvents=0;strokeWidth=2;" parent="1" vertex="1">
+        <mxCell id="dTx5JJAOd3eoJocpGkvk-9" value="every enemy" style="shape=umlFrame;whiteSpace=wrap;html=1;pointerEvents=0;strokeWidth=2;" parent="1" vertex="1">
           <mxGeometry x="281" y="630" width="460" height="169" as="geometry" />
         </mxCell>
       </root>

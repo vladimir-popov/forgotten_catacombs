@@ -58,7 +58,7 @@ pub fn create(
         .runtime = runtime,
         .events = events,
         .level_arena = std.heap.ArenaAllocator.init(alloc),
-        .play_mode = try PlayMode.init(self, alloc, self.prng.random()),
+        .play_mode = try PlayMode.init(self, self.prng.random()),
         .looking_around = try LookingAroundMode.init(self, alloc),
         .explore_mode = ExploreMode.init(self),
     };

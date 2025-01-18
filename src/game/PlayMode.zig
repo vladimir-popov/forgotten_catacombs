@@ -10,109 +10,22 @@ const log = std.log.scoped(.play_mode);
 
 const PlayMode = @This();
 
-const EnemiesIterator = struct {
-    /// The GameSession has a pointer to the actual level
-    session: *g.GameSession,
-    /// The index of all enemies, which are potentially can perform an action.
-    /// This list recreated every player's move.
-    not_completed: std.DoublyLinkedList(g.Entity),
-    /// Arena for the `not_completed` list
-    arena: *std.heap.ArenaAllocator,
-    /// The pointer to the next enemy, which should perform an action.
-    next_enemy: ?*std.DoublyLinkedList(g.Entity).Node = null,
-
-    fn init(alloc: std.mem.Allocator, session: *g.GameSession) !EnemiesIterator {
-        const arena = try alloc.create(std.heap.ArenaAllocator);
-        arena.* = std.heap.ArenaAllocator.init(alloc);
-        return .{
-            .session = session,
-            .arena = arena,
-            .not_completed = std.DoublyLinkedList(g.Entity){},
-        };
-    }
-
-    fn deinit(self: *EnemiesIterator) void {
-        const alloc = self.arena.child_allocator;
-        self.arena.deinit();
-        alloc.destroy(self.arena);
-    }
-
-    fn resetNotCompleted(self: *EnemiesIterator) !void {
-        _ = self.arena.reset(.retain_capacity);
-        self.not_completed = std.DoublyLinkedList(g.Entity){};
-        self.next_enemy = null;
-    }
-
-    /// Collects NPC and adds them move points
-    fn addMovePoints(self: *EnemiesIterator, move_points: u8) !void {
-        try self.resetNotCompleted();
-        var itr = self.session.level.query().get(c.Initiative);
-        while (itr.next()) |tuple| {
-            var node = try self.arena.allocator().create(std.DoublyLinkedList(g.Entity).Node);
-            node.data = tuple[0];
-            tuple[1].move_points +|= move_points;
-            self.not_completed.append(node);
-        }
-    }
-
-    inline fn completeMove(self: *EnemiesIterator, entity: g.Entity) void {
-        var itr = self.not_completed.first;
-        while (itr) |node| {
-            if (node.data == entity) {
-                const updated_current = if (node == self.next_enemy) node.next else self.next_enemy;
-                self.not_completed.remove(node);
-                self.next_enemy = updated_current;
-                return;
-            } else {
-                itr = node.next;
-            }
-        }
-    }
-
-    /// Returns the enemies circle back, till all of them complete their moves
-    fn next(self: *EnemiesIterator) ?struct { g.Entity, *c.Initiative, *c.Position, *c.Speed } {
-        if (self.next_enemy == null) {
-            self.next_enemy = self.not_completed.first;
-        }
-        while (self.next_enemy) |current_enemy| {
-            const enemy = current_enemy.data;
-            if (current_enemy.next) |next_enemy| {
-                self.next_enemy = next_enemy;
-            } else {
-                self.next_enemy = self.not_completed.first;
-            }
-            if (self.session.level.components.getForEntity3(enemy, c.Initiative, c.Position, c.Speed)) |res| {
-                return res;
-            } else {
-                log.debug("It looks like the entity {d} was removed. Remove it from enemies", .{enemy});
-                self.completeMove(enemy);
-            }
-        }
-        return null;
-    }
-};
-
 session: *g.GameSession,
-enemies: EnemiesIterator,
 ai: g.AI,
 /// The object of player's actions
 target_entity: ?g.Entity,
 // An action which could be applied to the entity in focus
 quick_action: ?g.Action,
+is_player_turn: bool = true,
 
-pub fn init(session: *g.GameSession, alloc: std.mem.Allocator, rand: std.Random) !PlayMode {
+pub fn init(session: *g.GameSession, rand: std.Random) !PlayMode {
     log.debug("Init PlayMode", .{});
     return .{
         .session = session,
-        .enemies = try EnemiesIterator.init(alloc, session),
         .ai = g.AI{ .session = session, .rand = rand },
         .target_entity = null,
         .quick_action = null,
     };
-}
-
-pub fn deinit(self: PlayMode) void {
-    self.enemies.deinit();
 }
 
 /// Updates the target entity after switching back to the play mode
@@ -229,35 +142,40 @@ pub fn tick(self: *PlayMode) !void {
     if (self.session.level.components.getAll(c.Animation).len > 0)
         return;
 
-    // the list of enemies is empty at the start
-    if (self.enemies.next()) |tuple| {
-        const entity = tuple[0];
-        const initiative = tuple[1];
-        const position = tuple[2];
-        const speed = tuple[3];
-        if (speed.move_points > initiative.move_points) {
-            self.enemies.completeMove(entity);
-            return;
-        }
-        const action = self.ai.action(entity, position.point);
-        const mp = try ActionSystem.doAction(self.session, entity, action, speed.move_points);
-        std.debug.assert(0 < mp and mp <= initiative.move_points);
-        tuple[1].move_points -= mp;
-    } else if (try self.session.runtime.readPushedButtons()) |buttons| {
-        const maybe_action = try self.handleInput(buttons);
-        // break this function if the mode was changed
-        if (self.session.mode != .play) return;
-        // If the player did some action
-        if (maybe_action) |action| {
-            const speed = self.session.level.components.getForEntityUnsafe(self.session.level.player, c.Speed);
-            const mp = try ActionSystem.doAction(self.session, self.session.level.player, action, speed.move_points);
-            if (mp > 0) {
-                log.debug("Update target after action {any}", .{action});
-                try self.updateTarget();
-                // find all enemies and give them move points
-                try self.enemies.addMovePoints(mp);
+    if (self.is_player_turn) {
+        if (try self.session.runtime.readPushedButtons()) |buttons| {
+            const maybe_action = try self.handleInput(buttons);
+            // break this function if the mode was changed
+            if (self.session.mode != .play) return;
+            // If the player did some action
+            if (maybe_action) |action| {
+                self.is_player_turn = false;
+                const speed = self.session.level.components.getForEntityUnsafe(self.session.level.player, c.Speed);
+                const mp = try ActionSystem.doAction(self.session, self.session.level.player, action, speed.move_points);
+                if (mp > 0) {
+                    log.debug("Update target after action {any}", .{action});
+                    try self.updateTarget();
+                    for (self.session.level.components.arrayOf(c.Initiative).components.items) |*initiative| {
+                        initiative.move_points += mp;
+                    }
+                }
             }
         }
+    } else {
+        var itr = self.session.level.query().get2(c.Initiative, c.Speed);
+        while (itr.next()) |tuple| {
+            const entity = tuple[0];
+            const initiative = tuple[1];
+            const speed = tuple[2];
+            if (speed.move_points > initiative.move_points) continue;
+            if (self.session.level.components.getForEntity(entity, c.Position)) |position| {
+                const action = self.ai.action(entity, position.point);
+                const mp = try ActionSystem.doAction(self.session, entity, action, speed.move_points);
+                std.debug.assert(0 < mp and mp <= initiative.move_points);
+                initiative.move_points -= mp;
+            }
+        }
+        self.is_player_turn = true;
     }
 }
 
