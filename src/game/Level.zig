@@ -127,7 +127,7 @@ pub fn randomEmptyPlace(self: Level, rand: std.Random) ?p.Point {
     var attempt: u8 = 10;
     while (attempt > 0) : (attempt -= 1) {
         const place = self.dungeon.randomPlace(rand);
-        if (self.collisionAt(place) == null) return place;
+        if (self.obstacleAt(place) == null) return place;
     }
     return null;
 }
@@ -139,9 +139,9 @@ pub fn obstacles(self: *const Level) g.DijkstraMap.Obstacles {
 // TODO improve
 fn isObstacle(ptr: *const anyopaque, place: p.Point) bool {
     const self: *const Level = @ptrCast(@alignCast(ptr));
-    if (self.collisionAt(place)) |collision| {
+    if (self.obstacleAt(place)) |collision| {
         return switch (collision) {
-            .cell, .door => true,
+            .landscape, .door => true,
             else => false,
         };
     }
@@ -149,13 +149,13 @@ fn isObstacle(ptr: *const anyopaque, place: p.Point) bool {
 }
 
 // TODO improve
-pub fn collisionAt(
+pub fn obstacleAt(
     self: *const Level,
     place: p.Point,
-) ?union(enum) { cell: d.Dungeon.Cell, door: g.Entity, entity: g.Entity } {
+) ?union(enum) { landscape: d.Dungeon.Cell, door: g.Entity, entity: g.Entity } {
     switch (self.dungeon.cellAt(place)) {
         .floor, .doorway => {},
-        else => |cell| return .{ .cell = cell },
+        else => |cell| return .{ .landscape = cell },
     }
 
     var itr = self.query().get(c.Position);

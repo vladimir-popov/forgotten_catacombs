@@ -50,17 +50,17 @@ pub const Action = union(enum) {
 };
 
 /// Handles intentions to do some actions
-pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action, move_speed: MovePoints) anyerror!MovePoints {
+pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action, actor_speed: MovePoints) !MovePoints {
     if (std.log.logEnabled(.debug, .action_system) and action != .do_nothing) {
         log.debug("Do action {s} by the entity {d}", .{ @tagName(action), actor });
     }
     switch (action) {
         .move => |move| {
             if (session.level.components.getForEntity(actor, c.Position)) |position|
-                return doMove(session, actor, position, move.target, move_speed);
+                return doMove(session, actor, position, move.target, actor_speed);
         },
         .hit => |hit| {
-            return doHit(session, actor, hit.by_weapon, move_speed, hit.target, hit.target_health);
+            return doHit(session, actor, hit.by_weapon, actor_speed, hit.target, hit.target_health);
         },
         .open => |door| {
             try session.level.components.setComponentsToEntity(door, g.entities.OpenedDoor);
@@ -94,7 +94,7 @@ pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action, move_s
         },
         else => {},
     }
-    return move_speed;
+    return actor_speed;
 }
 
 fn doMove(
@@ -127,9 +127,9 @@ fn doMove(
 }
 
 fn checkCollision(session: *g.GameSession, actor: g.Entity, place: p.Point) ?Action {
-    if (session.level.collisionAt(place)) |obstacle| {
+    if (session.level.obstacleAt(place)) |obstacle| {
         switch (obstacle) {
-            .cell => return .do_nothing,
+            .landscape => return .do_nothing,
             .door => |door| return .{ .open = door },
             .entity => |entity| {
                 if (session.level.components.getForEntity(entity, c.Health)) |health|
