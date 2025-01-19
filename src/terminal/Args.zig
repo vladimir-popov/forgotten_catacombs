@@ -2,7 +2,7 @@ const std = @import("std");
 
 /// Iterates over args, and looking for the '--{name}' argument. If the arg with the {name} is found,
 /// returns true, or false otherwise.
-pub fn key(comptime name: []const u8) bool {
+pub fn flag(comptime name: []const u8) bool {
     var args = std.process.args();
     while (args.next()) |arg| {
         if (arg.len > 2 and arg[0] == '-' and arg[1] == '-' and std.mem.eql(u8, arg[2..], name)) {

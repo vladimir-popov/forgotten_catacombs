@@ -12,12 +12,12 @@ pub const std_options: std.Options = .{
     .log_scope_levels = &[_]std.log.ScopeLevel{
         .{ .scope = .default, .level = .debug },
         .{ .scope = .render, .level = .warn },
-        .{ .scope = .tty_runtime, .level = .debug },
+        // .{ .scope = .tty_runtime, .level = .debug },
         // .{ .scope = .visibility, .level = .debug },
         // .{ .scope = .ai, .level = .debug },
         // .{ .scope = .game, .level = .debug },
         // .{ .scope = .game_session, .level = .debug },
-        .{ .scope = .play_mode, .level = .debug },
+        // .{ .scope = .play_mode, .level = .debug },
         // .{ .scope = .looking_around_mode, .level = .debug },
         // .{ .scope = .levels, .level = .debug },
         // .{ .scope = .level, .level = .debug },
@@ -43,17 +43,20 @@ pub fn main() !void {
     const seed = try Args.int(u64, "seed") orelse std.crypto.random.int(u64);
     log.info("\n====================\nSeed of the game is {d}\n====================", .{seed});
 
-    const use_cheats = Args.key("mommys_cheater");
-    if (use_cheats) {
-        log.warn("Mommy's cheater is in the room!", .{});
-    }
-
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const alloc = gpa.allocator();
     defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK DETECTED!");
 
+    const use_cheats = Args.flag("devmode");
+
     var runtime = try TtyRuntime.TtyRuntime(g.DISPLAY_ROWS + 2, g.DISPLAY_COLS + 2).init(alloc, true, true, use_cheats);
     defer runtime.deinit();
+    if (use_cheats) {
+        log.warn("The Developer is in the room!", .{});
+        if (Args.str("cheat")) |value| {
+            runtime.cheat = g.Cheat.parse(value);
+        }
+    }
     const game = try g.Game.create(alloc, runtime.runtime(), seed);
     defer game.destroy();
     runtime.run(game) catch |e| {
