@@ -4,7 +4,6 @@ const p = g.primitives;
 const Button = @This();
 
 pub const GameButton = enum(u8) {
-    cheat = 0,
     left = (1 << 0),
     right = (1 << 1),
     up = (1 << 2),
@@ -14,7 +13,6 @@ pub const GameButton = enum(u8) {
 
     pub fn fromCode(code: c_int) ?GameButton {
         return switch (code) {
-            0 => .cheat,
             1 => .left,
             2 => .right,
             4 => .up,
@@ -32,7 +30,7 @@ state: State,
 
 pub inline fn isMove(btn: Button) bool {
     return switch (btn.game_button) {
-        .cheat, .a, .b => false,
+        .a, .b => false,
         else => true,
     };
 }

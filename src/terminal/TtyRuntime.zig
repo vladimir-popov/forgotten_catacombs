@@ -90,7 +90,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             return .{
                 .context = self,
                 .vtable = &.{
-                    .getCheat = getCheat,
+                    .popCheat = popCheat,
                     .addMenuItem = addMenuItem,
                     .removeAllMenuItems = removeAllMenuItems,
                     .currentMillis = currentMillis,
@@ -166,10 +166,6 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
 
         fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
             var self: *Self = @ptrCast(@alignCast(ptr));
-            if (self.cheat) |cheat| {
-                log.debug("Cheat {any} as pushed button", .{cheat});
-                return .{ .game_button = .cheat, .state = .pressed };
-            }
             if (try self.readKeyboardInput()) |key| {
                 const game_button: ?g.Button.GameButton = switch (key) {
                     .char => switch (key.char.char) {
@@ -189,7 +185,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                         .RIGHT => .right,
                         else => null,
                     },
-                    .mouse => |m| cheat: {
+                    .mouse => |m| {
                         // handle mouse buttons only on press
                         if (m.is_released) return null;
                         switch (m.button) {
@@ -204,7 +200,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                             .WHEEL_DOWN => self.cheat = .move_player_to_ladder_down,
                             else => return null,
                         }
-                        break :cheat .cheat;
+                        return null;
                     },
                     else => null,
                 };
@@ -218,7 +214,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             return null;
         }
 
-        fn getCheat(ptr: *anyopaque) ?g.Cheat {
+        fn popCheat(ptr: *anyopaque) ?g.Cheat {
             const self: *Self = @ptrCast(@alignCast(ptr));
             const cheat = self.cheat;
             self.cheat = null;

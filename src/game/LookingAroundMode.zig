@@ -137,8 +137,6 @@ pub fn tick(self: *LookingAroundMode) anyerror!void {
                 self.chooseNextEntity(btn.toDirection().?);
                 try self.draw();
             },
-            // ignore cheats in the LookingAroundMode
-            .cheat => _ = self.session.runtime.getCheat(),
         }
     }
 }

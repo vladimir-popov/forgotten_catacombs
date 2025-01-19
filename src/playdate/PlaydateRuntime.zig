@@ -127,7 +127,7 @@ pub fn runtime(self: *PlaydateRuntime) g.Runtime {
     return .{
         .context = self,
         .vtable = &.{
-            .getCheat = getCheat,
+            .popCheat = popCheat,
             .addMenuItem = addMenuItem,
             .removeAllMenuItems = removeAllMenuItems,
             .currentMillis = currentMillis,
@@ -164,18 +164,14 @@ fn removeAllMenuItems(ptr: *anyopaque) void {
 fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
     const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
 
-    if (cheat) |_| return .{ .game_button = .cheat, .state = .pressed };
-
     if (self.playdate.system.isCrankDocked() == 0) {
         const change = self.playdate.system.getCrankChange();
         const angle = self.playdate.system.getCrankAngle();
         if (change > 2.0 and angle > 170.0 and angle < 190.0) {
             cheat = .move_player_to_ladder_down;
-            return .{ .game_button = .cheat, .state = .pressed };
         }
         if (change < -2.0 and (angle > 350.0 or angle < 10.0)) {
             cheat = .move_player_to_ladder_up;
-            return .{ .game_button = .cheat, .state = .pressed };
         }
     }
 
@@ -268,7 +264,7 @@ fn getCodepointIdx(codepoint: g.Codepoint) c_int {
     };
 }
 
-fn getCheat(_: *anyopaque) ?g.Cheat {
+fn popCheat(_: *anyopaque) ?g.Cheat {
     const result = cheat;
     cheat = null;
     return result;

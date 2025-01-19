@@ -32,14 +32,14 @@ const VTable = struct {
         mode: g.Render.DrawingMode,
     ) anyerror!void,
     currentMillis: *const fn (context: *anyopaque) c_uint,
-    getCheat: *const fn (context: *anyopaque) ?g.Cheat,
+    popCheat: *const fn (context: *anyopaque) ?g.Cheat,
 };
 
 context: *anyopaque,
 vtable: *const VTable,
 
-pub inline fn getCheat(self: Runtime) ?g.Cheat {
-    return self.vtable.getCheat(self.context);
+pub inline fn popCheat(self: Runtime) ?g.Cheat {
+    return self.vtable.popCheat(self.context);
 }
 
 pub inline fn currentMillis(self: Runtime) c_uint {

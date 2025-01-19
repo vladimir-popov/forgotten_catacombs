@@ -101,38 +101,38 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
     }
 }
 
-fn handleInput(self: *PlayMode, button: g.Button) !?g.Action {
-    if (button.state == .double_pressed) log.debug("Double press of {any}", .{button});
-    switch (button.game_button) {
-        .a => if (self.quick_action) |action| {
-            return action;
-        },
-        .b => if (button.state == .pressed) {
-            try self.session.lookAround();
-            // we have to handle changing the state right after this function
-            return null;
-        },
-        .left, .right, .up, .down => {
-            return g.Action{
-                .move = .{
-                    .target = .{ .direction = button.toDirection().? },
-                    .keep_moving = false, // btn.state == .double_pressed,
-                },
-            };
-        },
-        .cheat => {
-            if (self.session.runtime.getCheat()) |cheat| {
-                log.debug("Cheat {any}", .{cheat});
-                switch (cheat) {
-                    .dump_vector_field => self.session.level.dijkstra_map.dumpToLog(),
-                    .turn_light_on => g.visibility.turn_light_on = true,
-                    .turn_light_off => g.visibility.turn_light_on = false,
-                    else => if (cheat.toAction(self.session)) |action| {
-                        return action;
+fn handleInput(self: *PlayMode) !?g.Action {
+    if (try self.session.runtime.readPushedButtons()) |button| {
+        if (button.state == .double_pressed) log.debug("Double press of {any}", .{button});
+        switch (button.game_button) {
+            .a => if (self.quick_action) |action| {
+                return action;
+            },
+            .b => if (button.state == .pressed) {
+                try self.session.lookAround();
+                // we have to handle changing the state right after this function
+                return null;
+            },
+            .left, .right, .up, .down => {
+                return g.Action{
+                    .move = .{
+                        .target = .{ .direction = button.toDirection().? },
+                        .keep_moving = false, // btn.state == .double_pressed,
                     },
-                }
-            }
-        },
+                };
+            },
+        }
+    }
+    if (self.session.runtime.popCheat()) |cheat| {
+        log.debug("Cheat {any}", .{cheat});
+        switch (cheat) {
+            .dump_vector_field => self.session.level.dijkstra_map.dumpToLog(),
+            .turn_light_on => g.visibility.turn_light_on = true,
+            .turn_light_off => g.visibility.turn_light_on = false,
+            else => if (cheat.toAction(self.session)) |action| {
+                return action;
+            },
+        }
     }
     return null;
 }
@@ -143,21 +143,19 @@ pub fn tick(self: *PlayMode) !void {
         return;
 
     if (self.is_player_turn) {
-        if (try self.session.runtime.readPushedButtons()) |buttons| {
-            const maybe_action = try self.handleInput(buttons);
-            // break this function if the mode was changed
-            if (self.session.mode != .play) return;
-            // If the player did some action
-            if (maybe_action) |action| {
-                self.is_player_turn = false;
-                const speed = self.session.level.components.getForEntityUnsafe(self.session.level.player, c.Speed);
-                const mp = try ActionSystem.doAction(self.session, self.session.level.player, action, speed.move_points);
-                if (mp > 0) {
-                    log.debug("Update target after action {any}", .{action});
-                    try self.updateTarget();
-                    for (self.session.level.components.arrayOf(c.Initiative).components.items) |*initiative| {
-                        initiative.move_points += mp;
-                    }
+        const maybe_action = try self.handleInput();
+        // break this function if the mode was changed
+        if (self.session.mode != .play) return;
+        // If the player did some action
+        if (maybe_action) |action| {
+            self.is_player_turn = false;
+            const speed = self.session.level.components.getForEntityUnsafe(self.session.level.player, c.Speed);
+            const mp = try ActionSystem.doAction(self.session, self.session.level.player, action, speed.move_points);
+            if (mp > 0) {
+                log.debug("Update target after action {any}", .{action});
+                try self.updateTarget();
+                for (self.session.level.components.arrayOf(c.Initiative).components.items) |*initiative| {
+                    initiative.move_points += mp;
                 }
             }
         }
