@@ -3,16 +3,35 @@
 
 const std = @import("std");
 
-const os_tag = @import("builtin").os.tag;
+const builtin = @import("builtin");
+const native_os_tag = builtin.os.tag;
+const native_cpu_arch = builtin.cpu.arch;
 const name = "forgotten_catacombs";
 const pdx_file_name = name ++ ".pdx";
+const PLAYDATE_SDK_PATH = "PLAYDATE_SDK_PATH";
 
 pub fn build(b: *std.Build) !void {
-    const playdate_sdk_path = try std.process.getEnvVarOwned(b.allocator, "PLAYDATE_SDK_PATH");
 
-    const writer = b.addWriteFiles();
-    const source_dir = writer.getDirectory();
-    writer.step.name = "write source directory";
+    // ============================================================
+    //                    Modules:
+    // ============================================================
+
+    const game_module = b.createModule(.{
+        .root_source_file = b.path("src/game/game_pkg.zig"),
+    });
+    try buildForTerminal(b, game_module);
+    if (std.process.hasEnvVarConstant(PLAYDATE_SDK_PATH)) {
+        const playdate_sdk_path = try std.process.getEnvVarOwned(b.allocator, PLAYDATE_SDK_PATH);
+        try buildForPlaydate(b, game_module, playdate_sdk_path);
+    } else {
+        std.debug.print("Playdate SDK was not found. The {s} is absent", .{PLAYDATE_SDK_PATH});
+    }
+}
+
+/// ============================================================
+///                   Desktop files
+/// ============================================================
+fn buildForTerminal(b: *std.Build, game_module: *std.Build.Module) !void {
 
     // Standard target options allows the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
@@ -25,33 +44,30 @@ pub fn build(b: *std.Build) !void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    // ============================================================
-    //                    Modules:
-    // ============================================================
-
-    const game_module = b.createModule(.{
-        .root_source_file = b.path("src/game/game_pkg.zig"),
-    });
-
-    // ============================================================
-    //                   Desktop files:
-    // ============================================================
-
     // ------------------------------------------------------------
     //                  Forgotten Catacomb Game
     // ------------------------------------------------------------
 
-    const target_name = if (desktop_target.query.cpu_arch) |cpu_arch|
-        if (desktop_target.query.os_tag) |os|
+    const target_name = if (desktop_target.query.cpu_arch) |target_cpu|
+        if (desktop_target.query.os_tag) |target_os|
             try std.fmt.allocPrint(b.allocator, "{s}-{s}-{s}", .{
                 name,
-                @tagName(cpu_arch),
-                @tagName(os),
+                @tagName(target_os),
+                @tagName(target_cpu),
             })
         else
-            name
+            try std.fmt.allocPrint(b.allocator, "{s}-{s}-{s}", .{
+                name,
+                @tagName(native_os_tag),
+                @tagName(target_cpu),
+            })
     else
-        name;
+        try std.fmt.allocPrint(b.allocator, "{s}-{s}-{s}", .{
+            name,
+            @tagName(native_os_tag),
+            @tagName(native_cpu_arch),
+        });
+
     const terminal_game_exe = b.addExecutable(.{
         .name = target_name,
         .root_source_file = b.path("src/terminal/main.zig"),
@@ -89,83 +105,6 @@ pub fn build(b: *std.Build) !void {
     }
     const run_generator_step = b.step("generate", "Run the dungeons generator in the terminal");
     run_generator_step.dependOn(&run_generator_cmd.step);
-
-    // ============================================================
-    //                   Playdate files:
-    // ============================================================
-
-    const lib = b.addSharedLibrary(.{
-        .name = "pdex",
-        .root_source_file = b.path("src/playdate/main.zig"),
-        .optimize = optimize,
-        .target = b.host,
-    });
-    lib.root_module.addImport("game", game_module);
-    _ = writer.addCopyFile(lib.getEmittedBin(), "pdex" ++ switch (os_tag) {
-        .windows => ".dll",
-        .macos => ".dylib",
-        .linux => ".so",
-        else => @panic("Unsupported OS"),
-    });
-
-    const elf = b.addExecutable(.{
-        .name = "pdex.elf",
-        .root_source_file = b.path("src/playdate/main.zig"),
-        .target = b.resolveTargetQuery(try std.Target.Query.parse(.{
-            .arch_os_abi = "thumb-freestanding-eabihf",
-            .cpu_features = "cortex_m7+vfp4d16sp",
-        })),
-        .optimize = optimize,
-        .pic = true,
-    });
-    elf.root_module.addImport("game", game_module);
-    elf.link_emit_relocs = true;
-    elf.entry = .{ .symbol_name = "eventHandler" };
-
-    elf.setLinkerScriptPath(b.path("link_map.ld"));
-    if (optimize == .ReleaseFast) {
-        elf.root_module.omit_frame_pointer = true;
-    }
-    _ = writer.addCopyFile(elf.getEmittedBin(), "pdex.elf");
-
-    // copy resources:
-    try addCopyDirectory(writer, "assets", ".");
-
-    // ------------------------------------------------------------
-    //                Step to run in emulator
-    // ------------------------------------------------------------
-
-    const pdc_path = b.pathJoin(&.{ playdate_sdk_path, "bin", if (os_tag == .windows) "pdc.exe" else "pdc" });
-    const pd_simulator_path = switch (os_tag) {
-        .linux => b.pathJoin(&.{ playdate_sdk_path, "bin", "PlaydateSimulator" }),
-        .macos => "open", // `open` focuses the window, while running the simulator directry doesn't.
-        .windows => b.pathJoin(&.{ playdate_sdk_path, "bin", "PlaydateSimulator.exe" }),
-        else => @panic("Unsupported OS"),
-    };
-
-    const pdc = b.addSystemCommand(&.{pdc_path});
-    pdc.addDirectorySourceArg(source_dir);
-    pdc.setName("pdc");
-    const pdx_path = pdc.addOutputFileArg(pdx_file_name);
-
-    b.installDirectory(.{
-        .source_dir = pdx_path,
-        .install_dir = .prefix,
-        .install_subdir = pdx_file_name,
-    });
-    b.installDirectory(.{
-        .source_dir = source_dir,
-        .install_dir = .prefix,
-        .install_subdir = "pdx_source_dir",
-    });
-
-    const emulate_cmd = b.addSystemCommand(&.{pd_simulator_path});
-    emulate_cmd.addDirectorySourceArg(pdx_path);
-    emulate_cmd.setName("PlaydateSimulator");
-
-    const emulate_step = b.step("emulate", "Run the Forgotten Catacomb in the Playdate Simulator");
-    emulate_step.dependOn(&emulate_cmd.step);
-    emulate_step.dependOn(b.getInstallStep());
 
     // ------------------------------------------------------------
     //                Step to run tests
@@ -214,7 +153,91 @@ pub fn build(b: *std.Build) !void {
     test_step.dependOn(&run_ut_terminal.step);
 }
 
-pub fn addCopyDirectory(
+/// ============================================================
+///                   Playdate files
+/// ============================================================
+fn buildForPlaydate(b: *std.Build, game_module: *std.Build.Module, playdate_sdk_path: []const u8) !void {
+    const writer = b.addWriteFiles();
+    const source_dir = writer.getDirectory();
+    writer.step.name = "write source directory";
+
+    const optimize: std.builtin.OptimizeMode = .ReleaseFast;
+
+    const lib = b.addSharedLibrary(.{
+        .name = "pdex",
+        .root_source_file = b.path("src/playdate/main.zig"),
+        .optimize = optimize,
+        .target = b.host,
+    });
+    lib.root_module.addImport("game", game_module);
+    _ = writer.addCopyFile(lib.getEmittedBin(), "pdex" ++ switch (native_os_tag) {
+        .windows => ".dll",
+        .macos => ".dylib",
+        .linux => ".so",
+        else => @panic("Unsupported OS"),
+    });
+
+    const elf = b.addExecutable(.{
+        .name = "pdex.elf",
+        .root_source_file = b.path("src/playdate/main.zig"),
+        .target = b.resolveTargetQuery(try std.Target.Query.parse(.{
+            .arch_os_abi = "thumb-freestanding-eabihf",
+            .cpu_features = "cortex_m7+vfp4d16sp",
+        })),
+        .optimize = optimize,
+        .pic = true,
+    });
+    elf.root_module.addImport("game", game_module);
+    elf.link_emit_relocs = true;
+    elf.entry = .{ .symbol_name = "eventHandler" };
+
+    elf.setLinkerScriptPath(b.path("link_map.ld"));
+    if (optimize == .ReleaseFast) {
+        elf.root_module.omit_frame_pointer = true;
+    }
+    _ = writer.addCopyFile(elf.getEmittedBin(), "pdex.elf");
+
+    // copy resources:
+    try addCopyDirectory(writer, "assets", ".");
+
+    // ------------------------------------------------------------
+    //                Step to run in emulator
+    // ------------------------------------------------------------
+
+    const pdc_path = b.pathJoin(&.{ playdate_sdk_path, "bin", if (native_os_tag == .windows) "pdc.exe" else "pdc" });
+    const pd_simulator_path = switch (native_os_tag) {
+        .linux => b.pathJoin(&.{ playdate_sdk_path, "bin", "PlaydateSimulator" }),
+        .macos => "open", // `open` focuses the window, while running the simulator directry doesn't.
+        .windows => b.pathJoin(&.{ playdate_sdk_path, "bin", "PlaydateSimulator.exe" }),
+        else => @panic("Unsupported OS"),
+    };
+
+    const pdc = b.addSystemCommand(&.{pdc_path});
+    pdc.addDirectorySourceArg(source_dir);
+    pdc.setName("pdc");
+    const pdx_path = pdc.addOutputFileArg(pdx_file_name);
+
+    b.installDirectory(.{
+        .source_dir = pdx_path,
+        .install_dir = .prefix,
+        .install_subdir = pdx_file_name,
+    });
+    b.installDirectory(.{
+        .source_dir = source_dir,
+        .install_dir = .prefix,
+        .install_subdir = "pdx_source_dir",
+    });
+
+    const emulate_cmd = b.addSystemCommand(&.{pd_simulator_path});
+    emulate_cmd.addDirectorySourceArg(pdx_path);
+    emulate_cmd.setName("PlaydateSimulator");
+
+    const emulate_step = b.step("emulate", "Run the Forgotten Catacomb in the Playdate Simulator");
+    emulate_step.dependOn(&emulate_cmd.step);
+    emulate_step.dependOn(b.getInstallStep());
+}
+
+fn addCopyDirectory(
     wf: *std.Build.Step.WriteFile,
     src_path: []const u8,
     dest_path: []const u8,

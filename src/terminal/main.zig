@@ -44,12 +44,13 @@ pub fn main() !void {
     log.info("\n====================\nSeed of the game is {d}\n====================", .{seed});
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const alloc = gpa.allocator();
     defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK DETECTED!");
+    const alloc = gpa.allocator();
 
     const use_cheats = Args.flag("devmode");
 
-    var runtime = try TtyRuntime.TtyRuntime(g.DISPLAY_ROWS + 2, g.DISPLAY_COLS + 2).init(alloc, true, true, use_cheats);
+    var runtime = try TtyRuntime.TtyRuntime(g.DISPLAY_ROWS + 2, g.DISPLAY_COLS + 2)
+        .init(alloc, true, true, use_cheats);
     defer runtime.deinit();
     if (use_cheats) {
         log.warn("The Developer is in the room!", .{});
