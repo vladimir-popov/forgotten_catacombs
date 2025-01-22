@@ -4,6 +4,7 @@ const std = @import("std");
 
 const log = std.log.scoped(.primitives);
 
+/// The absolute difference between two numbers
 pub inline fn diff(comptime T: type, a: T, b: T) T {
     return @max(a, b) - @min(a, b);
 }
