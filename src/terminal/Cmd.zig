@@ -15,10 +15,10 @@ pub fn Cmd(comptime cols: u8) type {
         buffer: DisplayBuffer(1, cols),
         /// The position of the cursor in the **buffer**.
         /// 0 value of this index means the position of the prompt ':'.
-        /// The command line should be hide if this index is 0.
+        /// The command line should be hidden if this index is 0.
         cursor_idx: usize = 0,
         /// The list of available cheats in string form
-        suggestions: [g.Cheat.count][]const u8 = g.Cheat.allAsStrings(),
+        suggestions: [g.Cheat.count + 1][]const u8 = .{""} ++ g.Cheat.allAsStrings(),
         /// The index of the appropriate to the current input cheat
         suggestion_idx: u8 = 0,
 
@@ -33,6 +33,10 @@ pub fn Cmd(comptime cols: u8) type {
         pub fn cleanCmd(self: *Self) void {
             self.cursor_idx = 1;
             self.buffer.setSymbol(prompt, 0, 0, .normal);
+            self.cleanBufferAfterCursor();
+        }
+
+        inline fn cleanBufferAfterCursor(self: *Self) void {
             for (self.cursor_idx..self.buffer.cols) |col| {
                 self.buffer.setSymbol(' ', 0, col, .normal);
             }
@@ -85,13 +89,11 @@ pub fn Cmd(comptime cols: u8) type {
                     },
                     else => {},
                 }
-                if (self.cursor_idx > 1) {
-                    if (self.findSuggestion(self.suggestion_idx)) |i| {
-                        self.suggestion_idx = i;
-                        self.showSuggestion(self.suggestions[i]);
-                    }
+                if (self.findSuggestion(self.suggestion_idx)) |i| {
+                    self.suggestion_idx = i;
+                    self.showSuggestion(self.suggestions[i]);
                 } else {
-                    self.cleanCmd();
+                    self.cleanBufferAfterCursor();
                 }
             }
             return null;
@@ -104,13 +106,15 @@ pub fn Cmd(comptime cols: u8) type {
             }
             var i: usize = idx;
             while (true) {
-                if (std.mem.startsWith(u8, self.suggestions[i], buf[0 .. self.cursor_idx - 1])) {
+                if (self.cursor_idx > 0 and
+                    std.mem.startsWith(u8, self.suggestions[i], buf[0 .. self.cursor_idx - 1]))
+                {
                     log.debug(
                         "Suggestion: '{s}' at index {d}",
                         .{ self.suggestions[i], self.suggestion_idx },
                     );
                     return @intCast(i);
-                } else {
+                } else if (self.cursor_idx > 0) {
                     log.debug(
                         "Skip suggestion '{s}' for the input '{s}'",
                         .{ self.suggestions[i], buf[0 .. self.cursor_idx - 1] },
