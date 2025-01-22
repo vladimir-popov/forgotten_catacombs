@@ -97,8 +97,13 @@ const DungeonsGenerator = struct {
                 .{ .direction = .down, .id = 0, .target_ladder = 1 },
             ),
         };
+        self.level.visibility_strategy = showAll;
         try self.render.clearDisplay();
         try self.draw();
+    }
+
+    fn showAll(_: *const g.Level, _: p.Point) g.Render.Visibility {
+        return .visible;
     }
 
     pub fn tick(self: *DungeonsGenerator) !void {
