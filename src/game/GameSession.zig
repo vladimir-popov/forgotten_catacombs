@@ -58,7 +58,7 @@ pub fn create(
         .runtime = runtime,
         .events = events,
         .level_arena = std.heap.ArenaAllocator.init(alloc),
-        .play_mode = try PlayMode.init(self, self.prng.random()),
+        .play_mode = try PlayMode.init(arena, self, self.prng.random()),
         .looking_around = try LookingAroundMode.init(self, alloc),
         .explore_mode = ExploreMode.init(self),
     };
@@ -119,8 +119,6 @@ pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
 
     // TODO persist the current level
     _ = self.level_arena.reset(.retain_capacity);
-    self.play_mode.target_entity = null;
-    self.play_mode.quick_action = null;
     self.level = switch (new_depth) {
         0 => try g.Levels.firstLevel(&self.level_arena, player, false),
         1 => try g.Levels.cave(
@@ -138,5 +136,6 @@ pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
             by_ladder,
         ),
     };
+    try self.play_mode.updateQuickActions(null);
     self.render.viewport.centeredAround(self.level.playerPosition().point);
 }
