@@ -238,7 +238,7 @@ fn getCodepointIdx(codepoint: g.Codepoint) c_int {
         '•' => 115,
         '∞' => 116,
         '…' => 117,
-        '¿' => 118,
+        '↕' => 118,
         '×' => 119,
         else => getCodepointIdx('¿'),
     };

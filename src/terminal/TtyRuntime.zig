@@ -167,22 +167,24 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
         fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
             var self: *Self = @ptrCast(@alignCast(ptr));
             if (try self.readKeyboardInput()) |key| {
-                const game_button: ?g.Button.GameButton = switch (key) {
+                const button: ?g.Button = switch (key) {
                     .char => switch (key.char.char) {
                         // (B) (A)
-                        's', 'i' => .a,
-                        'a', 'u' => .b,
-                        'h' => .left,
-                        'j' => .down,
-                        'k' => .up,
-                        'l' => .right,
+                        's', 'i' => .{ .game_button = .a, .state = .released },
+                        'a', 'u' => .{ .game_button = .b, .state = .released },
+                        'S', 'I' => .{ .game_button = .a, .state = .hold },
+                        'A', 'U' => .{ .game_button = .b, .state = .hold },
+                        'h' => .{ .game_button = .left, .state = .released },
+                        'j' => .{ .game_button = .down, .state = .released },
+                        'k' => .{ .game_button = .up, .state = .released },
+                        'l' => .{ .game_button = .right, .state = .released },
                         else => null,
                     },
                     .control => switch (key.control) {
-                        .LEFT => .left,
-                        .DOWN => .down,
-                        .UP => .up,
-                        .RIGHT => .right,
+                        .LEFT => .{ .game_button = .left, .state = .released },
+                        .DOWN => .{ .game_button = .down, .state = .released },
+                        .UP => .{ .game_button = .up, .state = .released },
+                        .RIGHT => .{ .game_button = .right, .state = .released },
                         else => null,
                     },
                     .mouse => |m| {
@@ -204,9 +206,9 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                     },
                     else => null,
                 };
-                if (game_button) |gbtn| {
+                if (button) |btn| {
                     self.keyboard_buffer = null;
-                    return .{ .game_button = gbtn, .state = .released };
+                    return btn;
                 } else {
                     return null;
                 }

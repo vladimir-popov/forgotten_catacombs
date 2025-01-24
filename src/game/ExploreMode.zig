@@ -31,7 +31,7 @@ pub fn refresh(self: *ExploreMode) !void {
 fn draw(self: ExploreMode) !void {
     try self.session.render.hideLeftButton();
     try self.session.render.drawInfo("Explore the level");
-    try self.session.render.drawRightButton("Cancel");
+    try self.session.render.drawRightButton("Cancel", false);
     if (self.session.render.viewport.region.top_left.row > 1)
         self.session.render.setBorderWithArrow(.up);
 

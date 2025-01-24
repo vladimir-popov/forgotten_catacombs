@@ -60,13 +60,13 @@ fn drawInfoBar(self: *const PlayMode) !void {
         try self.session.render.drawPlayerHp(health);
     }
     switch (self.quickAction()) {
-        .wait => try self.session.render.drawRightButton("Wait"),
-        .open => try self.session.render.drawRightButton("Open"),
-        .close => try self.session.render.drawRightButton("Close"),
-        .hit => try self.session.render.drawRightButton("Attack"),
+        .wait => try self.session.render.drawRightButton("Wait", false),
+        .open => try self.session.render.drawRightButton("Open", false),
+        .close => try self.session.render.drawRightButton("Close", false),
+        .hit => try self.session.render.drawRightButton("Attack", false),
         .move_to_level => |ladder| switch (ladder.direction) {
-            .up => try self.session.render.drawRightButton("Go up"),
-            .down => try self.session.render.drawRightButton("Go down"),
+            .up => try self.session.render.drawRightButton("Go up", false),
+            .down => try self.session.render.drawRightButton("Go down", false),
         },
         else => try self.session.render.hideRightButton(),
     }

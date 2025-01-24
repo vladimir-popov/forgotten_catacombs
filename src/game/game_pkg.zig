@@ -1,5 +1,6 @@
 const std = @import("std");
 
+pub const codepoints = @import("codepoints.zig");
 pub const components = @import("components.zig");
 pub const dungeon = @import("dungeon/dungeon_pkg.zig");
 pub const ecs = @import("ecs.zig");
@@ -25,6 +26,7 @@ pub const MovePoints = ActionSystem.MovePoints;
 pub const Render = @import("Render.zig");
 pub const Runtime = @import("Runtime.zig");
 pub const Viewport = @import("Viewport.zig");
+pub const Window = @import("Window.zig");
 pub const ZOrder = u3;
 
 pub const RENDER_DELAY_MS = 150;

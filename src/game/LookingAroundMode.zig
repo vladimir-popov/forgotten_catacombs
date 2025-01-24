@@ -8,67 +8,111 @@ const p = g.primitives;
 const log = std.log.scoped(.looking_around_mode);
 
 const LookingAroundMode = @This();
-const ArrayOfEntitiesOnScreen = std.ArrayList(struct { g.Entity, p.Point, g.Codepoint });
+const EntitiesOnScreen = std.AutoHashMap(p.Point, std.ArrayListUnmanaged(g.Entity));
+const WindowType = enum { desription, variants };
 
-alloc: std.mem.Allocator,
+arena: *std.heap.ArenaAllocator,
 session: *g.GameSession,
-/// Arrays of entities and their positions on the screen
-entities_on_screen: ArrayOfEntitiesOnScreen,
-/// Highlighted entity
-entity_in_focus: ?g.Entity,
-/// The max length of the visible content of the window
-/// -2 for borders; -1 for scroll.
-window: ?*g.Render.WindowWithDescription,
+/// Map of entities and their positions on the screen
+entities_on_screen: EntitiesOnScreen,
+/// Highlighted place in the dungeon
+place_in_focus: ?p.Point,
+/// Index of the entity in focus
+focus_idx: usize = 0,
+/// The window to show description or variants
+window: ?*g.Window,
 
-pub fn init(session: *g.GameSession, alloc: std.mem.Allocator) !LookingAroundMode {
+pub fn init(alloc: std.mem.Allocator, session: *g.GameSession) !LookingAroundMode {
     log.debug("Init LookingAroundMode", .{});
+    const arena = try alloc.create(std.heap.ArenaAllocator);
+    arena.* = std.heap.ArenaAllocator.init(alloc);
     return .{
-        .alloc = alloc,
+        .arena = arena,
         .session = session,
-        .entities_on_screen = ArrayOfEntitiesOnScreen.init(alloc),
-        .entity_in_focus = null,
+        .entities_on_screen = EntitiesOnScreen.init(arena.allocator()),
+        .place_in_focus = null,
         .window = null,
     };
 }
 
 pub fn deinit(self: *LookingAroundMode) void {
-    self.entities_on_screen.deinit();
+    const alloc = self.arena.child_allocator;
+    self.arena.deinit();
+    alloc.destroy(self.arena);
 }
 
 pub fn refresh(self: *LookingAroundMode) !void {
-    self.entity_in_focus = self.session.level.player;
-    self.entities_on_screen.clearRetainingCapacity();
-    var itr = self.session.level.query().get2(c.Position, c.Sprite);
+    _ = self.arena.reset(.retain_capacity);
+    self.window = null;
+
+    const alloc = self.arena.allocator();
+    self.entities_on_screen = EntitiesOnScreen.init(self.arena.allocator());
+    var itr = self.session.level.query().get(c.Position);
     while (itr.next()) |tuple| {
         if (self.session.render.viewport.region.containsPoint(tuple[1].point)) {
-            const item = try self.entities_on_screen.addOne();
-            item.* = .{ tuple[0], tuple[1].point, tuple[2].codepoint };
+            const gop = try self.entities_on_screen.getOrPut(tuple[1].point);
+            if (!gop.found_existing) {
+                gop.value_ptr.* = try std.ArrayListUnmanaged(g.Entity).initCapacity(alloc, 1);
+            }
+            try gop.value_ptr.append(alloc, tuple[0]);
+            if (tuple[0] == self.session.level.player) {
+                self.place_in_focus = tuple[1].point;
+                self.focus_idx = gop.value_ptr.items.len - 1;
+            }
         }
     }
     try self.redraw();
-    log.debug("Refresh the LookingAroundMode. {d} entities on screen", .{self.entities_on_screen.items.len});
+    log.debug("LookingAroundMode has been refreshed. Entities on screen:\n{any}", .{self.entities_on_screen});
+}
+
+inline fn entityInFocus(self: LookingAroundMode) ?g.Entity {
+    if (self.entitiesInFocus()) |entities|
+        return entities.items[self.focus_idx];
+
+    return null;
+}
+
+inline fn entitiesInFocus(self: LookingAroundMode) ?std.ArrayListUnmanaged(g.Entity) {
+    if (self.place_in_focus) |place|
+        if (self.entities_on_screen.get(place)) |entities|
+            return entities;
+
+    return null;
+}
+
+inline fn countOfEntitiesInFocus(self: LookingAroundMode) usize {
+    if (self.place_in_focus) |place|
+        if (self.entities_on_screen.get(place)) |entities|
+            return entities.items.len;
+
+    return 0;
 }
 
 fn draw(self: *const LookingAroundMode) !void {
-    try self.session.render.drawScene(self.session, self.entity_in_focus, null);
+    try self.session.render.drawScene(self.session, self.entityInFocus(), null);
     try self.drawInfoBar();
 }
 
 fn redraw(self: *const LookingAroundMode) !void {
-    try self.session.render.redraw(self.session, self.entity_in_focus, null);
+    try self.session.render.redraw(self.session, self.entityInFocus(), null);
     try self.drawInfoBar();
 }
 
 fn drawInfoBar(self: *const LookingAroundMode) !void {
-    if (self.window) |_| {
-        try self.session.render.hideLeftButton();
-        try self.session.render.drawRightButton("Close");
+    if (self.window) |window| {
+        if (window.tag == @intFromEnum(WindowType.variants)) {
+            try self.session.render.hideLeftButton();
+            try self.session.render.drawRightButton("Choose", false);
+        } else {
+            try self.session.render.hideLeftButton();
+            try self.session.render.drawRightButton("Close", false);
+        }
     } else {
         try self.session.render.drawLeftButton("Continue");
-        try self.session.render.drawRightButton("Describe");
+        try self.session.render.drawRightButton("Describe", self.countOfEntitiesInFocus() > 1);
     }
     // Draw the name or health of the entity in focus
-    if (self.entity_in_focus) |entity| {
+    if (self.entityInFocus()) |entity| {
         if (entity != self.session.level.player) {
             if (self.session.level.components.getForEntity3(entity, c.Sprite, c.Health, c.Position)) |tuple| {
                 if (tuple[3].point.eql(self.session.level.playerPosition().point)) {
@@ -81,7 +125,10 @@ fn drawInfoBar(self: *const LookingAroundMode) !void {
                 return;
             }
         }
-        const name = if (self.session.level.components.getForEntity(entity, c.Description)) |desc| desc.name else "?";
+        const name = if (self.session.level.components.getForEntity(entity, c.Description)) |desc|
+            desc.name
+        else
+            "?";
         try self.session.render.drawInfo(name);
     } else {
         try self.session.render.cleanInfo();
@@ -103,15 +150,14 @@ fn statusLine(self: LookingAroundMode, entity: g.Entity, line: []u8) !usize {
     return len;
 }
 
-fn drawWindowWithDescription(self: *const LookingAroundMode) !void {
-    const window = self.window.?;
-    const max_rows = g.Render.MAX_WINDOW_HEIGHT - 2;
+fn drawWindow(self: *const LookingAroundMode, window: *const g.Window) !void {
+    const max_rows = g.Window.MAX_WINDOW_HEIGHT - 2;
     const top_left: p.Point = if (window.lines.items.len > max_rows)
         .{ .row = 1, .col = 2 }
     else
         .{ .row = @intCast(1 + (max_rows - window.lines.items.len) / 2), .col = 2 };
 
-    try self.session.render.drawWindow(g.Render.MAX_WINDOW_WIDTH, window, top_left);
+    try self.session.render.drawWindow(window, top_left);
 }
 
 pub fn tick(self: *LookingAroundMode) anyerror!void {
@@ -119,21 +165,51 @@ pub fn tick(self: *LookingAroundMode) anyerror!void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         switch (btn.game_button) {
             .a => if (self.window) |window| {
+                if (window.tag == @intFromEnum(WindowType.variants)) {
+                    self.focus_idx = window.selected_line orelse 0;
+                }
                 window.destroy();
                 self.window = null;
                 try self.redraw();
             } else {
-                if (self.entity_in_focus) |entity| {
+                if (btn.state == .hold and self.countOfEntitiesInFocus() > 1) {
+                    if (self.entitiesInFocus()) |entities| {
+                        self.window = try self.createWindowWithVariants(entities.items, self.focus_idx);
+                        try self.drawWindow(self.window.?);
+                        try self.drawInfoBar();
+                    }
+                } else if (self.entityInFocus()) |entity| {
                     self.window = try self.createWindowWithDescription(entity);
-                    try self.drawWindowWithDescription();
+                    try self.drawWindow(self.window.?);
                     try self.drawInfoBar();
                 }
             },
-            .b => if (btn.state == .released) {
-                try self.session.play(self.entity_in_focus);
+            .b => if (btn.state == .released and self.window == null) {
+                try self.session.play(self.entityInFocus());
                 return;
             },
-            .left, .right, .up, .down => {
+            .left, .right, .up, .down => if (self.window) |window| {
+                if (window.tag == @intFromEnum(WindowType.variants)) {
+                    if (btn.game_button == .up) {
+                        const selected_line = window.selected_line orelse 0;
+                        if (selected_line > 0)
+                            window.selected_line = selected_line - 1
+                        else
+                            window.selected_line = window.lines.items.len - 1;
+                        try self.drawWindow(window);
+                        try self.drawInfoBar();
+                    }
+                    if (btn.game_button == .down) {
+                        const selected_line = window.selected_line orelse 0;
+                        if (selected_line < window.lines.items.len - 1)
+                            window.selected_line = selected_line + 1
+                        else
+                            window.selected_line = 0;
+                        try self.drawWindow(window);
+                        try self.drawInfoBar();
+                    }
+                }
+            } else {
                 self.chooseNextEntity(btn.toDirection().?);
                 try self.draw();
             },
@@ -142,28 +218,24 @@ pub fn tick(self: *LookingAroundMode) anyerror!void {
 }
 
 fn chooseNextEntity(self: *LookingAroundMode, direction: p.Direction) void {
-    const target_entity = self.entity_in_focus orelse self.session.level.player;
-    const target_point = self.session.level.components.getForEntityUnsafe(target_entity, c.Position).point;
     var min_distance: u8 = 255;
-    log.debug(
-        "Choose an entity from {d} on the screen in {s} direction",
-        .{ self.entities_on_screen.items.len, @tagName(direction) },
-    );
-    for (self.entities_on_screen.items) |tuple| {
+    var itr = self.entities_on_screen.iterator();
+    while (itr.next()) |entry| {
+        const place = entry.key_ptr.*;
         // we should follow the same logic as the render:
         // only entities, which should be drawn, can be in focus
-        if (self.session.level.checkVisibility(tuple[1]) == .invisible) {
-            log.debug(
-                "The entity {d} '{u}' at {any} is invisible. Skip it.",
-                .{ tuple[0], tuple[2], tuple[1] },
-            );
+        if (self.session.level.checkVisibility(place) == .invisible)
             continue;
-        }
 
-        const d = distance(target_point, tuple[1], direction);
+        const d = if (self.place_in_focus) |current_place|
+            distance(current_place, place, direction)
+        else
+            0;
+
         if (d < min_distance) {
             min_distance = d;
-            self.entity_in_focus = tuple[0];
+            self.place_in_focus = place;
+            self.focus_idx = 0;
         }
     }
 }
@@ -191,11 +263,31 @@ inline fn sub(x: u8, y: u8) u8 {
     return if (y > x) y - x else x - y;
 }
 
+fn createWindowWithVariants(
+    self: LookingAroundMode,
+    variants: []const g.Entity,
+    selected: usize,
+) !*g.Window {
+    const window = try g.Window.create(self.arena.allocator());
+    window.tag = @intFromEnum(WindowType.variants);
+    for (variants, 0..) |entity, idx| {
+        // Every entity has to have description, or handling indexes become complicated
+        const description = self.session.level.components.getForEntityUnsafe(entity, c.Description);
+        const line = try window.addOneLine();
+        const pad = @divTrunc(g.Window.MAX_WINDOW_WIDTH - description.name.len, 2);
+        std.mem.copyForwards(u8, line[pad..], description.name);
+        if (idx == selected)
+            window.selected_line = idx;
+    }
+    return window;
+}
+
 fn createWindowWithDescription(
     self: LookingAroundMode,
     entity: g.Entity,
-) !*g.Render.WindowWithDescription {
-    const window = try g.Render.WindowWithDescription.create(self.alloc);
+) !*g.Window {
+    const window = try g.Window.create(self.arena.allocator());
+    window.tag = @intFromEnum(WindowType.desription);
     var len: usize = 0;
     if (self.session.level.components.getForEntity(entity, c.Description)) |description| {
         len += (try std.fmt.bufPrint(&window.title, "{s}", .{description.name})).len;

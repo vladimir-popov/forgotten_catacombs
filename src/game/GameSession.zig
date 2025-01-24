@@ -59,7 +59,7 @@ pub fn create(
         .events = events,
         .level_arena = std.heap.ArenaAllocator.init(alloc),
         .play_mode = try PlayMode.init(arena, self, self.prng.random()),
-        .looking_around = try LookingAroundMode.init(self, alloc),
+        .looking_around = try LookingAroundMode.init(alloc, self),
         .explore_mode = ExploreMode.init(self),
     };
     self.level = try g.Levels.firstLevel(&self.level_arena, g.entities.Player, true);

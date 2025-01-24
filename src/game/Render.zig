@@ -17,13 +17,12 @@
 ///   ║HP: 100     Rat:||||||||||||||| Attack ║     | <- the InfoBar is not buffered
 ///   ╚═══════════════════════════════════════╝-------
 ///   | Zone 0 |        Zone 1       | Zone 2 |
-///   |             Stats            |
 ///   |Button B|                     |Button A|
 ///
 const std = @import("std");
-const cp = @import("codepoints.zig");
 const g = @import("game_pkg.zig");
 const c = g.components;
+const cp = g.codepoints;
 const d = g.dungeon;
 const p = g.primitives;
 
@@ -33,14 +32,9 @@ pub const Window = @import("Window.zig").Window;
 
 pub const SIDE_ZONE_LENGTH = 8;
 pub const MIDDLE_ZONE_LENGTH = g.DISPLAY_COLS - (SIDE_ZONE_LENGTH + 1) * 2 - 2;
-/// The maximum count of rows including borders needed to draw a window
-pub const MAX_WINDOW_HEIGHT = g.DISPLAY_ROWS - 2;
-/// The maximum count of columns including borders needed to draw a window
-pub const MAX_WINDOW_WIDTH = g.DISPLAY_COLS - 2;
 
 pub const DrawingMode = enum { normal, inverted };
 pub const Visibility = enum { visible, known, invisible };
-pub const WindowWithDescription = Window(MAX_WINDOW_WIDTH);
 const TextAlign = enum { center, left, right };
 
 // this should be used to erase a symbol
@@ -312,7 +306,12 @@ fn drawSprite(
         .row = place_in_dungeon.row - self.viewport.region.top_left.row + 1,
         .col = place_in_dungeon.col - self.viewport.region.top_left.col + 1,
     };
-    self.scene_buffer.setSymbol(point_on_display, actualCodepoint(sprite.codepoint, visibility), mode, sprite.z_order);
+    self.scene_buffer.setSymbol(
+        point_on_display,
+        actualCodepoint(sprite.codepoint, visibility),
+        mode,
+        sprite.z_order,
+    );
 }
 
 /// This method validates visibility of the passed place, and
@@ -348,32 +347,32 @@ fn drawChangedSymbols(self: *Render) !void {
 
 pub fn drawWindow(
     self: Render,
-    comptime width: u8,
-    window: *const Window(width),
+    window: *const g.Window,
     top_left: p.Point,
 ) !void {
-    const is_scrolled = window.lines.items.len > MAX_WINDOW_HEIGHT - 2;
-    const lines: [][Window(width).cols]u8 = if (is_scrolled)
-        window.lines.items[window.scroll .. window.scroll + MAX_WINDOW_HEIGHT - 2]
+    const is_scrolled = window.lines.items.len > g.Window.MAX_WINDOW_HEIGHT - 2;
+    const lines: [][g.Window.COLS]u8 = if (is_scrolled)
+        window.lines.items[window.scroll .. window.scroll + g.Window.MAX_WINDOW_HEIGHT - 2]
     else
         window.lines.items;
     // Count of rows including borders
     const rows: u8 = @intCast(lines.len + 2);
 
     for (0..rows) |i| {
-        for (0..width) |j| {
+        for (0..g.Window.MAX_WINDOW_WIDTH) |j| {
             const point = top_left.movedToNTimes(.down, @intCast(i)).movedToNTimes(.right, @intCast(j));
             if (i == 0 or i == rows - 1) {
                 try self.runtime.drawSprite('─', point, .normal);
-            } else if (j == 0 or j == width - 1) {
+            } else if (j == 0 or j == g.Window.MAX_WINDOW_WIDTH - 1) {
                 try self.runtime.drawSprite('│', point, .normal);
             } else {
                 const row_idx = point.row - top_left.row - 1 + window.scroll;
                 const col_idx = point.col - top_left.col - 1;
-                if (row_idx < window.lines.items.len and col_idx < width - 3) {
-                    try self.runtime.drawSprite(window.lines.items[row_idx][col_idx], point, .normal);
+                const mode: g.Render.DrawingMode = if (window.selected_line == row_idx) .inverted else .normal;
+                if (row_idx < window.lines.items.len and col_idx < g.Window.COLS) {
+                    try self.runtime.drawSprite(window.lines.items[row_idx][col_idx], point, mode);
                 } else {
-                    try self.runtime.drawSprite(' ', point, .normal);
+                    try self.runtime.drawSprite(' ', point, mode);
                 }
             }
         }
@@ -382,7 +381,7 @@ pub fn drawWindow(
     // Draw the title
     //
     const title = std.mem.sliceTo(&window.title, 0);
-    const padding: u8 = @intCast(width - title.len);
+    const padding: u8 = @intCast(g.Window.MAX_WINDOW_WIDTH - title.len);
     var point = top_left.movedToNTimes(.right, padding / 2);
     for (title) |char| {
         try self.runtime.drawSprite(char, point, .normal);
@@ -393,8 +392,12 @@ pub fn drawWindow(
     //
     try self.runtime.drawSprite('┌', top_left, .normal);
     try self.runtime.drawSprite('└', top_left.movedToNTimes(.down, rows - 1), .normal);
-    try self.runtime.drawSprite('┐', top_left.movedToNTimes(.right, width - 1), .normal);
-    try self.runtime.drawSprite('┘', top_left.movedToNTimes(.down, rows - 1).movedToNTimes(.right, width - 1), .normal);
+    try self.runtime.drawSprite('┐', top_left.movedToNTimes(.right, g.Window.MAX_WINDOW_WIDTH - 1), .normal);
+    try self.runtime.drawSprite(
+        '┘',
+        top_left.movedToNTimes(.down, rows - 1).movedToNTimes(.right, g.Window.MAX_WINDOW_WIDTH - 1),
+        .normal,
+    );
 }
 
 /// Draws a single frame from every animation.
@@ -444,8 +447,12 @@ pub inline fn hideLeftButton(self: Render) !void {
     try self.cleanZone(0);
 }
 
-pub inline fn drawRightButton(self: Render, text: []const u8) !void {
+pub inline fn drawRightButton(self: Render, comptime text: []const u8, has_alternatives: bool) !void {
     try self.drawZone(2, text, .inverted);
+    if (has_alternatives) {
+        const pos = p.Point{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS };
+        try self.runtime.drawSprite(cp.variants, pos, .inverted);
+    }
 }
 
 pub inline fn hideRightButton(self: Render) !void {
