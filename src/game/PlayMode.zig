@@ -106,10 +106,9 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
 
 fn handleInput(self: *PlayMode) !?g.Action {
     if (try self.session.runtime.readPushedButtons()) |button| {
-        if (button.state == .double_pressed) log.debug("Double press of {any}", .{button});
         switch (button.game_button) {
-            .a => return self.quickAction(),
-            .b => if (button.state == .pressed) {
+            .a => if (button.state == .released) return self.quickAction(),
+            .b => if (button.state == .released) {
                 try self.session.lookAround();
                 // we have to handle changing the state right after this function
                 return null;

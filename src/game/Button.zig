@@ -22,17 +22,28 @@ pub const GameButton = enum(u8) {
             else => null,
         };
     }
+
+    pub inline fn isMove(self: GameButton) bool {
+        return switch (self) {
+            .left, .up, .right, .down => true,
+            else => false,
+        };
+    }
 };
-pub const State = enum { pressed, double_pressed, hold, released };
+pub const State = enum {
+    /// For the playdate it means that the button was released;
+    /// For terminal it means that some keyboard button code was read.
+    released,
+    /// For the playdate it means that the button is hold right now;
+    /// For terminal it means that some keyboard button was pressed with Shift.
+    hold,
+};
 
 game_button: GameButton,
 state: State,
 
-pub inline fn isMove(btn: Button) bool {
-    return switch (btn.game_button) {
-        .a, .b => false,
-        else => true,
-    };
+pub inline fn isMove(self: Button) bool {
+    return self.game_button.isMove();
 }
 
 pub inline fn toDirection(btn: Button) ?p.Direction {

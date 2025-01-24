@@ -8,82 +8,83 @@ const Allocator = @import("Allocator.zig");
 
 const log = std.log.scoped(.playdate_runtime);
 
+const HOLD_DELAY_MS = 700;
+const REPEATE_DELAY_MS = 100;
+
 const PlaydateRuntime = @This();
 
 const LastButton = struct {
-    const Btn = struct {
-        game_button: g.Button.GameButton,
-        is_pressed: bool,
-        pressed_at: u32,
-        pressed_count: u8,
-    };
+    const State = enum { pressed, released };
+    buttons: c_int = 0,
+    /// 0 means that all buttons are released now
+    pressed_at: u32 = 0,
+    was_repeated: bool = false,
 
-    button: ?Btn = null,
+    pub fn pop(self: *LastButton, now_ms: u32) ?g.Button {
+        if (g.Button.GameButton.fromCode(self.buttons)) |game_button| {
+            if (self.pressed_at == 0) {
+                // ignore release for repeated button
+                if (self.was_repeated) {
+                    log.info("ignore release for repeated {s}", .{@tagName(game_button)});
+                    self.* = .{};
+                    return null;
+                }
+                log.info("released {s}", .{@tagName(game_button)});
+                self.* = .{};
+                return .{ .game_button = game_button, .state = .released };
+            }
+            // repeat for pressed arrows only
+            else if (game_button.isMove() and now_ms - self.pressed_at > REPEATE_DELAY_MS) {
+                log.info("repeat {s}", .{@tagName(game_button)});
+                self.pressed_at = now_ms;
+                self.was_repeated = true;
+                return .{ .game_button = game_button, .state = .hold };
+            }
+            // the button is held
+            else if (now_ms - self.pressed_at > HOLD_DELAY_MS) {
+                log.info("hold {s}", .{@tagName(game_button)});
+                self.* = .{};
+                return .{ .game_button = game_button, .state = .hold };
+            }
+        }
+        return null;
+    }
 
+    /// The ButtonCallback handler.
+    ///
+    /// The function is called for each button up/down event
+    /// (possibly multiple events on the same button) that occurred during
+    /// the previous update cycle. At the default 30 FPS, a queue size of 5
+    /// should be adequate. At lower frame rates/longer frame times, the
+    /// queue size should be extended until all button presses are caught.
+    ///
+    /// See: https://sdk.play.date/2.6.2/Inside%20Playdate%20with%20C.html#f-system.setButtonCallback
+    ///
     fn handleEvent(
-        button: api.PDButtons,
+        buttons: api.PDButtons,
         down: c_int,
         when: u32,
         ptr: ?*anyopaque,
     ) callconv(.C) c_int {
         const self: *LastButton = @ptrCast(@alignCast(ptr));
-        const is_pressed = down > 0;
-        if (g.Button.GameButton.fromCode(button)) |game_button| {
-            if (self.button) |*current_button| {
-                return self.handleEventWithCurrentButton(current_button, game_button, is_pressed, when);
-            } else if (is_pressed) {
-                // the first press:
-                self.button = .{
-                    .game_button = game_button,
-                    .is_pressed = true,
-                    .pressed_at = when,
-                    .pressed_count = 1,
-                };
-            } else {
-                self.button = null;
-            }
-        }
-        return 0;
-    }
+        if (down > 0) {
+            if (self.pressed_at > 0)
+                // additional buttons have been pressed
+                self.buttons |= buttons
+            else
+                // nothing pressed before, new buttons have been pressed
+                self.buttons = buttons;
 
-    fn handleEventWithCurrentButton(
-        self: *LastButton,
-        current_button: *Btn,
-        game_button: g.Button.GameButton,
-        is_pressed: bool,
-        when: u32,
-    ) callconv(.C) c_int {
-        // event for the same button
-        if (current_button.game_button == game_button) {
-            if (is_pressed) {
-                // the current button pressed again
-                current_button.is_pressed = true;
-                current_button.pressed_at = when;
-                if ((when - current_button.pressed_at) < g.DOUBLE_PUSH_DELAY_MS) {
-                    current_button.pressed_count += 1;
-                } else {
-                    current_button.pressed_count = 1;
-                }
-            } else {
-                current_button.is_pressed = false;
-            }
+            self.pressed_at = when;
         } else {
-            // event for another button
-            if (!current_button.is_pressed and is_pressed) {
-                self.button = .{
-                    .game_button = game_button,
-                    .is_pressed = true,
-                    .pressed_at = when,
-                    .pressed_count = 1,
-                };
-            } else {
-                self.button = null;
-            }
+            self.pressed_at = 0;
         }
         return 0;
     }
 };
 
+// This is a global var because the
+// serialMessageCallback doesn't receive custom data
 var cheat: ?g.Cheat = null;
 
 playdate: *api.PlaydateAPI,
@@ -121,6 +122,7 @@ pub fn init(playdate: *api.PlaydateAPI) !PlaydateRuntime {
 
 pub fn deinit(self: *PlaydateRuntime) void {
     self.playdate.realloc(0, self.bitmap_table);
+    self.playdate.realloc(0, self.last_button);
 }
 
 pub fn runtime(self: *PlaydateRuntime) g.Runtime {
@@ -175,29 +177,7 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
         }
     }
 
-    if (self.last_button.button) |btn| {
-        // handle only released button
-        if (!btn.is_pressed) {
-            self.last_button.button = null;
-            // stop handle held button right after release
-            if ((currentMillis(self) - btn.pressed_at) > g.HOLD_DELAY_MS) {
-                return null;
-            }
-            return .{
-                .game_button = btn.game_button,
-                .state = if (btn.pressed_count > 1)
-                    .double_pressed
-                else
-                    .pressed,
-            };
-        } else if ((currentMillis(self) - btn.pressed_at) > g.HOLD_DELAY_MS) {
-            return .{
-                .game_button = btn.game_button,
-                .state = .hold,
-            };
-        }
-    }
-    return null;
+    return self.last_button.pop(currentMillis(ptr));
 }
 
 fn clearDisplay(ptr: *anyopaque) anyerror!void {

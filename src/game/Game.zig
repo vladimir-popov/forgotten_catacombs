@@ -111,13 +111,13 @@ pub fn tick(self: *Game) !void {
     switch (self.state) {
         .welcome => if (try self.runtime.readPushedButtons()) |btn| {
             switch (btn.game_button) {
-                .a => if (btn.state == .pressed) try self.newGame(),
+                .a => if (btn.state == .released) try self.newGame(),
                 else => {},
             }
         },
         .game_over => if (try self.runtime.readPushedButtons()) |btn| {
             switch (btn.game_button) {
-                .a => if (btn.state == .pressed) try self.welcome(),
+                .a => if (btn.state == .released) try self.welcome(),
                 else => {},
             }
         },

@@ -129,7 +129,7 @@ pub fn tick(self: *LookingAroundMode) anyerror!void {
                     try self.drawInfoBar();
                 }
             },
-            .b => if (btn.state == .pressed) {
+            .b => if (btn.state == .released) {
                 try self.session.play(self.entity_in_focus);
                 return;
             },

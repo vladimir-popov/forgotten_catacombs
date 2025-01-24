@@ -53,9 +53,6 @@ pub const DUNGEON_REGION: primitives.Region = .{
     .cols = DUNGEON_COLS,
 };
 
-pub const DOUBLE_PUSH_DELAY_MS = 250;
-pub const HOLD_DELAY_MS = 500;
-
 test {
     std.testing.refAllDecls(@This());
 }

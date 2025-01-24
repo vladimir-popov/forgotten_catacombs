@@ -206,7 +206,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                 };
                 if (game_button) |gbtn| {
                     self.keyboard_buffer = null;
-                    return .{ .game_button = gbtn, .state = .pressed };
+                    return .{ .game_button = gbtn, .state = .released };
                 } else {
                     return null;
                 }
