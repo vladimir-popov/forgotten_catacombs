@@ -150,16 +150,6 @@ fn statusLine(self: LookingAroundMode, entity: g.Entity, line: []u8) !usize {
     return len;
 }
 
-fn drawWindow(self: *const LookingAroundMode, window: *const g.Window) !void {
-    const max_rows = g.Window.MAX_WINDOW_HEIGHT - 2;
-    const top_left: p.Point = if (window.lines.items.len > max_rows)
-        .{ .row = 1, .col = 2 }
-    else
-        .{ .row = @intCast(1 + (max_rows - window.lines.items.len) / 2), .col = 2 };
-
-    try self.session.render.drawWindow(window, top_left);
-}
-
 pub fn tick(self: *LookingAroundMode) anyerror!void {
     // Nothing should happened until the player push a button
     if (try self.session.runtime.readPushedButtons()) |btn| {
@@ -175,12 +165,12 @@ pub fn tick(self: *LookingAroundMode) anyerror!void {
                 if (btn.state == .hold and self.countOfEntitiesInFocus() > 1) {
                     if (self.entitiesInFocus()) |entities| {
                         self.window = try self.createWindowWithVariants(entities.items, self.focus_idx);
-                        try self.drawWindow(self.window.?);
+                        try self.session.render.drawWindow(self.window.?);
                         try self.drawInfoBar();
                     }
                 } else if (self.entityInFocus()) |entity| {
                     self.window = try self.createWindowWithDescription(entity);
-                    try self.drawWindow(self.window.?);
+                    try self.session.render.drawWindow(self.window.?);
                     try self.drawInfoBar();
                 }
             },
@@ -191,21 +181,13 @@ pub fn tick(self: *LookingAroundMode) anyerror!void {
             .left, .right, .up, .down => if (self.window) |window| {
                 if (window.tag == @intFromEnum(WindowType.variants)) {
                     if (btn.game_button == .up) {
-                        const selected_line = window.selected_line orelse 0;
-                        if (selected_line > 0)
-                            window.selected_line = selected_line - 1
-                        else
-                            window.selected_line = window.lines.items.len - 1;
-                        try self.drawWindow(window);
+                        window.selectPrev();
+                        try self.session.render.drawWindow(window);
                         try self.drawInfoBar();
                     }
                     if (btn.game_button == .down) {
-                        const selected_line = window.selected_line orelse 0;
-                        if (selected_line < window.lines.items.len - 1)
-                            window.selected_line = selected_line + 1
-                        else
-                            window.selected_line = 0;
-                        try self.drawWindow(window);
+                        window.selectNext();
+                        try self.session.render.drawWindow(window);
                         try self.drawInfoBar();
                     }
                 }

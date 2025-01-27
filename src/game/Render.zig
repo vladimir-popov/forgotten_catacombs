@@ -348,8 +348,12 @@ fn drawChangedSymbols(self: *Render) !void {
 pub fn drawWindow(
     self: Render,
     window: *const g.Window,
-    top_left: p.Point,
 ) !void {
+    const max_rows = g.Window.MAX_WINDOW_HEIGHT - 2;
+    const top_left: p.Point = if (window.lines.items.len > max_rows)
+        .{ .row = 1, .col = 2 }
+    else
+        .{ .row = @intCast(1 + (max_rows - window.lines.items.len) / 2), .col = 2 };
     const is_scrolled = window.lines.items.len > g.Window.MAX_WINDOW_HEIGHT - 2;
     const lines: [][g.Window.COLS]u8 = if (is_scrolled)
         window.lines.items[window.scroll .. window.scroll + g.Window.MAX_WINDOW_HEIGHT - 2]
@@ -447,7 +451,7 @@ pub inline fn hideLeftButton(self: Render) !void {
     try self.cleanZone(0);
 }
 
-pub inline fn drawRightButton(self: Render, comptime text: []const u8, has_alternatives: bool) !void {
+pub inline fn drawRightButton(self: Render, text: []const u8, has_alternatives: bool) !void {
     try self.drawZone(2, text, .inverted);
     if (has_alternatives) {
         const pos = p.Point{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS };

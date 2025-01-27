@@ -47,6 +47,20 @@ pub const Action = union(enum) {
     take: g.Entity,
     /// The player moves from the level to another level
     move_to_level: c.Ladder,
+
+    pub fn toString(action: Action) []const u8 {
+        return switch (action) {
+            .wait => "Wait",
+            .open => "Open",
+            .close => "Close",
+            .hit => "Attack",
+            .move_to_level => |ladder| switch (ladder.direction) {
+                .up => "Go up",
+                .down => "Go down",
+            },
+            else => "",
+        };
+    }
 };
 
 /// Handles intentions to do some actions

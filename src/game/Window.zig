@@ -46,3 +46,21 @@ pub fn addOneLine(self: *Self) !*Line {
     line.* = [1]u8{' '} ** COLS;
     return line;
 }
+
+pub fn selectPrev(self: *Self) void {
+    if (self.selected_line) |selected_line| {
+        if (selected_line > 0)
+            self.selected_line = selected_line - 1
+        else
+            self.selected_line = self.lines.items.len - 1;
+    }
+}
+
+pub fn selectNext(self: *Self) void {
+    if (self.selected_line) |selected_line| {
+        if (selected_line < self.lines.items.len - 1)
+            self.selected_line = selected_line + 1
+        else
+            self.selected_line = 0;
+    }
+}

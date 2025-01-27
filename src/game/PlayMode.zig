@@ -1,4 +1,4 @@
-//! This is the main mode of the game in which player travel through the dungeons.
+//! This is the main mode of the game in which player travels through the dungeons.
 const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
@@ -12,15 +12,19 @@ const PlayMode = @This();
 
 const QuickAction = struct { target: g.Entity, action: g.Action };
 
+arena: *std.heap.ArenaAllocator,
 session: *g.GameSession,
 ai: g.AI,
 // The actions which can be applied to the entity in focus
 quick_actions: std.ArrayList(QuickAction),
+target_idx: usize = 0,
 is_player_turn: bool = true,
+window: ?*g.Window = null,
 
 pub fn init(arena: *std.heap.ArenaAllocator, session: *g.GameSession, rand: std.Random) !PlayMode {
     log.debug("Init PlayMode", .{});
     return .{
+        .arena = arena,
         .session = session,
         .ai = g.AI{ .session = session, .rand = rand },
         .quick_actions = std.ArrayList(QuickAction).init(arena.allocator()),
@@ -35,18 +39,22 @@ pub fn update(self: *PlayMode, target_entity: ?g.Entity) !void {
 }
 
 inline fn target(self: PlayMode) ?g.Entity {
-    return if (self.quick_actions.items[0].action == .wait)
+    return if (self.quick_actions.items[self.target_idx].action == .wait)
         null
     else
-        self.quick_actions.items[0].target;
+        self.quick_actions.items[self.target_idx].target;
 }
 
 inline fn quickAction(self: PlayMode) g.Action {
-    return self.quick_actions.items[0].action;
+    return self.quick_actions.items[self.target_idx].action;
 }
 
 fn draw(self: *const PlayMode) !void {
-    try self.session.render.drawScene(self.session, self.target(), self.quickAction());
+    if (self.window) |window| {
+        try self.session.render.drawWindow(window);
+    } else {
+        try self.session.render.drawScene(self.session, self.target(), self.quickAction());
+    }
     try self.drawInfoBar();
 }
 
@@ -56,20 +64,19 @@ fn redraw(self: *const PlayMode) !void {
 }
 
 fn drawInfoBar(self: *const PlayMode) !void {
+    if (self.window) |_| {
+        try self.session.render.hideLeftButton();
+        try self.session.render.drawRightButton("Choose", false);
+        return;
+    }
+
     if (self.session.level.components.getForEntity(self.session.level.player, c.Health)) |health| {
         try self.session.render.drawPlayerHp(health);
     }
-    switch (self.quickAction()) {
-        .wait => try self.session.render.drawRightButton("Wait", false),
-        .open => try self.session.render.drawRightButton("Open", false),
-        .close => try self.session.render.drawRightButton("Close", false),
-        .hit => try self.session.render.drawRightButton("Attack", false),
-        .move_to_level => |ladder| switch (ladder.direction) {
-            .up => try self.session.render.drawRightButton("Go up", false),
-            .down => try self.session.render.drawRightButton("Go down", false),
-        },
-        else => try self.session.render.hideRightButton(),
-    }
+    const qa = self.quickAction();
+    const action_label = qa.toString();
+    try self.session.render.drawRightButton(action_label, self.quick_actions.items.len > 1);
+
     // Draw the name or health of the target entity
     if (self.target()) |entity| {
         if (entity != self.session.level.player) {
@@ -107,13 +114,43 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
 fn handleInput(self: *PlayMode) !?g.Action {
     if (try self.session.runtime.readPushedButtons()) |button| {
         switch (button.game_button) {
-            .a => if (button.state == .released) return self.quickAction(),
+            .a => {
+                if (self.window) |window| {
+                    self.target_idx = window.selected_line orelse 0;
+                    window.destroy();
+                    self.window = null;
+                    try self.draw();
+                } else {
+                    switch (button.state) {
+                        .released => return self.quickAction(),
+                        .hold => if (self.quick_actions.items.len > 0) {
+                            self.window =
+                                try self.createWindowWithVariants(self.quick_actions.items, self.target_idx);
+                            try self.session.render.drawWindow(self.window.?);
+                            try self.drawInfoBar();
+                        },
+                    }
+                }
+                return null;
+            },
             .b => if (button.state == .released) {
                 try self.session.lookAround();
                 // we have to handle changing the state right after this function
                 return null;
             },
-            .left, .right, .up, .down => {
+            .left, .right, .up, .down => if (self.window) |window| {
+                if (button.game_button == .up) {
+                    window.selectPrev();
+                    try self.session.render.drawWindow(window);
+                    try self.drawInfoBar();
+                }
+                if (button.game_button == .down) {
+                    window.selectNext();
+                    try self.session.render.drawWindow(window);
+                    try self.drawInfoBar();
+                }
+                return null;
+            } else {
                 return g.Action{
                     .move = .{
                         .target = .{ .direction = button.toDirection().? },
@@ -226,7 +263,9 @@ fn calculateQuickActionForTarget(
     target_entity: g.Entity,
 ) ?g.Action {
     const player_position = self.session.level.playerPosition();
-    const target_position = self.session.level.components.getForEntity(target_entity, c.Position) orelse return null;
+    const target_position =
+        self.session.level.components.getForEntity(target_entity, c.Position) orelse return null;
+
     if (player_position.point.near(target_position.point)) {
         if (self.session.level.components.getForEntity(target_entity, c.Ladder)) |ladder| {
             // the player should be able to go between levels only from the
@@ -254,4 +293,21 @@ fn calculateQuickActionForTarget(
         }
     }
     return null;
+}
+
+fn createWindowWithVariants(
+    self: PlayMode,
+    variants: []const QuickAction,
+    selected: usize,
+) !*g.Window {
+    const window = try g.Window.create(self.arena.allocator());
+    for (variants, 0..) |qa, idx| {
+        const line = try window.addOneLine();
+        const action_label = qa.action.toString();
+        const pad = @divTrunc(g.Window.MAX_WINDOW_WIDTH - action_label.len, 2);
+        std.mem.copyForwards(u8, line[pad..], action_label);
+        if (idx == selected)
+            window.selected_line = idx;
+    }
+    return window;
 }

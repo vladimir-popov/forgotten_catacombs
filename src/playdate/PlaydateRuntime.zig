@@ -25,24 +25,20 @@ const LastButton = struct {
             if (self.pressed_at == 0) {
                 // ignore release for repeated button
                 if (self.was_repeated) {
-                    log.info("ignore release for repeated {s}", .{@tagName(game_button)});
                     self.* = .{};
                     return null;
                 }
-                log.info("released {s}", .{@tagName(game_button)});
                 self.* = .{};
                 return .{ .game_button = game_button, .state = .released };
             }
             // repeat for pressed arrows only
             else if (game_button.isMove() and now_ms - self.pressed_at > REPEATE_DELAY_MS) {
-                log.info("repeat {s}", .{@tagName(game_button)});
                 self.pressed_at = now_ms;
                 self.was_repeated = true;
                 return .{ .game_button = game_button, .state = .hold };
             }
             // the button is held
             else if (now_ms - self.pressed_at > HOLD_DELAY_MS) {
-                log.info("hold {s}", .{@tagName(game_button)});
                 self.* = .{};
                 return .{ .game_button = game_button, .state = .hold };
             }
