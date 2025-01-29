@@ -5,7 +5,11 @@ const log = std.log.scoped(.Game);
 
 const Game = @This();
 
-pub const State = enum { welcome, game_over, game };
+pub const State = union(enum) {
+    welcome,
+    game_over,
+    game_session: *g.GameSession,
+};
 
 alloc: std.mem.Allocator,
 /// This prng is used to make any dynamic decision by AI, or game events,
@@ -20,8 +24,6 @@ render: g.Render,
 seed: u64,
 /// The current state of the game
 state: State,
-/// The current game session
-game_session: ?*g.GameSession = null,
 game_session_arena: std.heap.ArenaAllocator,
 ///
 events: *g.events.EventBus = undefined,
@@ -47,7 +49,7 @@ pub fn create(alloc: std.mem.Allocator, runtime: g.Runtime, seed: u64) !*Game {
     self.events = try g.events.EventBus.create(&self.events_arena);
     try self.events.subscribe(self.subscriber());
     try self.events.subscribe(self.render.viewport.subscriber());
-    try self.welcome();
+    try self.render.drawWelcomeScreen();
     return self;
 }
 
@@ -58,47 +60,11 @@ pub fn destroy(self: *Game) void {
     self.alloc.destroy(self);
 }
 
-inline fn welcome(self: *Game) !void {
-    self.state = .welcome;
-    self.runtime.removeAllMenuItems();
-    try self.render.drawWelcomeScreen();
-}
-
-inline fn newGame(self: *Game) !void {
-    self.state = .game;
-    _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
-    _ = self.runtime.addMenuItem("Explore lvl", self, exploreMenu);
-    if (self.game_session) |gs| {
-        std.debug.assert(self.events.unsubscribe(gs));
-    }
-    _ = self.game_session_arena.reset(.retain_capacity);
-    self.game_session = try g.GameSession.create(
-        &self.game_session_arena,
-        self.seed,
-        self.prng.random(),
-        self.runtime,
-        &self.render,
-        self.events,
-    );
-}
-
-fn goToMainMenu(ptr: ?*anyopaque) callconv(.C) void {
-    if (ptr == null) return;
-    const self: *Game = @ptrCast(@alignCast(ptr.?));
-    self.welcome() catch @panic("Error when the Game went to the '.welcome' state");
-}
-
-fn exploreMenu(ptr: ?*anyopaque) callconv(.C) void {
-    if (ptr == null) return;
-    const self: *Game = @ptrCast(@alignCast(ptr.?));
-    self.game_session.?.explore() catch @panic("Error on looking around");
-}
-
 pub fn subscriber(self: *Game) g.events.Subscriber {
     return .{ .context = self, .onEvent = gameOver };
 }
 
-pub fn gameOver(ptr: *anyopaque, event: g.events.Event) !void {
+fn gameOver(ptr: *anyopaque, event: g.events.Event) !void {
     const self: *Game = @ptrCast(@alignCast(ptr));
     switch (event) {
         .entity_died => |entity_died| {
@@ -116,17 +82,55 @@ pub fn tick(self: *Game) !void {
     switch (self.state) {
         .welcome => if (try self.runtime.readPushedButtons()) |btn| {
             switch (btn.game_button) {
-                .a => if (btn.state == .released) try self.newGame(),
+                .a => if (btn.state == .released) {
+                    _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
+                    _ = self.runtime.addMenuItem("Explore lvl", self, exploreMenu);
+
+                    _ = self.game_session_arena.reset(.retain_capacity);
+                    self.state = .{ .game_session = try g.GameSession.create(
+                        &self.game_session_arena,
+                        self.seed,
+                        self.prng.random(),
+                        self.runtime,
+                        &self.render,
+                        self.events,
+                    ) };
+                },
                 else => {},
             }
         },
         .game_over => if (try self.runtime.readPushedButtons()) |btn| {
             switch (btn.game_button) {
-                .a => if (btn.state == .released) try self.welcome(),
+                .a => if (btn.state == .released) {
+                    self.state = .welcome;
+                    self.runtime.removeAllMenuItems();
+                    try self.render.drawWelcomeScreen();
+                },
                 else => {},
             }
         },
-        .game => try self.game_session.?.tick(),
+        .game_session => |game_session| try game_session.tick(),
     }
     try self.events.notifySubscribers();
+}
+
+fn goToMainMenu(ptr: ?*anyopaque) callconv(.C) void {
+    if (ptr == null) return;
+    const self: *Game = @ptrCast(@alignCast(ptr.?));
+    if (self.state == .game_session)
+        self.state.game_session.destroy();
+
+    self.state = .welcome;
+    self.runtime.removeAllMenuItems();
+    self.render.drawWelcomeScreen()
+        catch @panic("Error on drawing Welcome screen");
+}
+
+fn exploreMenu(ptr: ?*anyopaque) callconv(.C) void {
+    if (ptr == null) return;
+    const self: *Game = @ptrCast(@alignCast(ptr.?));
+    switch (self.state) {
+        .game_session => |game_session| game_session.explore() catch @panic("Error on looking around"),
+        else => {},
+    }
 }

@@ -42,9 +42,9 @@ rand: std.Random,
 runtime: g.Runtime,
 render: *g.Render,
 events: *g.events.EventBus,
-level_arena: std.heap.ArenaAllocator,
 /// The current level
-level: *g.Level = undefined,
+level: *g.Level,
+level_arena: std.heap.ArenaAllocator,
 /// The current mode of the game
 mode: Mode,
 
@@ -67,8 +67,10 @@ pub fn create(
     render: *g.Render,
     events: *g.events.EventBus,
 ) !*GameSession {
+    log.info("Begin the new game session with seed {d}", .{seed});
+    defer log.info("The new game session with seed {d} has been created", .{seed});
+
     const alloc = arena.allocator();
-    log.debug("Begin the new game session with seed {d}", .{seed});
     const self = try alloc.create(GameSession);
     self.* = .{
         .arena = arena,
@@ -87,6 +89,14 @@ pub fn create(
 
     render.viewport.region.top_left = .{ .row = 1, .col = 1 };
     return self;
+}
+
+pub fn destroy(self: *g.GameSession) void {
+    const alloc = self.arena.child_allocator;
+    std.debug.assert(self.events.unsubscribe(self));
+    self.arena.deinit();
+    alloc.destroy(self.arena);
+    alloc.destroy(self);
 }
 
 pub fn subscriber(self: *GameSession) g.events.Subscriber {
@@ -122,6 +132,7 @@ pub fn lookAround(self: *GameSession) !void {
 }
 
 pub inline fn tick(self: *GameSession) !void {
+    log.info("Tick {s}", .{@tagName(self.mode)});
     switch (self.mode) {
         .play => try self.mode.play.tick(),
         .explore => try self.mode.explore.tick(),
