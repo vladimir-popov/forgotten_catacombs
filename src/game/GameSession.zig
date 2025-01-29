@@ -21,29 +21,48 @@ const log = std.log.scoped(.game_session);
 
 const GameSession = @This();
 
-pub const Mode = enum { play, explore, looking_around };
+pub const Mode = union(enum) {
+    play: PlayMode,
+    explore: ExploreMode,
+    looking_around: LookingAroundMode,
 
+    inline fn deinit(self: *Mode) void {
+        switch (self.*) {
+            .play => self.play.deinit(),
+            .looking_around => self.looking_around.deinit(),
+            .explore => {},
+        }
+    }
+};
+
+arena: *std.heap.ArenaAllocator,
 /// This seed should help to make all levels of the single game session reproducible.
 seed: u64,
-/// The PRNG initialized by the session's seed. This prng is used to make any dynamic decision by AI, or game events,
-/// and should not be used to generate any level objects, to keep the levels reproducible.
-prng: std.Random.DefaultPrng,
+rand: std.Random,
 runtime: g.Runtime,
 render: *g.Render,
 events: *g.events.EventBus,
 level_arena: std.heap.ArenaAllocator,
-/// The current mode of the game
-mode: Mode = .play,
 /// The current level
 level: *g.Level = undefined,
-// stateful modes:
-play_mode: PlayMode,
-explore_mode: ExploreMode,
-looking_around: LookingAroundMode,
+/// The current mode of the game
+mode: Mode,
 
+/// Create a new game session.
+///
+/// arena -   used to allocate any objects inside the game session.
+///           Should be deinited at the end of life of this game session.
+/// seed  -   Used to generate levels. Can be used for reproducing game session.
+/// rand  -   Used to make decisions by AI, and to generate other game events,
+///           such as damage and etc.
+/// runtime - Particular runtime.
+/// render  - Implementation of the render.
+/// events  - EventBus used to handle events happened during the game session.
+///
 pub fn create(
     arena: *std.heap.ArenaAllocator,
     seed: u64,
+    rand: std.Random,
     runtime: g.Runtime,
     render: *g.Render,
     events: *g.events.EventBus,
@@ -52,52 +71,61 @@ pub fn create(
     log.debug("Begin the new game session with seed {d}", .{seed});
     const self = try alloc.create(GameSession);
     self.* = .{
+        .arena = arena,
         .seed = seed,
-        .prng = std.Random.DefaultPrng.init(seed),
+        .rand = rand,
         .render = render,
         .runtime = runtime,
         .events = events,
         .level_arena = std.heap.ArenaAllocator.init(alloc),
-        .play_mode = try PlayMode.init(arena, self, self.prng.random()),
-        .looking_around = try LookingAroundMode.init(alloc, self),
-        .explore_mode = ExploreMode.init(self),
+        .level = try g.Levels.firstLevel(&self.level_arena, g.entities.Player, true),
+        .mode = .{ .play = try PlayMode.init(alloc, self, null) },
     };
-    self.level = try g.Levels.firstLevel(&self.level_arena, g.entities.Player, true);
     log.debug("The first level has been created", .{});
 
-    try events.subscribe(self.play_mode.subscriber());
+    try events.subscribe(self.subscriber());
 
     render.viewport.region.top_left = .{ .row = 1, .col = 1 };
-    try self.play_mode.update(null);
     return self;
 }
 
-pub fn unsubscribe(self: *GameSession) void {
-    std.debug.assert(self.events.unsubscribe(&self.play_mode));
+pub fn subscriber(self: *GameSession) g.events.Subscriber {
+    return .{ .context = self, .onEvent = handleEvent };
+}
+
+fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
+    const self: *GameSession = @ptrCast(@alignCast(ptr));
+    switch (self.mode) {
+        .play => try self.mode.play.handleEvent(event),
+        else => {},
+    }
 }
 
 // TODO: Load session from file
 
 pub fn play(self: *GameSession, entity_in_focus: ?g.Entity) !void {
-    self.mode = .play;
-    try self.play_mode.update(entity_in_focus);
+    self.mode.deinit();
+    self.mode = .{ .play = try PlayMode.init(self.arena.allocator(), self, entity_in_focus) };
+    try self.mode.play.redraw();
 }
 
 pub fn explore(self: *GameSession) !void {
-    self.mode = .explore;
-    try self.explore_mode.refresh();
+    self.mode.deinit();
+    self.mode = .{ .explore = ExploreMode.init(self) };
+    try self.mode.explore.redraw();
 }
 
 pub fn lookAround(self: *GameSession) !void {
-    self.mode = .looking_around;
-    try self.looking_around.refresh();
+    self.mode.deinit();
+    self.mode = .{ .looking_around = try LookingAroundMode.init(self.arena.allocator(), self) };
+    try self.mode.looking_around.redraw();
 }
 
 pub inline fn tick(self: *GameSession) !void {
     switch (self.mode) {
-        .play => try self.play_mode.tick(),
-        .explore => try self.explore_mode.tick(),
-        .looking_around => try self.looking_around.tick(),
+        .play => try self.mode.play.tick(),
+        .explore => try self.mode.explore.tick(),
+        .looking_around => try self.mode.looking_around.tick(),
     }
 }
 
@@ -136,6 +164,6 @@ pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
             by_ladder,
         ),
     };
-    try self.play_mode.updateQuickActions(null);
     self.render.viewport.centeredAround(self.level.playerPosition().point);
+    try self.play(null);
 }

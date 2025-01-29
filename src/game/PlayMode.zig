@@ -21,32 +21,31 @@ target_idx: usize = 0,
 is_player_turn: bool = true,
 window: ?*g.Window = null,
 
-pub fn init(arena: *std.heap.ArenaAllocator, session: *g.GameSession, rand: std.Random) !PlayMode {
+pub fn init(alloc: std.mem.Allocator, session: *g.GameSession, target_entity: ?g.Entity) !PlayMode {
     log.debug("Init PlayMode", .{});
-    return .{
+    const arena = try alloc.create(std.heap.ArenaAllocator);
+    arena.* = std.heap.ArenaAllocator.init(alloc);
+    const arena_alloc = arena.allocator();
+    var self: PlayMode = .{
         .arena = arena,
         .session = session,
-        .ai = g.AI{ .session = session, .rand = rand },
-        .quick_actions = std.ArrayList(QuickAction).init(arena.allocator()),
+        .ai = g.AI{ .session = session },
+        .quick_actions = std.ArrayList(QuickAction).init(arena_alloc),
     };
-}
-
-/// Updates the target entity after switching back to the play mode
-pub fn update(self: *PlayMode, target_entity: ?g.Entity) !void {
-    log.debug("Update target after refresh", .{});
     try self.updateQuickActions(target_entity);
-    try self.redraw();
+    log.debug("PlayMode has been initialized", .{});
+    return self;
 }
 
-inline fn target(self: PlayMode) ?g.Entity {
-    return if (self.quick_actions.items[self.target_idx].action == .wait)
-        null
-    else
-        self.quick_actions.items[self.target_idx].target;
+pub fn deinit(self: *PlayMode) void {
+    const alloc = self.arena.child_allocator;
+    self.arena.deinit();
+    alloc.destroy(self.arena);
 }
 
-inline fn quickAction(self: PlayMode) g.Action {
-    return self.quick_actions.items[self.target_idx].action;
+pub fn redraw(self: *const PlayMode) !void {
+    try self.session.render.redraw(self.session, self.target(), self.quickAction());
+    try self.drawInfoBar();
 }
 
 fn draw(self: *const PlayMode) !void {
@@ -58,9 +57,15 @@ fn draw(self: *const PlayMode) !void {
     try self.drawInfoBar();
 }
 
-fn redraw(self: *const PlayMode) !void {
-    try self.session.render.redraw(self.session, self.target(), self.quickAction());
-    try self.drawInfoBar();
+inline fn target(self: PlayMode) ?g.Entity {
+    return if (self.quick_actions.items[self.target_idx].action == .wait)
+        null
+    else
+        self.quick_actions.items[self.target_idx].target;
+}
+
+inline fn quickAction(self: PlayMode) g.Action {
+    return self.quick_actions.items[self.target_idx].action;
 }
 
 fn drawInfoBar(self: *const PlayMode) !void {
@@ -92,12 +97,7 @@ fn drawInfoBar(self: *const PlayMode) !void {
     }
 }
 
-pub fn subscriber(self: *PlayMode) g.events.Subscriber {
-    return .{ .context = self, .onEvent = handleEvent };
-}
-
-fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
-    const self: *PlayMode = @ptrCast(@alignCast(ptr));
+pub fn handleEvent(self: *PlayMode, event: g.events.Event) !void {
     switch (event) {
         .player_hit => {
             log.debug("Update target after player hit", .{});

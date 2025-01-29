@@ -8,7 +8,7 @@ const Logger = @import("Logger.zig");
 
 pub const std_options: std.Options = .{
     .logFn = Logger.writeLog,
-    .log_level = .info,
+    .log_level = .debug,
     .log_scope_levels = &[_]std.log.ScopeLevel{
         .{ .scope = .default, .level = .debug },
         .{ .scope = .render, .level = .warn },

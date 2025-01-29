@@ -8,7 +8,6 @@ const log = std.log.scoped(.ai);
 const AI = @This();
 
 session: *const g.GameSession,
-rand: std.Random,
 
 /// Calculates the next action for the entity.
 /// Do not mutate anything, only creates an action.
@@ -40,7 +39,7 @@ inline fn actionForSleepingEnemy(
     if (entity_place.near(player_place)) return .{ .get_angry = entity };
     if (self.isPlayerIsInSight(entity_place)) {
         // TODO Probability of waking up should depends on player's skills
-        if (self.rand.uintLessThan(u8, 10) == 0) return .{ .get_angry = entity };
+        if (self.session.rand.uintLessThan(u8, 10) == 0) return .{ .get_angry = entity };
     }
     return .wait;
 }
@@ -55,11 +54,11 @@ inline fn actionForWalkingEnemy(
 
     if (self.isPlayerIsInSight(entity_place)) {
         // TODO Probability of become aggressive should depends on player's skills
-        if (self.rand.uintLessThan(u8, 10) > 3) return .{ .get_angry = entity };
+        if (self.session.rand.uintLessThan(u8, 10) > 3) return .{ .get_angry = entity };
     }
 
     var directions = [4]p.Direction{ .left, .up, .right, .down };
-    self.rand.shuffle(p.Direction, &directions);
+    self.session.rand.shuffle(p.Direction, &directions);
     for (directions) |direction| {
         const place = entity_place.movedTo(direction);
         if (self.session.level.obstacleAt(place)) |collision| {

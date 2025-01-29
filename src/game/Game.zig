@@ -8,6 +8,9 @@ const Game = @This();
 pub const State = enum { welcome, game_over, game };
 
 alloc: std.mem.Allocator,
+/// This prng is used to make any dynamic decision by AI, or game events,
+/// but not to generate any level objects.
+prng: std.Random.DefaultPrng,
 /// Playdate or terminal
 runtime: g.Runtime,
 /// Module to draw the game
@@ -28,6 +31,7 @@ pub fn create(alloc: std.mem.Allocator, runtime: g.Runtime, seed: u64) !*Game {
     var self = try alloc.create(Game);
     self.* = .{
         .alloc = alloc,
+        .prng = std.Random.DefaultPrng.init(seed),
         .runtime = runtime,
         .render = try g.Render.init(
             alloc,
@@ -65,12 +69,13 @@ inline fn newGame(self: *Game) !void {
     _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
     _ = self.runtime.addMenuItem("Explore lvl", self, exploreMenu);
     if (self.game_session) |gs| {
-        gs.unsubscribe();
+        std.debug.assert(self.events.unsubscribe(gs));
     }
     _ = self.game_session_arena.reset(.retain_capacity);
     self.game_session = try g.GameSession.create(
         &self.game_session_arena,
         self.seed,
+        self.prng.random(),
         self.runtime,
         &self.render,
         self.events,

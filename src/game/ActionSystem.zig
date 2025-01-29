@@ -163,7 +163,7 @@ fn doHit(
     enemy: g.Entity,
     enemy_health: *c.Health,
 ) !MovePoints {
-    const damage = actor_weapon.generateDamage(session.prng.random());
+    const damage = actor_weapon.generateDamage(session.rand);
     log.debug("The entity {d} received damage {d} from {d}", .{ enemy, damage, actor });
     enemy_health.current -= @as(i16, @intCast(damage));
     try session.level.components.setToEntity(
