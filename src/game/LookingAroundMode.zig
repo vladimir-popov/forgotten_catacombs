@@ -9,11 +9,11 @@ const log = std.log.scoped(.looking_around_mode);
 
 const LookingAroundMode = @This();
 const Entities = std.SegmentedList(g.Entity, 1);
-const EntitiesOnScreen = std.AutoHashMap(p.Point, Entities);
+const EntitiesOnScreen = std.AutoHashMapUnmanaged(p.Point, Entities);
 const WindowType = enum { desription, variants };
 
-arena: *std.heap.ArenaAllocator,
 session: *g.GameSession,
+arena: std.heap.ArenaAllocator,
 /// Map of entities and their positions on the screen
 entities_on_screen: EntitiesOnScreen,
 /// Highlighted place in the dungeon
@@ -21,46 +21,45 @@ place_in_focus: ?p.Point = null,
 /// Index of the entity in focus
 focus_idx: usize = 0,
 /// The window to show description or variants
-window: ?*g.Window = null,
+window: ?g.Window = null,
 
-pub fn init(alloc: std.mem.Allocator, session: *g.GameSession) !LookingAroundMode {
-    log.debug("Init LookingAroundMode", .{});
-    const arena = try alloc.create(std.heap.ArenaAllocator);
-    arena.* = std.heap.ArenaAllocator.init(alloc);
+pub fn init(session: *g.GameSession) !LookingAroundMode {
+    var arena = std.heap.ArenaAllocator.init(session.alloc);
     const arena_alloc = arena.allocator();
-    var self: LookingAroundMode = .{
-        .arena = arena,
-        .session = session,
-        .entities_on_screen = EntitiesOnScreen.init(arena_alloc),
-    };
-    var itr = self.session.level.query().get(c.Position);
+    var entities_on_screen = EntitiesOnScreen{};
+    var place_in_focus: ?p.Point = null;
+    var focus_idx: usize = 0;
+    var itr = session.level.query().get(c.Position);
     while (itr.next()) |tuple| {
-        if (self.session.render.viewport.region.containsPoint(tuple[1].point)) {
-            const entry = try self.entities_on_screen.getOrPutValue(tuple[1].point, .{});
+        if (session.render.viewport.region.containsPoint(tuple[1].point)) {
+            const entry = try entities_on_screen.getOrPutValue(arena_alloc, tuple[1].point, .{});
             try entry.value_ptr.append(arena_alloc, tuple[0]);
-            if (tuple[0] == self.session.level.player) {
-                self.place_in_focus = tuple[1].point;
-                self.focus_idx = entry.value_ptr.count() - 1;
+            if (tuple[0] == session.level.player) {
+                place_in_focus = tuple[1].point;
+                focus_idx = entry.value_ptr.count() - 1;
             }
         }
     }
-    log.debug("LookingAroundMode has been initialized", .{});
-    return self;
+    return .{
+        .session = session,
+        .entities_on_screen = entities_on_screen,
+        .place_in_focus = place_in_focus,
+        .focus_idx = focus_idx,
+        .arena = arena,
+    };
 }
 
 pub fn deinit(self: *LookingAroundMode) void {
-    const alloc = self.arena.child_allocator;
     self.arena.deinit();
-    alloc.destroy(self.arena);
 }
 
-pub fn redraw(self: *const LookingAroundMode) !void {
-    try self.session.render.redraw(self.session, self.entityInFocus(), null);
+pub fn redraw(self: *LookingAroundMode) !void {
+    try self.session.render.redraw(self.session.level, self.entityInFocus(), null);
     try self.drawInfoBar();
 }
 
 fn draw(self: *const LookingAroundMode) !void {
-    try self.session.render.drawScene(self.session, self.entityInFocus(), null);
+    try self.session.render.drawScene(self.session.level, self.entityInFocus(), null);
     try self.drawInfoBar();
 }
 
@@ -139,7 +138,7 @@ fn statusLine(self: LookingAroundMode, entity: g.Entity, line: []u8) !usize {
     return len;
 }
 
-pub fn tick(self: *LookingAroundMode) anyerror!void {
+pub fn tick(self: *LookingAroundMode) !void {
     // Nothing should happened until the player push a button
     if (try self.session.runtime.readPushedButtons()) |btn| {
         switch (btn.game_button) {
@@ -147,19 +146,19 @@ pub fn tick(self: *LookingAroundMode) anyerror!void {
                 if (window.tag == @intFromEnum(WindowType.variants)) {
                     self.focus_idx = window.selected_line orelse 0;
                 }
-                window.destroy();
+                window.deinit();
                 self.window = null;
                 try self.redraw();
             } else {
                 if (btn.state == .hold and self.countOfEntitiesInFocus() > 1) {
                     if (self.entitiesInFocus()) |entities| {
-                        self.window = try self.createWindowWithVariants(entities, self.focus_idx);
-                        try self.session.render.drawWindow(self.window.?);
+                        try self.initWindowWithVariants(entities, self.focus_idx);
+                        try self.session.render.drawWindow(&self.window.?);
                         try self.drawInfoBar();
                     }
                 } else if (self.entityInFocus()) |entity| {
-                    self.window = try self.createWindowWithDescription(entity);
-                    try self.session.render.drawWindow(self.window.?);
+                    try self.initWindowWithDescription(entity);
+                    try self.session.render.drawWindow(&self.window.?);
                     try self.drawInfoBar();
                 }
             },
@@ -167,7 +166,7 @@ pub fn tick(self: *LookingAroundMode) anyerror!void {
                 try self.session.play(self.entityInFocus());
                 return;
             },
-            .left, .right, .up, .down => if (self.window) |window| {
+            .left, .right, .up, .down => if (self.window) |*window| {
                 if (window.tag == @intFromEnum(WindowType.variants)) {
                     if (btn.game_button == .up) {
                         window.selectPrev();
@@ -234,51 +233,49 @@ inline fn sub(x: u8, y: u8) u8 {
     return if (y > x) y - x else x - y;
 }
 
-fn createWindowWithVariants(
-    self: LookingAroundMode,
+fn initWindowWithVariants(
+    self: *LookingAroundMode,
     variants: Entities,
     selected: usize,
-) !*g.Window {
-    const window = try g.Window.create(self.arena.allocator());
-    window.tag = @intFromEnum(WindowType.variants);
+) !void {
+    self.window = try g.Window.init(self.arena.allocator());
+    self.window.?.tag = @intFromEnum(WindowType.variants);
     var itr = variants.constIterator(0);
     var idx: usize = 0;
     while (itr.next()) |entity| : (idx += 1) {
         // Every entity has to have description, or handling indexes become complicated
         const description = self.session.level.components.getForEntityUnsafe(entity.*, c.Description);
-        const line = try window.addOneLine();
+        const line = try self.window.?.addOneLine();
         const pad = @divTrunc(g.Window.MAX_WINDOW_WIDTH - description.name.len, 2);
         std.mem.copyForwards(u8, line[pad..], description.name);
         if (idx == selected)
-            window.selected_line = idx;
+            self.window.?.selected_line = idx;
     }
-    return window;
 }
 
-fn createWindowWithDescription(
-    self: LookingAroundMode,
+fn initWindowWithDescription(
+    self: *LookingAroundMode,
     entity: g.Entity,
-) !*g.Window {
-    const window = try g.Window.create(self.arena.allocator());
-    window.tag = @intFromEnum(WindowType.desription);
+) !void {
+    self.window = try g.Window.init(self.arena.allocator());
+    self.window.?.tag = @intFromEnum(WindowType.desription);
     var len: usize = 0;
     if (self.session.level.components.getForEntity(entity, c.Description)) |description| {
-        len += (try std.fmt.bufPrint(&window.title, "{s}", .{description.name})).len;
+        len += (try std.fmt.bufPrint(&self.window.?.title, "{s}", .{description.name})).len;
     }
     if (true) {
-        len += (try std.fmt.bufPrint(window.title[len..], " [id: {d}]", .{entity})).len;
+        len += (try std.fmt.bufPrint(self.window.?.title[len..], " [id: {d}]", .{entity})).len;
     }
     if (self.session.level.components.getForEntity(entity, c.EnemyState)) |state| {
-        const line = try window.addOneLine();
+        const line = try self.window.?.addOneLine();
         _ = try std.fmt.bufPrint(line[1..], "State: is {s}", .{@tagName(state.*)});
     }
     if (self.session.level.components.getForEntity(entity, c.Health)) |health| {
-        const line = try window.addOneLine();
+        const line = try self.window.?.addOneLine();
         _ = try std.fmt.bufPrint(line[1..], "Health: {d}/{d}", .{ health.current, health.max });
     }
     if (self.session.level.components.getForEntity(entity, c.Speed)) |speed| {
-        const line = try window.addOneLine();
+        const line = try self.window.?.addOneLine();
         _ = try std.fmt.bufPrint(line[1..], "Speed: {d}", .{speed.move_points});
     }
-    return window;
 }

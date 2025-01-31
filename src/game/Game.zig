@@ -9,7 +9,15 @@ pub const State = union(enum) {
     welcome,
     game_over,
     game_session: *g.GameSession,
+
+    fn deinit(self: *State) void {
+        if (self.* == .game_session) {
+            self.game_session.destroy();
+        }
+    }
 };
+
+pub const TickResult = enum { continue_game, player_dead, player_win };
 
 alloc: std.mem.Allocator,
 /// This prng is used to make any dynamic decision by AI, or game events,
@@ -24,10 +32,6 @@ render: g.Render,
 seed: u64,
 /// The current state of the game
 state: State,
-game_session_arena: std.heap.ArenaAllocator,
-///
-events: *g.events.EventBus = undefined,
-events_arena: std.heap.ArenaAllocator,
 
 pub fn create(alloc: std.mem.Allocator, runtime: g.Runtime, seed: u64) !*Game {
     var self = try alloc.create(Game);
@@ -43,33 +47,30 @@ pub fn create(alloc: std.mem.Allocator, runtime: g.Runtime, seed: u64) !*Game {
         ),
         .seed = seed,
         .state = .welcome,
-        .game_session_arena = std.heap.ArenaAllocator.init(alloc),
-        .events_arena = std.heap.ArenaAllocator.init(alloc),
     };
-    self.events = try g.events.EventBus.create(&self.events_arena);
-    try self.events.subscribe(self.subscriber());
-    try self.events.subscribe(self.render.viewport.subscriber());
     try self.render.drawWelcomeScreen();
     return self;
 }
 
 pub fn destroy(self: *Game) void {
-    self.game_session_arena.deinit();
-    self.events_arena.deinit();
+    self.state.deinit();
     self.render.deinit();
     self.alloc.destroy(self);
 }
 
 pub fn subscriber(self: *Game) g.events.Subscriber {
-    return .{ .context = self, .onEvent = gameOver };
+    return .{ .context = self, .onEvent = handleEvent };
 }
 
-fn gameOver(ptr: *anyopaque, event: g.events.Event) !void {
+fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
     const self: *Game = @ptrCast(@alignCast(ptr));
+    if (self.state == .game_session) {
+        try self.state.game_session.handleEvent(self.state.game_session, event);
+    }
     switch (event) {
         .entity_died => |entity_died| {
             if (entity_died.is_player) {
-                _ = self.game_session_arena.reset(.retain_capacity);
+                self.state.game_session.destroy();
                 self.state = .game_over;
                 try self.render.drawGameOverScreen();
             }
@@ -86,14 +87,12 @@ pub fn tick(self: *Game) !void {
                     _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
                     _ = self.runtime.addMenuItem("Explore lvl", self, exploreMenu);
 
-                    _ = self.game_session_arena.reset(.retain_capacity);
                     self.state = .{ .game_session = try g.GameSession.create(
-                        &self.game_session_arena,
+                        self.alloc,
                         self.seed,
                         self.prng.random(),
                         self.runtime,
                         &self.render,
-                        self.events,
                     ) };
                 },
                 else => {},
@@ -109,9 +108,15 @@ pub fn tick(self: *Game) !void {
                 else => {},
             }
         },
-        .game_session => |game_session| try game_session.tick(),
+        .game_session => |game_session| switch (try game_session.tick()) {
+            .player_dead => {
+                self.state.game_session.destroy();
+                self.state = .game_over;
+                try self.render.drawGameOverScreen();
+            },
+            else => {},
+        },
     }
-    try self.events.notifySubscribers();
 }
 
 fn goToMainMenu(ptr: ?*anyopaque) callconv(.C) void {
@@ -122,8 +127,7 @@ fn goToMainMenu(ptr: ?*anyopaque) callconv(.C) void {
 
     self.state = .welcome;
     self.runtime.removeAllMenuItems();
-    self.render.drawWelcomeScreen()
-        catch @panic("Error on drawing Welcome screen");
+    self.render.drawWelcomeScreen() catch @panic("Error on drawing Welcome screen");
 }
 
 fn exploreMenu(ptr: ?*anyopaque) callconv(.C) void {

@@ -5,7 +5,6 @@ pub const components = @import("components.zig");
 pub const dungeon = @import("dungeon/dungeon_pkg.zig");
 pub const ecs = @import("ecs.zig");
 pub const entities = @import("entities.zig");
-pub const events = @import("events.zig");
 pub const primitives = @import("primitives.zig");
 pub const visibility = @import("visibility_strategies.zig");
 

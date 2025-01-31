@@ -7,22 +7,23 @@ const log = std.log.scoped(.ai);
 
 const AI = @This();
 
-session: *const g.GameSession,
+rand: std.Random,
 
 /// Calculates the next action for the entity.
 /// Do not mutate anything, only creates an action.
 pub fn action(
     self: AI,
+    level: *const g.Level,
     entity: g.Entity,
     entity_place: p.Point,
 ) g.Action {
-    const player_place = self.session.level.playerPosition().point;
+    const player_place = level.playerPosition().point;
 
-    if (self.session.level.components.getForEntity(entity, c.EnemyState)) |state| {
+    if (level.components.getForEntity(entity, c.EnemyState)) |state| {
         const act = switch (state.*) {
-            .sleeping => self.actionForSleepingEnemy(entity, entity_place, player_place),
-            .walking => self.actionForWalkingEnemy(entity, entity_place, player_place),
-            .aggressive => self.actionForAggressiveEnemy(entity, entity_place, player_place),
+            .sleeping => self.actionForSleepingEnemy(level, entity, entity_place, player_place),
+            .walking => self.actionForWalkingEnemy(level, entity, entity_place, player_place),
+            .aggressive => self.actionForAggressiveEnemy(level, entity, entity_place, player_place),
         };
         log.debug("The action for the entity {d} in state {s} is {any}", .{ entity, @tagName(state.*), act });
         return act;
@@ -32,36 +33,38 @@ pub fn action(
 
 inline fn actionForSleepingEnemy(
     self: AI,
+    level: *const g.Level,
     entity: g.Entity,
     entity_place: p.Point,
     player_place: p.Point,
 ) g.Action {
     if (entity_place.near(player_place)) return .{ .get_angry = entity };
-    if (self.isPlayerIsInSight(entity_place)) {
+    if (level.isPlayerIsInSight(entity_place)) {
         // TODO Probability of waking up should depends on player's skills
-        if (self.session.rand.uintLessThan(u8, 10) == 0) return .{ .get_angry = entity };
+        if (self.rand.uintLessThan(u8, 10) == 0) return .{ .get_angry = entity };
     }
     return .wait;
 }
 
 inline fn actionForWalkingEnemy(
     self: AI,
+    level: *const g.Level,
     entity: g.Entity,
     entity_place: p.Point,
     player_place: p.Point,
 ) g.Action {
     if (entity_place.near(player_place)) return .{ .get_angry = entity };
 
-    if (self.isPlayerIsInSight(entity_place)) {
+    if (level.isPlayerIsInSight(entity_place)) {
         // TODO Probability of become aggressive should depends on player's skills
-        if (self.session.rand.uintLessThan(u8, 10) > 3) return .{ .get_angry = entity };
+        if (self.rand.uintLessThan(u8, 10) > 3) return .{ .get_angry = entity };
     }
 
     var directions = [4]p.Direction{ .left, .up, .right, .down };
-    self.session.rand.shuffle(p.Direction, &directions);
+    self.rand.shuffle(p.Direction, &directions);
     for (directions) |direction| {
         const place = entity_place.movedTo(direction);
-        if (self.session.level.obstacleAt(place)) |collision| {
+        if (level.obstacleAt(place)) |collision| {
             if (collision == .landscape) continue;
         }
         return .{ .move = .{ .target = .{ .direction = direction } } };
@@ -71,18 +74,19 @@ inline fn actionForWalkingEnemy(
 }
 
 inline fn actionForAggressiveEnemy(
-    self: AI,
+    _: AI,
+    level: *const g.Level,
     entity: g.Entity,
     entity_place: p.Point,
     player_place: p.Point,
 ) g.Action {
-    if (self.session.level.dijkstra_map.vectors.get(entity_place)) |vector| {
+    if (level.dijkstra_map.vectors.get(entity_place)) |vector| {
         if (entity_place.near(player_place)) {
-            const health = self.session.level.components.getForEntityUnsafe(self.session.level.player, c.Health);
-            const weapon = self.session.level.components.getForEntityUnsafe(entity, c.Weapon);
+            const health = level.components.getForEntityUnsafe(level.player, c.Health);
+            const weapon = level.components.getForEntityUnsafe(entity, c.Weapon);
             return .{
                 .hit = .{
-                    .target = self.session.level.player,
+                    .target = level.player,
                     .target_health = health,
                     .by_weapon = weapon,
                 },
@@ -93,9 +97,4 @@ inline fn actionForAggressiveEnemy(
     } else {
         return .{ .chill = entity };
     }
-}
-
-fn isPlayerIsInSight(self: AI, entity_place: p.Point) bool {
-    if (!self.session.level.dijkstra_map.region.containsPointInside(entity_place)) return false;
-    return self.session.level.checkVisibility(entity_place) == .visible;
 }

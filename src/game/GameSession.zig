@@ -2,10 +2,6 @@
 //! which contains the current level, all entities and components.
 //! The GameSession has three modes: the `PlayMode`, `LookingAroundMode` and `ExploreMode`.
 //! That modes are part of the GameSession extracted to the separate files to make their maintenance easier.
-//! The `Mode` enum shows in which exactly mode the GameSession right now, but all implementations of the modes
-//! are not union. Instead, they are permanent part of the GameSession. It makes memory management easier and effective,
-//! because usually player switch between modes very often.
-//! See their documentations for more details.
 
 const std = @import("std");
 const g = @import("game_pkg.zig");
@@ -19,125 +15,176 @@ const LookingAroundMode = @import("LookingAroundMode.zig");
 
 const log = std.log.scoped(.game_session);
 
-const GameSession = @This();
+const Events = std.ArrayListUnmanaged(Event);
 
-pub const Mode = union(enum) {
-    play: PlayMode,
-    explore: ExploreMode,
-    looking_around: LookingAroundMode,
+pub const Event = union(enum) {
+    const Tag = @typeInfo(Event).Union.tag_type.?;
 
-    inline fn deinit(self: *Mode) void {
-        switch (self.*) {
-            .play => self.play.deinit(),
-            .looking_around => self.looking_around.deinit(),
-            .explore => {},
+    entity_moved: EntityMoved,
+    entity_died: EntityDied,
+    player_hit: PlayerHit,
+
+    pub fn get(self: Event, comptime tag: Tag) ?std.meta.TagPayload(Event, tag) {
+        switch (self) {
+            tag => |v| return v,
+            else => return null,
         }
     }
 };
 
-arena: *std.heap.ArenaAllocator,
+pub const EntityMoved = struct {
+    entity: g.Entity,
+    is_player: bool,
+    moved_from: p.Point,
+    target: g.Action.Move.Target,
+
+    pub fn targetPlace(self: EntityMoved) p.Point {
+        return switch (self.target) {
+            .direction => |direction| self.moved_from.movedTo(direction),
+            .new_place => |place| place,
+        };
+    }
+};
+
+pub const EntityDied = struct {
+    entity: g.Entity,
+    is_player: bool,
+};
+
+pub const PlayerHit = struct { target: g.Entity };
+
+const GameSession = @This();
+
+pub const Mode = union(enum) {
+    pub const Tag = @typeInfo(Mode).Union.tag_type.?;
+
+    play_mode: PlayMode,
+    explore_mode: ExploreMode,
+    looking_around_mode: LookingAroundMode,
+
+    inline fn deinit(self: *Mode) void {
+        switch (self.*) {
+            .play_mode => self.play_mode.deinit(),
+            .looking_around_mode => self.looking_around_mode.deinit(),
+            .explore_mode => {},
+        }
+    }
+};
+
+alloc: std.mem.Allocator,
 /// This seed should help to make all levels of the single game session reproducible.
 seed: u64,
 rand: std.Random,
 runtime: g.Runtime,
 render: *g.Render,
-events: *g.events.EventBus,
+ai: g.AI,
+/// Set of events happened during the one tick
+events: Events,
 /// The current level
 level: *g.Level,
 level_arena: std.heap.ArenaAllocator,
 /// The current mode of the game
 mode: Mode,
 
-/// Create a new game session.
+/// Initializes a new game session.
 ///
-/// arena -   used to allocate any objects inside the game session.
-///           Should be deinited at the end of life of this game session.
 /// seed  -   Used to generate levels. Can be used for reproducing game session.
 /// rand  -   Used to make decisions by AI, and to generate other game events,
 ///           such as damage and etc.
 /// runtime - Particular runtime.
 /// render  - Implementation of the render.
-/// events  - EventBus used to handle events happened during the game session.
 ///
 pub fn create(
-    arena: *std.heap.ArenaAllocator,
+    alloc: std.mem.Allocator,
     seed: u64,
     rand: std.Random,
     runtime: g.Runtime,
     render: *g.Render,
-    events: *g.events.EventBus,
 ) !*GameSession {
     log.info("Begin the new game session with seed {d}", .{seed});
-    defer log.info("The new game session with seed {d} has been created", .{seed});
 
-    const alloc = arena.allocator();
-    const self = try alloc.create(GameSession);
+    render.viewport.region.top_left = .{ .row = 1, .col = 1 };
+    const self = try alloc.create(g.GameSession);
     self.* = .{
-        .arena = arena,
+        .alloc = alloc,
         .seed = seed,
         .rand = rand,
         .render = render,
         .runtime = runtime,
-        .events = events,
+        .events = try Events.initCapacity(alloc, 5),
         .level_arena = std.heap.ArenaAllocator.init(alloc),
         .level = try g.Levels.firstLevel(&self.level_arena, g.entities.Player, true),
-        .mode = .{ .play = try PlayMode.init(alloc, self, null) },
+        .ai = g.AI{ .rand = rand },
+        .mode = .{ .play_mode = PlayMode.init(self) },
     };
-    log.debug("The first level has been created", .{});
-
-    try events.subscribe(self.subscriber());
-
-    render.viewport.region.top_left = .{ .row = 1, .col = 1 };
+    try self.mode.play_mode.update(null);
     return self;
 }
 
 pub fn destroy(self: *g.GameSession) void {
-    const alloc = self.arena.child_allocator;
-    std.debug.assert(self.events.unsubscribe(self));
-    self.arena.deinit();
-    alloc.destroy(self.arena);
-    alloc.destroy(self);
+    self.events.deinit(self.alloc);
+    self.level_arena.deinit();
+    self.mode.deinit();
+    self.alloc.destroy(self);
 }
 
-pub fn subscriber(self: *GameSession) g.events.Subscriber {
-    return .{ .context = self, .onEvent = handleEvent };
-}
-
-fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
-    const self: *GameSession = @ptrCast(@alignCast(ptr));
-    switch (self.mode) {
-        .play => try self.mode.play.handleEvent(event),
-        else => {},
-    }
+pub fn sendEvent(self: *g.GameSession, event: Event) !void {
+    log.debug("Event happened: {any}", .{event});
+    try self.events.append(self.alloc, event);
 }
 
 // TODO: Load session from file
 
 pub fn play(self: *GameSession, entity_in_focus: ?g.Entity) !void {
     self.mode.deinit();
-    self.mode = .{ .play = try PlayMode.init(self.arena.allocator(), self, entity_in_focus) };
-    try self.mode.play.redraw();
+    self.mode = .{ .play_mode = PlayMode.init(self) };
+    try self.mode.play_mode.update(entity_in_focus);
 }
 
 pub fn explore(self: *GameSession) !void {
     self.mode.deinit();
-    self.mode = .{ .explore = ExploreMode.init(self) };
-    try self.mode.explore.redraw();
+    self.mode = .{ .explore_mode = ExploreMode.init(self) };
+    try self.mode.explore_mode.update();
 }
 
 pub fn lookAround(self: *GameSession) !void {
     self.mode.deinit();
-    self.mode = .{ .looking_around = try LookingAroundMode.init(self.arena.allocator(), self) };
-    try self.mode.looking_around.redraw();
+    self.mode = .{ .looking_around_mode = try LookingAroundMode.init(self) };
+    try self.mode.looking_around_mode.redraw();
 }
 
-pub inline fn tick(self: *GameSession) !void {
+/// Returns true only when player is dead
+pub inline fn tick(self: *GameSession) !g.Game.TickResult {
     log.info("Tick {s}", .{@tagName(self.mode)});
+    defer self.events.clearRetainingCapacity();
+
     switch (self.mode) {
-        .play => try self.mode.play.tick(),
-        .explore => try self.mode.explore.tick(),
-        .looking_around => try self.mode.looking_around.tick(),
+        .explore_mode => try self.mode.explore_mode.tick(),
+        .looking_around_mode => try self.mode.looking_around_mode.tick(),
+        .play_mode => switch (try self.mode.play_mode.tick()) {
+            .play_mode => { // handle events:
+                for (self.events.items) |event| {
+                    switch (event) {
+                        .entity_died => |entity_died| {
+                            if (entity_died.is_player) {
+                                return .player_dead;
+                            }
+                        },
+                        .entity_moved => |entity_moved| {
+                            if (entity_moved.is_player)
+                                try self.render.viewport.keepPlayerInView(entity_moved);
+                        },
+                        else => {},
+                    }
+                    try self.mode.play_mode.handleEvent(event);
+                    log.debug("Event handled: {any}", .{event});
+                }
+            },
+            .looking_around_mode => try self.lookAround(),
+            .explore_mode => try self.explore(),
+        },
     }
+    return .continue_game;
 }
 
 pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
@@ -157,6 +204,7 @@ pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
     );
 
     // TODO persist the current level
+
     _ = self.level_arena.reset(.retain_capacity);
     self.level = switch (new_depth) {
         0 => try g.Levels.firstLevel(&self.level_arena, player, false),

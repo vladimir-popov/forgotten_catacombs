@@ -15,7 +15,7 @@ region: p.Region,
 rows_pad: u8,
 cols_pad: u8,
 
-pub fn init(rows: u8, cols: u8) !Viewport {
+pub fn init(rows: u8, cols: u8) Viewport {
     return .{
         .region = .{ .top_left = .{ .row = 1, .col = 1 }, .rows = rows, .cols = cols },
         .rows_pad = @intFromFloat(@as(f16, @floatFromInt(rows)) * 0.2),
@@ -23,16 +23,7 @@ pub fn init(rows: u8, cols: u8) !Viewport {
     };
 }
 
-pub fn subscriber(self: *Viewport) g.events.Subscriber {
-    return .{ .context = self, .onEvent = onEntityMoved };
-}
-
-fn onEntityMoved(ptr: *anyopaque, event: g.events.Event) !void {
-    if (event.get(.entity_moved) == null) return;
-    if (!event.entity_moved.is_player) return;
-    const self: *Viewport = @ptrCast(@alignCast(ptr));
-    const entity_moved = event.entity_moved;
-
+pub inline fn keepPlayerInView(self: *Viewport, entity_moved: g.GameSession.EntityMoved) !void {
     // keep player on the screen:
     switch (entity_moved.target) {
         .new_place => |place| self.centeredAround(place),

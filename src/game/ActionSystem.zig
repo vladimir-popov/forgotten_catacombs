@@ -29,6 +29,8 @@ pub const Action = union(enum) {
     do_nothing,
     /// Skip the round
     wait,
+    /// Change mode to looking around
+    look_around,
     /// Change the state of the entity to sleep
     go_sleep: g.Entity,
     /// Change the state of the entity to chill
@@ -82,9 +84,6 @@ pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action, actor_
         .close => |door| {
             try session.level.components.setComponentsToEntity(door, g.entities.ClosedDoor);
         },
-        .move_to_level => |ladder| {
-            try session.movePlayerToLevel(ladder);
-        },
         .go_sleep => |target| {
             session.level.components.getForEntityUnsafe(target, c.EnemyState).* = .sleeping;
             try session.level.components.setToEntity(
@@ -127,7 +126,7 @@ fn doMove(
     if (checkCollision(session, entity, new_place)) |action| {
         return try doAction(session, entity, action, move_speed);
     }
-    const event = g.events.Event{
+    const event = g.GameSession.Event{
         .entity_moved = .{
             .entity = entity,
             .is_player = (entity == session.level.player),
@@ -136,7 +135,7 @@ fn doMove(
         },
     };
     from_position.point = new_place;
-    try session.events.sendEvent(event);
+    try session.sendEvent(event);
     return move_speed;
 }
 
@@ -171,13 +170,13 @@ fn doHit(
         c.Animation{ .frames = &c.Animation.FramesPresets.hit },
     );
     if (actor == session.level.player) {
-        try session.events.sendEvent(.{ .player_hit = .{ .target = enemy } });
+        try session.sendEvent(.{ .player_hit = .{ .target = enemy } });
     }
     if (enemy_health.current <= 0) {
         log.debug("The entity {d} is died", .{enemy});
         try session.level.removeEntity(enemy);
-        try session.events.sendEvent(
-            g.events.Event{
+        try session.sendEvent(
+            g.GameSession.Event{
                 .entity_died = .{ .entity = enemy, .is_player = (enemy == session.level.player) },
             },
         );

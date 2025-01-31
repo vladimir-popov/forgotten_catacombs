@@ -56,6 +56,11 @@ pub inline fn checkVisibility(self: *const g.Level, place: p.Point) g.Render.Vis
     return self.visibility_strategy(self, place);
 }
 
+pub fn isPlayerIsInSight(self: *const Level, entity_place: p.Point) bool {
+    if (!self.dijkstra_map.region.containsPointInside(entity_place)) return false;
+    return self.checkVisibility(entity_place) == .visible;
+}
+
 /// Aggregates requests of few components for the same entities at once
 pub fn query(self: *const Level) ecs.ComponentsQuery(c.Components) {
     return .{ .entities = self.entities, .components_manager = self.components };
@@ -173,7 +178,7 @@ pub fn obstacleAt(
 
 // The level doesn't subscribe to event directly to avoid unsubscription.
 // Instead, the PlayMode delegates events to the actual level.
-pub fn onPlayerMoved(self: *Level, player_moved: g.events.EntityMoved) !void {
+pub fn onPlayerMoved(self: *Level, player_moved: g.GameSession.EntityMoved) !void {
     std.debug.assert(player_moved.is_player);
     self.updatePlacement(player_moved.moved_from, player_moved.targetPlace());
     const player_place = self.playerPosition().point;

@@ -43,49 +43,48 @@ const filler = ' ';
 const Render = @This();
 
 pub const DrawableSymbol = struct {
-    codepoint: g.Codepoint,
-    mode: g.Render.DrawingMode,
+    codepoint: g.Codepoint = 0,
+    mode: g.Render.DrawingMode = .normal,
 };
 
 const SceneBuffer = struct {
     const VersionedCell = struct {
-        symbol: DrawableSymbol,
-        z_order: g.ZOrder,
-        ver: u1,
-        is_changed: bool,
+        symbol: DrawableSymbol = .{},
+        z_order: g.ZOrder = 0,
+        ver: u1 = 0,
+        is_changed: bool = false,
     };
     pub const Row = []VersionedCell;
 
     rows: []Row,
-    arena: *std.heap.ArenaAllocator,
+    arena: std.heap.ArenaAllocator,
     current_iteration: u1 = 1,
 
-    pub fn init(alloc: std.mem.Allocator, rows: u8, cols: u8) !SceneBuffer {
-        const arena = try alloc.create(std.heap.ArenaAllocator);
-        arena.* = std.heap.ArenaAllocator.init(alloc);
+    pub fn init(alloc: std.mem.Allocator, rows_count: u8, cols_count: u8) !SceneBuffer {
+        var arena = std.heap.ArenaAllocator.init(alloc);
         const arena_alloc = arena.allocator();
-        var self = SceneBuffer{ .arena = arena, .rows = try arena_alloc.alloc(Row, rows) };
-        for (0..rows) |r| {
-            self.rows[r] = try arena_alloc.alloc(VersionedCell, cols);
+        const rows = try arena_alloc.alloc(Row, rows_count);
+        for (0..rows_count) |r| {
+            rows[r] = try arena_alloc.alloc(VersionedCell, cols_count);
+            for (rows[r]) |*cell| {
+                cell.* = .{};
+            }
         }
-        self.reset();
-        return self;
+        return .{
+            .rows = rows,
+            .arena = arena,
+        };
     }
 
     pub fn deinit(self: *SceneBuffer) void {
-        const alloc = self.arena.child_allocator;
         self.arena.deinit();
-        alloc.destroy(self.arena);
     }
 
     pub fn reset(self: *SceneBuffer) void {
         self.current_iteration = 1;
         for (0..self.rows.len) |r| {
             for (self.rows[r]) |*cell| {
-                cell.symbol.codepoint = 0;
-                cell.z_order = 0;
-                cell.ver = 0;
-                cell.is_changed = false;
+                cell.* = .{};
             }
         }
     }
@@ -189,7 +188,7 @@ const SceneBuffer = struct {
 runtime: g.Runtime,
 /// Visible area
 viewport: g.Viewport,
-/// Cache for the visible area
+/// Cache for visible area
 scene_buffer: SceneBuffer,
 
 pub fn init(
@@ -200,7 +199,7 @@ pub fn init(
 ) !Render {
     return .{
         .runtime = runtime,
-        .viewport = try g.Viewport.init(scene_rows, scene_cols),
+        .viewport = g.Viewport.init(scene_rows, scene_cols),
         .scene_buffer = try SceneBuffer.init(alloc, scene_rows, scene_cols),
     };
 }
@@ -211,17 +210,17 @@ pub fn deinit(self: *Render) void {
 
 /// Draws dungeon, sprites, animations, and stats on the screen.
 /// Removes completed animations.
-pub fn drawScene(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Entity, quick_action: ?g.Action) !void {
+pub fn drawScene(self: *Render, level: *g.Level, entity_in_focus: ?g.Entity, quick_action: ?g.Action) !void {
     log.debug(
         "Draw scene of the level {d}; entity in focus {any}; quick action {any}",
-        .{ session.level, entity_in_focus, quick_action },
+        .{ level, entity_in_focus, quick_action },
     );
     log.debug("Draw dungeon", .{});
-    try self.drawDungeon(session.level);
+    try self.drawDungeon(level);
     log.debug("Draw sprites", .{});
-    try self.drawSprites(session.level, entity_in_focus);
+    try self.drawSprites(level, entity_in_focus);
     log.debug("Draw animations", .{});
-    try self.drawAnimationsFrame(session, entity_in_focus);
+    try self.drawAnimationsFrame(level, entity_in_focus);
     log.debug("Draw the horizontal line of the border", .{});
     try self.drawHorizontalBorderLine(self.viewport.region.rows + 1, self.viewport.region.cols);
     log.debug("Draw changed symbols", .{});
@@ -238,10 +237,10 @@ pub fn drawLevelOnly(self: *Render, level: *g.Level) !void {
 
 /// Clears the screen and draw all from scratch.
 /// Removes completed animations.
-pub fn redraw(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Entity, quick_action: ?g.Action) !void {
+pub fn redraw(self: *Render, level: *g.Level, entity_in_focus: ?g.Entity, quick_action: ?g.Action) !void {
     try self.clearDisplay();
     self.scene_buffer.reset();
-    try self.drawScene(session, entity_in_focus, quick_action);
+    try self.drawScene(level, entity_in_focus, quick_action);
 }
 
 /// Clears both scene and info bar.
@@ -406,9 +405,9 @@ pub fn drawWindow(
 
 /// Draws a single frame from every animation.
 /// Removes the animation if the last frame was drawn.
-fn drawAnimationsFrame(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
+fn drawAnimationsFrame(self: *Render, level: *g.Level, entity_in_focus: ?g.Entity) !void {
     const now: c_uint = self.runtime.currentMillis();
-    var itr = session.level.query().get2(c.Position, c.Animation);
+    var itr = level.query().get2(c.Position, c.Animation);
     while (itr.next()) |components| {
         const position = components[1];
         const animation = components[2];
@@ -422,11 +421,11 @@ fn drawAnimationsFrame(self: *Render, session: *g.GameSession, entity_in_focus: 
                     .{ .codepoint = frame, .z_order = 3 },
                     position.point,
                     mode,
-                    session.level.checkVisibility(position.point),
+                    level.checkVisibility(position.point),
                 );
             }
         } else {
-            try session.level.components.removeFromEntity(components[0], c.Animation);
+            try level.components.removeFromEntity(components[0], c.Animation);
         }
     }
 }
