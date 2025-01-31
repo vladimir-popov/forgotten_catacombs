@@ -88,12 +88,11 @@ pub fn tick(self: *Game) !void {
 
                     _ = self.game_session_arena.reset(.retain_capacity);
                     self.state = .{ .game_session = try g.GameSession.create(
-                        &self.game_session_arena,
+                        self.game_session_arena.allocator(),
                         self.seed,
                         self.prng.random(),
                         self.runtime,
                         &self.render,
-                        self.events,
                     ) };
                 },
                 else => {},

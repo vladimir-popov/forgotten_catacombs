@@ -12,47 +12,37 @@ const PlayMode = @This();
 
 const QuickAction = struct { target: g.Entity, action: g.Action };
 
-arena: *std.heap.ArenaAllocator,
 session: *g.GameSession,
-ai: g.AI,
 // The actions which can be applied to the entity in focus
 quick_actions: std.ArrayList(QuickAction),
 target_idx: usize = 0,
 is_player_turn: bool = true,
-window: ?*g.Window = null,
+window: ?g.Window = null,
 
-pub fn init(alloc: std.mem.Allocator, session: *g.GameSession, target_entity: ?g.Entity) !PlayMode {
-    log.debug("Init PlayMode", .{});
-    const arena = try alloc.create(std.heap.ArenaAllocator);
-    arena.* = std.heap.ArenaAllocator.init(alloc);
-    const arena_alloc = arena.allocator();
-    var self: PlayMode = .{
-        .arena = arena,
+pub fn init(session: *g.GameSession) !PlayMode {
+    return .{
         .session = session,
-        .ai = g.AI{ .session = session },
-        .quick_actions = std.ArrayList(QuickAction).init(arena_alloc),
+        .quick_actions = std.ArrayList(QuickAction).init(session.alloc),
     };
-    try self.updateQuickActions(target_entity);
-    log.debug("PlayMode has been initialized", .{});
-    return self;
 }
 
 pub fn deinit(self: *PlayMode) void {
-    const alloc = self.arena.child_allocator;
-    self.arena.deinit();
-    alloc.destroy(self.arena);
+    self.quick_actions.deinit();
+    if (self.window) |window|
+        window.deinit();
 }
 
-pub fn redraw(self: *const PlayMode) !void {
-    try self.session.render.redraw(self.session, self.target(), self.quickAction());
+pub fn update(self: *PlayMode, target_entity: ?g.Entity) !void {
+    try self.updateQuickActions(target_entity);
+    try self.session.render.redraw(self.session.level, self.target(), self.quickAction());
     try self.drawInfoBar();
 }
 
-fn draw(self: *const PlayMode) !void {
+fn draw(self: *PlayMode) !void {
     if (self.window) |window| {
         try self.session.render.drawWindow(window);
     } else {
-        try self.session.render.drawScene(self.session, self.target(), self.quickAction());
+        try self.session.render.drawScene(self.session.level, self.target(), self.quickAction());
     }
     try self.drawInfoBar();
 }
@@ -104,8 +94,8 @@ pub fn handleEvent(self: *PlayMode, event: g.events.Event) !void {
             try self.updateQuickActions(event.player_hit.target);
         },
         // TODO: Move to level
-        .entity_moved => |entity_moved| if (entity_moved.entity == self.session.level.player) {
-            try self.session.level.onPlayerMoved(entity_moved);
+        .entity_moved => |entity_moved| if (entity_moved.entity == self.level.player) {
+            try self.level.onPlayerMoved(entity_moved);
         },
         else => {},
     }
@@ -117,7 +107,7 @@ fn handleInput(self: *PlayMode) !?g.Action {
             .a => {
                 if (self.window) |window| {
                     self.target_idx = window.selected_line orelse 0;
-                    window.destroy();
+                    window.deinit();
                     self.window = null;
                     try self.draw();
                 } else {
@@ -134,7 +124,7 @@ fn handleInput(self: *PlayMode) !?g.Action {
                 return null;
             },
             .b => if (button.state == .released) {
-                try self.session.lookAround();
+                try self.lookAround();
                 // we have to handle changing the state right after this function
                 return null;
             },
@@ -160,10 +150,10 @@ fn handleInput(self: *PlayMode) !?g.Action {
             },
         }
     }
-    if (self.session.runtime.popCheat()) |cheat| {
+    if (self.runtime.popCheat()) |cheat| {
         log.debug("Cheat {any}", .{cheat});
         switch (cheat) {
-            .dump_vector_field => self.session.level.dijkstra_map.dumpToLog(),
+            .dump_vector_field => self.level.dijkstra_map.dumpToLog(),
             .turn_light_on => g.visibility.turn_light_on = true,
             .turn_light_off => g.visibility.turn_light_on = false,
             else => if (cheat.toAction(self.session)) |action| {
@@ -182,28 +172,28 @@ pub fn tick(self: *PlayMode) !void {
     if (self.is_player_turn) {
         const maybe_action = try self.handleInput();
         // break this function if the mode was changed
-        if (self.session.mode != .play) return;
+        if (self.mode != .play) return;
         // If the player did some action
         if (maybe_action) |action| {
             self.is_player_turn = false;
-            const speed = self.session.level.components.getForEntityUnsafe(self.session.level.player, c.Speed);
-            const mp = try ActionSystem.doAction(self.session, self.session.level.player, action, speed.move_points);
+            const speed = self.level.components.getForEntityUnsafe(self.level.player, c.Speed);
+            const mp = try ActionSystem.doAction(self.session, self.level.player, action, speed.move_points);
             if (mp > 0) {
                 log.debug("Update quick actions after action {any}", .{action});
                 try self.updateQuickActions(self.target());
-                for (self.session.level.components.arrayOf(c.Initiative).components.items) |*initiative| {
+                for (self.level.components.arrayOf(c.Initiative).components.items) |*initiative| {
                     initiative.move_points += mp;
                 }
             }
         }
     } else {
-        var itr = self.session.level.query().get2(c.Initiative, c.Speed);
+        var itr = self.level.query().get2(c.Initiative, c.Speed);
         while (itr.next()) |tuple| {
             const entity = tuple[0];
             const initiative = tuple[1];
             const speed = tuple[2];
             if (speed.move_points > initiative.move_points) continue;
-            if (self.session.level.components.getForEntity(entity, c.Position)) |position| {
+            if (self.level.components.getForEntity(entity, c.Position)) |position| {
                 const action = self.ai.action(entity, position.point);
                 const mp = try ActionSystem.doAction(self.session, entity, action, speed.move_points);
                 std.debug.assert(0 < mp and mp <= initiative.move_points);
@@ -225,14 +215,14 @@ pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity) anyerror!vo
     self.quick_actions.clearRetainingCapacity();
 
     if (target_entity) |tg| {
-        if (tg != self.session.level.player) {
+        if (tg != self.level.player) {
             // check if quick action is available for target
             if (self.calculateQuickActionForTarget(tg)) |qa| {
                 try self.quick_actions.append(.{ .target = tg, .action = qa });
             }
         }
     }
-    const player_position = self.session.level.playerPosition();
+    const player_position = self.level.playerPosition();
     // Check the nearest entities:
     const region = p.Region{
         .top_left = .{
@@ -243,11 +233,11 @@ pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity) anyerror!vo
         .cols = 3,
     };
     // TODO improve:
-    const positions = self.session.level.components.arrayOf(c.Position);
+    const positions = self.level.components.arrayOf(c.Position);
     for (positions.components.items, 0..) |position, idx| {
         if (region.containsPoint(position.point)) {
             if (positions.index_entity.get(@intCast(idx))) |entity| {
-                if (entity == self.session.level.player or entity == target_entity) continue;
+                if (entity == self.level.player or entity == target_entity) continue;
                 if (self.calculateQuickActionForTarget(entity)) |qa| {
                     try self.quick_actions.append(.{ .target = entity, .action = qa });
                 }
@@ -255,33 +245,33 @@ pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity) anyerror!vo
         }
     }
     // player should always be able to wait
-    try self.quick_actions.append(.{ .target = self.session.level.player, .action = .wait });
+    try self.quick_actions.append(.{ .target = self.level.player, .action = .wait });
 }
 
 fn calculateQuickActionForTarget(
     self: PlayMode,
     target_entity: g.Entity,
 ) ?g.Action {
-    const player_position = self.session.level.playerPosition();
+    const player_position = self.level.playerPosition();
     const target_position =
-        self.session.level.components.getForEntity(target_entity, c.Position) orelse return null;
+        self.level.components.getForEntity(target_entity, c.Position) orelse return null;
 
     if (player_position.point.near(target_position.point)) {
-        if (self.session.level.components.getForEntity(target_entity, c.Ladder)) |ladder| {
+        if (self.level.components.getForEntity(target_entity, c.Ladder)) |ladder| {
             // the player should be able to go between levels only from the
             // place with the ladder
             if (!player_position.point.eql(target_position.point)) return null;
             // It's impossible to go upper the first level
-            if (ladder.direction == .up and self.session.level.depth == 0) return null;
+            if (ladder.direction == .up and self.level.depth == 0) return null;
 
             return .{ .move_to_level = ladder.* };
         }
-        if (self.session.level.components.getForEntity(self.session.level.player, c.Weapon)) |weapon| {
-            if (self.session.level.components.getForEntity(target_entity, c.Health)) |health| {
+        if (self.level.components.getForEntity(self.level.player, c.Weapon)) |weapon| {
+            if (self.level.components.getForEntity(target_entity, c.Health)) |health| {
                 return .{ .hit = .{ .target = target_entity, .target_health = health, .by_weapon = weapon } };
             }
         }
-        if (self.session.level.components.getForEntity(target_entity, c.Door)) |door| {
+        if (self.level.components.getForEntity(target_entity, c.Door)) |door| {
             // the player should not be able to open/close the door stay in the doorway
             if (player_position.point.eql(target_position.point)) {
                 return null;
@@ -299,8 +289,8 @@ fn createWindowWithVariants(
     self: PlayMode,
     variants: []const QuickAction,
     selected: usize,
-) !*g.Window {
-    const window = try g.Window.create(self.arena.allocator());
+) !g.Window {
+    var window = try g.Window.init(self.session.alloc);
     for (variants, 0..) |qa, idx| {
         const line = try window.addOneLine();
         const action_label = qa.action.toString();

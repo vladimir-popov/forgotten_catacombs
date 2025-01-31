@@ -30,13 +30,14 @@ pub const std_options: std.Options = .{
 
 const log = std.log.scoped(.main);
 
-pub fn panic(
+pub const panic = std.debug.FullPanic(handlePanic);
+
+pub fn handlePanic(
     msg: []const u8,
-    error_return_trace: ?*std.builtin.StackTrace,
-    return_address: ?usize,
+    first_trace_addr: ?usize,
 ) noreturn {
     TtyRuntime.disableGameMode() catch unreachable;
-    std.debug.panicImpl(error_return_trace, return_address, msg);
+    std.debug.defaultPanic(msg, first_trace_addr);
 }
 
 pub fn main() !void {

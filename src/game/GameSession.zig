@@ -35,68 +35,56 @@ pub const Mode = union(enum) {
     }
 };
 
-arena: *std.heap.ArenaAllocator,
+alloc: std.mem.Allocator,
 /// This seed should help to make all levels of the single game session reproducible.
 seed: u64,
 rand: std.Random,
 runtime: g.Runtime,
 render: *g.Render,
-events: *g.events.EventBus,
+ai: g.AI,
 /// The current level
 level: *g.Level,
 level_arena: std.heap.ArenaAllocator,
 /// The current mode of the game
 mode: Mode,
 
-/// Create a new game session.
+/// Initializes a new game session.
 ///
-/// arena -   used to allocate any objects inside the game session.
-///           Should be deinited at the end of life of this game session.
 /// seed  -   Used to generate levels. Can be used for reproducing game session.
 /// rand  -   Used to make decisions by AI, and to generate other game events,
 ///           such as damage and etc.
 /// runtime - Particular runtime.
 /// render  - Implementation of the render.
-/// events  - EventBus used to handle events happened during the game session.
 ///
 pub fn create(
-    arena: *std.heap.ArenaAllocator,
+    alloc: std.mem.Allocator,
     seed: u64,
     rand: std.Random,
     runtime: g.Runtime,
     render: *g.Render,
-    events: *g.events.EventBus,
 ) !*GameSession {
     log.info("Begin the new game session with seed {d}", .{seed});
-    defer log.info("The new game session with seed {d} has been created", .{seed});
 
-    const alloc = arena.allocator();
-    const self = try alloc.create(GameSession);
+    render.viewport.region.top_left = .{ .row = 1, .col = 1 };
+    const self = try alloc.create(g.GameSession);
     self.* = .{
-        .arena = arena,
+        .alloc = alloc,
         .seed = seed,
         .rand = rand,
         .render = render,
         .runtime = runtime,
-        .events = events,
         .level_arena = std.heap.ArenaAllocator.init(alloc),
         .level = try g.Levels.firstLevel(&self.level_arena, g.entities.Player, true),
-        .mode = .{ .play = try PlayMode.init(alloc, self, null) },
+        .ai = g.AI{ .rand = rand },
+        .mode = .{ .play = try PlayMode.init(self) },
     };
-    log.debug("The first level has been created", .{});
-
-    try events.subscribe(self.subscriber());
-
-    render.viewport.region.top_left = .{ .row = 1, .col = 1 };
     return self;
 }
 
 pub fn destroy(self: *g.GameSession) void {
-    const alloc = self.arena.child_allocator;
-    std.debug.assert(self.events.unsubscribe(self));
-    self.arena.deinit();
-    alloc.destroy(self.arena);
-    alloc.destroy(self);
+    self.level_arena.deinit();
+    self.mode.deinit();
+    self.alloc.destroy(self);
 }
 
 pub fn subscriber(self: *GameSession) g.events.Subscriber {
@@ -115,20 +103,20 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
 
 pub fn play(self: *GameSession, entity_in_focus: ?g.Entity) !void {
     self.mode.deinit();
-    self.mode = .{ .play = try PlayMode.init(self.arena.allocator(), self, entity_in_focus) };
-    try self.mode.play.redraw();
+    self.mode = .{ .play = try PlayMode.init(self, entity_in_focus) };
+    try self.mode.play.update();
 }
 
 pub fn explore(self: *GameSession) !void {
     self.mode.deinit();
     self.mode = .{ .explore = ExploreMode.init(self) };
-    try self.mode.explore.redraw();
+    try self.mode.explore.update();
 }
 
 pub fn lookAround(self: *GameSession) !void {
     self.mode.deinit();
-    self.mode = .{ .looking_around = try LookingAroundMode.init(self.arena.allocator(), self) };
-    try self.mode.looking_around.redraw();
+    self.mode = .{ .looking_around = try LookingAroundMode.init(self) };
+    try self.mode.looking_around.update();
 }
 
 pub inline fn tick(self: *GameSession) !void {

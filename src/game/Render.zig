@@ -211,17 +211,17 @@ pub fn deinit(self: *Render) void {
 
 /// Draws dungeon, sprites, animations, and stats on the screen.
 /// Removes completed animations.
-pub fn drawScene(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Entity, quick_action: ?g.Action) !void {
+pub fn drawScene(self: *Render, level: *g.Level, entity_in_focus: ?g.Entity, quick_action: ?g.Action) !void {
     log.debug(
         "Draw scene of the level {d}; entity in focus {any}; quick action {any}",
-        .{ session.level, entity_in_focus, quick_action },
+        .{ level, entity_in_focus, quick_action },
     );
     log.debug("Draw dungeon", .{});
-    try self.drawDungeon(session.level);
+    try self.drawDungeon(level);
     log.debug("Draw sprites", .{});
-    try self.drawSprites(session.level, entity_in_focus);
+    try self.drawSprites(level, entity_in_focus);
     log.debug("Draw animations", .{});
-    try self.drawAnimationsFrame(session, entity_in_focus);
+    try self.drawAnimationsFrame(level, entity_in_focus);
     log.debug("Draw the horizontal line of the border", .{});
     try self.drawHorizontalBorderLine(self.viewport.region.rows + 1, self.viewport.region.cols);
     log.debug("Draw changed symbols", .{});
@@ -238,10 +238,10 @@ pub fn drawLevelOnly(self: *Render, level: *g.Level) !void {
 
 /// Clears the screen and draw all from scratch.
 /// Removes completed animations.
-pub fn redraw(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Entity, quick_action: ?g.Action) !void {
+pub fn redraw(self: *Render, level: *g.Level, entity_in_focus: ?g.Entity, quick_action: ?g.Action) !void {
     try self.clearDisplay();
     self.scene_buffer.reset();
-    try self.drawScene(session, entity_in_focus, quick_action);
+    try self.drawScene(level, entity_in_focus, quick_action);
 }
 
 /// Clears both scene and info bar.
@@ -406,9 +406,9 @@ pub fn drawWindow(
 
 /// Draws a single frame from every animation.
 /// Removes the animation if the last frame was drawn.
-fn drawAnimationsFrame(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
+fn drawAnimationsFrame(self: *Render, level: *g.Level, entity_in_focus: ?g.Entity) !void {
     const now: c_uint = self.runtime.currentMillis();
-    var itr = session.level.query().get2(c.Position, c.Animation);
+    var itr = level.query().get2(c.Position, c.Animation);
     while (itr.next()) |components| {
         const position = components[1];
         const animation = components[2];
@@ -422,11 +422,11 @@ fn drawAnimationsFrame(self: *Render, session: *g.GameSession, entity_in_focus: 
                     .{ .codepoint = frame, .z_order = 3 },
                     position.point,
                     mode,
-                    session.level.checkVisibility(position.point),
+                    level.checkVisibility(position.point),
                 );
             }
         } else {
-            try session.level.components.removeFromEntity(components[0], c.Animation);
+            try level.components.removeFromEntity(components[0], c.Animation);
         }
     }
 }

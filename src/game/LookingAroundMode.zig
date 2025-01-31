@@ -54,7 +54,7 @@ pub fn deinit(self: *LookingAroundMode) void {
     alloc.destroy(self.arena);
 }
 
-pub fn redraw(self: *const LookingAroundMode) !void {
+pub fn update(self: *const LookingAroundMode) !void {
     try self.session.render.redraw(self.session, self.entityInFocus(), null);
     try self.drawInfoBar();
 }
@@ -149,7 +149,7 @@ pub fn tick(self: *LookingAroundMode) anyerror!void {
                 }
                 window.destroy();
                 self.window = null;
-                try self.redraw();
+                try self.update();
             } else {
                 if (btn.state == .hold and self.countOfEntitiesInFocus() > 1) {
                     if (self.entitiesInFocus()) |entities| {

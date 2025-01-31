@@ -59,7 +59,7 @@ pub fn CavesGenerator(comptime rows: comptime_int, comptime cols: comptime_int) 
                     var stack = std.ArrayList(p.Point).init(alloc);
                     defer stack.deinit();
                     try stack.append(tuple[1]);
-                    while (stack.popOrNull()) |point| {
+                    while (stack.pop()) |point| {
                         if (prototype_map.isSet(point.row, point.col)) continue;
                         prototype_map.setAt(point);
                         result.unsetAt(point);
@@ -112,7 +112,7 @@ pub fn CavesGenerator(comptime rows: comptime_int, comptime cols: comptime_int) 
             defer stack.deinit();
             try stack.append(init_point);
 
-            while (stack.popOrNull()) |point| {
+            while (stack.pop()) |point| {
                 if (map.isSet(point.row, point.col)) continue;
                 area += 1;
                 map.set(point.row, point.col);

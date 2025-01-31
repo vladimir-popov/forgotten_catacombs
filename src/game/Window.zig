@@ -14,31 +14,19 @@ const Line = [COLS]u8;
 
 const Self = @This();
 
-arena: *std.heap.ArenaAllocator,
-title: [COLS]u8,
 /// The scrollable content of the window
 lines: std.ArrayList(Line),
-scroll: u8,
+title: [COLS]u8 = [1]u8{0} ** COLS,
+scroll: u8 = 0,
 selected_line: ?usize = null,
 tag: u8 = 0,
 
-pub fn create(alloc: std.mem.Allocator) !*Self {
-    std.log.debug("Create a window", .{});
-    const arena = try alloc.create(std.heap.ArenaAllocator);
-    arena.* = std.heap.ArenaAllocator.init(alloc);
-    const self = try arena.allocator().create(Self);
-    self.arena = arena;
-    self.scroll = 0;
-    self.title = [1]u8{0} ** COLS;
-    self.lines = std.ArrayList(Line).init(arena.allocator());
-    std.log.debug("The window was created", .{});
-    return self;
+pub fn init(alloc: std.mem.Allocator) !Self {
+    return .{ .lines = std.ArrayList(Line).init(alloc) };
 }
 
-pub fn destroy(self: Self) void {
-    const alloc = self.arena.child_allocator;
-    self.arena.deinit();
-    alloc.destroy(self.arena);
+pub fn deinit(self: Self) void {
+    self.lines.deinit();
 }
 
 pub fn addOneLine(self: *Self) !*Line {
@@ -53,6 +41,8 @@ pub fn selectPrev(self: *Self) void {
             self.selected_line = selected_line - 1
         else
             self.selected_line = self.lines.items.len - 1;
+    } else {
+        self.selected_line = 0;
     }
 }
 
@@ -62,5 +52,7 @@ pub fn selectNext(self: *Self) void {
             self.selected_line = selected_line + 1
         else
             self.selected_line = 0;
+    } else {
+        self.selected_line = 0;
     }
 }

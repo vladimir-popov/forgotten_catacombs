@@ -1,5 +1,5 @@
-/// This is value object which represents the current level of the game session.
-/// The level consist of the dungeon and entities.
+//! This is a value object which represents the current level of the game session.
+//! The level consist of the dungeon and entities.
 const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
@@ -25,6 +25,7 @@ dijkstra_map: g.DijkstraMap,
 depth: u8,
 /// The entity id of the player
 player: g.Entity = undefined,
+/// The visibility calculation depends on the dungeon implementation
 visibility_strategy: *const fn (level: *const g.Level, place: p.Point) g.Render.Visibility,
 
 pub fn create(

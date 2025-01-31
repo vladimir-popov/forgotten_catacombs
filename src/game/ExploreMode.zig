@@ -22,7 +22,7 @@ pub fn init(session: *g.GameSession) ExploreMode {
     };
 }
 
-pub fn redraw(self: *ExploreMode) !void {
+pub fn update(self: *ExploreMode) !void {
     self.orig_viewport_top_left = self.session.render.viewport.region.top_left;
     log.debug("Start looking around. Top-left corner of the viewport is {any}", .{self.orig_viewport_top_left});
     try self.draw();
@@ -44,7 +44,7 @@ fn draw(self: ExploreMode) !void {
     if (self.session.render.viewport.region.bottomRightCol() < g.DUNGEON_COLS)
         self.session.render.setBorderWithArrow(.right);
 
-    try self.session.render.drawScene(self.session, null, null);
+    try self.session.render.drawScene(self.session.level, null, null);
 }
 
 pub fn tick(self: *ExploreMode) anyerror!void {
