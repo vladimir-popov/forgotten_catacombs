@@ -208,7 +208,7 @@ fn getBitmap(self: PlaydateRuntime, codepoint: g.Codepoint) *api.LCDBitmap {
     };
 }
 
-fn getCodepointIdx(codepoint: g.Codepoint) c_int {
+inline fn getCodepointIdx(codepoint: g.Codepoint) c_int {
     return switch (codepoint) {
         ' '...'~' => codepoint - ' ',
         '─' => 95,
@@ -234,9 +234,9 @@ fn getCodepointIdx(codepoint: g.Codepoint) c_int {
         '•' => 115,
         '∞' => 116,
         '…' => 117,
-        '↕' => 118,
+        '⇧' => 118,
         '×' => 119,
-        else => getCodepointIdx('¿'),
+        else => getCodepointIdx('⇧'),
     };
 }
 
