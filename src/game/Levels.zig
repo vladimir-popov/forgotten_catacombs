@@ -1,5 +1,5 @@
 //! This is the factory of the levels.
-//! It bind levels with dungeons, visibility strategies, add entities on the levels.
+//! It binds levels with dungeons, visibility strategies, add entities on the levels.
 const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;

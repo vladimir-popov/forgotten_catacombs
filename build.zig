@@ -186,6 +186,7 @@ fn buildForPlaydate(b: *std.Build, game_module: *std.Build.Module, playdate_sdk_
         })),
         .optimize = optimize,
         .pic = true,
+        .single_threaded = true,
     });
     elf.root_module.addImport("game", game_module);
     elf.link_emit_relocs = true;

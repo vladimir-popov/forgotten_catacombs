@@ -58,27 +58,6 @@ pub fn destroy(self: *Game) void {
     self.alloc.destroy(self);
 }
 
-pub fn subscriber(self: *Game) g.events.Subscriber {
-    return .{ .context = self, .onEvent = handleEvent };
-}
-
-fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
-    const self: *Game = @ptrCast(@alignCast(ptr));
-    if (self.state == .game_session) {
-        try self.state.game_session.handleEvent(self.state.game_session, event);
-    }
-    switch (event) {
-        .entity_died => |entity_died| {
-            if (entity_died.is_player) {
-                self.state.game_session.destroy();
-                self.state = .game_over;
-                try self.render.drawGameOverScreen();
-            }
-        },
-        else => {},
-    }
-}
-
 pub fn tick(self: *Game) !void {
     switch (self.state) {
         .welcome => if (try self.runtime.readPushedButtons()) |btn| {
