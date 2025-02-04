@@ -24,42 +24,37 @@ focus_idx: usize = 0,
 window: ?g.Window = null,
 
 pub fn init(session: *g.GameSession) !LookingAroundMode {
-    var arena = std.heap.ArenaAllocator.init(session.alloc);
-    const arena_alloc = arena.allocator();
-    var entities_on_screen = EntitiesOnScreen{};
-    var place_in_focus: ?p.Point = null;
-    var focus_idx: usize = 0;
+    var self = LookingAroundMode{
+        .session = session,
+        .arena = std.heap.ArenaAllocator.init(session.alloc),
+        .entities_on_screen = EntitiesOnScreen{},
+    };
+    const arena_alloc = self.arena.allocator();
     var itr = session.level.query().get(c.Position);
     while (itr.next()) |tuple| {
         if (session.render.viewport.region.containsPoint(tuple[1].point)) {
-            const entry = try entities_on_screen.getOrPutValue(arena_alloc, tuple[1].point, .{});
+            const entry = try self.entities_on_screen.getOrPutValue(arena_alloc, tuple[1].point, .{});
             try entry.value_ptr.append(arena_alloc, tuple[0]);
             if (tuple[0] == session.level.player) {
-                place_in_focus = tuple[1].point;
-                focus_idx = entry.value_ptr.count() - 1;
+                self.place_in_focus = tuple[1].point;
+                self.focus_idx = entry.value_ptr.count() - 1;
             }
         }
     }
-    return .{
-        .session = session,
-        .entities_on_screen = entities_on_screen,
-        .place_in_focus = place_in_focus,
-        .focus_idx = focus_idx,
-        .arena = arena,
-    };
+    try self.draw();
+    return self;
 }
 
 pub fn deinit(self: *LookingAroundMode) void {
     self.arena.deinit();
 }
 
-pub fn redraw(self: *LookingAroundMode) !void {
-    try self.session.render.redraw(self.session.level, self.entityInFocus(), null);
-    try self.drawInfoBar();
-}
-
 fn draw(self: *const LookingAroundMode) !void {
-    try self.session.render.drawScene(self.session.level, self.entityInFocus(), null);
+    if (self.window) |*window| {
+        try self.session.render.drawWindow(window);
+    } else {
+        try self.session.render.drawScene(self.session.level, self.entityInFocus(), null);
+    }
     try self.drawInfoBar();
 }
 
@@ -148,42 +143,36 @@ pub fn tick(self: *LookingAroundMode) !void {
                 }
                 window.deinit();
                 self.window = null;
-                try self.redraw();
+                self.session.render.clearSceneBuffer();
             } else {
                 if (btn.state == .hold and self.countOfEntitiesInFocus() > 1) {
                     if (self.entitiesInFocus()) |entities| {
                         try self.initWindowWithVariants(entities, self.focus_idx);
-                        try self.session.render.drawWindow(&self.window.?);
-                        try self.drawInfoBar();
                     }
                 } else if (self.entityInFocus()) |entity| {
                     try self.initWindowWithDescription(entity);
-                    try self.session.render.drawWindow(&self.window.?);
-                    try self.drawInfoBar();
                 }
             },
             .b => if (btn.state == .released and self.window == null) {
                 try self.session.play(self.entityInFocus());
                 return;
             },
-            .left, .right, .up, .down => if (self.window) |*window| {
-                if (window.tag == @intFromEnum(WindowType.variants)) {
-                    if (btn.game_button == .up) {
-                        window.selectPrev();
-                        try self.session.render.drawWindow(window);
-                        try self.drawInfoBar();
+            .left, .right, .up, .down => {
+                if (self.window) |*window| {
+                    if (window.tag == @intFromEnum(WindowType.variants)) {
+                        if (btn.game_button == .up) {
+                            window.selectPrev();
+                        }
+                        if (btn.game_button == .down) {
+                            window.selectNext();
+                        }
                     }
-                    if (btn.game_button == .down) {
-                        window.selectNext();
-                        try self.session.render.drawWindow(window);
-                        try self.drawInfoBar();
-                    }
+                } else {
+                    self.chooseNextEntity(btn.toDirection().?);
                 }
-            } else {
-                self.chooseNextEntity(btn.toDirection().?);
-                try self.draw();
             },
         }
+        try self.draw();
     }
 }
 

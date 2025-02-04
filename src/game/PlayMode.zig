@@ -34,8 +34,7 @@ pub fn deinit(self: *PlayMode) void {
 
 pub fn update(self: *PlayMode, target_entity: ?g.Entity) !void {
     try self.updateQuickActions(target_entity);
-    try self.session.render.drawScene(self.session.level, self.target(), self.quickAction());
-    try self.drawInfoBar();
+    try self.draw();
 }
 
 fn draw(self: *PlayMode) !void {
@@ -80,7 +79,10 @@ fn drawInfoBar(self: *const PlayMode) !void {
                 return;
             }
         }
-        const name = if (self.session.level.components.getForEntity(entity, c.Description)) |desc| desc.name else "?";
+        const name = if (self.session.level.components.getForEntity(entity, c.Description)) |desc|
+            desc.name
+        else
+            "?";
         try self.session.render.drawInfo(name);
     } else {
         try self.session.render.cleanInfo();
@@ -108,15 +110,12 @@ fn handleInput(self: *PlayMode) !?g.Action {
                     self.target_idx = window.selected_line orelse 0;
                     window.deinit();
                     self.window = null;
-                    try self.draw();
+                    self.session.render.clearSceneBuffer();
                 } else {
                     switch (button.state) {
                         .released => return self.quickAction(),
-                        .hold => if (self.quick_actions.items.len > 0) {
-                            try self.initWindowWithVariants(self.quick_actions.items, self.target_idx);
-                            try self.session.render.drawWindow(&self.window.?);
-                            try self.drawInfoBar();
-                        },
+                        .hold => if (self.quick_actions.items.len > 0)
+                            try self.initWindowWithVariants(self.quick_actions.items, self.target_idx),
                     }
                 }
                 return null;
@@ -127,20 +126,16 @@ fn handleInput(self: *PlayMode) !?g.Action {
             .left, .right, .up, .down => if (self.window) |*window| {
                 if (button.game_button == .up) {
                     window.selectPrev();
-                    try self.session.render.drawWindow(window);
-                    try self.drawInfoBar();
                 }
                 if (button.game_button == .down) {
                     window.selectNext();
-                    try self.session.render.drawWindow(window);
-                    try self.drawInfoBar();
                 }
                 return null;
             } else {
                 return g.Action{
                     .move = .{
                         .target = .{ .direction = button.toDirection().? },
-                        .keep_moving = false, // btn.state == .double_pressed,
+                        .keep_moving = false,
                     },
                 };
             },
@@ -160,6 +155,8 @@ fn handleInput(self: *PlayMode) !?g.Action {
     return null;
 }
 
+/// Draw the scene and handle player's input, or makes AI move
+/// Returns the next game mode.
 pub fn tick(self: *PlayMode) !g.GameSession.Mode.Tag {
     try self.draw();
     if (self.session.level.components.getAll(c.Animation).len > 0)
@@ -175,7 +172,8 @@ pub fn tick(self: *PlayMode) !g.GameSession.Mode.Tag {
                 },
                 else => {
                     self.is_player_turn = false;
-                    const speed = self.session.level.components.getForEntityUnsafe(self.session.level.player, c.Speed);
+                    const speed =
+                        self.session.level.components.getForEntityUnsafe(self.session.level.player, c.Speed);
                     const spent_move_points = try ActionSystem.doAction(
                         self.session,
                         self.session.level.player,
@@ -193,6 +191,7 @@ pub fn tick(self: *PlayMode) !g.GameSession.Mode.Tag {
             }
         }
     } else {
+        // NPC turn
         var itr = self.session.level.query().get2(c.Initiative, c.Speed);
         while (itr.next()) |tuple| {
             const entity = tuple[0];

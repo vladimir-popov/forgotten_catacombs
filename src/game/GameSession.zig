@@ -143,19 +143,16 @@ pub fn play(self: *GameSession, entity_in_focus: ?g.Entity) !void {
 
 pub fn explore(self: *GameSession) !void {
     self.mode.deinit();
-    self.mode = .{ .explore_mode = ExploreMode.init(self) };
-    try self.mode.explore_mode.update();
+    self.mode = .{ .explore_mode = try ExploreMode.init(self) };
 }
 
 pub fn lookAround(self: *GameSession) !void {
     self.mode.deinit();
     self.mode = .{ .looking_around_mode = try LookingAroundMode.init(self) };
-    try self.mode.looking_around_mode.redraw();
 }
 
 /// Returns true only when player is dead
 pub inline fn tick(self: *GameSession) !g.Game.TickResult {
-    log.info("Tick {s}", .{@tagName(self.mode)});
     defer self.events.clearRetainingCapacity();
 
     switch (self.mode) {

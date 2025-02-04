@@ -208,6 +208,16 @@ pub fn deinit(self: *Render) void {
     self.scene_buffer.deinit();
 }
 
+/// Clears the whole screen including borders in terminal
+pub inline fn clearDisplay(self: Render) !void {
+    try self.runtime.clearDisplay();
+}
+
+/// Resets all cells of the scene buffer to the initial state
+pub inline fn clearSceneBuffer(self: *Render) void {
+    self.scene_buffer.reset();
+}
+
 /// Draws dungeon, sprites, animations, and stats on the screen.
 /// Removes completed animations.
 pub fn drawScene(self: *Render, level: *g.Level, entity_in_focus: ?g.Entity, quick_action: ?g.Action) !void {
@@ -233,19 +243,6 @@ pub fn drawLevelOnly(self: *Render, level: *g.Level) !void {
     try self.drawDungeon(level);
     try self.drawSprites(level, null);
     try self.drawChangedSymbols();
-}
-
-/// Clears the screen and draw all from scratch.
-/// Removes completed animations.
-pub fn redraw(self: *Render, level: *g.Level, entity_in_focus: ?g.Entity, quick_action: ?g.Action) !void {
-    try self.clearDisplay();
-    self.scene_buffer.reset();
-    try self.drawScene(level, entity_in_focus, quick_action);
-}
-
-/// Clears both scene and info bar.
-pub inline fn clearDisplay(self: Render) !void {
-    try self.runtime.clearDisplay();
 }
 
 fn drawDungeon(self: *Render, level: *g.Level) anyerror!void {
