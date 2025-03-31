@@ -4,7 +4,7 @@ const g = @import("game");
 
 const PlaydateRuntime = @import("PlaydateRuntime.zig");
 
-pub const std_options = .{
+pub const std_options = std.Options{
     .log_level = .info,
     .logFn = writeLog,
 };

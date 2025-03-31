@@ -217,19 +217,19 @@ pub const Display = struct {
     /// Returns count of rows and cols of the current window
     pub fn getWindowSize() !RowsCols {
         var ws: c.winsize = std.mem.zeroes(c.winsize);
-        if (c.ioctl(c.STDOUT_FILENO, std.posix.system.T.IOCGWINSZ, &ws) == 1 or ws.ws_col == 0) {
+        if (c.ioctl(c.STDOUT_FILENO, std.posix.system.T.IOCGWINSZ, &ws) == 1 or ws.col == 0) {
             try write(Text.cursorDown(999) ++ Text.cursorRight(999));
             return try getCursorPosition();
         } else {
-            return .{ .rows = ws.ws_row, .cols = ws.ws_col };
+            return .{ .rows = ws.row, .cols = ws.col };
         }
     }
 
-    pub fn handleWindowResize(act: *std.posix.Sigaction, handler: *align(1) const fn (i32) callconv(.C) void) !void {
+    pub fn handleWindowResize(act: *std.posix.Sigaction, handler: *align(1) const fn (i32) callconv(.C) void) void {
         act.flags = std.posix.SA.RESTART;
         act.handler = .{ .handler = handler };
         act.mask = std.posix.empty_sigset;
-        try std.posix.sigaction(std.posix.SIG.WINCH, act, null);
+        std.posix.sigaction(std.posix.SIG.WINCH, act, null);
     }
 };
 
@@ -293,9 +293,9 @@ pub const KeyboardAndMouse = struct {
                 while (std.mem.indexOfAny(u8, self.bytes[start..], ";Mm")) |end| {
                     ns[i] = std.fmt.parseInt(u8, self.bytes[start..(start + end)], 10) catch
                         std.debug.panic(
-                        "Error on parsing [{any}] from {d} to {d} (end == {d})",
-                        .{ self.bytes, start, start + end, end },
-                    );
+                            "Error on parsing [{any}] from {d} to {d} (end == {d})",
+                            .{ self.bytes, start, start + end, end },
+                        );
                     i += 1;
                     start += end + 1;
                 }

@@ -420,7 +420,7 @@ pub const Region = struct {
     /// └──│┘  │    │      │
     ///    └───┘    └──────┘
     pub fn unionWith(self: Region, other: Region) Region {
-        const top_left = .{
+        const top_left = Point{
             .row = @min(self.top_left.row, other.top_left.row),
             .col = @min(self.top_left.col, other.top_left.col),
         };

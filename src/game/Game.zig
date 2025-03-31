@@ -7,6 +7,7 @@ const Game = @This();
 
 pub const State = enum { welcome, game_over, game };
 
+/// The general purpose allocator
 alloc: std.mem.Allocator,
 /// Playdate or terminal
 runtime: g.Runtime,

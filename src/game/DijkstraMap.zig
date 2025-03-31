@@ -37,7 +37,7 @@ pub fn calculate(self: *DijkstraMap, target: p.Point) !void {
     self.vectors.clearRetainingCapacity();
 
     try openned.append(.{ target, 0 });
-    while (openned.popOrNull()) |tuple| {
+    while (openned.pop()) |tuple| {
         const weight: u8 = tuple[1];
         for (&[_]p.Direction{ .left, .up, .right, .down }) |direction| {
             const neighbor = tuple[0].movedTo(direction);

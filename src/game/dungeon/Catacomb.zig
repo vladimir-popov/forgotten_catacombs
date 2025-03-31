@@ -3,13 +3,13 @@
 const std = @import("std");
 const g = @import("../game_pkg.zig");
 const p = g.primitives;
-const placements = @import("placements.zig");
+const plc = @import("placements.zig");
 const Dungeon = @import("Dungeon.zig");
 
-const Placement = placements.Placement;
-const Doorway = placements.Doorway;
-const Room = placements.Room;
-const Passage = placements.Passage;
+const Placement = plc.Placement;
+const Doorway = plc.Doorway;
+const Room = plc.Room;
+const Passage = plc.Passage;
 
 const log = std.log.scoped(.bsp_dungeon);
 
@@ -332,7 +332,7 @@ fn findPlaceForPassageTurn(
     try stack.append(.{ init_from, init_to });
     var middle1: p.Point = undefined;
     var middle2: p.Point = undefined;
-    while (stack.popOrNull()) |points| {
+    while (stack.pop()) |points| {
         const from = points[0];
         const to = points[1];
         const distance: u8 = if (is_horizontal)
@@ -428,7 +428,7 @@ fn findPlaceForDoorInRegionRnd(
 ) !?p.Point {
     var stack = std.ArrayList(p.Region).init(stack_arena.allocator());
     try stack.append(init_region);
-    while (stack.popOrNull()) |region| {
+    while (stack.pop()) |region| {
         const place = switch (side) {
             .up => p.Point{
                 .row = region.top_left.row,

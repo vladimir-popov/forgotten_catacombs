@@ -375,7 +375,7 @@ test "places iterator" {
     //            Exit
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
-    const passage = Placement.createPassage(&arena);
+    const passage = try Placement.createPassage(&arena);
 
     _ = try passage.turnAt(.{ .row = 1, .col = 1 }, .right);
     _ = try passage.turnAt(.{ .row = 1, .col = 3 }, .down);

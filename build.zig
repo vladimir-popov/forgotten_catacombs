@@ -12,44 +12,19 @@ const PLAYDATE_SDK_PATH = "PLAYDATE_SDK_PATH";
 
 pub fn build(b: *std.Build) !void {
 
-    // ============================================================
-    //                    Modules:
-    // ============================================================
-
-    const game_module = b.createModule(.{
-        .root_source_file = b.path("src/game/game_pkg.zig"),
-    });
-    try buildForTerminal(b, game_module);
-    if (std.process.hasEnvVarConstant(PLAYDATE_SDK_PATH)) {
-        const playdate_sdk_path = try std.process.getEnvVarOwned(b.allocator, PLAYDATE_SDK_PATH);
-        try buildForPlaydate(b, game_module, playdate_sdk_path);
-    } else {
-        std.debug.print("Playdate SDK was not found. The {s} is absent", .{PLAYDATE_SDK_PATH});
-    }
-}
-
-/// ============================================================
-///                   Desktop files
-/// ============================================================
-fn buildForTerminal(b: *std.Build, game_module: *std.Build.Module) !void {
-
     // Standard target options allows the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
     // means any target is allowed, and the default is native. Other options
     // for restricting supported target set are available.
-    const desktop_target = b.standardTargetOptions(.{});
+    const target = b.standardTargetOptions(.{});
 
     // Standard optimization options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    // ------------------------------------------------------------
-    //                  Forgotten Catacomb Game
-    // ------------------------------------------------------------
-
-    const target_name = if (desktop_target.query.cpu_arch) |target_cpu|
-        if (desktop_target.query.os_tag) |target_os|
+    const target_name = if (target.query.cpu_arch) |target_cpu|
+        if (target.query.os_tag) |target_os|
             try std.fmt.allocPrint(b.allocator, "{s}-{s}-{s}", .{
                 name,
                 @tagName(target_os),
@@ -68,14 +43,54 @@ fn buildForTerminal(b: *std.Build, game_module: *std.Build.Module) !void {
             @tagName(native_cpu_arch),
         });
 
-    const terminal_game_exe = b.addExecutable(.{
-        .name = target_name,
-        .root_source_file = b.path("src/terminal/main.zig"),
-        .target = desktop_target,
+    // ============================================================
+    //                    Modules:
+    // ============================================================
+
+    const game_module = b.createModule(.{
+        .root_source_file = b.path("src/game/game_pkg.zig"),
+        .target = target,
         .optimize = optimize,
     });
-    terminal_game_exe.linkLibC();
-    terminal_game_exe.root_module.addImport("game", game_module);
+
+    const terminal_module = b.createModule(.{
+        .root_source_file = b.path("src/terminal/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    terminal_module.addImport("game", game_module);
+
+    const dungeon_generator_module = b.createModule(.{
+        .root_source_file = b.path("src/terminal/DungeonsGenerator.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    dungeon_generator_module.addImport("game", game_module);
+
+    const playdate_module = b.createModule(.{
+        .root_source_file = b.path("src/playdate/main.zig"),
+        .target = b.resolveTargetQuery(try std.Target.Query.parse(.{
+            .arch_os_abi = "thumb-freestanding-eabihf",
+            .cpu_features = "cortex_m7+vfp4d16sp",
+        })),
+        .optimize = .ReleaseFast,
+        .pic = true,
+    });
+    playdate_module.addImport("game", game_module);
+
+    // ============================================================
+    //                   Desktop files
+    // ============================================================
+
+    // ------------------------------------------------------------
+    //                  Forgotten Catacomb Game
+    // ------------------------------------------------------------
+
+    const terminal_game_exe = b.addExecutable(.{
+        .name = target_name,
+        .root_module = terminal_module,
+        .link_libc = true,
+    });
     b.installArtifact(terminal_game_exe);
 
     const run_game_step = b.step("run", "Run the Forgotten Catacombs in the terminal");
@@ -90,12 +105,9 @@ fn buildForTerminal(b: *std.Build, game_module: *std.Build.Module) !void {
     // ------------------------------------------------------------
     const dungeons_exe = b.addExecutable(.{
         .name = "dungeons-generator",
-        .root_source_file = b.path("src/terminal/DungeonsGenerator.zig"),
-        .target = desktop_target,
-        .optimize = optimize,
+        .root_module = dungeon_generator_module,
+        .link_libc = true,
     });
-    dungeons_exe.linkLibC();
-    dungeons_exe.root_module.addImport("game", game_module);
     b.installArtifact(dungeons_exe);
 
     // Step to build and run the game in terminal
@@ -106,9 +118,9 @@ fn buildForTerminal(b: *std.Build, game_module: *std.Build.Module) !void {
     const run_generator_step = b.step("generate", "Run the dungeons generator in the terminal");
     run_generator_step.dependOn(&run_generator_cmd.step);
 
-    // ------------------------------------------------------------
+    // ============================================================
     //                Step to run tests
-    // ------------------------------------------------------------
+    // ============================================================
 
     const test_filter = b.option(
         []const []const u8,
@@ -116,58 +128,89 @@ fn buildForTerminal(b: *std.Build, game_module: *std.Build.Module) !void {
         "Skip tests that do not match any filter",
     ) orelse &[0][]const u8{};
 
-    const ut_game = b.addTest(.{
-        .root_source_file = b.path("src/game/game_pkg.zig"),
-        .test_runner = b.path("src/test_runner.zig"),
-        .target = desktop_target,
-        .optimize = optimize,
+    const test_runner = std.Build.Step.Compile.TestRunner{
+        .path = b.path("src/test_runner.zig"),
+        .mode = .simple,
+    };
+
+    const game_tests = b.addTest(.{
+        .root_module = game_module,
+        .test_runner = test_runner,
         .filters = test_filter,
     });
-    const run_ut_game = b.addRunArtifact(ut_game);
+    b.installArtifact(game_tests);
+    const run_game_tests = b.addRunArtifact(game_tests);
 
-    const ut_terminal = b.addTest(.{
-        .root_source_file = b.path("src/terminal/main.zig"),
-        .test_runner = b.path("src/test_runner.zig"),
-        .target = desktop_target,
-        .optimize = optimize,
+    const terminal_tests = b.addTest(.{
+        .root_module = terminal_module,
+        .test_runner = test_runner,
         .filters = test_filter,
     });
-    ut_terminal.linkLibC();
-    ut_terminal.root_module.addImport("game", game_module);
+    b.installArtifact(terminal_tests);
+    const run_terminal_tests = b.addRunArtifact(terminal_tests);
 
-    b.installArtifact(ut_terminal);
-    const run_ut_terminal = b.addRunArtifact(ut_terminal);
+    const generator_tests = b.addTest(.{
+        .root_module = dungeon_generator_module,
+        .test_runner = test_runner,
+        .filters = test_filter,
+    });
+    b.installArtifact(generator_tests);
+    const run_generator_tests = b.addRunArtifact(generator_tests);
 
     // Similar to creating the run step earlier, this exposes a `test` step to
     // the `zig build --help` menu, providing a way for the user to request
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
     if (b.args) |args| {
-        run_ut_game.addArgs(args);
-        run_ut_terminal.addArgs(args);
+        run_game_tests.addArgs(args);
+        run_terminal_tests.addArgs(args);
+        run_generator_tests.addArgs(args);
     }
-    run_ut_game.has_side_effects = true;
-    run_ut_terminal.has_side_effects = true;
+    // run_terminal_tests.has_side_effects = true;
+    // run_generator_tests.has_side_effects = true;
 
-    test_step.dependOn(&run_ut_game.step);
-    test_step.dependOn(&run_ut_terminal.step);
-}
+    test_step.dependOn(&run_game_tests.step);
+    test_step.dependOn(&run_terminal_tests.step);
+    test_step.dependOn(&run_generator_tests.step);
 
-/// ============================================================
-///                   Playdate files
-/// ============================================================
-fn buildForPlaydate(b: *std.Build, game_module: *std.Build.Module, playdate_sdk_path: []const u8) !void {
+    // ============================================================
+    //                Step to check by zls
+    // ============================================================
+    const check_game = b.addSharedLibrary(.{
+        .name = "check game",
+        .root_module = game_module,
+    });
+    const check_terminal = b.addExecutable(.{
+        .name = "check terminal",
+        .root_module = terminal_module,
+    });
+    const check_generator = b.addExecutable(.{
+        .name = "check generator",
+        .root_module = dungeon_generator_module,
+    });
+    const check_playdate = b.addExecutable(.{
+        .name = "check playdate",
+        .root_module = playdate_module,
+    });
+    const check = b.step("check", "Verify code by zls on save");
+    check.dependOn(&check_game.step);
+    check.dependOn(&check_terminal.step);
+    check.dependOn(&check_generator.step);
+    check.dependOn(&check_playdate.step);
+
+    // ============================================================
+    //                   Playdate files
+    // ============================================================
+
     const writer = b.addWriteFiles();
     const source_dir = writer.getDirectory();
     writer.step.name = "write source directory";
 
-    const optimize: std.builtin.OptimizeMode = .ReleaseFast;
-
     const lib = b.addSharedLibrary(.{
         .name = "pdex",
         .root_source_file = b.path("src/playdate/main.zig"),
-        .optimize = optimize,
-        .target = b.host,
+        .optimize = .ReleaseFast,
+        .target = b.graph.host,
     });
     lib.root_module.addImport("game", game_module);
     _ = writer.addCopyFile(lib.getEmittedBin(), "pdex" ++ switch (native_os_tag) {
@@ -179,22 +222,13 @@ fn buildForPlaydate(b: *std.Build, game_module: *std.Build.Module, playdate_sdk_
 
     const elf = b.addExecutable(.{
         .name = "pdex.elf",
-        .root_source_file = b.path("src/playdate/main.zig"),
-        .target = b.resolveTargetQuery(try std.Target.Query.parse(.{
-            .arch_os_abi = "thumb-freestanding-eabihf",
-            .cpu_features = "cortex_m7+vfp4d16sp",
-        })),
-        .optimize = optimize,
-        .pic = true,
+        .root_module = playdate_module,
     });
-    elf.root_module.addImport("game", game_module);
     elf.link_emit_relocs = true;
     elf.entry = .{ .symbol_name = "eventHandler" };
 
-    elf.setLinkerScriptPath(b.path("link_map.ld"));
-    if (optimize == .ReleaseFast) {
-        elf.root_module.omit_frame_pointer = true;
-    }
+    elf.setLinkerScript(b.path("link_map.ld"));
+    elf.root_module.omit_frame_pointer = true;
     _ = writer.addCopyFile(elf.getEmittedBin(), "pdex.elf");
 
     // copy resources:
@@ -203,6 +237,11 @@ fn buildForPlaydate(b: *std.Build, game_module: *std.Build.Module, playdate_sdk_
     // ------------------------------------------------------------
     //                Step to run in emulator
     // ------------------------------------------------------------
+    if (!std.process.hasEnvVarConstant(PLAYDATE_SDK_PATH)) {
+        std.debug.print("Playdate SDK was not found. The {s} is absent", .{PLAYDATE_SDK_PATH});
+        return;
+    }
+    const playdate_sdk_path = try std.process.getEnvVarOwned(b.allocator, PLAYDATE_SDK_PATH);
 
     const pdc_path = b.pathJoin(&.{ playdate_sdk_path, "bin", if (native_os_tag == .windows) "pdc.exe" else "pdc" });
     const pd_simulator_path = switch (native_os_tag) {
@@ -213,7 +252,7 @@ fn buildForPlaydate(b: *std.Build, game_module: *std.Build.Module, playdate_sdk_
     };
 
     const pdc = b.addSystemCommand(&.{pdc_path});
-    pdc.addDirectorySourceArg(source_dir);
+    pdc.addDirectoryArg(source_dir);
     pdc.setName("pdc");
     const pdx_path = pdc.addOutputFileArg(pdx_file_name);
 
@@ -229,7 +268,7 @@ fn buildForPlaydate(b: *std.Build, game_module: *std.Build.Module, playdate_sdk_
     });
 
     const emulate_cmd = b.addSystemCommand(&.{pd_simulator_path});
-    emulate_cmd.addDirectorySourceArg(pdx_path);
+    emulate_cmd.addDirectoryArg(pdx_path);
     emulate_cmd.setName("PlaydateSimulator");
 
     const emulate_step = b.step("emulate", "Run the Forgotten Catacomb in the Playdate Simulator");

@@ -28,7 +28,7 @@ pub const EntityDied = struct {
 pub const PlayerHit = struct { target: g.Entity };
 
 pub const Event = union(enum) {
-    const Tag = @typeInfo(Event).Union.tag_type.?;
+    const Tag = @typeInfo(Event).@"union".tag_type.?;
 
     entity_moved: EntityMoved,
     entity_died: EntityDied,

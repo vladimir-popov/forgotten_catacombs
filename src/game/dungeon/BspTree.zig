@@ -110,7 +110,7 @@ const Splitter = struct {
 fn zip(
     maybe_a: anytype,
     maybe_b: anytype,
-) ?struct { @typeInfo(@TypeOf(maybe_a)).Optional.child, @typeInfo(@TypeOf(maybe_b)).Optional.child } {
+) ?struct { @typeInfo(@TypeOf(maybe_a)).optional.child, @typeInfo(@TypeOf(maybe_b)).optional.child } {
     if (maybe_a) |a| if (maybe_b) |b| return .{ a, b };
     return null;
 }
@@ -165,7 +165,7 @@ fn GenericNode(comptime V: type) type {
             std.debug.assert(self.right == null);
             var stack = std.ArrayList(*NodeV).init(arena.allocator());
             try stack.append(self);
-            while (stack.popOrNull()) |node| {
+            while (stack.pop()) |node| {
                 const maybe_values = try splitter.split(splitter.ptr, node);
                 if (maybe_values) |values| {
                     log.debug("Splitted into regions: {any}", .{values});
@@ -215,7 +215,7 @@ fn GenericNode(comptime V: type) type {
         pub fn traverse(self: *NodeV, arena: *std.heap.ArenaAllocator, handler: TraverseHandler) !void {
             var stack = std.ArrayList(*NodeV).init(arena.allocator());
             try stack.append(self);
-            while (stack.popOrNull()) |node| {
+            while (stack.pop()) |node| {
                 try handler.handle(handler.ptr, node);
                 if (node.right) |right| {
                     try stack.append(right);

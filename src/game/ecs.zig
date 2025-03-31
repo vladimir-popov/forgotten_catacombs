@@ -11,25 +11,27 @@ pub const Entity = u32;
 pub fn ArraySet(comptime C: anytype) type {
     return struct {
         const Self = @This();
-        // all components have to be stored in the array for perf. boost.
-        components: std.ArrayList(C),
-        entity_index: std.AutoHashMap(Entity, u8),
-        index_entity: std.AutoHashMap(u8, Entity),
+
+        alloc: std.mem.Allocator,
+        components: std.ArrayListUnmanaged(C),
+        entity_index: std.AutoHashMapUnmanaged(Entity, u8),
+        index_entity: std.AutoHashMapUnmanaged(u8, Entity),
 
         /// Creates instances of the inner storages.
         pub fn init(alloc: std.mem.Allocator) Self {
             return .{
-                .components = std.ArrayList(C).init(alloc),
-                .entity_index = std.AutoHashMap(Entity, u8).init(alloc),
-                .index_entity = std.AutoHashMap(u8, Entity).init(alloc),
+                .alloc = alloc,
+                .components = std.ArrayListUnmanaged(C){},
+                .entity_index = std.AutoHashMapUnmanaged(Entity, u8){},
+                .index_entity = std.AutoHashMapUnmanaged(u8, Entity){},
             };
         }
 
         /// Deinits the inner storages and components.
         pub fn deinit(self: *Self) void {
-            self.components.deinit();
-            self.entity_index.deinit();
-            self.index_entity.deinit();
+            self.components.deinit(self.alloc);
+            self.entity_index.deinit(self.alloc);
+            self.index_entity.deinit(self.alloc);
         }
 
         pub fn clearRetainingCapacity(self: *Self) void {
@@ -39,9 +41,9 @@ pub fn ArraySet(comptime C: anytype) type {
         }
 
         pub fn clear(self: *Self) void {
-            self.components.clearAndFree();
-            self.entity_index.clearAndFree();
-            self.index_entity.clearAndFree();
+            self.components.clearAndFree(self.alloc);
+            self.entity_index.clearAndFree(self.alloc);
+            self.index_entity.clearAndFree(self.alloc);
         }
 
         /// Returns the pointer to the component for the entity if it was added before, or null.
@@ -58,9 +60,9 @@ pub fn ArraySet(comptime C: anytype) type {
             if (self.entity_index.get(entity)) |idx| {
                 self.components.items[idx] = component;
             } else {
-                try self.entity_index.put(entity, @intCast(self.components.items.len));
-                try self.index_entity.put(@intCast(self.components.items.len), entity);
-                try self.components.append(component);
+                try self.entity_index.put(self.alloc, entity, @intCast(self.components.items.len));
+                try self.index_entity.put(self.alloc, @intCast(self.components.items.len), entity);
+                try self.components.append(self.alloc, component);
             }
         }
 
@@ -76,9 +78,10 @@ pub fn ArraySet(comptime C: anytype) type {
                     _ = self.components.pop();
                 } else {
                     const last_entity = self.index_entity.get(last_idx).?;
-                    self.components.items[idx] = self.components.pop();
-                    try self.entity_index.put(last_entity, idx);
-                    try self.index_entity.put(idx, last_entity);
+                    self.components.items[idx] = self.components.items[self.components.items.len - 1];
+                    self.components.items.len -= 1;
+                    try self.entity_index.put(self.alloc, last_entity, idx);
+                    try self.index_entity.put(self.alloc, idx, last_entity);
                 }
             }
         }
@@ -90,7 +93,7 @@ pub fn ArraySet(comptime C: anytype) type {
 fn ComponentsMap(comptime ComponentsStruct: anytype) type {
     const type_info = @typeInfo(ComponentsStruct);
     switch (type_info) {
-        .Struct => {},
+        .@"struct" => {},
         else => @compileError(
             std.fmt.comptimePrint(
                 "Wrong `{s}` type. The components must be grouped to the struct with optional types, but found `{any}`",
@@ -98,7 +101,7 @@ fn ComponentsMap(comptime ComponentsStruct: anytype) type {
             ),
         ),
     }
-    const struct_fields = type_info.Struct.fields;
+    const struct_fields = type_info.@"struct".fields;
     if (struct_fields.len == 0) {
         @compileError("At least one component should exist");
     }
@@ -107,11 +110,11 @@ fn ComponentsMap(comptime ComponentsStruct: anytype) type {
     // every field inside the ComponentsStruct should be optional, but we need their child types
     for (struct_fields, 0..) |field, i| {
         switch (@typeInfo(field.type)) {
-            .Optional => |opt| {
+            .optional => |opt| {
                 components[i] = .{
                     .name = @typeName(opt.child),
                     .type = ArraySet(opt.child),
-                    .default_value = null,
+                    .default_value_ptr = null,
                     .is_comptime = false,
                     .alignment = 0,
                 };
@@ -136,7 +139,7 @@ fn ComponentsMap(comptime ComponentsStruct: anytype) type {
     }
 
     return @Type(.{
-        .Struct = .{
+        .@"struct" = .{
             .layout = .auto,
             .fields = components[0..],
             .decls = &[_]std.builtin.Type.Declaration{},
@@ -170,7 +173,7 @@ pub fn ComponentsManager(comptime ComponentsStruct: type) type {
             inner_state.alloc = alloc;
             inner_state.components_map = undefined;
 
-            const Arrays = @typeInfo(ComponentsMap(ComponentsStruct)).Struct.fields;
+            const Arrays = @typeInfo(ComponentsMap(ComponentsStruct)).@"struct".fields;
             inline for (Arrays) |array| {
                 @field(inner_state.components_map, array.name) =
                     array.type.init(alloc);
@@ -181,7 +184,7 @@ pub fn ComponentsManager(comptime ComponentsStruct: type) type {
 
         /// Cleans up all inner storages.
         pub fn deinit(self: *Self) void {
-            inline for (@typeInfo(ComponentsMap(ComponentsStruct)).Struct.fields) |field| {
+            inline for (@typeInfo(ComponentsMap(ComponentsStruct)).@"struct".fields) |field| {
                 @field(self.inner_state.components_map, field.name).deinit();
             }
             self.inner_state.alloc.destroy(self.inner_state);
@@ -278,7 +281,7 @@ pub fn ComponentsManager(comptime ComponentsStruct: type) type {
 
         /// Removes all components from all stores which belong to the entity.
         pub fn removeAllForEntity(self: *Self, entity: Entity) !void {
-            inline for (@typeInfo(ComponentsMap(ComponentsStruct)).Struct.fields) |field| {
+            inline for (@typeInfo(ComponentsMap(ComponentsStruct)).@"struct".fields) |field| {
                 try @field(self.inner_state.components_map, field.name).removeFromEntity(entity);
             }
         }
@@ -287,9 +290,9 @@ pub fn ComponentsManager(comptime ComponentsStruct: type) type {
         /// fields of the `ComponentsStruct`.
         pub fn entityToStruct(self: Self, entity: Entity) !ComponentsStruct {
             var structure: ComponentsStruct = undefined;
-            inline for (@typeInfo(ComponentsStruct).Struct.fields) |field| {
+            inline for (@typeInfo(ComponentsStruct).@"struct".fields) |field| {
                 const field_type = @typeInfo(field.type);
-                const type_name = @typeName(field_type.Optional.child);
+                const type_name = @typeName(field_type.optional.child);
                 if (@field(self.inner_state.components_map, type_name).getForEntity(entity)) |cmp_ptr|
                     @field(structure, field.name) = cmp_ptr.*
                 else
@@ -300,7 +303,7 @@ pub fn ComponentsManager(comptime ComponentsStruct: type) type {
 
         /// Sets all defined fields from the `ComponentsStruct` to the entity as the components
         pub fn setComponentsToEntity(self: *Self, entity: Entity, components: ComponentsStruct) !void {
-            inline for (@typeInfo(ComponentsStruct).Struct.fields) |field| {
+            inline for (@typeInfo(ComponentsStruct).@"struct".fields) |field| {
                 if (@field(components, field.name)) |component| {
                     try self.setToEntity(entity, component);
                 }
