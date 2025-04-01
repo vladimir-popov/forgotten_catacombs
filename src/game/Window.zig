@@ -14,40 +14,60 @@ const Line = [COLS]u8;
 
 const Self = @This();
 
-arena: *std.heap.ArenaAllocator,
+alloc: std.mem.Allocator,
 title: [COLS]u8,
 /// The scrollable content of the window
-lines: std.ArrayList(Line),
-scroll: u8,
+lines: std.ArrayListUnmanaged(Line),
+/// How many scrolled lines should be skipped
+scroll: usize,
+/// The index of the selected line
 selected_line: ?usize = null,
 tag: u8 = 0,
 
-pub fn create(alloc: std.mem.Allocator) !*Self {
-    std.log.debug("Create a window", .{});
-    const arena = try alloc.create(std.heap.ArenaAllocator);
-    arena.* = std.heap.ArenaAllocator.init(alloc);
-    const self = try arena.allocator().create(Self);
-    self.arena = arena;
-    self.scroll = 0;
-    self.title = [1]u8{0} ** COLS;
-    self.lines = std.ArrayList(Line).init(arena.allocator());
-    std.log.debug("The window was created", .{});
-    return self;
+pub fn init(alloc: std.mem.Allocator) !Self {
+    std.log.debug("Init a window", .{});
+    return .{
+        .alloc = alloc,
+        .scroll = 0,
+        .title = [1]u8{0} ** COLS,
+        .lines = .empty,
+    };
 }
 
-pub fn destroy(self: Self) void {
-    const alloc = self.arena.child_allocator;
-    self.arena.deinit();
-    alloc.destroy(self.arena);
+pub fn deinit(self: *Self) void {
+    self.lines.deinit(self.alloc);
+}
+
+/// Returns the region of the screen occupied by the window including border.
+pub inline fn region(self: Self) p.Region {
+    return .{
+        .top_left = if (self.lines.items.len > g.Window.MAX_WINDOW_HEIGHT - 2)
+            .{ .row = 1, .col = 2 }
+        else
+            .{ .row = @intCast(1 + (g.Window.MAX_WINDOW_HEIGHT - 2 - self.lines.items.len) / 2), .col = 2 },
+        .rows = @intCast(self.visibleLines().len + 2),
+        .cols = MAX_WINDOW_WIDTH,
+    };
+}
+
+pub inline fn isScrolled(self: Self) bool {
+    return self.lines.items.len > g.Window.MAX_WINDOW_HEIGHT - 2;
+}
+
+pub fn visibleLines(self: Self) [][g.Window.COLS]u8 {
+    return if (self.isScrolled())
+        self.lines.items[self.scroll .. self.scroll + g.Window.MAX_WINDOW_HEIGHT - 2]
+    else
+        self.lines.items;
 }
 
 pub fn addOneLine(self: *Self) !*Line {
-    const line = try self.lines.addOne();
+    const line = try self.lines.addOne(self.alloc);
     line.* = [1]u8{' '} ** COLS;
     return line;
 }
 
-pub fn selectPrev(self: *Self) void {
+pub fn selectPreviousLine(self: *Self) void {
     if (self.selected_line) |selected_line| {
         if (selected_line > 0)
             self.selected_line = selected_line - 1
@@ -56,7 +76,7 @@ pub fn selectPrev(self: *Self) void {
     }
 }
 
-pub fn selectNext(self: *Self) void {
+pub fn selectNextLine(self: *Self) void {
     if (self.selected_line) |selected_line| {
         if (selected_line < self.lines.items.len - 1)
             self.selected_line = selected_line + 1

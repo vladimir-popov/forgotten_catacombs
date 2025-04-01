@@ -17,9 +17,10 @@ session: *g.GameSession,
 ai: g.AI,
 // The actions which can be applied to the entity in focus
 quick_actions: std.ArrayList(QuickAction),
+// The index of the quick action for the target entity
 target_idx: usize = 0,
 is_player_turn: bool = true,
-window: ?*g.Window = null,
+window: ?g.Window = null,
 
 pub fn init(arena: *std.heap.ArenaAllocator, session: *g.GameSession, rand: std.Random) !PlayMode {
     log.debug("Init PlayMode", .{});
@@ -39,7 +40,9 @@ pub fn update(self: *PlayMode, target_entity: ?g.Entity) !void {
 }
 
 inline fn target(self: PlayMode) ?g.Entity {
-    return if (self.quick_actions.items[self.target_idx].action == .wait)
+    return if (self.target_idx > self.quick_actions.items.len - 1)
+        null
+    else if (self.quick_actions.items[self.target_idx].action == .wait)
         null
     else
         self.quick_actions.items[self.target_idx].target;
@@ -50,17 +53,21 @@ inline fn quickAction(self: PlayMode) g.Action {
 }
 
 fn draw(self: *const PlayMode) !void {
-    if (self.window) |window| {
+    if (self.window) |*window| {
         try self.session.render.drawWindow(window);
     } else {
         try self.session.render.drawScene(self.session, self.target(), self.quickAction());
+        try self.drawInfoBar();
     }
-    try self.drawInfoBar();
 }
 
 fn redraw(self: *const PlayMode) !void {
-    try self.session.render.redraw(self.session, self.target(), self.quickAction());
-    try self.drawInfoBar();
+    if (self.window) |*window| {
+        try self.session.render.drawWindow(window);
+    } else {
+        try self.session.render.redrawScene(self.session, self.target(), self.quickAction());
+        try self.drawInfoBar();
+    }
 }
 
 fn drawInfoBar(self: *const PlayMode) !void {
@@ -111,23 +118,27 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
     }
 }
 
+fn closeWindow(self: *PlayMode, window: *g.Window) !void {
+    try self.session.render.redrawRegion(window.region());
+    window.deinit();
+    self.window = null;
+}
+
 fn handleInput(self: *PlayMode) !?g.Action {
     if (try self.session.runtime.readPushedButtons()) |button| {
         switch (button.game_button) {
             .a => {
-                if (self.window) |window| {
+                if (self.window) |*window| {
                     self.target_idx = window.selected_line orelse 0;
-                    window.destroy();
-                    self.window = null;
-                    try self.draw();
+                    try self.closeWindow(window);
+                    try self.drawInfoBar();
                 } else {
                     switch (button.state) {
                         .released => return self.quickAction(),
                         .hold => if (self.quick_actions.items.len > 0) {
                             self.window =
-                                try self.createWindowWithVariants(self.quick_actions.items, self.target_idx);
-                            try self.session.render.drawWindow(self.window.?);
-                            try self.drawInfoBar();
+                                try self.initWindowWithVariants(self.quick_actions.items, self.target_idx);
+                            try self.draw();
                         },
                     }
                 }
@@ -138,14 +149,14 @@ fn handleInput(self: *PlayMode) !?g.Action {
                 // we have to handle changing the state right after this function
                 return null;
             },
-            .left, .right, .up, .down => if (self.window) |window| {
+            .left, .right, .up, .down => if (self.window) |*window| {
                 if (button.game_button == .up) {
-                    window.selectPrev();
+                    window.selectPreviousLine();
                     try self.session.render.drawWindow(window);
                     try self.drawInfoBar();
                 }
                 if (button.game_button == .down) {
-                    window.selectNext();
+                    window.selectNextLine();
                     try self.session.render.drawWindow(window);
                     try self.drawInfoBar();
                 }
@@ -223,6 +234,7 @@ pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity) anyerror!vo
     }
 
     self.quick_actions.clearRetainingCapacity();
+    self.target_idx = 0;
 
     if (target_entity) |tg| {
         if (tg != self.session.level.player) {
@@ -295,12 +307,12 @@ fn calculateQuickActionForTarget(
     return null;
 }
 
-fn createWindowWithVariants(
+fn initWindowWithVariants(
     self: PlayMode,
     variants: []const QuickAction,
     selected: usize,
-) !*g.Window {
-    const window = try g.Window.create(self.arena.allocator());
+) !g.Window {
+    var window = try g.Window.init(self.arena.allocator());
     for (variants, 0..) |qa, idx| {
         const line = try window.addOneLine();
         const action_label = qa.action.toString();

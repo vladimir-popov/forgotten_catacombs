@@ -1,27 +1,33 @@
-/// Set of methods to draw the game.
-/// Comparing with `Runtime`, this module contains methods
-/// to draw objects from the game domain.
-///
-///   ╔═══════════════════════════════════════╗-------
-///   ║                                       ║ |   |
-///   ║                                       ║ V
-///   ║                                       ║ i
-///   ║                                       ║ e   D
-///   ║             SceneBuffer               ║ w   i
-///   ║                                       ║ p   s
-///   ║                                       ║ o   p
-///   ║                                       ║ r   l
-///   ║                                       ║ t   a
-///   ║                                       ║ |   y
-///   ║═══════════════════════════════════════║---
-///   ║HP: 100     Rat:||||||||||||||| Attack ║     | <- the InfoBar is not buffered
-///   ╚═══════════════════════════════════════╝-------
-///   | Zone 0 |        Zone 1       | Zone 2 |
-///   |Button B|                     |Button A|
-///
+//! Set of methods to draw the game.
+//! Comparing with `Runtime`, this module contains methods
+//! to draw objects from the game domain.
+//!
+//! The Welcome and Game over screen, as windows are drawn directly to the
+//! screen by runtime methods.
+//!
+//! The game scene is drawing not directly to the screen, but to the buffer.
+//! It makes it possible to calculate changed symbols and draw only them.
+//!
+//!   ╔═══════════════════════════════════════╗-------
+//!   ║                                       ║ |   |
+//!   ║                                       ║ V
+//!   ║                                       ║ i
+//!   ║                                       ║ e   D
+//!   ║             SceneBuffer               ║ w   i
+//!   ║                                       ║ p   s
+//!   ║                                       ║ o   p
+//!   ║                                       ║ r   l
+//!   ║                                       ║ t   a
+//!   ║                                       ║ |   y
+//!   ║═══════════════════════════════════════║---
+//!   ║HP: 100     Rat:||||||||||||||| Attack ║     | <- the InfoBar is not buffered
+//!   ╚═══════════════════════════════════════╝-------
+//!   | Zone 0 |        Zone 1       | Zone 2 |
+//!   |Button B|                     |Button A|
+//!
 const std = @import("std");
 const g = @import("game_pkg.zig");
-const c = g.components;
+const cm = g.components;
 const cp = g.codepoints;
 const d = g.dungeon;
 const p = g.primitives;
@@ -88,6 +94,15 @@ const SceneBuffer = struct {
                 cell.is_changed = false;
             }
         }
+    }
+
+    fn getSymbol(self: SceneBuffer, point: p.Point) ?DrawableSymbol {
+        if (point.row > 0 and point.row <= self.rows.len) {
+            if (point.col > 0 and point.col <= self.rows[0].len) {
+                return self.rows[point.row - 1][point.col - 1].symbol;
+            }
+        }
+        return null;
     }
 
     fn setSymbol(
@@ -209,6 +224,31 @@ pub fn deinit(self: *Render) void {
     self.scene_buffer.deinit();
 }
 
+pub fn drawWelcomeScreen(self: Render) !void {
+    try self.clearDisplay();
+    const vertical_middle = g.DISPLAY_ROWS / 2;
+    try self.drawTextWithAlign(g.DISPLAY_COLS, "Welcome", .{ .row = vertical_middle - 1, .col = 1 }, .normal, .center);
+    try self.drawTextWithAlign(g.DISPLAY_COLS, "to", .{ .row = vertical_middle, .col = 1 }, .normal, .center);
+    try self.drawTextWithAlign(
+        g.DISPLAY_COLS,
+        "Forgotten catacombs",
+        .{ .row = vertical_middle + 1, .col = 1 },
+        .normal,
+        .center,
+    );
+}
+
+pub fn drawGameOverScreen(self: Render) !void {
+    try self.clearDisplay();
+    try self.drawTextWithAlign(
+        g.DISPLAY_COLS,
+        "You are dead",
+        .{ .row = g.DISPLAY_ROWS / 2, .col = 1 },
+        .normal,
+        .center,
+    );
+}
+
 /// Draws dungeon, sprites, animations, and stats on the screen.
 /// Removes completed animations.
 pub fn drawScene(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Entity, quick_action: ?g.Action) !void {
@@ -219,7 +259,7 @@ pub fn drawScene(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Ent
     log.debug("Draw dungeon", .{});
     try self.drawDungeon(session.level);
     log.debug("Draw sprites", .{});
-    try self.drawSprites(session.level, entity_in_focus);
+    try self.drawSpritesToBuffer(session.level, entity_in_focus);
     log.debug("Draw animations", .{});
     try self.drawAnimationsFrame(session, entity_in_focus);
     log.debug("Draw the horizontal line of the border", .{});
@@ -232,13 +272,13 @@ pub fn drawScene(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Ent
 pub fn drawLevelOnly(self: *Render, level: *g.Level) !void {
     self.scene_buffer.reset();
     try self.drawDungeon(level);
-    try self.drawSprites(level, null);
+    try self.drawSpritesToBuffer(level, null);
     try self.drawChangedSymbols();
 }
 
 /// Clears the screen and draw all from scratch.
 /// Removes completed animations.
-pub fn redraw(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Entity, quick_action: ?g.Action) !void {
+pub fn redrawScene(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Entity, quick_action: ?g.Action) !void {
     try self.clearDisplay();
     self.scene_buffer.reset();
     try self.drawScene(session, entity_in_focus, quick_action);
@@ -252,7 +292,7 @@ pub inline fn clearDisplay(self: Render) !void {
 fn drawDungeon(self: *Render, level: *g.Level) anyerror!void {
     var itr = level.dungeon.cellsInRegion(self.viewport.region);
     var place = self.viewport.region.top_left;
-    var sprite = c.Sprite{ .codepoint = undefined, .z_order = 0 };
+    var sprite = cm.Sprite{ .codepoint = undefined, .z_order = 0 };
     while (itr.next()) |cell| {
         const visibility = level.checkVisibility(place);
         if (visibility == .visible and !level.map.isVisited(place))
@@ -268,7 +308,7 @@ fn drawDungeon(self: *Render, level: *g.Level) anyerror!void {
                 else => cp.unknown,
             },
         };
-        try self.drawSprite(sprite, place, .normal, visibility);
+        try self.drawSpriteToBuffer(sprite, place, .normal, visibility);
         place.move(.right);
         if (!self.viewport.region.containsPoint(place)) {
             place.col = self.viewport.region.top_left.col;
@@ -277,7 +317,7 @@ fn drawDungeon(self: *Render, level: *g.Level) anyerror!void {
     }
 }
 
-const ZOrderedSprites = struct { g.Entity, *c.Position, *c.Sprite };
+const ZOrderedSprites = struct { g.Entity, *cm.Position, *cm.Sprite };
 fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order {
     if (a[2].z_order < b[2].z_order)
         return .lt
@@ -285,19 +325,19 @@ fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order
         return .gt;
 }
 /// Draw sprites inside the screen
-fn drawSprites(self: *Render, level: *const g.Level, entity_in_focus: ?g.Entity) !void {
-    var itr = level.query().get2(c.Position, c.Sprite);
+fn drawSpritesToBuffer(self: *Render, level: *const g.Level, entity_in_focus: ?g.Entity) !void {
+    var itr = level.query().get2(cm.Position, cm.Sprite);
     while (itr.next()) |tuple| {
         if (!self.viewport.region.containsPoint(tuple[1].point)) continue;
         const mode: g.Render.DrawingMode = if (tuple[0] == entity_in_focus) .inverted else .normal;
         const visibility = level.checkVisibility(tuple[1].point);
-        try self.drawSprite(tuple[2].*, tuple[1].point, mode, visibility);
+        try self.drawSpriteToBuffer(tuple[2].*, tuple[1].point, mode, visibility);
     }
 }
 
-fn drawSprite(
+fn drawSpriteToBuffer(
     self: *Render,
-    sprite: c.Sprite,
+    sprite: cm.Sprite,
     place_in_dungeon: p.Point,
     mode: g.Render.DrawingMode,
     visibility: g.Render.Visibility,
@@ -315,7 +355,7 @@ fn drawSprite(
 }
 
 /// This method validates visibility of the passed place, and
-/// return the passed codepoint if the place is visible, an  'nothing' if the place
+/// return the passed codepoint if the place is visible, and  'nothing' if the place
 /// invisible, or the codepoint for invisible but known place.
 inline fn actualCodepoint(codepoint: g.Codepoint, visibility: g.Render.Visibility) g.Codepoint {
     return switch (visibility) {
@@ -345,39 +385,26 @@ fn drawChangedSymbols(self: *Render) !void {
     }
 }
 
+/// Uses the runtime to draw the window directly to the screen.
 pub fn drawWindow(
     self: Render,
     window: *const g.Window,
 ) !void {
-    const max_rows = g.Window.MAX_WINDOW_HEIGHT - 2;
-    const top_left: p.Point = if (window.lines.items.len > max_rows)
-        .{ .row = 1, .col = 2 }
-    else
-        .{ .row = @intCast(1 + (max_rows - window.lines.items.len) / 2), .col = 2 };
-    const is_scrolled = window.lines.items.len > g.Window.MAX_WINDOW_HEIGHT - 2;
-    const lines: [][g.Window.COLS]u8 = if (is_scrolled)
-        window.lines.items[window.scroll .. window.scroll + g.Window.MAX_WINDOW_HEIGHT - 2]
-    else
-        window.lines.items;
-    // Count of rows including borders
-    const rows: u8 = @intCast(lines.len + 2);
-
-    for (0..rows) |i| {
-        for (0..g.Window.MAX_WINDOW_WIDTH) |j| {
-            const point = top_left.movedToNTimes(.down, @intCast(i)).movedToNTimes(.right, @intCast(j));
-            if (i == 0 or i == rows - 1) {
-                try self.runtime.drawSprite('─', point, .normal);
-            } else if (j == 0 or j == g.Window.MAX_WINDOW_WIDTH - 1) {
-                try self.runtime.drawSprite('│', point, .normal);
+    const region = window.region();
+    var itr = region.cells();
+    while (itr.next()) |point| {
+        if (point.row == region.top_left.row or point.row == region.bottomRightRow()) {
+            try self.runtime.drawSprite('─', point, .normal);
+        } else if (point.col == region.top_left.col or point.col == region.bottomRightCol()) {
+            try self.runtime.drawSprite('│', point, .normal);
+        } else {
+            const row_idx = point.row - region.top_left.row - 1 + window.scroll;
+            const col_idx = point.col - region.top_left.col - 1;
+            const mode: g.Render.DrawingMode = if (window.selected_line == row_idx) .inverted else .normal;
+            if (row_idx < window.lines.items.len and col_idx < region.cols - 3) { // -3 for borders and scroll
+                try self.runtime.drawSprite(window.lines.items[row_idx][col_idx], point, mode);
             } else {
-                const row_idx = point.row - top_left.row - 1 + window.scroll;
-                const col_idx = point.col - top_left.col - 1;
-                const mode: g.Render.DrawingMode = if (window.selected_line == row_idx) .inverted else .normal;
-                if (row_idx < window.lines.items.len and col_idx < g.Window.COLS) {
-                    try self.runtime.drawSprite(window.lines.items[row_idx][col_idx], point, mode);
-                } else {
-                    try self.runtime.drawSprite(' ', point, mode);
-                }
+                try self.runtime.drawSprite(' ', point, mode);
             }
         }
     }
@@ -385,8 +412,8 @@ pub fn drawWindow(
     // Draw the title
     //
     const title = std.mem.sliceTo(&window.title, 0);
-    const padding: u8 = @intCast(g.Window.MAX_WINDOW_WIDTH - title.len);
-    var point = top_left.movedToNTimes(.right, padding / 2);
+    const padding: u8 = @intCast(region.cols - title.len);
+    var point = region.top_left.movedToNTimes(.right, padding / 2);
     for (title) |char| {
         try self.runtime.drawSprite(char, point, .normal);
         point.move(.right);
@@ -394,21 +421,32 @@ pub fn drawWindow(
     //
     // Draw the corners
     //
-    try self.runtime.drawSprite('┌', top_left, .normal);
-    try self.runtime.drawSprite('└', top_left.movedToNTimes(.down, rows - 1), .normal);
-    try self.runtime.drawSprite('┐', top_left.movedToNTimes(.right, g.Window.MAX_WINDOW_WIDTH - 1), .normal);
+    try self.runtime.drawSprite('┌', region.top_left, .normal);
+    try self.runtime.drawSprite('└', region.top_left.movedToNTimes(.down, region.rows - 1), .normal);
+    try self.runtime.drawSprite('┐', region.top_left.movedToNTimes(.right, region.cols - 1), .normal);
     try self.runtime.drawSprite(
         '┘',
-        top_left.movedToNTimes(.down, rows - 1).movedToNTimes(.right, g.Window.MAX_WINDOW_WIDTH - 1),
+        region.top_left.movedToNTimes(.down, region.rows - 1).movedToNTimes(.right, region.cols - 1),
         .normal,
     );
+}
+
+/// Copies sprites from the scene buffer to the screen.
+/// `region` - is a region inside the scene.
+pub fn redrawRegion(self: Render, region: p.Region) !void {
+    var itr = region.cells();
+    while (itr.next()) |point| {
+        if (self.scene_buffer.getSymbol(point)) |symbol| {
+            try self.runtime.drawSprite(symbol.codepoint, point, symbol.mode);
+        }
+    }
 }
 
 /// Draws a single frame from every animation.
 /// Removes the animation if the last frame was drawn.
 fn drawAnimationsFrame(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
     const now: c_uint = self.runtime.currentMillis();
-    var itr = session.level.query().get2(c.Position, c.Animation);
+    var itr = session.level.query().get2(cm.Position, cm.Animation);
     while (itr.next()) |components| {
         const position = components[1];
         const animation = components[2];
@@ -418,7 +456,7 @@ fn drawAnimationsFrame(self: *Render, session: *g.GameSession, entity_in_focus: 
                     .inverted
                 else
                     .normal;
-                try self.drawSprite(
+                try self.drawSpriteToBuffer(
                     .{ .codepoint = frame, .z_order = 3 },
                     position.point,
                     mode,
@@ -426,7 +464,7 @@ fn drawAnimationsFrame(self: *Render, session: *g.GameSession, entity_in_focus: 
                 );
             }
         } else {
-            try session.level.components.removeFromEntity(components[0], c.Animation);
+            try session.level.components.removeFromEntity(components[0], cm.Animation);
         }
     }
 }
@@ -441,7 +479,7 @@ pub inline fn drawLeftButton(self: Render, text: []const u8) !void {
     try self.drawZone(0, text, .inverted);
 }
 
-pub fn drawPlayerHp(self: Render, health: *const c.Health) !void {
+pub fn drawPlayerHp(self: Render, health: *const cm.Health) !void {
     var buf = [_]u8{0} ** SIDE_ZONE_LENGTH;
     const text = try std.fmt.bufPrint(&buf, "HP:{d}", .{health.current});
     try self.drawZone(0, text, .normal);
@@ -467,7 +505,7 @@ pub inline fn drawInfo(self: Render, text: []const u8) !void {
     try self.drawZone(1, text, .normal);
 }
 
-pub fn drawEnemyHealth(self: Render, codepoint: g.Codepoint, health: *const c.Health) !void {
+pub fn drawEnemyHealth(self: Render, codepoint: g.Codepoint, health: *const cm.Health) !void {
     var buf: [MIDDLE_ZONE_LENGTH]u8 = undefined;
     inline for (0..MIDDLE_ZONE_LENGTH) |i| buf[i] = filler;
     // +1 for padding between the right zone
@@ -524,31 +562,6 @@ pub fn setBorderWithArrow(
             }
         },
     }
-}
-
-pub fn drawWelcomeScreen(self: Render) !void {
-    try self.clearDisplay();
-    const vertical_middle = g.DISPLAY_ROWS / 2;
-    try self.drawTextWithAlign(g.DISPLAY_COLS, "Welcome", .{ .row = vertical_middle - 1, .col = 1 }, .normal, .center);
-    try self.drawTextWithAlign(g.DISPLAY_COLS, "to", .{ .row = vertical_middle, .col = 1 }, .normal, .center);
-    try self.drawTextWithAlign(
-        g.DISPLAY_COLS,
-        "Forgotten catacombs",
-        .{ .row = vertical_middle + 1, .col = 1 },
-        .normal,
-        .center,
-    );
-}
-
-pub fn drawGameOverScreen(self: Render) !void {
-    try self.clearDisplay();
-    try self.drawTextWithAlign(
-        g.DISPLAY_COLS,
-        "You are dead",
-        .{ .row = g.DISPLAY_ROWS / 2, .col = 1 },
-        .normal,
-        .center,
-    );
 }
 
 inline fn drawZone(

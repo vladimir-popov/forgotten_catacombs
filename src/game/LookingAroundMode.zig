@@ -20,7 +20,7 @@ place_in_focus: ?p.Point,
 /// Index of the entity in focus
 focus_idx: usize = 0,
 /// The window to show description or variants
-window: ?*g.Window,
+window: ?g.Window,
 
 pub fn init(alloc: std.mem.Allocator, session: *g.GameSession) !LookingAroundMode {
     log.debug("Init LookingAroundMode", .{});
@@ -89,13 +89,21 @@ inline fn countOfEntitiesInFocus(self: LookingAroundMode) usize {
 }
 
 fn draw(self: *const LookingAroundMode) !void {
-    try self.session.render.drawScene(self.session, self.entityInFocus(), null);
-    try self.drawInfoBar();
+    if (self.window) |*window| {
+        try self.session.render.drawWindow(window);
+    } else {
+        try self.session.render.drawScene(self.session, self.entityInFocus(), null);
+        try self.drawInfoBar();
+    }
 }
 
 fn redraw(self: *const LookingAroundMode) !void {
-    try self.session.render.redraw(self.session, self.entityInFocus(), null);
-    try self.drawInfoBar();
+    if (self.window) |*window| {
+        try self.session.render.drawWindow(window);
+    } else {
+        try self.session.render.redrawScene(self.session, self.entityInFocus(), null);
+        try self.drawInfoBar();
+    }
 }
 
 fn drawInfoBar(self: *const LookingAroundMode) !void {
@@ -150,27 +158,32 @@ fn statusLine(self: LookingAroundMode, entity: g.Entity, line: []u8) !usize {
     return len;
 }
 
+fn closeWindow(self: *LookingAroundMode, window: *g.Window) !void {
+    try self.session.render.redrawRegion(window.region());
+    window.deinit();
+    self.window = null;
+}
+
 pub fn tick(self: *LookingAroundMode) anyerror!void {
     // Nothing should happened until the player push a button
     if (try self.session.runtime.readPushedButtons()) |btn| {
         switch (btn.game_button) {
-            .a => if (self.window) |window| {
+            .a => if (self.window) |*window| {
                 if (window.tag == @intFromEnum(WindowType.variants)) {
                     self.focus_idx = window.selected_line orelse 0;
                 }
-                window.destroy();
-                self.window = null;
-                try self.redraw();
+                try self.closeWindow(window);
+                try self.drawInfoBar();
             } else {
                 if (btn.state == .hold and self.countOfEntitiesInFocus() > 1) {
                     if (self.entitiesInFocus()) |entities| {
-                        self.window = try self.createWindowWithVariants(entities.items, self.focus_idx);
-                        try self.session.render.drawWindow(self.window.?);
+                        self.window = try self.initWindowWithVariants(entities.items, self.focus_idx);
+                        try self.session.render.drawWindow(&self.window.?);
                         try self.drawInfoBar();
                     }
                 } else if (self.entityInFocus()) |entity| {
-                    self.window = try self.createWindowWithDescription(entity);
-                    try self.session.render.drawWindow(self.window.?);
+                    self.window = try self.initWindowWithDescription(entity);
+                    try self.session.render.drawWindow(&self.window.?);
                     try self.drawInfoBar();
                 }
             },
@@ -178,15 +191,15 @@ pub fn tick(self: *LookingAroundMode) anyerror!void {
                 try self.session.play(self.entityInFocus());
                 return;
             },
-            .left, .right, .up, .down => if (self.window) |window| {
+            .left, .right, .up, .down => if (self.window) |*window| {
                 if (window.tag == @intFromEnum(WindowType.variants)) {
                     if (btn.game_button == .up) {
-                        window.selectPrev();
+                        window.selectPreviousLine();
                         try self.session.render.drawWindow(window);
                         try self.drawInfoBar();
                     }
                     if (btn.game_button == .down) {
-                        window.selectNext();
+                        window.selectNextLine();
                         try self.session.render.drawWindow(window);
                         try self.drawInfoBar();
                     }
@@ -245,12 +258,12 @@ inline fn sub(x: u8, y: u8) u8 {
     return if (y > x) y - x else x - y;
 }
 
-fn createWindowWithVariants(
+fn initWindowWithVariants(
     self: LookingAroundMode,
     variants: []const g.Entity,
     selected: usize,
-) !*g.Window {
-    const window = try g.Window.create(self.arena.allocator());
+) !g.Window {
+    var window = try g.Window.init(self.arena.allocator());
     window.tag = @intFromEnum(WindowType.variants);
     for (variants, 0..) |entity, idx| {
         // Every entity has to have description, or handling indexes become complicated
@@ -264,11 +277,11 @@ fn createWindowWithVariants(
     return window;
 }
 
-fn createWindowWithDescription(
+fn initWindowWithDescription(
     self: LookingAroundMode,
     entity: g.Entity,
-) !*g.Window {
-    const window = try g.Window.create(self.arena.allocator());
+) !g.Window {
+    var window = try g.Window.init(self.arena.allocator());
     window.tag = @intFromEnum(WindowType.desription);
     var len: usize = 0;
     if (self.session.level.components.getForEntity(entity, c.Description)) |description| {
