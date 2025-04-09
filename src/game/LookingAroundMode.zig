@@ -15,12 +15,12 @@ arena: *std.heap.ArenaAllocator,
 session: *g.GameSession,
 /// Map of entities and their positions on the screen
 entities_on_screen: EntitiesOnScreen,
-/// Highlighted place in the dungeon
-place_in_focus: ?p.Point,
-/// Index of the entity in focus
+/// Highlighted a place in the dungeon
+place_in_focus: p.Point = .{},
+/// Index of the focused entity in the map with entities on screen
 focus_idx: usize = 0,
 /// The window to show description or variants
-window: ?g.Window,
+window: ?g.Window = null,
 
 pub fn init(alloc: std.mem.Allocator, session: *g.GameSession) !LookingAroundMode {
     log.debug("Init LookingAroundMode", .{});
@@ -30,8 +30,6 @@ pub fn init(alloc: std.mem.Allocator, session: *g.GameSession) !LookingAroundMod
         .arena = arena,
         .session = session,
         .entities_on_screen = EntitiesOnScreen.init(arena.allocator()),
-        .place_in_focus = null,
-        .window = null,
     };
 }
 
@@ -41,7 +39,7 @@ pub fn deinit(self: *LookingAroundMode) void {
     alloc.destroy(self.arena);
 }
 
-pub fn refresh(self: *LookingAroundMode) !void {
+pub fn update(self: *LookingAroundMode) !void {
     _ = self.arena.reset(.retain_capacity);
     self.window = null;
 
@@ -49,7 +47,12 @@ pub fn refresh(self: *LookingAroundMode) !void {
     self.entities_on_screen = EntitiesOnScreen.init(self.arena.allocator());
     var itr = self.session.level.query().get(c.Position);
     while (itr.next()) |tuple| {
-        if (self.session.render.viewport.region.containsPoint(tuple[1].point)) {
+        const is_inside_viewport = self.session.render.viewport.region.containsPoint(tuple[1].point);
+        // we should follow the same logic as the render:
+        // only entities, which should be drawn, can be in focus
+        const is_visible = self.session.level.checkVisibility(tuple[1].point) != .invisible;
+
+        if (is_inside_viewport and is_visible) {
             const gop = try self.entities_on_screen.getOrPut(tuple[1].point);
             if (!gop.found_existing) {
                 gop.value_ptr.* = try std.ArrayListUnmanaged(g.Entity).initCapacity(alloc, 1);
@@ -73,17 +76,14 @@ inline fn entityInFocus(self: LookingAroundMode) ?g.Entity {
 }
 
 inline fn entitiesInFocus(self: LookingAroundMode) ?std.ArrayListUnmanaged(g.Entity) {
-    if (self.place_in_focus) |place|
-        if (self.entities_on_screen.get(place)) |entities|
-            return entities;
-
+    if (self.entities_on_screen.get(self.place_in_focus)) |entities|
+        return entities;
     return null;
 }
 
 inline fn countOfEntitiesInFocus(self: LookingAroundMode) usize {
-    if (self.place_in_focus) |place|
-        if (self.entities_on_screen.get(place)) |entities|
-            return entities.items.len;
+    if (self.entities_on_screen.get(self.place_in_focus)) |entities|
+        return entities.items.len;
 
     return 0;
 }
@@ -205,52 +205,66 @@ pub fn tick(self: *LookingAroundMode) anyerror!void {
                     }
                 }
             } else {
-                self.chooseNextEntity(btn.toDirection().?);
+                self.place_in_focus = chooseNextEntity(
+                    self.place_in_focus,
+                    btn.toDirection().?,
+                    self.entities_on_screen,
+                    self.session.render.viewport.region,
+                );
+                self.focus_idx = 0;
                 try self.draw();
             },
         }
     }
 }
 
-fn chooseNextEntity(self: *LookingAroundMode, direction: p.Direction) void {
-    var min_distance: u8 = 255;
-    var itr = self.entities_on_screen.iterator();
+fn chooseNextEntity(
+    current_place: p.Point,
+    direction: p.Direction,
+    entities_on_screen: EntitiesOnScreen,
+    region: p.Region,
+) p.Point {
+    var nearest_place = current_place;
+    var min_distance: f16 = std.math.floatMax(f16);
+    var itr = entities_on_screen.iterator();
     while (itr.next()) |entry| {
         const place = entry.key_ptr.*;
-        // we should follow the same logic as the render:
-        // only entities, which should be drawn, can be in focus
-        if (self.session.level.checkVisibility(place) == .invisible)
-            continue;
 
-        const d = if (self.place_in_focus) |current_place|
-            distance(current_place, place, direction)
-        else
-            0;
+        const d: f16 = distance(current_place, place, direction, region);
+        log.info("Distance to {any} is {d} (entity {any})", .{ place, d, entry.value_ptr.items });
 
-        if (d < min_distance) {
+        if (d > 0 and d < min_distance) {
+            log.warn("New closest place {any}. min {d}", .{ place, d });
             min_distance = d;
-            self.place_in_focus = place;
-            self.focus_idx = 0;
+            nearest_place = place;
         }
     }
+    return nearest_place;
 }
 
-/// Calculates the distance between two points in direction with follow logic:
-/// 1. calculates the difference with multiplayer between points on the axis related to direction
-/// 2. adds the difference between points on the orthogonal axis
-inline fn distance(from: p.Point, to: p.Point, direction: p.Direction) u8 {
-    switch (direction) {
-        .right => {
-            if (to.col <= from.col) return 255;
-            return ((to.col - from.col) << 2) + sub(to.row, from.row);
-        },
-        .left => return distance(to, from, .right),
-        .down => {
-            if (to.row <= from.row) return 255;
-            return ((to.row - from.row) << 2) + sub(to.col, from.col);
-        },
-        .up => return distance(to, from, .down),
-    }
+/// Returns the distance between two points. If the target point is outside of the region
+/// for the specified direction, this function returns max(f16).
+///
+///    Example:
+///  ------
+/// |  *   |
+/// |  |  *|
+/// |  f-->|
+/// |  |*  |
+/// |  |   |
+///  ------
+///  All three points should have a distance in right direction.
+inline fn distance(from: p.Point, to: p.Point, direction: p.Direction, region: p.Region) f16 {
+    const subregion: p.Region = switch (direction) {
+        .up => region.splitHorizontally(from.row)[0],
+        .down => region.splitHorizontally(from.row)[1],
+        .left => region.splitVertically(from.col)[0],
+        .right => region.splitVertically(from.col)[1],
+    };
+    if (subregion.containsPoint(to))
+        return from.distanceTo(to)
+    else
+        return std.math.floatMax(f16);
 }
 
 /// Returns y - x if y > x, or x - y otherwise.

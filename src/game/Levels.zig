@@ -38,7 +38,7 @@ pub fn firstLevel(
     try level.entities.append(id);
     try level.components.setComponentsToEntity(id, g.entities.cavesEntrance(id, level.newEntity(), dungeon.exit));
 
-    // Generate player on the wharf
+    // Place the player on the level
     level.player = try level.addNewEntity(player);
     log.debug("The player entity id is {d}", .{level.player});
     if (first_visit)

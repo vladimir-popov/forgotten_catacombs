@@ -85,12 +85,12 @@ pub fn play(self: *GameSession, entity_in_focus: ?g.Entity) !void {
 
 pub fn explore(self: *GameSession) !void {
     self.mode = .explore;
-    try self.explore_mode.refresh();
+    try self.explore_mode.update();
 }
 
 pub fn lookAround(self: *GameSession) !void {
     self.mode = .looking_around;
-    try self.looking_around.refresh();
+    try self.looking_around.update();
 }
 
 pub inline fn tick(self: *GameSession) !void {

@@ -22,7 +22,7 @@ pub fn init(session: *g.GameSession) ExploreMode {
     };
 }
 
-pub fn refresh(self: *ExploreMode) !void {
+pub fn update(self: *ExploreMode) !void {
     self.orig_viewport_top_left = self.session.render.viewport.region.top_left;
     log.debug("Start looking around. Top-left corner of the viewport is {any}", .{self.orig_viewport_top_left});
     try self.draw();

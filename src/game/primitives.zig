@@ -42,10 +42,14 @@ pub const Direction = enum {
     }
 };
 
-/// The coordinates of a point. Index begins from 1.
+/// The coordinates of a point.
 pub const Point = struct {
-    row: u8,
-    col: u8,
+    row: u8 = 0,
+    col: u8 = 0,
+
+    pub fn init(r: u8, c: u8) Point {
+        return .{ .row = r, .col = c };
+    }
 
     pub fn format(
         self: Point,
@@ -112,6 +116,19 @@ pub const Point = struct {
         const b: f16 = @floatFromInt(diff(u8, self.col, other.col));
         return @sqrt(a * a + b * b);
     }
+
+    /// Two points on the same side of the line should have similar sign.
+    /// Result == 0 means that point is on the line.
+    pub fn sideOfLine(self: Point, line_start: Point, line_end: Point) i16 {
+        // A=(x1,y1) to B=(x2,y2) a point P=(x,y)
+        const x: i16 = @intCast(self.col);
+        const y: i16 = @intCast(self.row);
+        const x1: i16 = @intCast(line_start.col);
+        const y1: i16 = @intCast(line_start.row);
+        const x2: i16 = @intCast(line_end.col);
+        const y2: i16 = @intCast(line_end.row);
+        return (x - x1) * (y2 - y1) - (y - y1) * (x2 - x1);
+    }
 };
 
 /// The region described as its top left corner
@@ -131,6 +148,10 @@ pub const Region = struct {
     rows: u8,
     /// The count of columns in this region.
     cols: u8,
+
+    pub fn init(rows: u8, cols: u8) Region {
+        return .{ .top_left = .{ .row = 1, .col = 1 }, .rows = rows, .cols = cols };
+    }
 
     pub fn format(
         self: Region,
@@ -182,6 +203,14 @@ pub const Region = struct {
 
     pub inline fn bottomRight(self: Region) Point {
         return .{ .row = self.bottomRightRow(), .col = self.bottomRightCol() };
+    }
+
+    pub inline fn topRight(self: Region) Point {
+        return .{ .row = self.top_left.row, .col = self.bottomRightCol() };
+    }
+
+    pub inline fn bottomLeft(self: Region) Point {
+        return .{ .row = self.bottomRightRow(), .col = self.top_left.col };
     }
 
     pub inline fn center(self: Region) Point {
@@ -241,7 +270,7 @@ pub const Region = struct {
     /// left corner and `cols` columns. The second has the other part.
     /// If splitting is impossible, returns null.
     /// ┌───┬───┐
-    /// │ 1 │ 2 │
+    /// │ 0 │ 1 │
     /// └───┴───┘
     pub fn splitVertically(self: Region, cols: u8) struct { Region, Region } {
         std.debug.assert(0 < cols);
@@ -264,9 +293,9 @@ pub const Region = struct {
     /// left corner and `rows` rows. The second has the other part.
     /// If splitting is impossible, returns null.
     /// ┌───┐
-    /// │ 1 │
+    /// │ 0 │
     /// ├───┤
-    /// │ 2 │
+    /// │ 1 │
     /// └───┘
     pub fn splitHorizontally(self: Region, rows: u8) struct { Region, Region } {
         std.debug.assert(0 < rows);
