@@ -233,7 +233,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             ptr: *anyopaque,
             symbol: u21,
             position_on_display: p.Point,
-            mode: g.Render.DrawingMode,
+            mode: g.DrawingMode,
         ) !void {
             const self: *Self = @ptrCast(@alignCast(ptr));
             // the buffer used indexes begun from 0, but the position coordinates begun from 1
@@ -245,7 +245,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             ptr: *anyopaque,
             text: []const u8,
             position_on_display: p.Point,
-            mode: g.Render.DrawingMode,
+            mode: g.DrawingMode,
         ) !void {
             const self: *Self = @ptrCast(@alignCast(ptr));
             self.buffer.setAsciiText(text, position_on_display.row, position_on_display.col, mode);

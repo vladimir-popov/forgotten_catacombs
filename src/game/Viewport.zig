@@ -15,7 +15,7 @@ region: p.Region,
 rows_pad: u8,
 cols_pad: u8,
 
-pub fn init(rows: u8, cols: u8) !Viewport {
+pub fn init(rows: u8, cols: u8) Viewport {
     return .{
         .region = .{ .top_left = .{ .row = 1, .col = 1 }, .rows = rows, .cols = cols },
         .rows_pad = @intFromFloat(@as(f16, @floatFromInt(rows)) * 0.2),

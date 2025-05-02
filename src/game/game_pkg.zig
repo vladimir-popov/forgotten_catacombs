@@ -16,6 +16,7 @@ pub const Button = @import("Button.zig");
 pub const Cheat = @import("cheats.zig").Cheat;
 pub const Codepoint = u21;
 pub const DijkstraMap = @import("DijkstraMap.zig");
+pub const DrawingMode = Runtime.DrawingMode;
 pub const Entity = ecs.Entity;
 pub const Game = @import("Game.zig");
 pub const GameSession = @import("GameSession.zig");

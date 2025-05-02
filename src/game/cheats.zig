@@ -70,7 +70,7 @@ pub const Cheat = union(enum) {
                 }
             },
             .move_player => |point_on_screen| {
-                const screen_corner = session.render.viewport.region.top_left;
+                const screen_corner = session.viewport.region.top_left;
                 return movePlayerToPoint(.{
                     .row = point_on_screen.row + screen_corner.row,
                     .col = point_on_screen.col + screen_corner.col,

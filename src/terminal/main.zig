@@ -59,8 +59,12 @@ pub fn main() !void {
             runtime.cheat = g.Cheat.parse(value);
         }
     }
-    const game = try g.Game.create(alloc, runtime.runtime(), seed);
-    defer game.destroy();
+    var game = try alloc.create(g.Game);
+    defer alloc.destroy(game);
+
+    try game.init(alloc, runtime.runtime(), seed);
+    defer game.deinit();
+
     runtime.run(game) catch |e| {
         std.debug.panic("Fatal error {any}", .{e});
     };

@@ -404,7 +404,7 @@ pub fn ComponentsQuery(comptime Components: type) type {
     return struct {
         const Self = @This();
 
-        entities: std.ArrayList(Entity),
+        entities: std.ArrayListUnmanaged(Entity),
         components_manager: ComponentsManager(Components),
 
         pub fn Query1(comptime Cmp: type) type {

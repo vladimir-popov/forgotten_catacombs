@@ -136,8 +136,7 @@ fn handleInput(self: *PlayMode) !?g.Action {
                     switch (button.state) {
                         .released => return self.quickAction(),
                         .hold => if (self.quick_actions.items.len > 0) {
-                            self.window =
-                                try self.initWindowWithVariants(self.quick_actions.items, self.target_idx);
+                            try self.initWindowWithVariants(self.quick_actions.items, self.target_idx);
                             try self.draw();
                         },
                     }
@@ -308,18 +307,17 @@ fn calculateQuickActionForTarget(
 }
 
 fn initWindowWithVariants(
-    self: PlayMode,
+    self: *PlayMode,
     variants: []const QuickAction,
     selected: usize,
-) !g.Window {
-    var window = try g.Window.init(self.arena.allocator());
+) !void {
+    self.window = g.Window.init(self.arena.allocator());
     for (variants, 0..) |qa, idx| {
-        const line = try window.addOneLine();
+        const line = try self.window.?.addOneLine();
         const action_label = qa.action.toString();
         const pad = @divTrunc(g.Window.MAX_WINDOW_WIDTH - action_label.len, 2);
         std.mem.copyForwards(u8, line[pad..], action_label);
         if (idx == selected)
-            window.selected_line = idx;
+            self.window.?.selected_line = idx;
     }
-    return window;
 }

@@ -181,7 +181,7 @@ fn clearDisplay(ptr: *anyopaque) anyerror!void {
     self.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
 }
 
-fn drawSprite(ptr: *anyopaque, codepoint: g.Codepoint, position_on_display: p.Point, mode: g.Render.DrawingMode) !void {
+fn drawSprite(ptr: *anyopaque, codepoint: g.Codepoint, position_on_display: p.Point, mode: g.DrawingMode) !void {
     var self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
     const x = @as(c_int, position_on_display.col - 1) * g.SPRITE_WIDTH;
     const y = @as(c_int, position_on_display.row - 1) * g.SPRITE_HEIGHT;
@@ -192,7 +192,7 @@ fn drawSprite(ptr: *anyopaque, codepoint: g.Codepoint, position_on_display: p.Po
     self.playdate.graphics.drawBitmap(self.getBitmap(codepoint), x, y, .BitmapUnflipped);
 }
 
-fn drawText(ptr: *anyopaque, text: []const u8, position_on_display: p.Point, mode: g.Render.DrawingMode) !void {
+fn drawText(ptr: *anyopaque, text: []const u8, position_on_display: p.Point, mode: g.DrawingMode) !void {
     var itr = std.unicode.Utf8View.initUnchecked(text).iterator();
     var position = position_on_display;
     while (itr.nextCodepoint()) |codepoint| {

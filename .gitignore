@@ -3,5 +3,6 @@ zig-cache/
 zig-out/
 game.log
 **.bkp
+**.dtmp
 **.*~
 .DS_Store

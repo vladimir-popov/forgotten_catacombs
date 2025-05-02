@@ -50,19 +50,20 @@ pub const Subscriber = struct {
 pub const EventBus = struct {
     const Ptr = usize;
 
-    events: std.ArrayList(Event),
-    subscribers: std.AutoHashMap(Ptr, Subscriber),
+    arena: *std.heap.ArenaAllocator,
+    events: std.ArrayListUnmanaged(Event),
+    subscribers: std.AutoHashMapUnmanaged(Ptr, Subscriber),
 
-    pub fn create(arena: *std.heap.ArenaAllocator) !*EventBus {
-        const alloc = arena.allocator();
-        const self = try alloc.create(EventBus);
-        self.subscribers = std.AutoHashMap(Ptr, Subscriber).init(alloc);
-        self.events = std.ArrayList(Event).init(alloc);
-        return self;
+    pub fn init(arena: *std.heap.ArenaAllocator) EventBus {
+        return .{
+            .arena = arena,
+            .subscribers = std.AutoHashMapUnmanaged(Ptr, Subscriber){},
+            .events = std.ArrayListUnmanaged(Event){},
+        };
     }
 
     pub inline fn subscribe(self: *EventBus, subscriber: Subscriber) !void {
-        try self.subscribers.putNoClobber(@intFromPtr(subscriber.context), subscriber);
+        try self.subscribers.putNoClobber(self.arena.allocator(), @intFromPtr(subscriber.context), subscriber);
     }
 
     pub fn unsubscribe(self: *EventBus, subscriber_context: *anyopaque) bool {
@@ -71,7 +72,7 @@ pub const EventBus = struct {
 
     pub fn sendEvent(self: *EventBus, event: Event) !void {
         log.debug("Event happened: {any}", .{event});
-        try self.events.append(event);
+        try self.events.append(self.arena.allocator(), event);
     }
 
     pub fn notifySubscribers(self: *EventBus) !void {
@@ -99,9 +100,8 @@ test "publish/consume" {
             self.event = event;
         }
     };
-    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer arena.deinit();
-    var bus: *EventBus = try EventBus.create(&arena);
+    var bus: EventBus = EventBus.create(std.testing.allocator);
+    defer bus.deinit();
 
     var subscriber = TestSubscriber{};
     const event = Event{

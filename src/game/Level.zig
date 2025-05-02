@@ -11,9 +11,10 @@ const log = std.log.scoped(.level);
 
 const Level = @This();
 
-entities: std.ArrayList(g.Entity),
+arena: std.heap.ArenaAllocator,
+entities: std.ArrayListUnmanaged(g.Entity),
 /// The new new entity id
-next_entity: g.Entity = 0,
+next_entity: g.Entity,
 /// Collection of the components of the entities
 components: ecs.ComponentsManager(c.Components),
 dungeon: d.Dungeon,
@@ -27,29 +28,8 @@ depth: u8,
 player: g.Entity = undefined,
 visibility_strategy: *const fn (level: *const g.Level, place: p.Point) g.Render.Visibility,
 
-pub fn create(
-    arena: *std.heap.ArenaAllocator,
-    depth: u8,
-    dungeon: d.Dungeon,
-    player_place: p.Point,
-    visibility_strategy: *const fn (level: *const g.Level, place: p.Point) g.Render.Visibility,
-) !*Level {
-    const level = try arena.allocator().create(Level);
-    level.* = .{
-        .depth = depth,
-        .entities = std.ArrayList(g.Entity).init(arena.allocator()),
-        .components = try ecs.ComponentsManager(c.Components).init(arena.allocator()),
-        .map = try g.LevelMap.init(arena, dungeon.rows, dungeon.cols),
-        .dijkstra_map = g.DijkstraMap.init(
-            arena.allocator(),
-            .{ .top_left = .{ .row = 1, .col = 1 }, .rows = 12, .cols = 25 },
-            level.obstacles(),
-        ),
-        .dungeon = dungeon,
-        .player_placement = dungeon.placementWith(player_place).?,
-        .visibility_strategy = visibility_strategy,
-    };
-    return level;
+pub fn deinit(self: *Level) void {
+    self.arena.deinit();
 }
 
 pub inline fn checkVisibility(self: *const g.Level, place: p.Point) g.Render.Visibility {
@@ -87,13 +67,18 @@ pub fn entityAt(self: Level, place: p.Point) EntitiesOnPositionIterator {
 }
 
 pub fn addNewEntity(self: *Level, components: c.Components) !g.Entity {
-    const entity = self.newEntity();
-    try self.entities.append(entity);
+    const entity = try self.newEntity();
     try self.components.setComponentsToEntity(entity, components);
     return entity;
 }
 
-pub fn newEntity(self: *Level) g.Entity {
+pub fn newEntity(self: *Level) !g.Entity {
+    const entity = self.generateNextEntityId();
+    try self.entities.append(self.arena.allocator(), entity);
+    return entity;
+}
+
+pub fn generateNextEntityId(self: *Level) g.Entity {
     const entity = self.next_entity;
     self.next_entity += 1;
     return entity;
@@ -109,7 +94,7 @@ pub fn removeEntity(self: *Level, entity: g.Entity) !void {
 
 pub fn addLadder(self: *Level, ladder: c.Ladder, place: p.Point) !void {
     std.debug.assert(ladder.id < self.next_entity);
-    try self.entities.append(ladder.id);
+    try self.entities.append(self.arena.allocator(), ladder.id);
     try self.components.setComponentsToEntity(ladder.id, g.entities.ladder(ladder));
     try self.components.setToEntity(ladder.id, c.Position{ .point = place });
 }

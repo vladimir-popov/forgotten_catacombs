@@ -47,7 +47,7 @@ pub fn update(self: *LookingAroundMode) !void {
     self.entities_on_screen = EntitiesOnScreen.init(self.arena.allocator());
     var itr = self.session.level.query().get(c.Position);
     while (itr.next()) |tuple| {
-        const is_inside_viewport = self.session.render.viewport.region.containsPoint(tuple[1].point);
+        const is_inside_viewport = self.session.viewport.region.containsPoint(tuple[1].point);
         // we should follow the same logic as the render:
         // only entities, which should be drawn, can be in focus
         const is_visible = self.session.level.checkVisibility(tuple[1].point) != .invisible;
@@ -177,12 +177,12 @@ pub fn tick(self: *LookingAroundMode) anyerror!void {
             } else {
                 if (btn.state == .hold and self.countOfEntitiesInFocus() > 1) {
                     if (self.entitiesInFocus()) |entities| {
-                        self.window = try self.initWindowWithVariants(entities.items, self.focus_idx);
+                        try self.initWindowWithVariants(entities.items, self.focus_idx);
                         try self.session.render.drawWindow(&self.window.?);
                         try self.drawInfoBar();
                     }
                 } else if (self.entityInFocus()) |entity| {
-                    self.window = try self.initWindowWithDescription(entity);
+                    try self.initWindowWithDescription(entity);
                     try self.session.render.drawWindow(&self.window.?);
                     try self.drawInfoBar();
                 }
@@ -209,7 +209,7 @@ pub fn tick(self: *LookingAroundMode) anyerror!void {
                     self.place_in_focus,
                     btn.toDirection().?,
                     self.entities_on_screen,
-                    self.session.render.viewport.region,
+                    self.session.viewport.region,
                 );
                 self.focus_idx = 0;
                 try self.draw();
@@ -273,48 +273,46 @@ inline fn sub(x: u8, y: u8) u8 {
 }
 
 fn initWindowWithVariants(
-    self: LookingAroundMode,
+    self: *LookingAroundMode,
     variants: []const g.Entity,
     selected: usize,
-) !g.Window {
-    var window = try g.Window.init(self.arena.allocator());
-    window.tag = @intFromEnum(WindowType.variants);
+) !void {
+    self.window = g.Window.init(self.arena.allocator());
+    self.window.?.tag = @intFromEnum(WindowType.variants);
     for (variants, 0..) |entity, idx| {
         // Every entity has to have description, or handling indexes become complicated
         const description = self.session.level.components.getForEntityUnsafe(entity, c.Description);
-        const line = try window.addOneLine();
+        const line = try self.window.?.addOneLine();
         const pad = @divTrunc(g.Window.MAX_WINDOW_WIDTH - description.name.len, 2);
         std.mem.copyForwards(u8, line[pad..], description.name);
         if (idx == selected)
-            window.selected_line = idx;
+            self.window.?.selected_line = idx;
     }
-    return window;
 }
 
 fn initWindowWithDescription(
-    self: LookingAroundMode,
+    self: *LookingAroundMode,
     entity: g.Entity,
-) !g.Window {
-    var window = try g.Window.init(self.arena.allocator());
-    window.tag = @intFromEnum(WindowType.desription);
+) !void {
+    self.window = g.Window.init(self.arena.allocator());
+    self.window.?.tag = @intFromEnum(WindowType.desription);
     var len: usize = 0;
     if (self.session.level.components.getForEntity(entity, c.Description)) |description| {
-        len += (try std.fmt.bufPrint(&window.title, "{s}", .{description.name})).len;
+        len += (try std.fmt.bufPrint(&self.window.?.title, "{s}", .{description.name})).len;
     }
     if (true) {
-        len += (try std.fmt.bufPrint(window.title[len..], " [id: {d}]", .{entity})).len;
+        len += (try std.fmt.bufPrint(self.window.?.title[len..], " [id: {d}]", .{entity})).len;
     }
     if (self.session.level.components.getForEntity(entity, c.EnemyState)) |state| {
-        const line = try window.addOneLine();
+        const line = try self.window.?.addOneLine();
         _ = try std.fmt.bufPrint(line[1..], "State: is {s}", .{@tagName(state.*)});
     }
     if (self.session.level.components.getForEntity(entity, c.Health)) |health| {
-        const line = try window.addOneLine();
+        const line = try self.window.?.addOneLine();
         _ = try std.fmt.bufPrint(line[1..], "Health: {d}/{d}", .{ health.current, health.max });
     }
     if (self.session.level.components.getForEntity(entity, c.Speed)) |speed| {
-        const line = try window.addOneLine();
+        const line = try self.window.?.addOneLine();
         _ = try std.fmt.bufPrint(line[1..], "Speed: {d}", .{speed.move_points});
     }
-    return window;
 }

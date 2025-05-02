@@ -23,57 +23,61 @@ const GameSession = @This();
 
 pub const Mode = enum { play, explore, looking_around };
 
+arena: std.heap.ArenaAllocator,
 /// This seed should help to make all levels of the single game session reproducible.
 seed: u64,
 /// The PRNG initialized by the session's seed. This prng is used to make any dynamic decision by AI, or game events,
 /// and should not be used to generate any level objects, to keep the levels reproducible.
 prng: std.Random.DefaultPrng,
 runtime: g.Runtime,
-render: *g.Render,
-events: *g.events.EventBus,
-level_arena: std.heap.ArenaAllocator,
-/// The current mode of the game
-mode: Mode = .play,
+/// Buffered render to draw the game
+render: g.Render,
+/// Visible area
+viewport: g.Viewport,
+///
+events: g.events.EventBus,
 /// The current level
-level: *g.Level = undefined,
+level: g.Level,
 // stateful modes:
 play_mode: PlayMode,
 explore_mode: ExploreMode,
 looking_around: LookingAroundMode,
+/// The current mode of the game
+mode: Mode,
+is_game_over: bool,
 
-pub fn create(
-    arena: *std.heap.ArenaAllocator,
+pub fn init(
+    self: *GameSession,
+    gpa: std.mem.Allocator,
     seed: u64,
     runtime: g.Runtime,
-    render: *g.Render,
-    events: *g.events.EventBus,
-) !*GameSession {
-    const alloc = arena.allocator();
+    render: g.Render,
+) !void {
     log.debug("Begin the new game session with seed {d}", .{seed});
-    const self = try alloc.create(GameSession);
     self.* = .{
+        .arena = std.heap.ArenaAllocator.init(gpa),
         .seed = seed,
         .prng = std.Random.DefaultPrng.init(seed),
-        .render = render,
         .runtime = runtime,
-        .events = events,
-        .level_arena = std.heap.ArenaAllocator.init(alloc),
-        .play_mode = try PlayMode.init(arena, self, self.prng.random()),
-        .looking_around = try LookingAroundMode.init(alloc, self),
+        .render = render,
+        .viewport = g.Viewport.init(render.scene_rows, render.scene_cols),
+        .events = g.events.EventBus.init(&self.arena),
+        .level = undefined,
+        .play_mode = try PlayMode.init(&self.arena, self, self.prng.random()),
+        .looking_around = try LookingAroundMode.init(self.arena.allocator(), self),
         .explore_mode = ExploreMode.init(self),
+        .mode = .play,
+        .is_game_over = false,
     };
-    self.level = try g.Levels.firstLevel(&self.level_arena, g.entities.Player, true);
-    log.debug("The first level has been created", .{});
-
-    try events.subscribe(self.play_mode.subscriber());
-
-    render.viewport.region.top_left = .{ .row = 1, .col = 1 };
+    try g.Levels.firstLevel(&self.level, self.arena.allocator(), g.entities.Player, true);
+    try self.events.subscribe(self.play_mode.subscriber());
+    try self.events.subscribe(self.viewport.subscriber());
+    self.viewport.region.top_left = .{ .row = 1, .col = 1 };
     try self.play_mode.update(null);
-    return self;
 }
 
-pub fn unsubscribe(self: *GameSession) void {
-    std.debug.assert(self.events.unsubscribe(&self.play_mode));
+pub fn deinit(self: *GameSession) void {
+    self.arena.deinit();
 }
 
 // TODO: Load session from file
@@ -93,12 +97,24 @@ pub fn lookAround(self: *GameSession) !void {
     try self.looking_around.update();
 }
 
+pub fn subscriber(self: *GameSession) g.events.Subscriber {
+    return .{ .context = self, .onEvent = gameOver };
+}
+
+pub fn gameOver(ptr: *anyopaque, event: g.events.Event) !void {
+    const self: *GameSession = @ptrCast(@alignCast(ptr));
+    if (event == .entity_died and event.entity_died.is_player) {
+        self.is_game_over = true;
+    }
+}
+
 pub inline fn tick(self: *GameSession) !void {
     switch (self.mode) {
         .play => try self.play_mode.tick(),
         .explore => try self.explore_mode.tick(),
         .looking_around => try self.looking_around.tick(),
     }
+    try self.events.notifySubscribers();
 }
 
 pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
@@ -118,24 +134,26 @@ pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
     );
 
     // TODO persist the current level
-    _ = self.level_arena.reset(.retain_capacity);
-    self.level = switch (new_depth) {
-        0 => try g.Levels.firstLevel(&self.level_arena, player, false),
+    self.level.deinit();
+    switch (new_depth) {
+        0 => try g.Levels.firstLevel(&self.level, self.arena.allocator(), player, false),
         1 => try g.Levels.cave(
-            &self.level_arena,
+            &self.level,
+            self.arena.allocator(),
             self.seed + new_depth,
             new_depth,
             player,
             by_ladder,
         ),
         else => try g.Levels.catacomb(
-            &self.level_arena,
+            &self.level,
+            self.arena.allocator(),
             self.seed + new_depth,
             new_depth,
             player,
             by_ladder,
         ),
-    };
+    }
     try self.play_mode.updateQuickActions(null);
-    self.render.viewport.centeredAround(self.level.playerPosition().point);
+    self.viewport.centeredAround(self.level.playerPosition().point);
 }

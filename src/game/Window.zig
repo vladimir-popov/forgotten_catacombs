@@ -12,19 +12,19 @@ pub const MAX_WINDOW_WIDTH = g.DISPLAY_COLS - 2;
 pub const COLS = MAX_WINDOW_WIDTH - 3;
 const Line = [COLS]u8;
 
-const Self = @This();
+const Window = @This();
 
 alloc: std.mem.Allocator,
-title: [COLS]u8,
+title: [COLS]u8 = [1]u8{0} ** COLS,
 /// The scrollable content of the window
-lines: std.ArrayListUnmanaged(Line),
+lines: std.ArrayListUnmanaged(Line) = .empty,
 /// How many scrolled lines should be skipped
-scroll: usize,
+scroll: usize = 0,
 /// The index of the selected line
 selected_line: ?usize = null,
 tag: u8 = 0,
 
-pub fn init(alloc: std.mem.Allocator) !Self {
+pub fn init(alloc: std.mem.Allocator) Window {
     std.log.debug("Init a window", .{});
     return .{
         .alloc = alloc,
@@ -34,12 +34,12 @@ pub fn init(alloc: std.mem.Allocator) !Self {
     };
 }
 
-pub fn deinit(self: *Self) void {
+pub fn deinit(self: *Window) void {
     self.lines.deinit(self.alloc);
 }
 
 /// Returns the region of the screen occupied by the window including border.
-pub inline fn region(self: Self) p.Region {
+pub inline fn region(self: Window) p.Region {
     return .{
         .top_left = if (self.lines.items.len > g.Window.MAX_WINDOW_HEIGHT - 2)
             .{ .row = 1, .col = 2 }
@@ -50,24 +50,24 @@ pub inline fn region(self: Self) p.Region {
     };
 }
 
-pub inline fn isScrolled(self: Self) bool {
+pub inline fn isScrolled(self: Window) bool {
     return self.lines.items.len > g.Window.MAX_WINDOW_HEIGHT - 2;
 }
 
-pub fn visibleLines(self: Self) [][g.Window.COLS]u8 {
+pub fn visibleLines(self: Window) [][g.Window.COLS]u8 {
     return if (self.isScrolled())
         self.lines.items[self.scroll .. self.scroll + g.Window.MAX_WINDOW_HEIGHT - 2]
     else
         self.lines.items;
 }
 
-pub fn addOneLine(self: *Self) !*Line {
+pub fn addOneLine(self: *Window) !*Line {
     const line = try self.lines.addOne(self.alloc);
     line.* = [1]u8{' '} ** COLS;
     return line;
 }
 
-pub fn selectPreviousLine(self: *Self) void {
+pub fn selectPreviousLine(self: *Window) void {
     if (self.selected_line) |selected_line| {
         if (selected_line > 0)
             self.selected_line = selected_line - 1
@@ -76,7 +76,7 @@ pub fn selectPreviousLine(self: *Self) void {
     }
 }
 
-pub fn selectNextLine(self: *Self) void {
+pub fn selectNextLine(self: *Window) void {
     if (self.selected_line) |selected_line| {
         if (selected_line < self.lines.items.len - 1)
             self.selected_line = selected_line + 1

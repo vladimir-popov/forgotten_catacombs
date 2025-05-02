@@ -39,64 +39,69 @@ pub fn main() !void {
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK DETECTED!");
-    const alloc = gpa.allocator();
+    var arena = std.heap.ArenaAllocator.init(gpa.allocator());
+    defer arena.deinit();
 
-    var runtime = try TtyRuntime.TtyRuntime(g.DUNGEON_ROWS + 2, g.DUNGEON_COLS + 2).init(alloc, false, false, false);
+    var runtime = try TtyRuntime.TtyRuntime(g.DUNGEON_ROWS + 2, g.DUNGEON_COLS + 2).init(
+        arena.allocator(),
+        false,
+        false,
+        false,
+    );
     defer runtime.deinit();
 
-    var generator = try DungeonsGenerator.init(alloc, runtime.runtime(), dungeon_type);
-    defer generator.deinit();
-
+    var generator: DungeonsGenerator = undefined;
+    try generator.init(&arena, runtime.runtime(), dungeon_type);
     try generator.generate(seed);
     try runtime.run(&generator);
 }
 
 const DungeonsGenerator = struct {
+    alloc: std.mem.Allocator,
     runtime: g.Runtime,
     render: g.Render,
+    viewport: g.Viewport,
     dungeon_type: DungeonType,
-    level: *g.Level = undefined,
-    level_arena: std.heap.ArenaAllocator,
+    level: g.Level,
 
-    pub fn init(alloc: std.mem.Allocator, runtime: g.Runtime, dungeon_type: DungeonType) !DungeonsGenerator {
-        return .{
+    pub fn init(
+        self: *DungeonsGenerator,
+        arena: *std.heap.ArenaAllocator,
+        runtime: g.Runtime,
+        dungeon_type: DungeonType,
+    ) !void {
+        self.* = .{
+            .alloc = arena.allocator(),
             .runtime = runtime,
-            .render = try g.Render.init(
-                alloc,
-                runtime,
-                g.DUNGEON_ROWS,
-                g.DUNGEON_COLS,
-            ),
+            .viewport = g.Viewport.init(g.DUNGEON_ROWS, g.DUNGEON_COLS),
             .dungeon_type = dungeon_type,
-            .level_arena = std.heap.ArenaAllocator.init(alloc),
+            .level = undefined,
+            .render = undefined,
         };
-    }
-
-    pub fn deinit(self: *DungeonsGenerator) void {
-        self.level_arena.deinit();
-        self.render.deinit();
+        try self.render.init(self.alloc, runtime, g.DUNGEON_ROWS, g.DUNGEON_COLS);
     }
 
     fn generate(self: *DungeonsGenerator, seed: u64) !void {
         log.info("\n====================\nGenerate level with seed {d}\n====================\n", .{seed});
-        _ = self.level_arena.reset(.retain_capacity);
-        self.level = switch (self.dungeon_type) {
-            .first => try g.Levels.firstLevel(&self.level_arena, g.entities.Player, true),
+        switch (self.dungeon_type) {
+            .first => try g.Levels.firstLevel(&self.level, self.alloc, g.entities.Player, true),
             .cave => try g.Levels.cave(
-                &self.level_arena,
+                &self.level,
+                self.alloc,
                 seed,
                 0,
                 g.entities.Player,
                 .{ .direction = .down, .id = 0, .target_ladder = 1 },
             ),
             else => try g.Levels.catacomb(
-                &self.level_arena,
+                &self.level,
+                self.alloc,
                 seed,
                 0,
                 g.entities.Player,
                 .{ .direction = .down, .id = 0, .target_ladder = 1 },
             ),
-        };
+        }
         self.level.visibility_strategy = showAll;
         try self.render.clearDisplay();
         try self.draw();
@@ -112,12 +117,13 @@ const DungeonsGenerator = struct {
     }
 
     inline fn draw(self: *DungeonsGenerator) !void {
-        try self.render.drawLevelOnly(self.level);
+        try self.render.drawLevelOnly(self.viewport, &self.level);
     }
 
     fn handleInput(self: *DungeonsGenerator) !bool {
         const btn = try self.runtime.readPushedButtons() orelse return false;
         if (btn.game_button == .a) {
+            self.level.deinit();
             const seed = std.crypto.random.int(u64);
             try self.generate(seed);
         }

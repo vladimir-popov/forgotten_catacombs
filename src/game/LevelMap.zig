@@ -1,3 +1,4 @@
+//! Contains already visted places and static object on the level.
 const std = @import("std");
 const g = @import("game_pkg.zig");
 const d = g.dungeon;
@@ -7,24 +8,26 @@ const log = std.log.scoped(.level_map);
 
 const LevelMap = @This();
 
+arena: *std.heap.ArenaAllocator,
 rows: u8,
 cols: u8,
 /// Already visited places in the dungeon.
-visited_places: []std.DynamicBitSet,
+visited_places: []std.DynamicBitSetUnmanaged,
 /// All static objects (doors, ladders, items) met previously.
-remembered_objects: std.AutoHashMap(p.Point, g.Entity),
+remembered_objects: std.AutoHashMapUnmanaged(p.Point, g.Entity),
 
 pub fn init(arena: *std.heap.ArenaAllocator, rows: u8, cols: u8) !LevelMap {
     const alloc = arena.allocator();
-    var visited_places = try alloc.alloc(std.DynamicBitSet, rows);
+    const visited_places = try alloc.alloc(std.DynamicBitSetUnmanaged, rows);
     for (0..rows) |r0| {
-        visited_places[r0] = try std.DynamicBitSet.initEmpty(alloc, cols);
+        visited_places[r0] = try std.DynamicBitSetUnmanaged.initEmpty(alloc, cols);
     }
     return .{
+        .arena = arena,
         .rows = rows,
         .cols = cols,
         .visited_places = visited_places,
-        .remembered_objects = std.AutoHashMap(p.Point, g.Entity).init(alloc),
+        .remembered_objects = std.AutoHashMapUnmanaged(p.Point, g.Entity){},
     };
 }
 
@@ -65,7 +68,7 @@ pub fn addVisitedPlace(self: *LevelMap, visited_place: p.Point) !void {
 
 pub fn rememberObject(self: *LevelMap, entity: g.Entity, place: p.Point) !void {
     log.debug("Remember object {any} at {any}\n{any}", .{ entity, place, self });
-    self.remembered_objects.put(place, entity);
+    self.remembered_objects.put(self.arena.allocator(), place, entity);
 }
 
 pub fn forgetObject(self: *LevelMap, place: p.Point) !void {

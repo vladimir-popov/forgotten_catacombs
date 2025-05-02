@@ -7,6 +7,8 @@ const log = std.log.scoped(.runtime);
 
 const Runtime = @This();
 
+pub const DrawingMode = enum { normal, inverted };
+pub const TextAlign = enum { center, left, right };
 pub const MenuItemCallback = *const fn (userdata: ?*anyopaque) callconv(.C) void;
 
 const VTable = struct {
@@ -23,13 +25,13 @@ const VTable = struct {
         context: *anyopaque,
         codepoint: g.Codepoint,
         position_on_display: p.Point,
-        mode: g.Render.DrawingMode,
+        mode: DrawingMode,
     ) anyerror!void,
     drawText: *const fn (
         context: *anyopaque,
         text: []const u8,
         position_on_display: p.Point,
-        mode: g.Render.DrawingMode,
+        mode: DrawingMode,
     ) anyerror!void,
     currentMillis: *const fn (context: *anyopaque) c_uint,
     popCheat: *const fn (context: *anyopaque) ?g.Cheat,
@@ -69,10 +71,30 @@ pub inline fn clearDisplay(self: Runtime) !void {
     try self.vtable.clearDisplay(self.context);
 }
 
-pub fn drawSprite(self: Runtime, codepoint: u21, position_on_display: p.Point, mode: g.Render.DrawingMode) !void {
+pub fn drawSprite(self: Runtime, codepoint: u21, position_on_display: p.Point, mode: DrawingMode) !void {
     try self.vtable.drawSprite(self.context, codepoint, position_on_display, mode);
 }
 
-pub fn drawText(self: Runtime, text: []const u8, position_on_display: p.Point, mode: g.Render.DrawingMode) !void {
+pub fn drawText(self: Runtime, text: []const u8, position_on_display: p.Point, mode: DrawingMode) !void {
     try self.vtable.drawText(self.context, text, position_on_display, mode);
+}
+
+pub fn drawTextWithAlign(
+    self: Runtime,
+    comptime zone_length: u8,
+    text: []const u8,
+    absolut_position: p.Point,
+    mode: DrawingMode,
+    aln: TextAlign,
+) !void {
+    var buf: [zone_length]u8 = undefined;
+    inline for (0..zone_length) |i| buf[i] = ' ';
+    const text_length = @min(zone_length, text.len);
+    const pad = switch (aln) {
+        .left => 0,
+        .center => (zone_length - text_length) / 2,
+        .right => zone_length - text_length,
+    };
+    std.mem.copyForwards(u8, buf[pad..], text[0..text_length]);
+    try self.drawText(&buf, absolut_position, mode);
 }
