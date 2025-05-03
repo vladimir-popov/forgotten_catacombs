@@ -8,10 +8,10 @@ const p = g.primitives;
 const log = std.log.scoped(.looking_around_mode);
 
 const LookingAroundMode = @This();
-const EntitiesOnScreen = std.AutoHashMap(p.Point, std.ArrayListUnmanaged(g.Entity));
+const EntitiesOnScreen = std.AutoHashMapUnmanaged(p.Point, std.ArrayListUnmanaged(g.Entity));
 const WindowType = enum { desription, variants };
 
-arena: *std.heap.ArenaAllocator,
+arena: std.heap.ArenaAllocator,
 session: *g.GameSession,
 /// Map of entities and their positions on the screen
 entities_on_screen: EntitiesOnScreen,
@@ -22,29 +22,23 @@ focus_idx: usize = 0,
 /// The window to show description or variants
 window: ?g.Window = null,
 
-pub fn init(alloc: std.mem.Allocator, session: *g.GameSession) !LookingAroundMode {
+pub fn init(self: *LookingAroundMode, alloc: std.mem.Allocator, session: *g.GameSession) !void {
     log.debug("Init LookingAroundMode", .{});
-    const arena = try alloc.create(std.heap.ArenaAllocator);
-    arena.* = std.heap.ArenaAllocator.init(alloc);
-    return .{
-        .arena = arena,
+    self.* = .{
+        .arena = std.heap.ArenaAllocator.init(alloc),
         .session = session,
-        .entities_on_screen = EntitiesOnScreen.init(arena.allocator()),
+        .entities_on_screen = EntitiesOnScreen{},
     };
+    try self.update();
 }
 
-pub fn deinit(self: *LookingAroundMode) void {
-    const alloc = self.arena.child_allocator;
+pub fn deinit(self: LookingAroundMode) void {
     self.arena.deinit();
-    alloc.destroy(self.arena);
 }
 
-pub fn update(self: *LookingAroundMode) !void {
-    _ = self.arena.reset(.retain_capacity);
-    self.window = null;
-
+fn update(self: *LookingAroundMode) !void {
     const alloc = self.arena.allocator();
-    self.entities_on_screen = EntitiesOnScreen.init(self.arena.allocator());
+    self.entities_on_screen.clearRetainingCapacity();
     var itr = self.session.level.query().get(c.Position);
     while (itr.next()) |tuple| {
         const is_inside_viewport = self.session.viewport.region.containsPoint(tuple[1].point);
@@ -53,9 +47,9 @@ pub fn update(self: *LookingAroundMode) !void {
         const is_visible = self.session.level.checkVisibility(tuple[1].point) != .invisible;
 
         if (is_inside_viewport and is_visible) {
-            const gop = try self.entities_on_screen.getOrPut(tuple[1].point);
+            const gop = try self.entities_on_screen.getOrPut(alloc, tuple[1].point);
             if (!gop.found_existing) {
-                gop.value_ptr.* = try std.ArrayListUnmanaged(g.Entity).initCapacity(alloc, 1);
+                gop.value_ptr.* = std.ArrayListUnmanaged(g.Entity){};
             }
             try gop.value_ptr.append(alloc, tuple[0]);
             if (tuple[0] == self.session.level.player) {

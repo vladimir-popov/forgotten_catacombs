@@ -11,40 +11,36 @@ const ExploreMode = @This();
 session: *g.GameSession,
 horizontal_step: u8,
 vertical_step: u8,
-orig_viewport_top_left: p.Point = undefined,
+orig_viewport_top_left: p.Point,
 
-pub fn init(session: *g.GameSession) ExploreMode {
+pub fn init(session: *g.GameSession) !ExploreMode {
     log.debug("Init ExploreMode", .{});
+    try draw(session);
     return .{
         .session = session,
         .horizontal_step = session.viewport.region.cols / 5,
         .vertical_step = session.viewport.region.rows / 3,
+        .orig_viewport_top_left = session.viewport.region.top_left,
     };
 }
 
-pub fn update(self: *ExploreMode) !void {
-    self.orig_viewport_top_left = self.session.viewport.region.top_left;
-    log.debug("Start looking around. Top-left corner of the viewport is {any}", .{self.orig_viewport_top_left});
-    try self.draw();
-}
+fn draw(session: *g.GameSession) !void {
+    try session.render.hideLeftButton();
+    try session.render.drawInfo("Explore the level");
+    try session.render.drawRightButton("Cancel", false);
+    if (session.viewport.region.top_left.row > 1)
+        session.render.setBorderWithArrow(session.viewport, .up);
 
-fn draw(self: ExploreMode) !void {
-    try self.session.render.hideLeftButton();
-    try self.session.render.drawInfo("Explore the level");
-    try self.session.render.drawRightButton("Cancel", false);
-    if (self.session.viewport.region.top_left.row > 1)
-        self.session.render.setBorderWithArrow(self.session.viewport, .up);
+    if (session.viewport.region.top_left.col > 1)
+        session.render.setBorderWithArrow(session.viewport, .left);
 
-    if (self.session.viewport.region.top_left.col > 1)
-        self.session.render.setBorderWithArrow(self.session.viewport, .left);
+    if (session.viewport.region.bottomRightRow() < g.DUNGEON_ROWS)
+        session.render.setBorderWithArrow(session.viewport, .down);
 
-    if (self.session.viewport.region.bottomRightRow() < g.DUNGEON_ROWS)
-        self.session.render.setBorderWithArrow(self.session.viewport, .down);
+    if (session.viewport.region.bottomRightCol() < g.DUNGEON_COLS)
+        session.render.setBorderWithArrow(session.viewport, .right);
 
-    if (self.session.viewport.region.bottomRightCol() < g.DUNGEON_COLS)
-        self.session.render.setBorderWithArrow(self.session.viewport, .right);
-
-    try self.session.render.drawScene(self.session, null, null);
+    try session.render.drawScene(session, null, null);
 }
 
 pub fn tick(self: *ExploreMode) anyerror!void {
@@ -67,6 +63,6 @@ pub fn tick(self: *ExploreMode) anyerror!void {
             },
             else => {},
         }
-        try self.draw();
+        try draw(self.session);
     }
 }

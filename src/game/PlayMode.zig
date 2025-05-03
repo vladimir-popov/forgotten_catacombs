@@ -12,31 +12,33 @@ const PlayMode = @This();
 
 const QuickAction = struct { target: g.Entity, action: g.Action };
 
-arena: *std.heap.ArenaAllocator,
+arena: std.heap.ArenaAllocator,
 session: *g.GameSession,
-ai: g.AI,
 // The actions which can be applied to the entity in focus
-quick_actions: std.ArrayList(QuickAction),
+quick_actions: std.ArrayListUnmanaged(QuickAction),
 // The index of the quick action for the target entity
 target_idx: usize = 0,
 is_player_turn: bool = true,
 window: ?g.Window = null,
 
-pub fn init(arena: *std.heap.ArenaAllocator, session: *g.GameSession, rand: std.Random) !PlayMode {
+pub fn init(
+    self: *PlayMode,
+    alloc: std.mem.Allocator,
+    session: *g.GameSession,
+    target_entity: ?g.Entity,
+) !void {
     log.debug("Init PlayMode", .{});
-    return .{
-        .arena = arena,
+    self.* = .{
+        .arena = std.heap.ArenaAllocator.init(alloc),
         .session = session,
-        .ai = g.AI{ .session = session, .rand = rand },
-        .quick_actions = std.ArrayList(QuickAction).init(arena.allocator()),
+        .quick_actions = std.ArrayListUnmanaged(QuickAction){},
     };
+    try self.updateQuickActions(target_entity);
+    try self.draw();
 }
 
-/// Updates the target entity after switching back to the play mode
-pub fn update(self: *PlayMode, target_entity: ?g.Entity) !void {
-    log.debug("Update target after refresh", .{});
-    try self.updateQuickActions(target_entity);
-    try self.redraw();
+pub fn deinit(self: PlayMode) void {
+    self.arena.deinit();
 }
 
 inline fn target(self: PlayMode) ?g.Entity {
@@ -57,15 +59,6 @@ fn draw(self: *const PlayMode) !void {
         try self.session.render.drawWindow(window);
     } else {
         try self.session.render.drawScene(self.session, self.target(), self.quickAction());
-        try self.drawInfoBar();
-    }
-}
-
-fn redraw(self: *const PlayMode) !void {
-    if (self.window) |*window| {
-        try self.session.render.drawWindow(window);
-    } else {
-        try self.session.render.redrawScene(self.session, self.target(), self.quickAction());
         try self.drawInfoBar();
     }
 }
@@ -96,25 +89,6 @@ fn drawInfoBar(self: *const PlayMode) !void {
         try self.session.render.drawInfo(name);
     } else {
         try self.session.render.cleanInfo();
-    }
-}
-
-pub fn subscriber(self: *PlayMode) g.events.Subscriber {
-    return .{ .context = self, .onEvent = handleEvent };
-}
-
-fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
-    const self: *PlayMode = @ptrCast(@alignCast(ptr));
-    switch (event) {
-        .player_hit => {
-            log.debug("Update target after player hit", .{});
-            try self.updateQuickActions(event.player_hit.target);
-        },
-        // TODO: Move to level
-        .entity_moved => |entity_moved| if (entity_moved.entity == self.session.level.player) {
-            try self.session.level.onPlayerMoved(entity_moved);
-        },
-        else => {},
     }
 }
 
@@ -214,7 +188,7 @@ pub fn tick(self: *PlayMode) !void {
             const speed = tuple[2];
             if (speed.move_points > initiative.move_points) continue;
             if (self.session.level.components.getForEntity(entity, c.Position)) |position| {
-                const action = self.ai.action(entity, position.point);
+                const action = self.session.ai.action(entity, position.point);
                 const mp = try ActionSystem.doAction(self.session, entity, action, speed.move_points);
                 std.debug.assert(0 < mp and mp <= initiative.move_points);
                 initiative.move_points -= mp;
@@ -239,7 +213,7 @@ pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity) anyerror!vo
         if (tg != self.session.level.player) {
             // check if quick action is available for target
             if (self.calculateQuickActionForTarget(tg)) |qa| {
-                try self.quick_actions.append(.{ .target = tg, .action = qa });
+                try self.quick_actions.append(self.arena.allocator(), .{ .target = tg, .action = qa });
             }
         }
     }
@@ -260,13 +234,13 @@ pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity) anyerror!vo
             if (positions.index_entity.get(@intCast(idx))) |entity| {
                 if (entity == self.session.level.player or entity == target_entity) continue;
                 if (self.calculateQuickActionForTarget(entity)) |qa| {
-                    try self.quick_actions.append(.{ .target = entity, .action = qa });
+                    try self.quick_actions.append(self.arena.allocator(), .{ .target = entity, .action = qa });
                 }
             }
         }
     }
     // player should always be able to wait
-    try self.quick_actions.append(.{ .target = self.session.level.player, .action = .wait });
+    try self.quick_actions.append(self.arena.allocator(), .{ .target = self.session.level.player, .action = .wait });
 }
 
 fn calculateQuickActionForTarget(

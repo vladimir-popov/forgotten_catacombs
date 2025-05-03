@@ -34,7 +34,7 @@ pub fn showTheCurrentPlacementInLight(level: *const g.Level, place: p.Point) g.R
     return chechKnownPlaces(level, place);
 }
 
-/// Marks as visible the whole placement with player, and optionally its nearest neighbors, if the player is
+/// Marks as visible the whole placement with the player, and optionally its nearest neighbors, if the player is
 /// in the doorway.
 ///
 /// Ignores the light source.
