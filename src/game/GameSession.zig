@@ -73,6 +73,7 @@ pub fn init(
     try g.Levels.firstLevel(&self.level, self.arena.allocator(), g.entities.Player, true);
     self.viewport.region.top_left = .{ .row = 1, .col = 1 };
     try self.events.subscribe(self.viewport.subscriber());
+    try self.events.subscribe(self.subscriber());
     try self.mode.play.init(self.arena.allocator(), self, null);
 }
 
@@ -110,13 +111,12 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
             log.debug("Update target after player hit", .{});
             try self.mode.play.updateQuickActions(event.player_hit.target);
         },
-        .entity_moved => |entity_moved| if (entity_moved.entity == self.session.level.player) {
+        .entity_moved => |entity_moved| if (entity_moved.entity == self.level.player) {
             try self.level.onPlayerMoved(entity_moved);
         },
         .entity_died => if (event.entity_died.is_player) {
             self.is_game_over = true;
         },
-        else => {},
     }
 }
 
@@ -201,8 +201,8 @@ fn doMove(
             .target = target,
         },
     };
-    from_position.point = new_place;
     try self.events.sendEvent(event);
+    from_position.point = new_place;
     return move_speed;
 }
 
@@ -290,4 +290,13 @@ fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
     }
     try self.mode.play.updateQuickActions(null);
     self.viewport.centeredAround(self.level.playerPosition().point);
+    const event = g.events.Event{
+        .entity_moved = .{
+            .entity = self.level.player,
+            .is_player = true,
+            .moved_from = p.Point.init(0, 0),
+            .target = .{ .new_place = self.level.playerPosition().point },
+        },
+    };
+    try self.events.sendEvent(event);
 }

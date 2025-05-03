@@ -4,8 +4,6 @@ const g = @import("game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
-const ActionSystem = @import("ActionSystem.zig");
-
 const log = std.log.scoped(.play_mode);
 
 const PlayMode = @This();
@@ -171,7 +169,7 @@ pub fn tick(self: *PlayMode) !void {
         if (maybe_action) |action| {
             self.is_player_turn = false;
             const speed = self.session.level.components.getForEntityUnsafe(self.session.level.player, c.Speed);
-            const mp = try ActionSystem.doAction(self.session, self.session.level.player, action, speed.move_points);
+            const mp = try self.session.doAction(self.session.level.player, action, speed.move_points);
             if (mp > 0) {
                 log.debug("Update quick actions after action {any}", .{action});
                 try self.updateQuickActions(self.target());
@@ -189,7 +187,7 @@ pub fn tick(self: *PlayMode) !void {
             if (speed.move_points > initiative.move_points) continue;
             if (self.session.level.components.getForEntity(entity, c.Position)) |position| {
                 const action = self.session.ai.action(entity, position.point);
-                const mp = try ActionSystem.doAction(self.session, entity, action, speed.move_points);
+                const mp = try self.session.doAction(entity, action, speed.move_points);
                 std.debug.assert(0 < mp and mp <= initiative.move_points);
                 initiative.move_points -= mp;
             }
