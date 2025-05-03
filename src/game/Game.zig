@@ -1,7 +1,7 @@
 const std = @import("std");
 const g = @import("game_pkg.zig");
 
-const log = std.log.scoped(.Game);
+const log = std.log.scoped(.game);
 
 const Game = @This();
 

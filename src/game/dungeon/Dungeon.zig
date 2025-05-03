@@ -58,7 +58,7 @@ entrance: p.Point,
 /// a bottom level.
 exit: p.Point,
 /// Index of all doorways by their place
-doorways: ?*const std.AutoHashMap(p.Point, d.Doorway) = null,
+doorways: ?*const std.AutoHashMapUnmanaged(p.Point, d.Doorway) = null,
 vtable: VTable,
 
 pub inline fn cellAt(self: Dungeon, place: p.Point) Cell {

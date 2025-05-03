@@ -49,7 +49,8 @@ pub fn generateDungeon(
         .{ .min_rows = self.region_min_rows, .min_cols = self.region_min_cols, .square_ratio = self.square_ratio },
     );
 
-    const catacomb = try Catacomb.create(arena);
+    const catacomb = try arena.allocator().create(Catacomb);
+    catacomb.* = try Catacomb.init(arena);
     // visit every BSP node and generate rooms in the leafs
     var createRooms: TraverseAndCreateRooms = .{
         .generator = &self,

@@ -17,33 +17,25 @@ pub fn CavesGenerator(comptime rows: comptime_int, comptime cols: comptime_int) 
             arena: *std.heap.ArenaAllocator,
             rand: std.Random,
         ) !d.Dungeon {
-            const alloc = arena.allocator();
-
-            const generate_arena = try alloc.create(std.heap.ArenaAllocator);
-            defer alloc.destroy(generate_arena);
-
-            generate_arena.* = std.heap.ArenaAllocator.init(alloc);
-            defer generate_arena.deinit();
-
-            const dungeon = try arena.allocator().create(d.Cave(rows, cols));
-            dungeon.* = try d.Cave(rows, cols).init(arena);
-            dungeon.cells.copyFrom(
-                try generate(arena.allocator(), rand, self.cellural_automata, 20),
-            );
+            const cave = try arena.allocator().create(d.Cave(rows, cols));
+            cave.* = try d.Cave(rows, cols).init(arena);
+            try generate(&cave.cells, arena.allocator(), rand, self.cellural_automata, 20);
             // TODO move this place far away of each other
-            dungeon.entrance = dungeon.randomEmptyPlace(rand);
-            dungeon.exit = dungeon.randomEmptyPlace(rand);
-            return dungeon.dungeon();
+            cave.entrance = cave.randomEmptyPlace(rand);
+            cave.exit = cave.randomEmptyPlace(rand);
+            // the cave it self will be removed on arena deinit
+            return cave.dungeon();
         }
 
-        /// Repeatedly generates caves until one of them will have more than 40% of opened cells.
+        /// Repeatedly generates cells for a cave until one of them will have more than 40% of opened cells.
         /// Generates panic after the `max_attempts`.
         fn generate(
+            cells: *p.BitMap(rows, cols),
             alloc: std.mem.Allocator,
             rand: std.Random,
             cellural_automata: CelluralAutomata,
             max_attempts: u8,
-        ) !*p.BitMap(rows, cols) {
+        ) !void {
             const min_area: usize = @divTrunc(rows * cols * 4, 10);
             for (0..max_attempts) |attempt| {
                 var tmp_arena = std.heap.ArenaAllocator.init(alloc);
@@ -54,22 +46,21 @@ pub fn CavesGenerator(comptime rows: comptime_int, comptime cols: comptime_int) 
                 log.debug("Generated cave with max open area {d}. Expected > {d}", .{ tuple[0], min_area });
                 // now, let's create the final result and clear the biggest area
                 if (tuple[0] > min_area) {
-                    const result = try alloc.create(p.BitMap(rows, cols));
-                    result.* = try p.BitMap(rows, cols).initFull(alloc);
+                    cells.* = try p.BitMap(rows, cols).initFull(alloc);
                     var stack = std.ArrayList(p.Point).init(alloc);
                     defer stack.deinit();
                     try stack.append(tuple[1]);
                     while (stack.pop()) |point| {
                         if (prototype_map.isSet(point.row, point.col)) continue;
                         prototype_map.setAt(point);
-                        result.unsetAt(point);
+                        cells.unsetAt(point);
                         try stack.append(point.movedTo(.up));
                         try stack.append(point.movedTo(.down));
                         try stack.append(point.movedTo(.left));
                         try stack.append(point.movedTo(.right));
                     }
-                    log.debug("The cave was generate on {d} attempt", .{attempt + 1});
-                    return result;
+                    log.debug("The cells for a cave were generate on {d} attempt", .{attempt + 1});
+                    return;
                 }
             }
             std.debug.panic("No one cave was generated after {d} attempts", .{max_attempts});
@@ -103,7 +94,7 @@ pub fn CavesGenerator(comptime rows: comptime_int, comptime cols: comptime_int) 
             init_point: p.Point,
         ) !usize {
             var map = try p.BitMap(rows, cols).initEmpty(alloc);
-            defer map.deinit();
+            defer map.deinit(alloc);
             map.copyFrom(original_map);
 
             var area: usize = 0;

@@ -39,33 +39,33 @@ pub const teleport_place = teleport_tent.center();
 
 area: d.Area,
 /// Index of all doorways by their place
-doorways: std.AutoHashMap(p.Point, d.Doorway),
+doorways: std.AutoHashMapUnmanaged(p.Point, d.Doorway),
 
-pub fn create(arena: *std.heap.ArenaAllocator) !*FirstLocation {
+pub fn generateDungeon(arena: *std.heap.ArenaAllocator) !d.Dungeon {
     const alloc = arena.allocator();
-    const self = try alloc.create(FirstLocation);
-    self.* = .{
+    const first_location = try alloc.create(FirstLocation);
+    first_location.* = .{
         .area = d.Area.init(arena, whole_region),
-        .doorways = std.AutoHashMap(p.Point, d.Doorway).init(alloc),
+        .doorways = .empty,
     };
 
-    try self.createRoom(ladder_room, ladder.movedTo(.down));
-    try self.createRoom(traider_tent, traider_tent.bottomRight().movedTo(.up));
-    try self.createRoom(scientist_tent, scientist_tent.bottomRight().movedTo(.up));
-    try self.createRoom(teleport_tent, teleport_tent.top_left.movedTo(.down));
-
-    return self;
+    try first_location.createRoom(alloc, ladder_room, ladder.movedTo(.down));
+    try first_location.createRoom(alloc, traider_tent, traider_tent.bottomRight().movedTo(.up));
+    try first_location.createRoom(alloc, scientist_tent, scientist_tent.bottomRight().movedTo(.up));
+    try first_location.createRoom(alloc, teleport_tent, teleport_tent.top_left.movedTo(.down));
+    // the pointer to the first_location will be removed on arena.deinit
+    return first_location.dungeon();
 }
 
-fn createRoom(self: *FirstLocation, region: p.Region, door: p.Point) !void {
+fn createRoom(self: *FirstLocation, alloc: std.mem.Allocator, region: p.Region, door: p.Point) !void {
     const doorway = d.Doorway{
         .placement_from = .{ .area = &self.area },
         .placement_to = .{ .room = try self.area.addRoom(region, door) },
     };
-    try self.doorways.put(door, doorway);
+    try self.doorways.put(alloc, door, doorway);
 }
 
-pub fn dungeon(self: *FirstLocation) d.Dungeon {
+fn dungeon(self: *FirstLocation) d.Dungeon {
     return .{
         .parent = self,
         .rows = rows,

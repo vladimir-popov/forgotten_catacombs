@@ -580,25 +580,24 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
         pub const rows: u8 = rows_count;
         pub const cols: u8 = cols_count;
 
-        alloc: std.mem.Allocator,
         bitsets: []std.StaticBitSet(cols),
 
         pub fn initEmpty(alloc: std.mem.Allocator) !Self {
-            var self: Self = .{ .alloc = alloc, .bitsets = try alloc.alloc(std.StaticBitSet(cols), rows) };
+            var self: Self = .{ .bitsets = try alloc.alloc(std.StaticBitSet(cols), rows) };
             self.clear();
             return self;
         }
 
         pub fn initFull(alloc: std.mem.Allocator) !Self {
-            var self: Self = .{ .alloc = alloc, .bitsets = try alloc.alloc(std.StaticBitSet(cols), rows) };
+            var self: Self = .{ .bitsets = try alloc.alloc(std.StaticBitSet(cols), rows) };
             for (0..rows) |idx| {
                 self.bitsets[idx] = std.StaticBitSet(cols).initFull();
             }
             return self;
         }
 
-        pub fn deinit(self: *Self) void {
-            self.alloc.free(self.bitsets);
+        pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
+            alloc.free(self.bitsets);
             self.bitsets = undefined;
         }
 
@@ -728,7 +727,7 @@ test "parse BitMap" {
 
     // when:
     var bitmap = try BitMap(3, 3).initEmpty(std.testing.allocator);
-    defer bitmap.deinit();
+    defer bitmap.deinit(std.testing.allocator);
     try bitmap.parse('#', str);
 
     // then:
@@ -743,7 +742,7 @@ test "parse BitMap" {
 test "unset a region" {
     // given:
     var bitmap = try BitMap(10, 10).initFull(std.testing.allocator);
-    defer bitmap.deinit();
+    defer bitmap.deinit(std.testing.allocator);
     const region = Region{ .top_left = .{ .row = 2, .col = 2 }, .rows = 5, .cols = 5 };
 
     // when:

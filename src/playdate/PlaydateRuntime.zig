@@ -5,79 +5,11 @@ const c = g.components;
 const p = g.primitives;
 
 const Allocator = @import("Allocator.zig");
+const LastButton = @import("LastButton.zig");
 
 const log = std.log.scoped(.playdate_runtime);
 
-const HOLD_DELAY_MS = 700;
-const REPEATE_DELAY_MS = 100;
-
 const PlaydateRuntime = @This();
-
-const LastButton = struct {
-    const State = enum { pressed, released };
-    buttons: c_int = 0,
-    /// 0 means that all buttons are released now
-    pressed_at: u32 = 0,
-    was_repeated: bool = false,
-
-    pub fn pop(self: *LastButton, now_ms: u32) ?g.Button {
-        if (g.Button.GameButton.fromCode(self.buttons)) |game_button| {
-            if (self.pressed_at == 0) {
-                // ignore release for repeated button
-                if (self.was_repeated) {
-                    self.* = .{};
-                    return null;
-                }
-                self.* = .{};
-                return .{ .game_button = game_button, .state = .released };
-            }
-            // repeat for pressed arrows only
-            else if (game_button.isMove() and now_ms - self.pressed_at > REPEATE_DELAY_MS) {
-                self.pressed_at = now_ms;
-                self.was_repeated = true;
-                return .{ .game_button = game_button, .state = .hold };
-            }
-            // the button is held
-            else if (now_ms - self.pressed_at > HOLD_DELAY_MS) {
-                self.* = .{};
-                return .{ .game_button = game_button, .state = .hold };
-            }
-        }
-        return null;
-    }
-
-    /// The ButtonCallback handler.
-    ///
-    /// The function is called for each button up/down event
-    /// (possibly multiple events on the same button) that occurred during
-    /// the previous update cycle. At the default 30 FPS, a queue size of 5
-    /// should be adequate. At lower frame rates/longer frame times, the
-    /// queue size should be extended until all button presses are caught.
-    ///
-    /// See: https://sdk.play.date/2.6.2/Inside%20Playdate%20with%20C.html#f-system.setButtonCallback
-    ///
-    fn handleEvent(
-        buttons: api.PDButtons,
-        down: c_int,
-        when: u32,
-        ptr: ?*anyopaque,
-    ) callconv(.C) c_int {
-        const self: *LastButton = @ptrCast(@alignCast(ptr));
-        if (down > 0) {
-            if (self.pressed_at > 0)
-                // additional buttons have been pressed
-                self.buttons |= buttons
-            else
-                // nothing pressed before, new buttons have been pressed
-                self.buttons = buttons;
-
-            self.pressed_at = when;
-        } else {
-            self.pressed_at = 0;
-        }
-        return 0;
-    }
-};
 
 // This is a global var because the
 // serialMessageCallback doesn't receive custom data
@@ -103,10 +35,11 @@ pub fn init(playdate: *api.PlaydateAPI) !PlaydateRuntime {
 
     const alloc = Allocator.allocator(playdate);
     const last_button = try alloc.create(LastButton);
+    last_button.* = .reset;
     errdefer alloc.destroy(last_button);
 
     playdate.system.setSerialMessageCallback(serialMessageCallback);
-    playdate.system.setButtonCallback(LastButton.handleEvent, last_button, 4);
+    playdate.system.setButtonCallback(LastButton.handleEvent, last_button, 1);
 
     return .{
         .playdate = playdate,

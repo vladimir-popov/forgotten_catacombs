@@ -17,7 +17,7 @@ pub fn Cave(comptime rows: u8, cols: u8) type {
         pub fn init(arena: *std.heap.ArenaAllocator) !Self {
             return .{
                 .room = d.Room.init(
-                    arena.allocator(),
+                    arena,
                     p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = rows, .cols = cols },
                 ),
                 .cells = try p.BitMap(rows, cols).initEmpty(arena.allocator()),

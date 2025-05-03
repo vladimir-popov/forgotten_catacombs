@@ -7,6 +7,26 @@ const PlaydateRuntime = @import("PlaydateRuntime.zig");
 pub const std_options = std.Options{
     .log_level = .info,
     .logFn = writeLog,
+    .log_scope_levels = &[_]std.log.ScopeLevel{
+        .{ .scope = .default, .level = .debug },
+        .{ .scope = .playdate_runtime, .level = .debug },
+        .{ .scope = .last_button, .level = .debug },
+        .{ .scope = .runtime, .level = .debug },
+        // .{ .scope = .render, .level = .warn },
+        // .{ .scope = .visibility, .level = .debug },
+        // .{ .scope = .ai, .level = .debug },
+        .{ .scope = .game, .level = .debug },
+        // .{ .scope = .game_session, .level = .debug },
+        // .{ .scope = .play_mode, .level = .debug },
+        // .{ .scope = .explore_mode, .level = .debug },
+        // .{ .scope = .looking_around_mode, .level = .debug },
+        // .{ .scope = .levels, .level = .debug },
+        // .{ .scope = .level, .level = .debug },
+        // .{ .scope = .cmd, .level = .debug },
+        // .{ .scope = .level_map, .level = .debug },
+        // .{ .scope = .events, .level = .debug },
+        // .{ .scope = .action_system, .level = .debug },
+    },
 };
 
 fn writeLog(
@@ -37,8 +57,12 @@ var playdate_log_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) voi
 
 pub const GlobalState = struct {
     playdate_runtime: PlaydateRuntime,
-    game: *g.Game,
+    game: g.Game,
 };
+
+// dirty hack: we need to handle events in playdate_runtime, but it's unavailable inside
+// the eventHandler
+var global_state: *GlobalState = undefined;
 
 pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent, arg: u32) callconv(.C) c_int {
     _ = arg;
@@ -47,25 +71,28 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
             playdate_error_to_console = playdate.system.@"error";
             playdate_log_to_console = playdate.system.logToConsole;
 
-            var state: *GlobalState = @ptrCast(@alignCast(playdate.system.realloc(null, @sizeOf(GlobalState))));
-            state.playdate_runtime = PlaydateRuntime.init(playdate) catch
+            global_state = @ptrCast(@alignCast(playdate.system.realloc(null, @sizeOf(GlobalState))));
+            global_state.playdate_runtime = PlaydateRuntime.init(playdate) catch
                 @panic("Error on creating Runtime");
-            state.game.init(
-                state.playdate_runtime.alloc,
-                state.playdate_runtime.runtime(),
+            global_state.game.init(
+                global_state.playdate_runtime.alloc,
+                global_state.playdate_runtime.runtime(),
                 playdate.system.getCurrentTimeMilliseconds(),
             ) catch
                 @panic("Error on creating game session");
 
             playdate.display.setRefreshRate(0);
-            playdate.system.setUpdateCallback(update_and_render, state);
+            playdate.system.setUpdateCallback(updateAndRender, global_state);
+        },
+        .EventPause => {
+            global_state.playdate_runtime.last_button.is_menu_shown = true;
         },
         else => {},
     }
     return 0;
 }
 
-fn update_and_render(userdata: ?*anyopaque) callconv(.C) c_int {
+fn updateAndRender(userdata: ?*anyopaque) callconv(.C) c_int {
     const state: *GlobalState = @ptrCast(@alignCast(userdata.?));
     state.game.tick() catch |err|
         std.debug.panic("Error {any} on game tick", .{err});

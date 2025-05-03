@@ -100,9 +100,10 @@ test "publish/consume" {
             self.event = event;
         }
     };
-    var bus: EventBus = EventBus.create(std.testing.allocator);
-    defer bus.deinit();
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
 
+    var bus: EventBus = EventBus.init(&arena);
     var subscriber = TestSubscriber{};
     const event = Event{
         .entity_moved = .{

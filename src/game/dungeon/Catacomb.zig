@@ -28,13 +28,12 @@ pub const cols = g.DUNGEON_COLS;
 const Catacomb = @This();
 
 arena: *std.heap.ArenaAllocator,
-arena_alloc: std.mem.Allocator,
 /// The index over all placements in the dungeon.
 // we can't store the placements in the array, because of invalidation of the
 // inner state of the array
-placements: std.ArrayList(Placement),
+placements: std.ArrayListUnmanaged(Placement),
 /// Index of all doorways by their place
-doorways: std.AutoHashMap(p.Point, Doorway),
+doorways: std.AutoHashMapUnmanaged(p.Point, Doorway),
 /// The bit mask of the places with floor.
 floor: p.BitMap(rows, cols),
 /// The bit mask of the places with walls. The floor under the walls is undefined, it can be set, or can be omitted.
@@ -45,18 +44,15 @@ exit: ?p.Point = null,
 /// Allocates an empty dungeon, and initializes all inner state with passed arena
 /// allocator. The returned instance should be additionally initialized by the
 /// CatacombGenerator. All memory can be freed by deinit arena.
-pub fn create(arena: *std.heap.ArenaAllocator) !*Catacomb {
+pub fn init(arena: *std.heap.ArenaAllocator) !Catacomb {
     const arena_alloc = arena.allocator();
-    const self = try arena_alloc.create(Catacomb);
-    self.* = .{
+    return .{
         .arena = arena,
-        .arena_alloc = arena_alloc,
-        .placements = std.ArrayList(Placement).init(arena_alloc),
-        .doorways = std.AutoHashMap(p.Point, Doorway).init(arena_alloc),
+        .placements = std.ArrayListUnmanaged(Placement){},
+        .doorways = std.AutoHashMapUnmanaged(p.Point, Doorway){},
         .floor = try p.BitMap(rows, cols).initEmpty(arena_alloc),
         .walls = try p.BitMap(rows, cols).initEmpty(arena_alloc),
     };
-    return self;
 }
 
 pub fn dungeon(self: *Catacomb) Dungeon {
@@ -152,10 +148,10 @@ pub fn parse(arena: *std.heap.ArenaAllocator, str: []const u8) !Catacomb {
     if (!@import("builtin").is_test) {
         @compileError("The function `parse` is for test purpose only");
     }
-    var dung = try Catacomb.create(arena);
-    try dung.floor.parse('.', str);
-    try dung.walls.parse('#', str);
-    return dung;
+    var catacomb = try Catacomb.init(arena);
+    try catacomb.floor.parse('.', str);
+    try catacomb.walls.parse('#', str);
+    return catacomb;
 }
 
 // ==================================================
@@ -175,12 +171,12 @@ pub fn generateAndAddRoom(self: *Catacomb, region: p.Region) !void {
     }
     // generate floor:
     self.floor.setRegionValue(region, true);
-    try self.placements.append(.{ .room = try Placement.createRoom(self.arena, region) });
+    try self.placements.append(self.arena.allocator(), .{ .room = try Placement.createRoom(self.arena, region) });
 }
 
 inline fn addEmptyPassage(self: *Catacomb) !*Passage {
     const passage = try Placement.createPassage(self.arena);
-    try self.placements.append(.{ .passage = passage });
+    try self.placements.append(self.arena.allocator(), .{ .passage = passage });
     return passage;
 }
 
@@ -190,7 +186,7 @@ pub fn createAndAddPassageBetweenRegions(
     r1: p.Region,
     r2: p.Region,
 ) !p.Region {
-    var stack_arena = std.heap.ArenaAllocator.init(self.arena_alloc);
+    var stack_arena = std.heap.ArenaAllocator.init(self.arena.allocator());
     defer _ = stack_arena.deinit();
 
     const direction: p.Direction = if (r1.top_left.row == r2.top_left.row) .right else .down;
@@ -289,7 +285,7 @@ pub fn forceCreateDoorBetween(
     }
     self.cleanAt(place);
     const doorway = Doorway{ .placement_from = placement_from, .placement_to = placement_to };
-    try self.doorways.put(place, doorway);
+    try self.doorways.put(self.arena.allocator(), place, doorway);
     try placement_from.addDoor(place);
     try placement_to.addDoor(place);
     log.debug("Created {any} at {any}", .{ doorway, place });

@@ -36,7 +36,7 @@ pub const Animation = struct {
     previous_render_time: c_uint = 0,
     lag: u32 = 0,
 
-    pub fn frame(self: *Animation, now: c_uint) ?g.Codepoint {
+    pub fn frame(self: *Animation, now: u32) ?g.Codepoint {
         self.lag += now - self.previous_render_time;
         self.previous_render_time = now;
         if (self.lag > g.RENDER_DELAY_MS) {

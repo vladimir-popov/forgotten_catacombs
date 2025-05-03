@@ -1,17 +1,17 @@
-<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/26.1.1 Chrome/132.0.6834.210 Electron/34.3.3 Safari/537.36" version="26.1.1" pages="9">
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.7.17 Chrome/128.0.6613.36 Electron/32.0.1 Safari/537.36" version="24.7.17" pages="9">
   <diagram id="LtS7kmC65dY39-LbUc1Z" name="Memory and  life time management">
-    <mxGraphModel dx="415" dy="830" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel grid="1" page="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="7zvu-Zuf9Dn60HD56mGA-1" value="&lt;br style=&quot;font-size: 14px;&quot;&gt;&lt;h3 style=&quot;font-size: 14px;&quot;&gt;Memory and&amp;nbsp; life time management&lt;/h3&gt;&lt;br style=&quot;font-size: 14px;&quot;&gt;&lt;b style=&quot;font-size: 14px;&quot;&gt;1. Do not make constructor returned pointer&lt;br style=&quot;font-size: 14px;&quot;&gt;&lt;/b&gt;All entities should be structures nested in each other. Only the root object should be allocated on the heap. It means, entities should have only init method that initialises and/or returns a structure. If the structure has a child which needs the reference to that structure, the init method should receive the pointer to the structure. See bellow for more details.&lt;div&gt;&lt;b&gt;&lt;br class=&quot;Apple-interchange-newline&quot;&gt;2. Nested structures&lt;br&gt;&lt;/b&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;If the inner structure need to capture a pointer to its parent,&amp;nbsp;&lt;/span&gt;&amp;nbsp;the init method of that parent structure should receive the pointer to that structure for initialisation:&lt;/div&gt;&lt;div&gt;&lt;pre&gt;const Baz = struct {&lt;br&gt;   foo: *Foo,&lt;br&gt;};&lt;br&gt;const Foo = struct {&amp;nbsp;&lt;br&gt;&amp;nbsp; &amp;nbsp; baz: Baz,&lt;br&gt;    pub fn init(self: *Foo) void {&lt;br&gt;        self.baz = Baz{ .foo = self };&lt;br&gt;    }&lt;br&gt;}&lt;/pre&gt;&lt;br style=&quot;font-size: 14px;&quot;&gt;&lt;b style=&quot;font-size: 14px;&quot;&gt;3. Use incapsulated ArenaAllocator for complicated structures&lt;br style=&quot;font-size: 14px;&quot;&gt;&lt;/b&gt;If the structure contains complicated data structures, use ArenaAllocator to manage the memory.&amp;nbsp; An initial allocator should be an argument of the init method, and should be used to create the arena:&lt;br style=&quot;font-size: 14px;&quot;&gt;&lt;pre style=&quot;font-size: 14px;&quot;&gt;const Foo = struct {&amp;nbsp;&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; arena: std.heap.ArenaAllocator,&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; bar: Bar,&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp;&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp;pub fn init(gpa: std.mem.Allocator) !Foo {&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; var arena =&amp;nbsp;std.heap.ArenaAllocator.init(alloc_gpa);&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; errdefer arena.deinit();&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; const alloc = arena.allocator();&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &lt;br style=&quot;font-size: 14px;&quot;&gt;        return .{&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; .bar = try alloc.allocate(Bar),&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;&amp;nbsp;&lt;br style=&quot;font-size: 14px;&quot;&gt;            // This has to be last so that we copy AFTER the arena allocations&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; // above happen (Zig assigns in order).&lt;br style=&quot;font-size: 14px;&quot;&gt;            // This is safe only if all allocations happened before this assignment:&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; .arena = arena,&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; };&lt;br style=&quot;font-size: 14px;&quot;&gt;}&lt;/pre&gt;&lt;div style=&quot;font-size: 14px;&quot;&gt;Do &lt;b&gt;NOT&lt;/b&gt; pass arena.allocator() as an allocator argument! The memory of the arena is captured here: `arena.allocator()`, and can be violated later when the passed allocator will be used. If the inner structure needs an allocator, and that inner structure should be destroyed at same time as it outer parent or early, the init method of the parent outer structure should take a pointer to self, then `self.arena.allocator()` can be safely passed to children:&lt;/div&gt;&lt;div style=&quot;font-size: 14px;&quot;&gt;&lt;br&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 14px;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;const Bar = struct {&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;   fn init(alloc: std.mem.Allocator) !Bar { ... }&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;};&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;const Foo = struct {&amp;nbsp;&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&amp;nbsp; &amp;nbsp; arena: std.heap.ArenaAllocator,&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&amp;nbsp; &amp;nbsp; bar: Bar,&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&amp;nbsp; &amp;nbsp;&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&amp;nbsp; &amp;nbsp;pub fn init(self: *Foo, gpa: std.mem.Allocator) !void {&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; errdefer self.arena.deinit();&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;        self.* = .{&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;            .arena =&amp;nbsp;std.heap.ArenaAllocator.init(gpa)&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; .bar = try Bar.init(self.arena.allocator()),&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; };&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;}&lt;/span&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;&amp;nbsp;&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 14px;&quot;&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;In that case the deinit method can be omitted for the inner structure.&lt;/span&gt;&lt;br&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 14px;&quot;&gt;&lt;br style=&quot;font-size: 14px;&quot;&gt;&lt;b style=&quot;font-size: 14px;&quot;&gt;4. Nested structures shared lifetime with parent&lt;br style=&quot;font-size: 14px;&quot;&gt;&lt;/b&gt;&lt;pre style=&quot;font-size: 14px;&quot;&gt;&lt;p style=&quot;font-size: 14px;&quot;&gt;&lt;font face=&quot;Helvetica&quot; style=&quot;font-size: 14px;&quot;&gt;&lt;span style=&quot;white-space: normal; font-size: 14px;&quot;&gt;If the inner structure strictly belong to the parent and their lifecycles are equal&amp;nbsp;&lt;/span&gt;&lt;/font&gt;&lt;span style=&quot;font-family: Helvetica; white-space: normal; background-color: initial; font-size: 14px;&quot;&gt;(as a Dungeon belong to the Level for example)&lt;/span&gt;&lt;span style=&quot;white-space: normal; font-family: Helvetica; background-color: initial; font-size: 14px;&quot;&gt;, it reasonable to pass a pointer to the arena from the parent to child:&lt;/span&gt;&lt;/p&gt;&lt;p style=&quot;font-size: 14px;&quot;&gt;const Bar = struct {&lt;br style=&quot;font-size: 14px;&quot;&gt;   fn init(arena: *std.heap.ArenaAllocator) !Bar { ... }&lt;br style=&quot;font-size: 14px;&quot;&gt;};&lt;br style=&quot;font-size: 14px;&quot;&gt;const Foo = struct {&amp;nbsp;&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; arena: std.heap.ArenaAllocator,&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; bar: Bar,&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp;&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp;pub fn init(self: *Foo, gpa: std.mem.Allocator) !Foo {&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; errdefer self.arena.deinit(); &amp;nbsp; &amp;nbsp; &amp;nbsp; &lt;br style=&quot;font-size: 14px;&quot;&gt;        return .{&lt;br style=&quot;font-size: 14px;&quot;&gt;            .arena =&amp;nbsp;std.heap.ArenaAllocator.init(gpa)&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; .bar = try Bar.init(&amp;amp;self.arena),&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; };&lt;br style=&quot;font-size: 14px;&quot;&gt;}&lt;span style=&quot;white-space: normal; font-family: Helvetica; background-color: initial; font-size: 14px;&quot;&gt;&lt;br style=&quot;font-size: 14px;&quot;&gt;&lt;/span&gt;&lt;/p&gt;&lt;p style=&quot;font-size: 14px;&quot;&gt;&lt;font face=&quot;Helvetica&quot;&gt;The pointer to an externalArenaAllocator can be a good sign that the structure strictly belong to some other outer structure.&lt;/font&gt;&lt;/p&gt;&lt;p style=&quot;font-size: 14px;&quot;&gt;&lt;span style=&quot;white-space: normal; font-family: Helvetica; background-color: initial; font-size: 14px;&quot;&gt;---&lt;/span&gt;&lt;/p&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;" style="text;html=1;overflow=block;rounded=0;spacing=5;spacingLeft=0;spacingRight=0;fontSize=14;whiteSpace=wrap;" parent="1" vertex="1">
+        <mxCell id="7zvu-Zuf9Dn60HD56mGA-1" value="&lt;br style=&quot;font-size: 14px;&quot;&gt;&lt;h3 style=&quot;font-size: 14px;&quot;&gt;Memory and&amp;nbsp; life time management&lt;/h3&gt;&lt;br style=&quot;font-size: 14px;&quot;&gt;&lt;b style=&quot;font-size: 14px;&quot;&gt;1. Do not make constructor returned pointer&lt;br style=&quot;font-size: 14px;&quot;&gt;&lt;/b&gt;All entities should be structures nested in each other. Only the root object should be allocated on the heap. It means, entities should have only init method that initialises and/or returns a structure. If the structure has a child which needs the reference to that structure, the init method should receive the pointer to the structure. See bellow for more details.&lt;div&gt;&lt;b&gt;&lt;br class=&quot;Apple-interchange-newline&quot;&gt;2. Nested structures&lt;br&gt;&lt;/b&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;If the inner structure need to capture a pointer to its parent,&amp;nbsp;&lt;/span&gt;&amp;nbsp;the init method of that parent structure should receive the pointer to that structure for initialisation:&lt;/div&gt;&lt;div&gt;&lt;pre&gt;const Baz = struct {&lt;br&gt;   foo: *Foo,&lt;br&gt;};&lt;br&gt;const Foo = struct {&amp;nbsp;&lt;br&gt;&amp;nbsp; &amp;nbsp; baz: Baz,&lt;br&gt;    pub fn init(self: *Foo) void {&lt;br&gt;        self.baz = Baz{ .foo = self };&lt;br&gt;    }&lt;br&gt;}&lt;/pre&gt;&lt;br style=&quot;font-size: 14px;&quot;&gt;&lt;b style=&quot;font-size: 14px;&quot;&gt;3. Use incapsulated ArenaAllocator for complicated structures&lt;br style=&quot;font-size: 14px;&quot;&gt;&lt;/b&gt;If the structure contains complicated data structures, use ArenaAllocator to manage the memory.&amp;nbsp; An initial allocator should be an argument of the init method, and should be used to create the arena:&lt;br style=&quot;font-size: 14px;&quot;&gt;&lt;pre style=&quot;font-size: 14px;&quot;&gt;const Foo = struct {&amp;nbsp;&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; arena: std.heap.ArenaAllocator,&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; bar: Bar,&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp;&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp;pub fn init(gpa: std.mem.Allocator) !Foo {&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; var arena =&amp;nbsp;std.heap.ArenaAllocator.init(alloc_gpa);&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; errdefer arena.deinit();&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; const alloc = arena.allocator();&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &lt;br style=&quot;font-size: 14px;&quot;&gt;        return .{&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; .bar = try alloc.allocate(Bar),&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;&amp;nbsp;&lt;br style=&quot;font-size: 14px;&quot;&gt;            // This has to be last so that we copy AFTER the arena allocations&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; // above happen (Zig assigns in order).&lt;br style=&quot;font-size: 14px;&quot;&gt;            // This is safe only if all allocations happened before this assignment:&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; .arena = arena,&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; };&lt;br style=&quot;font-size: 14px;&quot;&gt;}&lt;/pre&gt;&lt;div style=&quot;font-size: 14px;&quot;&gt;Do &lt;b&gt;NOT&lt;/b&gt; pass arena.allocator() as an allocator argument! The memory of the arena is captured here: `arena.allocator()`, and can be violated later when the passed allocator will be used. If the inner structure needs an allocator, and that inner structure should be destroyed at same time as it outer parent or early, the init method of the parent outer structure should take a pointer to self, then `self.arena.allocator()` can be safely passed to children:&lt;/div&gt;&lt;div style=&quot;font-size: 14px;&quot;&gt;&lt;br&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 14px;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;const Bar = struct {&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;   fn init(alloc: std.mem.Allocator) !Bar { ... }&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;};&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;const Foo = struct {&amp;nbsp;&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&amp;nbsp; &amp;nbsp; arena: std.heap.ArenaAllocator,&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&amp;nbsp; &amp;nbsp; bar: Bar,&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&amp;nbsp; &amp;nbsp;&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&amp;nbsp; &amp;nbsp;pub fn init(self: *Foo, gpa: std.mem.Allocator) !void {&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; errdefer self.arena.deinit();&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;        self.* = .{&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;            .arena =&amp;nbsp;std.heap.ArenaAllocator.init(gpa)&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; .bar = try Bar.init(self.arena.allocator()),&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; };&lt;/span&gt;&lt;br style=&quot;font-family: monospace; white-space: pre;&quot;&gt;&lt;span style=&quot;font-family: monospace; white-space: pre;&quot;&gt;}&lt;/span&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;&amp;nbsp;&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 14px;&quot;&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;In that case the deinit method can be omitted for the inner structure.&lt;/span&gt;&lt;br&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 14px;&quot;&gt;&lt;br style=&quot;font-size: 14px;&quot;&gt;&lt;b style=&quot;font-size: 14px;&quot;&gt;4. Nested structures shared lifetime with parent&lt;br style=&quot;font-size: 14px;&quot;&gt;&lt;/b&gt;&lt;pre style=&quot;font-size: 14px;&quot;&gt;&lt;p style=&quot;font-size: 14px;&quot;&gt;&lt;font face=&quot;Helvetica&quot; style=&quot;font-size: 14px;&quot;&gt;&lt;span style=&quot;white-space: normal; font-size: 14px;&quot;&gt;If the inner structure strictly belong to the parent and their lifecycles are equal&amp;nbsp;&lt;/span&gt;&lt;/font&gt;&lt;span style=&quot;font-family: Helvetica; white-space: normal; background-color: initial; font-size: 14px;&quot;&gt;(as a Dungeon belong to the Level for example)&lt;/span&gt;&lt;span style=&quot;white-space: normal; font-family: Helvetica; background-color: initial; font-size: 14px;&quot;&gt;, it reasonable to pass a pointer to the arena from the parent to child:&lt;/span&gt;&lt;/p&gt;&lt;p style=&quot;font-size: 14px;&quot;&gt;const Bar = struct {&lt;br style=&quot;font-size: 14px;&quot;&gt;   fn init(arena: *std.heap.ArenaAllocator) !Bar { ... }&lt;br style=&quot;font-size: 14px;&quot;&gt;};&lt;br style=&quot;font-size: 14px;&quot;&gt;const Foo = struct {&amp;nbsp;&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; arena: std.heap.ArenaAllocator,&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; bar: Bar,&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp;&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp;pub fn init(self: *Foo, gpa: std.mem.Allocator) !Foo {&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; errdefer self.arena.deinit(); &amp;nbsp; &amp;nbsp; &amp;nbsp; &lt;br style=&quot;font-size: 14px;&quot;&gt;        return .{&lt;br style=&quot;font-size: 14px;&quot;&gt;            .arena =&amp;nbsp;std.heap.ArenaAllocator.init(gpa)&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; .bar = try Bar.init(&amp;amp;self.arena),&lt;br style=&quot;font-size: 14px;&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; };&lt;br style=&quot;font-size: 14px;&quot;&gt;}&lt;span style=&quot;white-space: normal; font-family: Helvetica; background-color: initial; font-size: 14px;&quot;&gt;&lt;br style=&quot;font-size: 14px;&quot;&gt;&lt;/span&gt;&lt;/p&gt;&lt;p style=&quot;font-size: 14px;&quot;&gt;&lt;font face=&quot;Helvetica&quot;&gt;The pointer to an externalArenaAllocator can be a good sign that the structure strictly belong to some other outer structure.&lt;/font&gt;&lt;/p&gt;&lt;p style=&quot;font-size: 14px;&quot;&gt;&lt;span style=&quot;white-space: normal; font-family: Helvetica; background-color: initial; font-size: 14px;&quot;&gt;---&lt;/span&gt;&lt;/p&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;" style="text;html=1;overflow=block;rounded=0;spacing=5;spacingLeft=0;spacingRight=0;fontSize=14;whiteSpace=wrap;" vertex="1" parent="1">
           <mxGeometry x="840" width="840" height="1690" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
   </diagram>
   <diagram name="Main components" id="-2OWC2zbBcRplkYAPWdl">
-    <mxGraphModel dx="1242" dy="830" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel grid="1" page="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -107,7 +107,7 @@
         <mxCell id="pd7l8gPbVpFbZsBwoUrC-5" value="Render" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
           <mxGeometry x="350" y="330" width="120" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="pd7l8gPbVpFbZsBwoUrC-8" value="" style="endArrow=diamondThin;endFill=1;endSize=12;html=1;rounded=0;exitX=0.75;exitY=0;exitDx=0;exitDy=0;startArrow=classic;startFill=1;strokeWidth=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;" parent="1" source="pd7l8gPbVpFbZsBwoUrC-2" target="pd7l8gPbVpFbZsBwoUrC-1" edge="1">
+        <mxCell id="pd7l8gPbVpFbZsBwoUrC-8" value="" style="endArrow=diamondThin;endFill=1;endSize=12;html=1;rounded=0;exitX=0.75;exitY=0;exitDx=0;exitDy=0;startArrow=classic;startFill=1;strokeWidth=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;" parent="1" source="pd7l8gPbVpFbZsBwoUrC-2" edge="1" target="pd7l8gPbVpFbZsBwoUrC-1">
           <mxGeometry width="160" relative="1" as="geometry">
             <mxPoint x="411" y="410" as="sourcePoint" />
             <mxPoint x="411" y="290" as="targetPoint" />
@@ -132,7 +132,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="vAHDTozMd6C6kMaGwjEr-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=diamondThin;startFill=1;startSize=12;" parent="1" source="pd7l8gPbVpFbZsBwoUrC-18" target="pd7l8gPbVpFbZsBwoUrC-36" edge="1">
+        <mxCell id="vAHDTozMd6C6kMaGwjEr-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=diamondThin;startFill=1;startSize=12;" edge="1" parent="1" source="pd7l8gPbVpFbZsBwoUrC-18" target="pd7l8gPbVpFbZsBwoUrC-36">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="pd7l8gPbVpFbZsBwoUrC-18" value="PlayMode" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="1" vertex="1">
@@ -184,7 +184,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="owp73ZJN7-YQm8G0uh9_-8" value="implements" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;" vertex="1" connectable="0" parent="owp73ZJN7-YQm8G0uh9_-4">
+        <mxCell id="owp73ZJN7-YQm8G0uh9_-8" value="implements" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;" connectable="0" vertex="1" parent="owp73ZJN7-YQm8G0uh9_-4">
           <mxGeometry x="-0.8049" y="3" relative="1" as="geometry">
             <mxPoint y="-18" as="offset" />
           </mxGeometry>
@@ -208,7 +208,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="owp73ZJN7-YQm8G0uh9_-9" value="&lt;span style=&quot;&quot;&gt;implements&lt;/span&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;" vertex="1" connectable="0" parent="owp73ZJN7-YQm8G0uh9_-5">
+        <mxCell id="owp73ZJN7-YQm8G0uh9_-9" value="&lt;span style=&quot;&quot;&gt;implements&lt;/span&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;" connectable="0" vertex="1" parent="owp73ZJN7-YQm8G0uh9_-5">
           <mxGeometry x="-0.763" relative="1" as="geometry">
             <mxPoint y="-15" as="offset" />
           </mxGeometry>
@@ -1154,79 +1154,85 @@
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="n1Z1mIffaEkhDIQYPr0y-13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;startArrow=diamondThin;startFill=1;startSize=12;" edge="1" parent="1" source="n1Z1mIffaEkhDIQYPr0y-2" target="n1Z1mIffaEkhDIQYPr0y-3">
+        <mxCell id="ou_eVfsO8Yb9YzmfedNn-6" value="level.arena" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry width="820" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="n1Z1mIffaEkhDIQYPr0y-13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;startArrow=diamondThin;startFill=1;startSize=12;" parent="1" source="n1Z1mIffaEkhDIQYPr0y-2" target="n1Z1mIffaEkhDIQYPr0y-3" edge="1">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="590" y="290" />
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="n1Z1mIffaEkhDIQYPr0y-16" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;startArrow=diamondThin;startFill=1;startSize=12;" edge="1" parent="1" source="n1Z1mIffaEkhDIQYPr0y-2" target="n1Z1mIffaEkhDIQYPr0y-4">
+        <mxCell id="n1Z1mIffaEkhDIQYPr0y-16" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;startArrow=diamondThin;startFill=1;startSize=12;" parent="1" source="n1Z1mIffaEkhDIQYPr0y-2" target="n1Z1mIffaEkhDIQYPr0y-4" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="n1Z1mIffaEkhDIQYPr0y-2" value="Level" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+        <mxCell id="n1Z1mIffaEkhDIQYPr0y-2" value="Level" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;" parent="1" vertex="1">
           <mxGeometry x="170" y="260" width="120" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="SYh21IR2CsC6Fc0l9mOT-12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.25;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="n1Z1mIffaEkhDIQYPr0y-3" target="SYh21IR2CsC6Fc0l9mOT-2">
+        <mxCell id="SYh21IR2CsC6Fc0l9mOT-12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.25;exitY=0;exitDx=0;exitDy=0;dashed=1;" parent="1" source="n1Z1mIffaEkhDIQYPr0y-3" target="ou_eVfsO8Yb9YzmfedNn-3" edge="1">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="560" y="100" />
-              <mxPoint x="399" y="100" />
+              <mxPoint x="420" y="100" />
             </Array>
+            <mxPoint x="399" y="70" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="nAFppx22rd0CC_RT0n_Q-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.75;exitY=0;exitDx=0;exitDy=0;dashed=1;" edge="1" parent="1" source="n1Z1mIffaEkhDIQYPr0y-3" target="nAFppx22rd0CC_RT0n_Q-3">
-          <mxGeometry relative="1" as="geometry" />
+        <mxCell id="nAFppx22rd0CC_RT0n_Q-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;dashed=1;" parent="1" source="n1Z1mIffaEkhDIQYPr0y-3" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="740" y="70" as="targetPoint" />
+          </mxGeometry>
         </mxCell>
-        <mxCell id="n1Z1mIffaEkhDIQYPr0y-3" value="Dungeon" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+        <mxCell id="n1Z1mIffaEkhDIQYPr0y-3" value="Dungeon" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
           <mxGeometry x="530" y="150" width="120" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="n1Z1mIffaEkhDIQYPr0y-14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.75;exitY=0;exitDx=0;exitDy=0;entryX=0.75;entryY=1;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="n1Z1mIffaEkhDIQYPr0y-4" target="n1Z1mIffaEkhDIQYPr0y-2">
+        <mxCell id="n1Z1mIffaEkhDIQYPr0y-14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.75;exitY=0;exitDx=0;exitDy=0;entryX=0.75;entryY=1;entryDx=0;entryDy=0;dashed=1;" parent="1" source="n1Z1mIffaEkhDIQYPr0y-4" target="n1Z1mIffaEkhDIQYPr0y-2" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="n1Z1mIffaEkhDIQYPr0y-15" value="read only" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="n1Z1mIffaEkhDIQYPr0y-14">
+        <mxCell id="n1Z1mIffaEkhDIQYPr0y-15" value="read only" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;" parent="n1Z1mIffaEkhDIQYPr0y-14" vertex="1" connectable="0">
           <mxGeometry x="-0.0667" y="4" relative="1" as="geometry">
             <mxPoint y="3" as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="g-8Y1XaLcSOugTjwy_zE-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n1Z1mIffaEkhDIQYPr0y-4" target="SYh21IR2CsC6Fc0l9mOT-1">
+        <mxCell id="g-8Y1XaLcSOugTjwy_zE-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="n1Z1mIffaEkhDIQYPr0y-4" target="SYh21IR2CsC6Fc0l9mOT-1" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="n1Z1mIffaEkhDIQYPr0y-4" value="VisibilityStrategy" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+        <mxCell id="n1Z1mIffaEkhDIQYPr0y-4" value="VisibilityStrategy" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
           <mxGeometry x="170" y="370" width="120" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="n1Z1mIffaEkhDIQYPr0y-5" value="DungeonGenerator" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+        <mxCell id="n1Z1mIffaEkhDIQYPr0y-5" value="DungeonGenerator" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;dashed=1;" parent="1" vertex="1">
           <mxGeometry x="350" y="150" width="120" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="n1Z1mIffaEkhDIQYPr0y-9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n1Z1mIffaEkhDIQYPr0y-6" target="n1Z1mIffaEkhDIQYPr0y-2">
+        <mxCell id="n1Z1mIffaEkhDIQYPr0y-9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="n1Z1mIffaEkhDIQYPr0y-6" target="n1Z1mIffaEkhDIQYPr0y-2" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="n1Z1mIffaEkhDIQYPr0y-10" value="generate" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="n1Z1mIffaEkhDIQYPr0y-9">
+        <mxCell id="n1Z1mIffaEkhDIQYPr0y-10" value="generate" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;" parent="n1Z1mIffaEkhDIQYPr0y-9" vertex="1" connectable="0">
           <mxGeometry x="0.1429" y="-1" relative="1" as="geometry">
             <mxPoint as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="n1Z1mIffaEkhDIQYPr0y-11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n1Z1mIffaEkhDIQYPr0y-6" target="n1Z1mIffaEkhDIQYPr0y-5">
+        <mxCell id="n1Z1mIffaEkhDIQYPr0y-11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="n1Z1mIffaEkhDIQYPr0y-6" target="n1Z1mIffaEkhDIQYPr0y-5" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="n1Z1mIffaEkhDIQYPr0y-12" value="use" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="n1Z1mIffaEkhDIQYPr0y-11">
+        <mxCell id="n1Z1mIffaEkhDIQYPr0y-12" value="use" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;" parent="n1Z1mIffaEkhDIQYPr0y-11" vertex="1" connectable="0">
           <mxGeometry x="0.1" y="-1" relative="1" as="geometry">
             <mxPoint x="-3" y="-11" as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="n1Z1mIffaEkhDIQYPr0y-6" value="Levels" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+        <mxCell id="n1Z1mIffaEkhDIQYPr0y-6" value="Levels" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
           <mxGeometry x="170" y="150" width="120" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="SYh21IR2CsC6Fc0l9mOT-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=block;endFill=0;endSize=12;exitX=0.75;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="SYh21IR2CsC6Fc0l9mOT-2" target="n1Z1mIffaEkhDIQYPr0y-3">
+        <mxCell id="SYh21IR2CsC6Fc0l9mOT-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=block;endFill=0;endSize=12;" parent="1" source="ou_eVfsO8Yb9YzmfedNn-3" target="n1Z1mIffaEkhDIQYPr0y-3" edge="1">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="500" y="70" as="sourcePoint" />
+            <mxPoint x="429" y="70" as="sourcePoint" />
             <Array as="points">
-              <mxPoint x="429" y="90" />
+              <mxPoint x="450" y="90" />
               <mxPoint x="590" y="90" />
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="SYh21IR2CsC6Fc0l9mOT-5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;endArrow=block;endFill=0;endSize=12;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="SYh21IR2CsC6Fc0l9mOT-3" target="n1Z1mIffaEkhDIQYPr0y-5">
+        <mxCell id="SYh21IR2CsC6Fc0l9mOT-5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;endArrow=block;endFill=0;endSize=12;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" parent="1" source="SYh21IR2CsC6Fc0l9mOT-3" target="n1Z1mIffaEkhDIQYPr0y-5" edge="1">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="209" y="120" />
@@ -1234,40 +1240,38 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="SYh21IR2CsC6Fc0l9mOT-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="SYh21IR2CsC6Fc0l9mOT-3" target="SYh21IR2CsC6Fc0l9mOT-2">
-          <mxGeometry relative="1" as="geometry" />
+        <mxCell id="SYh21IR2CsC6Fc0l9mOT-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" parent="1" source="SYh21IR2CsC6Fc0l9mOT-3" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="339" y="40" as="targetPoint" />
+          </mxGeometry>
         </mxCell>
-        <mxCell id="SYh21IR2CsC6Fc0l9mOT-7" value="generate" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="SYh21IR2CsC6Fc0l9mOT-6">
+        <mxCell id="SYh21IR2CsC6Fc0l9mOT-7" value="generate" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;" parent="SYh21IR2CsC6Fc0l9mOT-6" vertex="1" connectable="0">
           <mxGeometry x="0.1429" y="2" relative="1" as="geometry">
             <mxPoint x="-10" y="-8" as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="SYh21IR2CsC6Fc0l9mOT-3" value="CatacombGenerator" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+        <mxCell id="SYh21IR2CsC6Fc0l9mOT-3" value="CatacombGenerator" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
           <mxGeometry x="149" y="10" width="120" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="SYh21IR2CsC6Fc0l9mOT-11" value="" style="group;fillColor=#fff2cc;strokeColor=#d6b656;rounded=0;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontColor=default;" vertex="1" connectable="0" parent="1">
-          <mxGeometry x="339" y="10" width="120" height="60" as="geometry" />
-        </mxCell>
-        <mxCell id="SYh21IR2CsC6Fc0l9mOT-2" value="Catacomb" style="rounded=0;whiteSpace=wrap;html=1;strokeColor=#d6b656;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontColor=default;fillColor=#fff2cc;" vertex="1" parent="SYh21IR2CsC6Fc0l9mOT-11">
-          <mxGeometry width="120" height="60" as="geometry" />
-        </mxCell>
-        <mxCell id="SYh21IR2CsC6Fc0l9mOT-13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;startArrow=diamondThin;startFill=1;startSize=12;" edge="1" parent="1" source="n1Z1mIffaEkhDIQYPr0y-2" target="SYh21IR2CsC6Fc0l9mOT-1">
+        <mxCell id="SYh21IR2CsC6Fc0l9mOT-13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;startArrow=diamondThin;startFill=1;startSize=12;" parent="1" source="n1Z1mIffaEkhDIQYPr0y-2" target="SYh21IR2CsC6Fc0l9mOT-1" edge="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="635" y="320" as="sourcePoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="SYh21IR2CsC6Fc0l9mOT-1" value="LevelMap" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+        <mxCell id="SYh21IR2CsC6Fc0l9mOT-1" value="LevelMap" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
           <mxGeometry x="10" y="370" width="120" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="nAFppx22rd0CC_RT0n_Q-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="nAFppx22rd0CC_RT0n_Q-1" target="nAFppx22rd0CC_RT0n_Q-3">
-          <mxGeometry relative="1" as="geometry" />
+        <mxCell id="nAFppx22rd0CC_RT0n_Q-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="nAFppx22rd0CC_RT0n_Q-1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="680" y="40" as="targetPoint" />
+          </mxGeometry>
         </mxCell>
-        <mxCell id="nAFppx22rd0CC_RT0n_Q-5" value="generate" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="nAFppx22rd0CC_RT0n_Q-4">
+        <mxCell id="nAFppx22rd0CC_RT0n_Q-5" value="generate" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;" parent="nAFppx22rd0CC_RT0n_Q-4" vertex="1" connectable="0">
           <mxGeometry x="0.0571" y="-1" relative="1" as="geometry">
             <mxPoint x="-7" y="-11" as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="nAFppx22rd0CC_RT0n_Q-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;endArrow=block;endFill=0;endSize=12;" edge="1" parent="1" source="nAFppx22rd0CC_RT0n_Q-1" target="n1Z1mIffaEkhDIQYPr0y-5">
+        <mxCell id="nAFppx22rd0CC_RT0n_Q-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;endArrow=block;endFill=0;endSize=12;" parent="1" source="nAFppx22rd0CC_RT0n_Q-1" target="n1Z1mIffaEkhDIQYPr0y-5" edge="1">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="520" y="120" />
@@ -1275,23 +1279,27 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="nAFppx22rd0CC_RT0n_Q-1" value="CavesGenerator" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+        <mxCell id="nAFppx22rd0CC_RT0n_Q-1" value="CavesGenerator" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="1" vertex="1">
           <mxGeometry x="490" y="10" width="120" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="nAFppx22rd0CC_RT0n_Q-2" value="" style="group;fillColor=#ffe6cc;strokeColor=#d79b00;rounded=0;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontColor=default;" vertex="1" connectable="0" parent="1">
-          <mxGeometry x="680" y="10" width="120" height="60" as="geometry" />
-        </mxCell>
-        <mxCell id="nAFppx22rd0CC_RT0n_Q-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;endArrow=block;endFill=0;endSize=12;strokeColor=#000000;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontColor=default;fillColor=#ffe6cc;" edge="1" parent="nAFppx22rd0CC_RT0n_Q-2" source="nAFppx22rd0CC_RT0n_Q-3">
+        <mxCell id="nAFppx22rd0CC_RT0n_Q-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;endArrow=block;endFill=0;endSize=12;strokeColor=#000000;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontColor=default;fillColor=#ffe6cc;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" parent="1" edge="1" target="n1Z1mIffaEkhDIQYPr0y-3">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="-90" y="140" as="targetPoint" />
+            <mxPoint x="590" y="150" as="targetPoint" />
             <Array as="points">
-              <mxPoint x="30" y="80" />
-              <mxPoint x="-89" y="80" />
+              <mxPoint x="710" y="90" />
+              <mxPoint x="620" y="90" />
             </Array>
+            <mxPoint x="710" y="70" as="sourcePoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="nAFppx22rd0CC_RT0n_Q-3" value="Cave" style="rounded=0;whiteSpace=wrap;html=1;strokeColor=#d79b00;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontColor=default;fillColor=#ffe6cc;" vertex="1" parent="nAFppx22rd0CC_RT0n_Q-2">
-          <mxGeometry width="120" height="60" as="geometry" />
+        <mxCell id="ou_eVfsO8Yb9YzmfedNn-4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="ou_eVfsO8Yb9YzmfedNn-3" target="n1Z1mIffaEkhDIQYPr0y-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ou_eVfsO8Yb9YzmfedNn-3" value="Catacomb" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="340" y="10" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ou_eVfsO8Yb9YzmfedNn-5" value="Cave" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="680" y="10" width="120" height="60" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>

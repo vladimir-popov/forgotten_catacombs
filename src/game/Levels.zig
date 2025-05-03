@@ -19,7 +19,7 @@ pub fn firstLevel(
 ) !void {
     level.arena = std.heap.ArenaAllocator.init(alloc);
     log.debug("Begin creation of the first level. Is first visit? {any}", .{first_visit});
-    const dungeon = (try d.FirstLocation.create(&level.arena)).dungeon();
+    const dungeon = try d.FirstLocation.generateDungeon(&level.arena);
     log.debug("The dungeon has been created successfully", .{});
     try initWithDungeon(
         level,
