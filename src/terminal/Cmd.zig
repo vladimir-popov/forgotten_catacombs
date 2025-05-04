@@ -16,6 +16,7 @@ pub fn Cmd(comptime cols: u8) type {
         /// The position of the cursor in the **buffer**.
         /// 0 means the position of the prompt ':'.
         /// The command line should be hidden if this index is 0.
+        /// The symbol under cursor should be inverted.
         cursor_idx: usize = 0,
         /// The list of available cheats in string form
         suggestions: [g.Cheat.count + 1][]const u8 = .{""} ++ g.Cheat.allAsStrings(),
@@ -40,6 +41,7 @@ pub fn Cmd(comptime cols: u8) type {
             for (self.cursor_idx..self.buffer.cols) |col| {
                 self.buffer.setSymbol(' ', 0, col, .normal);
             }
+            self.buffer.setSymbol(' ', 0, self.cursor_idx, .inverted);
         }
 
         pub fn readCheat(self: *Self) !?g.Cheat {
@@ -54,7 +56,7 @@ pub fn Cmd(comptime cols: u8) type {
                         .BACKSPACE => if (self.cursor_idx > 0) {
                             self.cursor_idx -= 1;
                             self.suggestion_idx = 0;
-                            self.buffer.setSymbol(' ', 0, self.cursor_idx, .normal);
+                            self.buffer.setSymbol(' ', 0, self.cursor_idx, .inverted);
                         },
                         .TAB => {
                             if (self.suggestion_idx < self.suggestions.len - 1)
@@ -88,6 +90,8 @@ pub fn Cmd(comptime cols: u8) type {
                                     self.buffer.lines[0][self.cursor_idx].mode = .normal;
                                     self.cursor_idx += 1;
                                 }
+                                self.buffer.setSymbol(' ', 0, self.cursor_idx, .normal);
+                                self.cursor_idx += 1;
                                 self.buffer.setSymbol(' ', 0, self.cursor_idx, .inverted);
                                 return null;
                             } else {
@@ -101,6 +105,8 @@ pub fn Cmd(comptime cols: u8) type {
                     .char => |ch| if (self.cursor_idx < self.buffer.cols - 1) {
                         self.buffer.setSymbol(ch.char, 0, self.cursor_idx, .normal);
                         self.cursor_idx += 1;
+                        if (self.cursor_idx < self.buffer.cols - 1)
+                            self.buffer.setSymbol(' ', 0, self.cursor_idx, .inverted);
                     },
                     else => {},
                 }

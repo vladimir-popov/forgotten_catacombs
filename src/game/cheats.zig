@@ -20,11 +20,7 @@ pub const Cheat = union(enum) {
     pub fn init(tag: Tag, args: []const u8) ?Cheat {
         switch (tag) {
             .goto => {
-                var itr = std.mem.splitScalar(
-                    u8,
-                    std.mem.trim(u8, args, " "),
-                    ' ',
-                );
+                var itr = std.mem.tokenizeScalar(u8, args, ' ');
                 if (itr.next()) |a_str|
                     if (tryParse(u8, a_str)) |a|
                         if (itr.next()) |b_str|
@@ -36,11 +32,7 @@ pub const Cheat = union(enum) {
                 return .{ .set_health = hp };
             },
             .hit => {
-                var itr = std.mem.splitScalar(
-                    u8,
-                    std.mem.trim(u8, args, " "),
-                    ' ',
-                );
+                var itr = std.mem.tokenizeScalar(u8, args, ' ');
                 if (itr.next()) |entity_str| if (tryParse(g.Entity, entity_str)) |target|
                     if (itr.next()) |value_str| if (tryParse(u8, value_str)) |damage| {
                         return .{
@@ -60,12 +52,8 @@ pub const Cheat = union(enum) {
         return null;
     }
 
-    fn tryParse(comptime U: type, str: []const u8) ?U {
-        return std.fmt.parseInt(
-            U,
-            std.mem.trim(u8, str, " "),
-            10,
-        ) catch null;
+    inline fn tryParse(comptime U: type, str: []const u8) ?U {
+        return std.fmt.parseInt(U, str, 10) catch null;
     }
 
     pub inline fn allAsStrings() [count][]const u8 {
