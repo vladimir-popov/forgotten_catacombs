@@ -145,8 +145,8 @@ pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_spe
             if (self.level.components.getForEntity(actor, c.Position)) |position|
                 return doMove(self, actor, position, move.target, actor_speed);
         },
-        .hit => |hit| {
-            return doHit(self, actor, hit.by_weapon, actor_speed, hit.target, hit.target_health);
+        .hit => |hit| if (self.level.components.getForEntity(hit.target, c.Health)) |health| {
+            return doHit(self, actor, hit.by_weapon, actor_speed, hit.target, health);
         },
         .open => |door| {
             try self.level.components.setComponentsToEntity(door, g.entities.OpenedDoor);
@@ -218,9 +218,9 @@ fn checkCollision(self: *GameSession, actor: g.Entity, place: p.Point) ?g.Action
             .landscape => return .do_nothing,
             .door => |door| return .{ .open = door },
             .entity => |entity| {
-                if (self.level.components.getForEntity(entity, c.Health)) |health|
+                if (self.level.components.getForEntity(entity, c.Health)) |_|
                     if (self.level.components.getForEntity(actor, c.Weapon)) |weapon|
-                        return .{ .hit = .{ .target = entity, .target_health = health, .by_weapon = weapon } };
+                        return .{ .hit = .{ .target = entity, .by_weapon = weapon.* } };
             },
         }
     }
@@ -230,7 +230,7 @@ fn checkCollision(self: *GameSession, actor: g.Entity, place: p.Point) ?g.Action
 fn doHit(
     self: *GameSession,
     actor: g.Entity,
-    actor_weapon: *const c.Weapon,
+    actor_weapon: c.Weapon,
     actor_speed: g.MovePoints,
     enemy: g.Entity,
     enemy_health: *c.Health,

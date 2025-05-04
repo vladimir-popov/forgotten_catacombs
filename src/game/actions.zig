@@ -18,8 +18,7 @@ pub const Action = union(enum) {
     };
     pub const Hit = struct {
         target: g.Entity,
-        target_health: *c.Health,
-        by_weapon: *c.Weapon,
+        by_weapon: c.Weapon,
     };
     /// Do nothing, as example, when trying to move to the wall
     do_nothing,

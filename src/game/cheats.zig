@@ -15,6 +15,7 @@ pub const Cheat = union(enum) {
     // Moves the player to the point on the screen
     goto: p.Point,
     set_health: u8,
+    hit: g.Action.Hit,
 
     pub fn init(tag: Tag, args: []const u8) ?Cheat {
         switch (tag) {
@@ -25,14 +26,30 @@ pub const Cheat = union(enum) {
                     ' ',
                 );
                 if (itr.next()) |a_str|
-                    if (tryParseU8(a_str)) |a|
+                    if (tryParse(u8, a_str)) |a|
                         if (itr.next()) |b_str|
-                            if (tryParseU8(b_str)) |b| {
+                            if (tryParse(u8, b_str)) |b| {
                                 return .{ .goto = p.Point.init(a, b) };
                             };
             },
-            .set_health => if (tryParseU8(args)) |hp| {
+            .set_health => if (tryParse(u8, args)) |hp| {
                 return .{ .set_health = hp };
+            },
+            .hit => {
+                var itr = std.mem.splitScalar(
+                    u8,
+                    std.mem.trim(u8, args, " "),
+                    ' ',
+                );
+                if (itr.next()) |entity_str| if (tryParse(g.Entity, entity_str)) |target|
+                    if (itr.next()) |value_str| if (tryParse(u8, value_str)) |damage| {
+                        return .{
+                            .hit = .{
+                                .target = target,
+                                .by_weapon = .{ .min_damage = damage, .max_damage = damage },
+                            },
+                        };
+                    };
             },
             .dump_vector_field => return .dump_vector_field,
             .move_player_to_ladder_up => return .move_player_to_ladder_up,
@@ -43,9 +60,9 @@ pub const Cheat = union(enum) {
         return null;
     }
 
-    fn tryParseU8(str: []const u8) ?u8 {
+    fn tryParse(comptime U: type, str: []const u8) ?U {
         return std.fmt.parseInt(
-            u8,
+            U,
             std.mem.trim(u8, str, " "),
             10,
         ) catch null;
@@ -69,6 +86,7 @@ pub const Cheat = union(enum) {
             return switch (self) {
                 .dump_vector_field => "dump vectors",
                 .goto => "goto",
+                .hit => "hit",
                 .move_player_to_ladder_down => "down ladder",
                 .move_player_to_ladder_up => "up ladder",
                 .set_health => "set health",
@@ -114,6 +132,7 @@ pub const Cheat = union(enum) {
                     .col = goto.col + screen_corner.col,
                 });
             },
+            .hit => return .{ .hit = self.hit },
             else => return null,
         }
         return null;

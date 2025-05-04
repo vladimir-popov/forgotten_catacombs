@@ -79,13 +79,11 @@ inline fn actionForAggressiveEnemy(
 ) g.Action {
     if (self.session.level.dijkstra_map.vectors.get(entity_place)) |vector| {
         if (entity_place.near(player_place)) {
-            const health = self.session.level.components.getForEntityUnsafe(self.session.level.player, c.Health);
             const weapon = self.session.level.components.getForEntityUnsafe(entity, c.Weapon);
             return .{
                 .hit = .{
                     .target = self.session.level.player,
-                    .target_health = health,
-                    .by_weapon = weapon,
+                    .by_weapon = weapon.*,
                 },
             };
         } else {

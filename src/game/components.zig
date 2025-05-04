@@ -79,10 +79,14 @@ pub const Speed = struct {
 };
 
 pub const Weapon = struct {
+    min_damage: u8 = 1,
     max_damage: u8,
 
     pub inline fn generateDamage(self: Weapon, rand: std.Random) u8 {
-        return rand.uintLessThan(u8, self.max_damage) + 1;
+        return if (self.max_damage > self.min_damage)
+            rand.uintLessThan(u8, self.max_damage - self.min_damage) + self.min_damage
+        else
+            self.min_damage;
     }
 };
 

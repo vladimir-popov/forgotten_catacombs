@@ -264,9 +264,9 @@ fn calculateQuickActionForTarget(
 
             return .{ .move_to_level = ladder.* };
         }
-        if (self.session.level.components.getForEntity(self.session.level.player, c.Weapon)) |weapon| {
-            if (self.session.level.components.getForEntity(target_entity, c.Health)) |health| {
-                return .{ .hit = .{ .target = target_entity, .target_health = health, .by_weapon = weapon } };
+        if (self.session.level.components.getForEntity(target_entity, c.Health)) |_| {
+            if (self.session.level.components.getForEntity(self.session.level.player, c.Weapon)) |weapon| {
+                return .{ .hit = .{ .target = target_entity, .by_weapon = weapon.* } };
             }
         }
         if (self.session.level.components.getForEntity(target_entity, c.Door)) |door| {
