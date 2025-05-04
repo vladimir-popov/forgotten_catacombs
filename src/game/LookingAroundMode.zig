@@ -58,7 +58,7 @@ fn update(self: *LookingAroundMode) !void {
             }
         }
     }
-    try self.redraw();
+    try self.draw();
     log.debug("LookingAroundMode has been refreshed. Entities on screen:\n{any}", .{self.entities_on_screen});
 }
 
@@ -87,15 +87,6 @@ fn draw(self: *const LookingAroundMode) !void {
         try self.session.render.drawWindow(window);
     } else {
         try self.session.render.drawScene(self.session, self.entityInFocus(), null);
-        try self.drawInfoBar();
-    }
-}
-
-fn redraw(self: *const LookingAroundMode) !void {
-    if (self.window) |*window| {
-        try self.session.render.drawWindow(window);
-    } else {
-        try self.session.render.redrawScene(self.session, self.entityInFocus(), null);
         try self.drawInfoBar();
     }
 }
@@ -203,7 +194,6 @@ pub fn tick(self: *LookingAroundMode) anyerror!void {
                     self.place_in_focus,
                     btn.toDirection().?,
                     self.entities_on_screen,
-                    self.session.viewport.region,
                 );
                 self.focus_idx = 0;
                 try self.draw();
@@ -216,7 +206,6 @@ fn chooseNextEntity(
     current_place: p.Point,
     direction: p.Direction,
     entities_on_screen: EntitiesOnScreen,
-    region: p.Region,
 ) p.Point {
     var nearest_place = current_place;
     var min_distance: f16 = std.math.floatMax(f16);
@@ -224,11 +213,11 @@ fn chooseNextEntity(
     while (itr.next()) |entry| {
         const place = entry.key_ptr.*;
 
-        const d: f16 = distance(current_place, place, direction, region);
-        log.info("Distance to {any} is {d} (entity {any})", .{ place, d, entry.value_ptr.items });
+        const d: f16 = distance(current_place, place, direction);
+        log.debug("Distance to {any} is {d} (entity {any})", .{ place, d, entry.value_ptr.items });
 
         if (d > 0 and d < min_distance) {
-            log.warn("New closest place {any}. min {d}", .{ place, d });
+            log.debug("New closest place {any}. min {d}", .{ place, d });
             min_distance = d;
             nearest_place = place;
         }
@@ -247,15 +236,16 @@ fn chooseNextEntity(
 /// |  |*  |
 /// |  |   |
 ///  ------
-///  All three points should have a distance in right direction.
-inline fn distance(from: p.Point, to: p.Point, direction: p.Direction, region: p.Region) f16 {
-    const subregion: p.Region = switch (direction) {
-        .up => region.splitHorizontally(from.row)[0],
-        .down => region.splitHorizontally(from.row)[1],
-        .left => region.splitVertically(from.col)[0],
-        .right => region.splitVertically(from.col)[1],
+///  Only two points should have a distance in right direction. The point is on the border should
+///  not be count.
+inline fn distance(from: p.Point, to: p.Point, direction: p.Direction) f16 {
+    const in_the_direction = switch (direction) {
+        .up => to.row < from.row,
+        .down => to.row > from.row,
+        .left => to.col < from.col,
+        .right => to.col > from.col,
     };
-    if (subregion.containsPoint(to))
+    if (in_the_direction)
         return from.distanceTo(to)
     else
         return std.math.floatMax(f16);
