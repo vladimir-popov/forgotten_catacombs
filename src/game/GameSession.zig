@@ -100,6 +100,17 @@ pub fn lookAround(self: *GameSession) !void {
     try self.mode.looking_around.init(self.arena.allocator(), self);
 }
 
+pub inline fn tick(self: *GameSession) !void {
+    if (self.is_game_over) return;
+
+    switch (self.mode) {
+        .play => try self.mode.play.tick(),
+        .explore => try self.mode.explore.tick(),
+        .looking_around => try self.mode.looking_around.tick(),
+    }
+    try self.events.notifySubscribers();
+}
+
 pub fn subscriber(self: *GameSession) g.events.Subscriber {
     return .{ .context = self, .onEvent = handleEvent };
 }
@@ -118,15 +129,6 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
             self.is_game_over = true;
         },
     }
-}
-
-pub inline fn tick(self: *GameSession) !void {
-    switch (self.mode) {
-        .play => try self.mode.play.tick(),
-        .explore => try self.mode.explore.tick(),
-        .looking_around => try self.mode.looking_around.tick(),
-    }
-    try self.events.notifySubscribers();
 }
 
 /// Handles intentions to do some actions
@@ -240,11 +242,13 @@ fn doHit(
         try self.events.sendEvent(.{ .player_hit = .{ .target = enemy } });
     }
     if (enemy_health.current <= 0) {
-        log.debug("The entity {d} is died", .{enemy});
+        const is_player = enemy == self.level.player;
+        log.debug("The {s} {d} died", .{if (is_player) "player" else "enemy", enemy});
         try self.level.removeEntity(enemy);
+        self.is_game_over = is_player;
         try self.events.sendEvent(
             g.events.Event{
-                .entity_died = .{ .entity = enemy, .is_player = (enemy == self.level.player) },
+                .entity_died = .{ .entity = enemy, .is_player = is_player },
             },
         );
     }

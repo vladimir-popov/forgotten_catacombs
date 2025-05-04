@@ -148,6 +148,11 @@ fn handleInput(self: *PlayMode) !?g.Action {
             .dump_vector_field => self.session.level.dijkstra_map.dumpToLog(),
             .turn_light_on => g.visibility.turn_light_on = true,
             .turn_light_off => g.visibility.turn_light_on = false,
+            .set_health => |hp| {
+                if (self.session.level.components.getForEntity(self.session.level.player, c.Health)) |health| {
+                    health.current = hp;
+                }
+            },
             else => if (cheat.toAction(self.session)) |action| {
                 return action;
             },

@@ -14,7 +14,7 @@ pub fn Cmd(comptime cols: u8) type {
 
         buffer: DisplayBuffer(1, cols),
         /// The position of the cursor in the **buffer**.
-        /// 0 value of this index means the position of the prompt ':'.
+        /// 0 means the position of the prompt ':'.
         /// The command line should be hidden if this index is 0.
         cursor_idx: usize = 0,
         /// The list of available cheats in string form
@@ -63,23 +63,38 @@ pub fn Cmd(comptime cols: u8) type {
                                 self.suggestion_idx = 0;
                         },
                         .ENTER => {
+                            // read entered part
                             var buf: [cols]u8 = undefined;
                             for (0..self.cursor_idx) |col| {
                                 buf[col] = @truncate(self.buffer.lines[0][col + 1].symbol);
                             }
                             var buf_len = self.cursor_idx - 1;
+                            // read suggested part
                             while (buf_len + 1 < cols and self.buffer.lines[0][buf_len + 1].mode == .inverted) {
                                 buf[buf_len] = @truncate(self.buffer.lines[0][buf_len + 1].symbol);
                                 buf_len += 1;
                             }
-                            const cheat = g.Cheat.parse(buf[0..buf_len]);
-                            log.debug(
-                                "Cheat entered: '{s}'; parsed as: {any}",
-                                .{ buf[0 .. self.cursor_idx - 1], cheat },
-                            );
-                            self.cursor_idx = 0;
-                            self.suggestion_idx = 0;
-                            return cheat;
+                            if (g.Cheat.parse(buf[0..buf_len])) |cheat| {
+                                log.debug(
+                                    "Cheat entered: '{s}'; parsed as: {any}",
+                                    .{ buf[0 .. self.cursor_idx - 1], cheat },
+                                );
+                                self.cursor_idx = 0;
+                                self.suggestion_idx = 0;
+                                return cheat;
+                            } else if (self.buffer.lines[0][self.cursor_idx].mode == .inverted) {
+                                // just apply suggestion and continue entering the args for the cheat
+                                while (self.buffer.lines[0][self.cursor_idx].mode == .inverted) {
+                                    self.buffer.lines[0][self.cursor_idx].mode = .normal;
+                                    self.cursor_idx += 1;
+                                }
+                                self.buffer.setSymbol(' ', 0, self.cursor_idx, .inverted);
+                                return null;
+                            } else {
+                                self.cursor_idx = 0;
+                                self.suggestion_idx = 0;
+                                return null;
+                            }
                         },
                         else => {},
                     },

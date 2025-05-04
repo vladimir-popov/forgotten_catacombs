@@ -345,7 +345,12 @@ pub inline fn drawLeftButton(self: Render, text: []const u8) !void {
 
 pub fn drawPlayerHp(self: Render, health: *const cm.Health) !void {
     var buf = [_]u8{0} ** SIDE_ZONE_LENGTH;
-    const text = try std.fmt.bufPrint(&buf, "HP:{d}", .{health.current});
+    const text = try std.fmt.bufPrint(
+        &buf,
+        "HP:{d:3}",
+        // hack to avoid showing '+'
+        .{if (health.current > 0) @abs(health.current) else health.current},
+    );
     try self.drawZone(0, text, .normal);
 }
 
