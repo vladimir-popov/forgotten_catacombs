@@ -55,8 +55,10 @@ pub fn tick(self: *Game) !void {
             }
         },
         .game => {
-            try self.game_session.tick();
-            if (self.game_session.is_game_over) try self.gameOver();
+            self.game_session.tick() catch |err| switch (err) {
+                error.GameOver => try self.gameOver(),
+                else => return err,
+            };
         },
     }
 }

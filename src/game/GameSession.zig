@@ -47,7 +47,6 @@ events: g.events.EventBus,
 level: g.Level,
 /// The current mode of the game
 mode: Mode,
-is_game_over: bool,
 
 pub fn init(
     self: *GameSession,
@@ -68,7 +67,6 @@ pub fn init(
         .events = g.events.EventBus.init(&self.arena),
         .level = undefined,
         .mode = .{ .play = undefined },
-        .is_game_over = false,
     };
     try g.Levels.firstLevel(&self.level, self.arena.allocator(), g.entities.Player, true);
     self.viewport.region.top_left = .{ .row = 1, .col = 1 };
@@ -101,8 +99,6 @@ pub fn lookAround(self: *GameSession) !void {
 }
 
 pub inline fn tick(self: *GameSession) !void {
-    if (self.is_game_over) return;
-
     switch (self.mode) {
         .play => try self.mode.play.tick(),
         .explore => try self.mode.explore.tick(),
@@ -124,13 +120,6 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
         },
         .entity_moved => |entity_moved| if (entity_moved.entity == self.level.player) {
             try self.level.onPlayerMoved(entity_moved);
-        },
-        .entity_died => |dead| {
-            try self.level.removeEntity(dead.entity);
-            self.is_game_over = dead.is_player;
-            if (self.is_game_over) {
-                log.info("Player is dead. Game over.", .{});
-            }
         },
     }
 }
@@ -248,11 +237,11 @@ fn doHit(
     if (enemy_health.current <= 0) {
         const is_player = enemy == self.level.player;
         log.debug("The {s} {d} died", .{ if (is_player) "player" else "enemy", enemy });
-        try self.events.sendEvent(
-            g.events.Event{
-                .entity_died = .{ .entity = enemy, .is_player = is_player },
-            },
-        );
+        try self.level.removeEntity(enemy);
+        if (is_player) {
+            log.info("Player is dead. Game over.", .{});
+            return error.GameOver;
+        }
     }
     return actor_speed;
 }

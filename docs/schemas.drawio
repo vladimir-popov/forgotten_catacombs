@@ -374,7 +374,7 @@
     </mxGraphModel>
   </diagram>
   <diagram id="PEu5v51dWF8_odGiC0OC" name="Events">
-    <mxGraphModel dx="1242" dy="830" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="1553" dy="1038" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -391,22 +391,10 @@
           <mxGeometry x="730.0041176470588" width="30" height="30" as="geometry" />
         </mxCell>
         <mxCell id="RMLkYq3r2y5AaR51wwYY-34" value="GameSession" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
-          <mxGeometry x="250" y="120" width="240" height="60" as="geometry" />
+          <mxGeometry x="200" y="120" width="240" height="60" as="geometry" />
         </mxCell>
         <mxCell id="RMLkYq3r2y5AaR51wwYY-35" value="Viewport" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
           <mxGeometry x="70" y="470" width="120" height="60" as="geometry" />
-        </mxCell>
-        <mxCell id="RMLkYq3r2y5AaR51wwYY-36" value="GameSession" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
-          <mxGeometry x="535" y="470" width="120" height="60" as="geometry" />
-        </mxCell>
-        <mxCell id="RMLkYq3r2y5AaR51wwYY-37" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;endWidth=10;endSize=3.665;width=6;" parent="1" edge="1">
-          <mxGeometry width="50" height="50" relative="1" as="geometry">
-            <mxPoint x="595" y="350" as="sourcePoint" />
-            <mxPoint x="594.5" y="460" as="targetPoint" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="RMLkYq3r2y5AaR51wwYY-38" value="Entity Died" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
-          <mxGeometry x="565" y="380" width="60" height="50" as="geometry" />
         </mxCell>
         <mxCell id="RMLkYq3r2y5AaR51wwYY-39" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;endWidth=10;endSize=3.665;width=6;" parent="1" edge="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
@@ -426,14 +414,11 @@
         <mxCell id="RMLkYq3r2y5AaR51wwYY-42" value="Entity Moved" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
           <mxGeometry x="280" y="380" width="60" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="RMLkYq3r2y5AaR51wwYY-43" value="Keeps player in viewport" style="shape=callout;whiteSpace=wrap;html=1;perimeter=calloutPerimeter;flipV=1;size=10;position=0.29;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;base=24;" parent="1" vertex="1">
+        <mxCell id="RMLkYq3r2y5AaR51wwYY-43" value="Keeps player inside the viewport" style="shape=callout;whiteSpace=wrap;html=1;perimeter=calloutPerimeter;flipV=1;size=10;position=0.29;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;base=24;" parent="1" vertex="1">
           <mxGeometry x="40" y="540" width="140" height="70" as="geometry" />
         </mxCell>
         <mxCell id="RMLkYq3r2y5AaR51wwYY-44" value="Keeps actual placement with player" style="shape=callout;whiteSpace=wrap;html=1;perimeter=calloutPerimeter;flipV=1;size=10;position=0.71;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;position2=0.93;" parent="1" vertex="1">
           <mxGeometry x="120" y="670" width="140" height="70" as="geometry" />
-        </mxCell>
-        <mxCell id="RMLkYq3r2y5AaR51wwYY-45" value="Marks the GameSession as completed" style="shape=callout;whiteSpace=wrap;html=1;perimeter=calloutPerimeter;flipV=1;size=10;position=0.33;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" parent="1" vertex="1">
-          <mxGeometry x="510" y="540" width="160" height="70" as="geometry" />
         </mxCell>
         <mxCell id="RMLkYq3r2y5AaR51wwYY-46" value="" style="group" parent="1" vertex="1" connectable="0">
           <mxGeometry x="240" y="190" width="60" height="110" as="geometry" />
@@ -445,18 +430,6 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="RMLkYq3r2y5AaR51wwYY-48" value="Entity Moved" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="RMLkYq3r2y5AaR51wwYY-46" vertex="1">
-          <mxGeometry y="30" width="60" height="50" as="geometry" />
-        </mxCell>
-        <mxCell id="RMLkYq3r2y5AaR51wwYY-49" value="" style="group" parent="1" vertex="1" connectable="0">
-          <mxGeometry x="430" y="190" width="60" height="110" as="geometry" />
-        </mxCell>
-        <mxCell id="RMLkYq3r2y5AaR51wwYY-50" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;endWidth=10;endSize=3.665;width=6;" parent="RMLkYq3r2y5AaR51wwYY-49" edge="1">
-          <mxGeometry width="50" height="50" relative="1" as="geometry">
-            <mxPoint x="30" as="sourcePoint" />
-            <mxPoint x="29.5" y="110" as="targetPoint" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="RMLkYq3r2y5AaR51wwYY-51" value="Entity Died" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="RMLkYq3r2y5AaR51wwYY-49" vertex="1">
           <mxGeometry y="30" width="60" height="50" as="geometry" />
         </mxCell>
         <mxCell id="RMLkYq3r2y5AaR51wwYY-52" value="" style="group" parent="1" vertex="1" connectable="0">
@@ -499,6 +472,18 @@
         </mxCell>
         <mxCell id="iLvenzcXXZ-sHmGomyuF-4" value="Update the &#xa;Dijkstra Map" style="shape=callout;whiteSpace=wrap;html=1;perimeter=calloutPerimeter;flipV=1;size=10;position=0.14;fillColor=#f5f5f5;strokeColor=#666666;base=20;position2=0.07;" parent="1" vertex="1">
           <mxGeometry x="440" y="670" width="140" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="o3DMln8Z0Wve9TggOpCn-1" value="Entity Moved" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="270" y="540" width="60" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="o3DMln8Z0Wve9TggOpCn-4" value="" style="group" vertex="1" connectable="0" parent="1">
+          <mxGeometry x="439.99500000000006" y="469.9950000000001" width="182.69499999999994" height="44.99499999999989" as="geometry" />
+        </mxCell>
+        <mxCell id="o3DMln8Z0Wve9TggOpCn-2" value="" style="shape=callout;whiteSpace=wrap;html=1;perimeter=calloutPerimeter;flipV=1;size=15;position=0.47;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;base=10;rotation=-90;" vertex="1" parent="o3DMln8Z0Wve9TggOpCn-4">
+          <mxGeometry x="62.02499999999998" y="-62.02500000000009" width="43.65" height="167.7" as="geometry" />
+        </mxCell>
+        <mxCell id="o3DMln8Z0Wve9TggOpCn-3" value="&lt;span style=&quot;color: rgb(51, 51, 51); font-family: Helvetica; font-size: 12px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: center; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; background-color: rgb(251, 251, 251); text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial; display: inline !important; float: none;&quot;&gt;Keeps player in viewport&lt;/span&gt;" style="text;whiteSpace=wrap;html=1;" vertex="1" parent="o3DMln8Z0Wve9TggOpCn-4">
+          <mxGeometry x="22.694999999999936" y="4.994999999999891" width="160" height="40" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
@@ -751,7 +736,7 @@
     </mxGraphModel>
   </diagram>
   <diagram id="ViG4A132wJBVBo7uBfqU" name="Moving through the levels">
-    <mxGraphModel dx="637" dy="426" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="1656" dy="1107" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />

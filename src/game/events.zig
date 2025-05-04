@@ -20,18 +20,12 @@ pub const EntityMoved = struct {
     }
 };
 
-pub const EntityDied = struct {
-    entity: g.Entity,
-    is_player: bool,
-};
-
 pub const PlayerHit = struct { target: g.Entity };
 
 pub const Event = union(enum) {
     const Tag = @typeInfo(Event).@"union".tag_type.?;
 
     entity_moved: EntityMoved,
-    entity_died: EntityDied,
     player_hit: PlayerHit,
 
     pub fn get(self: Event, comptime tag: Tag) ?std.meta.TagPayload(Event, tag) {
