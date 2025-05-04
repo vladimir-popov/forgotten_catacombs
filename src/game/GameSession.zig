@@ -125,8 +125,12 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
         .entity_moved => |entity_moved| if (entity_moved.entity == self.level.player) {
             try self.level.onPlayerMoved(entity_moved);
         },
-        .entity_died => if (event.entity_died.is_player) {
-            self.is_game_over = true;
+        .entity_died => |dead| {
+            try self.level.removeEntity(dead.entity);
+            self.is_game_over = dead.is_player;
+            if (self.is_game_over) {
+                log.info("Player is dead. Game over.", .{});
+            }
         },
     }
 }
@@ -243,9 +247,7 @@ fn doHit(
     }
     if (enemy_health.current <= 0) {
         const is_player = enemy == self.level.player;
-        log.debug("The {s} {d} died", .{if (is_player) "player" else "enemy", enemy});
-        try self.level.removeEntity(enemy);
-        self.is_game_over = is_player;
+        log.debug("The {s} {d} died", .{ if (is_player) "player" else "enemy", enemy });
         try self.events.sendEvent(
             g.events.Event{
                 .entity_died = .{ .entity = enemy, .is_player = is_player },

@@ -102,6 +102,7 @@ pub fn drawWelcomeScreen(self: Render) !void {
 
 pub fn drawGameOverScreen(self: Render) !void {
     try self.runtime.clearDisplay();
+    self.scene_buffer.reset();
     try self.runtime.drawTextWithAlign(
         g.DISPLAY_COLS,
         "You are dead",
@@ -345,12 +346,11 @@ pub inline fn drawLeftButton(self: Render, text: []const u8) !void {
 
 pub fn drawPlayerHp(self: Render, health: *const cm.Health) !void {
     var buf = [_]u8{0} ** SIDE_ZONE_LENGTH;
-    const text = try std.fmt.bufPrint(
-        &buf,
-        "HP:{d:3}",
+    const text = if (health.current > 0)
         // hack to avoid showing '+'
-        .{if (health.current > 0) @abs(health.current) else health.current},
-    );
+        try std.fmt.bufPrint(&buf, "HP:{d:3}", .{@abs(health.current)})
+    else
+        try std.fmt.bufPrint(&buf, "HP:{d:3}", .{health.current});
     try self.drawZone(0, text, .normal);
 }
 

@@ -7,7 +7,7 @@ const p = g.primitives;
 pub const Player = c.Components{
     .sprite = .{ .codepoint = cp.human, .z_order = 3 },
     .description = .{ .name = "You" },
-    .health = .{ .max = 100, .current = 50 },
+    .health = .{ .max = 100, .current = 100 },
     .weapon = .{ .max_damage = 3 },
     .speed = .{ .move_points = 10 },
     .source_of_light = .{ .radius = 4 },
