@@ -83,14 +83,15 @@ const DungeonsGenerator = struct {
 
     fn generate(self: *DungeonsGenerator, seed: u64) !void {
         log.info("\n====================\nGenerate level with seed {d}\n====================\n", .{seed});
+        const player = g.entities.player(self.alloc);
         switch (self.dungeon_type) {
-            .first => try g.Levels.firstLevel(&self.level, self.alloc, g.entities.Player, true),
+            .first => try g.Levels.firstLevel(&self.level, self.alloc, player, true),
             .cave => try g.Levels.cave(
                 &self.level,
                 self.alloc,
                 seed,
                 0,
-                g.entities.Player,
+                player,
                 .{ .direction = .down, .id = 0, .target_ladder = 1 },
             ),
             else => try g.Levels.catacomb(
@@ -98,7 +99,7 @@ const DungeonsGenerator = struct {
                 self.alloc,
                 seed,
                 0,
-                g.entities.Player,
+                player,
                 .{ .direction = .down, .id = 0, .target_ladder = 1 },
             ),
         }

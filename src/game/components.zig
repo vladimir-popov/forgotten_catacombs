@@ -3,6 +3,7 @@ const g = @import("game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
+// FIXME: change to: `const Position = p.Point`
 pub const Position = struct {
     point: p.Point,
 };
@@ -75,11 +76,43 @@ pub const Health = struct {
 
 pub const Speed = struct {
     /// How many move points are needed for moving on the neighbor position
-    move_points: u8 = 10,
+    move_points: u8,
+
+    pub const default: Speed = .{ .move_points = 10 };
+};
+
+// TODO: Add docs here!
+pub const Inventory = struct {
+    alloc: std.mem.Allocator,
+    items: std.ArrayListUnmanaged(g.Entity),
+
+    pub fn empty(alloc: std.mem.Allocator) Inventory {
+        return .{ .alloc = alloc, .items = .empty };
+    }
+
+    pub fn deinit(self: *Inventory) void {
+        self.items.deinit(self.alloc);
+    }
+
+    pub inline fn put(self: *Inventory, item: g.Entity) !void {
+        try self.items.append(self.alloc, item);
+    }
+
+    pub fn drop(self: *Inventory, idx: usize) !g.Entity {
+        std.debug.assert(self.items.items.len > idx);
+        return self.items.swapRemove(idx);
+    }
+};
+
+pub const Equipment = struct {
+    weapon: ?g.Entity,
+    light: ?g.Entity,
+
+    pub const nothing: Equipment = .{ .weapon = null, .light = null };
 };
 
 pub const Weapon = struct {
-    min_damage: u8 = 1,
+    min_damage: u8,
     max_damage: u8,
 
     pub inline fn generateDamage(self: Weapon, rand: std.Random) u8 {
@@ -91,7 +124,9 @@ pub const Weapon = struct {
 };
 
 pub const Initiative = struct {
-    move_points: g.MovePoints = 0,
+    move_points: g.MovePoints,
+
+    pub const empty: Initiative = .{ .move_points = 0 };
 };
 
 pub const EnemyState = enum {
@@ -108,13 +143,15 @@ pub const Components = struct {
     animation: ?Animation = null,
     description: ?Description = null,
     door: ?Door = null,
-    state: ?EnemyState = null,
+    equipment: ?Equipment = null,
     health: ?Health = null,
     initiative: ?Initiative = null,
+    inventory: ?Inventory = null,
     ladder: ?Ladder = null,
     position: ?Position = null,
     source_of_light: ?SourceOfLight = null,
     speed: ?Speed = null,
     sprite: ?Sprite = null,
+    state: ?EnemyState = null,
     weapon: ?Weapon = null,
 };

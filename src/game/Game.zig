@@ -71,8 +71,9 @@ inline fn welcome(self: *Game) !void {
 
 inline fn newGame(self: *Game) !void {
     std.debug.assert(self.state != .game);
-    _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
+    _ = self.runtime.addMenuItem("Inventory", self, inventoryMenu);
     _ = self.runtime.addMenuItem("Explore lvl", self, exploreMenu);
+    _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
     try self.game_session.init(
         self.gpa,
         self.seed,
@@ -95,6 +96,13 @@ fn goToMainMenu(ptr: ?*anyopaque) callconv(.C) void {
     std.debug.assert(self.state == .game);
     self.game_session.deinit();
     self.welcome() catch @panic("Error when the Game went to the '.welcome' state");
+}
+
+fn inventoryMenu(ptr: ?*anyopaque) callconv(.C) void {
+    if (ptr == null) return;
+    const self: *Game = @ptrCast(@alignCast(ptr.?));
+    std.debug.assert(self.state == .game);
+    self.game_session.inventory() catch @panic("Error on switching to the Inventory mode");
 }
 
 fn exploreMenu(ptr: ?*anyopaque) callconv(.C) void {

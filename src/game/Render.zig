@@ -143,12 +143,12 @@ pub fn drawLevelOnly(self: *Render, viewport: g.Viewport, level: *g.Level) !void
 /// Removes completed animations.
 pub fn redrawScene(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Entity, quick_action: ?g.Action) !void {
     try self.clearDisplay();
-    self.scene_buffer.reset();
     try self.drawScene(session, entity_in_focus, quick_action);
 }
 
 /// Clears both scene and info bar.
 pub inline fn clearDisplay(self: Render) !void {
+    self.scene_buffer.reset();
     try self.runtime.clearDisplay();
 }
 
@@ -340,6 +340,7 @@ fn drawHorizontalBorderLine(self: Render) !void {
     }
 }
 
+/// Draws the label for the B button
 pub inline fn drawLeftButton(self: Render, text: []const u8) !void {
     try self.drawZone(0, text, .inverted);
 }
@@ -358,6 +359,7 @@ pub inline fn hideLeftButton(self: Render) !void {
     try self.cleanZone(0);
 }
 
+/// Draws the label for the A button
 pub inline fn drawRightButton(self: Render, text: []const u8, has_alternatives: bool) !void {
     try self.drawZone(2, text, .inverted);
     if (has_alternatives) {

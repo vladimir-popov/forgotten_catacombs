@@ -3,6 +3,7 @@
 const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
+const cp = g.codepoints;
 const d = g.dungeon;
 const ecs = g.ecs;
 const p = g.primitives;
@@ -31,17 +32,27 @@ pub fn firstLevel(
     log.debug("The level is initialized. Start adding the content.", .{});
 
     // Add wharf
-    _ = try level.addNewEntity(g.entities.wharfEntrance(dungeon.entrance));
+    _ = try level.addNewEntity(.{
+        .description = .{ .name = "Wharf" },
+        .sprite = .{ .codepoint = cp.ladder_up, .z_order = 2 },
+        .position = .{ .point = dungeon.entrance },
+    });
 
     // Add the ladder leads to the bottom dungeons:
     const id = try level.newEntity();
-    try level.components.setComponentsToEntity(
-        id,
-        g.entities.cavesEntrance(id, level.generateNextEntityId(), dungeon.exit),
-    );
+    try level.components.setComponentsToEntity(id, .{
+        .ladder = .{ .direction = .down, .id = id, .target_ladder = level.generateNextEntityId() },
+        .description = .{ .name = "Ladder to caves" },
+        .sprite = .{ .codepoint = cp.ladder_down, .z_order = 2 },
+        .position = .{ .point = dungeon.exit },
+    });
 
     // Place the player on the level
     level.player = try level.addNewEntity(player);
+    if (first_visit) {
+        if (level.components.getForEntity2(level.player, c.Equipment, c.Inventory)) |tuple|
+            try equipPlayer(level, tuple[1], tuple[2]);
+    }
     log.debug("The player entity id is {d}", .{level.player});
     if (first_visit)
         try level.components.setToEntity(level.player, c.Position{ .point = dungeon.entrance })
@@ -49,9 +60,17 @@ pub fn firstLevel(
         try level.components.setToEntity(level.player, c.Position{ .point = dungeon.exit });
 
     // Add the trader
-    _ = try level.addNewEntity(g.entities.trader(d.FirstLocation.trader_place));
+    _ = try level.addNewEntity(.{
+        .position = .{ .point = d.FirstLocation.trader_place },
+        .sprite = .{ .codepoint = cp.human, .z_order = 3 },
+        .description = .{ .name = "Trader" },
+    });
     // Add the scientist
-    _ = try level.addNewEntity(g.entities.scientist(d.FirstLocation.scientist_place));
+    _ = try level.addNewEntity(.{
+        .position = .{ .point = d.FirstLocation.scientist_place },
+        .sprite = .{ .codepoint = cp.human, .z_order = 3 },
+        .description = .{ .name = "Scientist" },
+    });
     // Add the teleport
     _ = try level.addNewEntity(g.entities.teleport(d.FirstLocation.teleport_place));
 
@@ -62,6 +81,15 @@ pub fn firstLevel(
         try level.components.setToEntity(entry.value_ptr.door_id, c.Position{ .point = entry.key_ptr.* });
         log.debug("For the doorway on {any} added closed door with id {d}", .{ entry.key_ptr.*, entry.value_ptr.door_id });
     }
+}
+
+fn equipPlayer(level: *g.Level, equipment: *c.Equipment, inventory: *c.Inventory) !void {
+    const weapon = try level.addNewEntity(g.entities.Club);
+    const light = try level.addNewEntity(g.entities.Torch);
+    equipment.weapon = weapon;
+    equipment.light = light;
+    try inventory.put(weapon);
+    try inventory.put(light);
 }
 
 pub inline fn cave(

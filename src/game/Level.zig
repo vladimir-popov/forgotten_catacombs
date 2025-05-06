@@ -13,10 +13,12 @@ const Level = @This();
 
 arena: std.heap.ArenaAllocator,
 entities: std.ArrayListUnmanaged(g.Entity),
+// FIXME: extract to ECS struct and move to GameSession
 /// The new new entity id
 next_entity: g.Entity,
 /// Collection of the components of the entities
 components: ecs.ComponentsManager(c.Components),
+//---
 dungeon: d.Dungeon,
 player_placement: d.Placement,
 map: g.LevelMap,

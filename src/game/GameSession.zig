@@ -8,6 +8,7 @@ const p = g.primitives;
 const ecs = g.ecs;
 
 const PlayMode = @import("PlayMode.zig");
+const InventoryMode = @import("InventoryMode.zig");
 const ExploreMode = @import("ExploreMode.zig");
 const LookingAroundMode = @import("LookingAroundMode.zig");
 
@@ -17,12 +18,14 @@ const GameSession = @This();
 
 pub const Mode = union(enum) {
     play: PlayMode,
+    inventory: InventoryMode,
     explore: ExploreMode,
     looking_around: LookingAroundMode,
 
-    inline fn deinit(self: Mode) void {
-        switch (self) {
+    inline fn deinit(self: *Mode) void {
+        switch (self.*) {
             .play => self.play.deinit(),
+            .inventory => self.inventory.deinit(),
             .looking_around => self.looking_around.deinit(),
             .explore => {},
         }
@@ -68,7 +71,8 @@ pub fn init(
         .level = undefined,
         .mode = .{ .play = undefined },
     };
-    try g.Levels.firstLevel(&self.level, self.arena.allocator(), g.entities.Player, true);
+    const player = g.entities.player(self.arena.allocator());
+    try g.Levels.firstLevel(&self.level, self.arena.allocator(), player, true);
     self.viewport.region.top_left = .{ .row = 1, .col = 1 };
     try self.events.subscribe(self.viewport.subscriber());
     try self.events.subscribe(self.subscriber());
@@ -84,7 +88,16 @@ pub fn deinit(self: *GameSession) void {
 pub fn play(self: *GameSession, entity_in_focus: ?g.Entity) !void {
     self.mode.deinit();
     self.mode = .{ .play = undefined };
+    try self.render.clearDisplay();
     try self.mode.play.init(self.arena.allocator(), self, entity_in_focus);
+}
+
+pub fn inventory(self: *GameSession) !void {
+    if (self.level.components.getForEntity2(self.level.player, c.Equipment, c.Inventory)) |tuple| {
+        self.mode.deinit();
+        self.mode = .{ .inventory = undefined };
+        try self.mode.inventory.init(self.arena.allocator(), self, tuple[1], tuple[2]);
+    }
 }
 
 pub fn explore(self: *GameSession) !void {
@@ -101,6 +114,7 @@ pub fn lookAround(self: *GameSession) !void {
 pub inline fn tick(self: *GameSession) !void {
     switch (self.mode) {
         .play => try self.mode.play.tick(),
+        .inventory => try self.mode.inventory.tick(),
         .explore => try self.mode.explore.tick(),
         .looking_around => try self.mode.looking_around.tick(),
     }

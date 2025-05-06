@@ -20,7 +20,7 @@ title: [COLS]u8 = [1]u8{0} ** COLS,
 lines: std.ArrayListUnmanaged(Line) = .empty,
 /// How many scrolled lines should be skipped
 scroll: usize = 0,
-/// The index of the selected line
+/// The absolute index of the selected line (includes the lines out of scroll)
 selected_line: ?usize = null,
 tag: u8 = 0,
 
