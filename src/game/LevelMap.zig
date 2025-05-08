@@ -45,7 +45,7 @@ pub fn format(
         try writer.writeByte('\n');
         for (0..self.cols) |c0| {
             if (self.remembered_objects.get(.{ .row = @intCast(r0 + 1), .col = @intCast(c0 + 1) })) |entity|
-                try writer.print("{d}", .{entity})
+                try writer.print("{d}", .{entity.id})
             else if (self.visited_places[r0].isSet(c0))
                 try writer.writeByte('#')
             else

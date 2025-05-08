@@ -22,7 +22,7 @@ pub fn showTheCurrentPlacementInLight(level: *const g.Level, place: p.Point) g.R
     var doorways = level.player_placement.doorways();
     while (doorways.next()) |door_place| {
         if (level.dungeon.doorwayAt(door_place.*)) |doorway| {
-            if (level.components.getForEntity(doorway.door_id, c.Door)) |door| {
+            if (level.session.entities.get(doorway.door_id, c.Door)) |door| {
                 if (door.state == .closed) continue;
                 if (doorway.oppositePlacement(level.player_placement)) |placement| {
                     if (placement.contains(place)) return showInRadiusOfSourceOfLight(level, place);
@@ -64,9 +64,9 @@ pub fn showInRadiusOfSourceOfLight(level: *const g.Level, place: p.Point) g.Rend
 
     var radius: f16 = 2.0;
     // TODO create a getter for the light
-    if (level.components.getForEntity(level.player, c.Equipment)) |equipment| {
+    if (level.session.entities.get(level.session.player, c.Equipment)) |equipment| {
         if (equipment.light) |light| {
-            if (level.components.getForEntity(light, c.SourceOfLight)) |sol|
+            if (level.session.entities.get(light, c.SourceOfLight)) |sol|
                 radius = sol.radius;
         }
     }

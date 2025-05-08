@@ -79,11 +79,11 @@ fn initInventoryWindow(self: *InventoryMode) !void {
     self.window.selected_line = 0;
     for (self.inventory.items.items) |item| {
         const line = try self.window.addOneLine();
-        const name = if (self.session.level.components.getForEntity(item, c.Description)) |desc|
+        const name = if (self.session.entities.get(item, c.Description)) |desc|
             desc.name
         else
             "???";
-        const using = if (self.equipment.weapon == item or self.equipment.light == item)
+        const using = if (item.eql(self.equipment.weapon) or item.eql(self.equipment.light))
             "[x]"
         else if (self.isTool(item)) "[ ]" else "   ";
         _ = try std.fmt.bufPrint(line, fmt_mask, .{ name, using });
@@ -91,26 +91,26 @@ fn initInventoryWindow(self: *InventoryMode) !void {
 }
 
 fn isTool(self: *InventoryMode, item: g.Entity) bool {
-    return (self.session.level.components.getForEntity(item, c.Weapon) != null) or
-        (self.session.level.components.getForEntity(item, c.SourceOfLight) != null);
+    return (self.session.entities.get(item, c.Weapon) != null) or
+        (self.session.entities.get(item, c.SourceOfLight) != null);
 }
 
 fn useItem(self: *InventoryMode, idx: usize) !void {
     std.debug.assert(idx < self.inventory.items.items.len);
     const item = self.inventory.items.items[idx];
-    if (self.equipment.weapon == item) {
+    if (item.eql(self.equipment.weapon)) {
         self.equipment.weapon = null;
         return;
     }
-    if (self.session.level.components.getForEntity(self.session.level.player, c.Weapon)) |_| {
+    if (self.session.entities.get(self.session.player, c.Weapon)) |_| {
         self.equipment.weapon = item;
         return;
     }
-    if (self.equipment.light == item) {
+    if (item.eql(self.equipment.light)) {
         self.equipment.light = null;
         return;
     }
-    if (self.session.level.components.getForEntity(self.session.level.player, c.SourceOfLight)) |_| {
+    if (self.session.entities.get(self.session.player, c.SourceOfLight)) |_| {
         self.equipment.light = item;
         return;
     }

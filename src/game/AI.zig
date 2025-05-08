@@ -19,13 +19,13 @@ pub fn action(
 ) g.Action {
     const player_place = self.session.level.playerPosition().point;
 
-    if (self.session.level.components.getForEntity(entity, c.EnemyState)) |state| {
+    if (self.session.entities.get(entity, c.EnemyState)) |state| {
         const act = switch (state.*) {
             .sleeping => self.actionForSleepingEnemy(entity, entity_place, player_place),
             .walking => self.actionForWalkingEnemy(entity, entity_place, player_place),
             .aggressive => self.actionForAggressiveEnemy(entity, entity_place, player_place),
         };
-        log.debug("The action for the entity {d} in state {s} is {any}", .{ entity, @tagName(state.*), act });
+        log.debug("The action for the entity {d} in state {s} is {any}", .{ entity.id, @tagName(state.*), act });
         return act;
     }
     return .wait;
@@ -67,7 +67,7 @@ inline fn actionForWalkingEnemy(
         }
         return .{ .move = .{ .target = .{ .direction = direction } } };
     }
-    log.err("Entity {d} is stuck at {any}", .{ entity, entity_place });
+    log.err("Entity {d} is stuck at {any}", .{ entity.id, entity_place });
     return .{ .go_sleep = entity };
 }
 
@@ -79,10 +79,10 @@ inline fn actionForAggressiveEnemy(
 ) g.Action {
     if (self.session.level.dijkstra_map.vectors.get(entity_place)) |vector| {
         if (entity_place.near(player_place)) {
-            const weapon = self.session.level.components.getForEntityUnsafe(entity, c.Weapon);
+            const weapon = self.session.entities.getUnsafe(entity, c.Weapon);
             return .{
                 .hit = .{
-                    .target = self.session.level.player,
+                    .target = self.session.player,
                     .by_weapon = weapon.*,
                 },
             };

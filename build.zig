@@ -44,7 +44,7 @@ pub fn build(b: *std.Build) !void {
         });
 
     // ============================================================
-    //                    Modules:
+    //                The main Game Module:
     // ============================================================
 
     const game_module = b.createModule(.{
@@ -53,38 +53,16 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
 
+    // ============================================================
+    //                     Terminal
+    // ============================================================
+
     const terminal_module = b.createModule(.{
         .root_source_file = b.path("src/terminal/main.zig"),
         .target = target,
         .optimize = optimize,
     });
     terminal_module.addImport("game", game_module);
-
-    const dungeon_generator_module = b.createModule(.{
-        .root_source_file = b.path("src/terminal/DungeonsGenerator.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    dungeon_generator_module.addImport("game", game_module);
-
-    const playdate_module = b.createModule(.{
-        .root_source_file = b.path("src/playdate/main.zig"),
-        .target = b.resolveTargetQuery(try std.Target.Query.parse(.{
-            .arch_os_abi = "thumb-freestanding-eabihf",
-            .cpu_features = "cortex_m7+vfp4d16sp",
-        })),
-        .optimize = .ReleaseFast,
-        .pic = true,
-    });
-    playdate_module.addImport("game", game_module);
-
-    // ============================================================
-    //                   Desktop files
-    // ============================================================
-
-    // ------------------------------------------------------------
-    //                  Forgotten Catacomb Game
-    // ------------------------------------------------------------
 
     const terminal_game_exe = b.addExecutable(.{
         .name = target_name,
@@ -100,107 +78,20 @@ pub fn build(b: *std.Build) !void {
     }
     run_game_step.dependOn(&run_game_cmd.step);
 
-    // ------------------------------------------------------------
-    //                   Dungeons generator
-    // ------------------------------------------------------------
-    const dungeons_exe = b.addExecutable(.{
-        .name = "dungeons-generator",
-        .root_module = dungeon_generator_module,
-        .link_libc = true,
-    });
-    b.installArtifact(dungeons_exe);
-
-    // Step to build and run the game in terminal
-    const run_generator_cmd = b.addRunArtifact(dungeons_exe);
-    if (b.args) |args| {
-        run_generator_cmd.addArgs(args);
-    }
-    const run_generator_step = b.step("generate", "Run the dungeons generator in the terminal");
-    run_generator_step.dependOn(&run_generator_cmd.step);
-
     // ============================================================
-    //                Step to run tests
+    //                      Playdate
     // ============================================================
 
-    const test_filter = b.option(
-        []const []const u8,
-        "test-filter",
-        "Skip tests that do not match any filter",
-    ) orelse &[0][]const u8{};
-
-    const test_runner = std.Build.Step.Compile.TestRunner{
-        .path = b.path("src/test_runner.zig"),
-        .mode = .simple,
-    };
-
-    const game_tests = b.addTest(.{
-        .root_module = game_module,
-        .test_runner = test_runner,
-        .filters = test_filter,
+    const playdate_module = b.createModule(.{
+        .root_source_file = b.path("src/playdate/main.zig"),
+        .target = b.resolveTargetQuery(try std.Target.Query.parse(.{
+            .arch_os_abi = "thumb-freestanding-eabihf",
+            .cpu_features = "cortex_m7+vfp4d16sp",
+        })),
+        .optimize = .ReleaseFast,
+        .pic = true,
     });
-    b.installArtifact(game_tests);
-    const run_game_tests = b.addRunArtifact(game_tests);
-
-    const terminal_tests = b.addTest(.{
-        .root_module = terminal_module,
-        .test_runner = test_runner,
-        .filters = test_filter,
-    });
-    b.installArtifact(terminal_tests);
-    const run_terminal_tests = b.addRunArtifact(terminal_tests);
-
-    const generator_tests = b.addTest(.{
-        .root_module = dungeon_generator_module,
-        .test_runner = test_runner,
-        .filters = test_filter,
-    });
-    b.installArtifact(generator_tests);
-    const run_generator_tests = b.addRunArtifact(generator_tests);
-
-    // Similar to creating the run step earlier, this exposes a `test` step to
-    // the `zig build --help` menu, providing a way for the user to request
-    // running the unit tests.
-    const test_step = b.step("test", "Run unit tests");
-    if (b.args) |args| {
-        run_game_tests.addArgs(args);
-        run_terminal_tests.addArgs(args);
-        run_generator_tests.addArgs(args);
-    }
-    // run_terminal_tests.has_side_effects = true;
-    // run_generator_tests.has_side_effects = true;
-
-    test_step.dependOn(&run_game_tests.step);
-    test_step.dependOn(&run_terminal_tests.step);
-    test_step.dependOn(&run_generator_tests.step);
-
-    // ============================================================
-    //                Step to check by zls
-    // ============================================================
-    const check_game = b.addSharedLibrary(.{
-        .name = "check game",
-        .root_module = game_module,
-    });
-    const check_terminal = b.addExecutable(.{
-        .name = "check terminal",
-        .root_module = terminal_module,
-    });
-    const check_generator = b.addExecutable(.{
-        .name = "check generator",
-        .root_module = dungeon_generator_module,
-    });
-    const check_playdate = b.addExecutable(.{
-        .name = "check playdate",
-        .root_module = playdate_module,
-    });
-    const check = b.step("check", "Verify code by zls on save");
-    check.dependOn(&check_game.step);
-    check.dependOn(&check_terminal.step);
-    check.dependOn(&check_generator.step);
-    check.dependOn(&check_playdate.step);
-
-    // ============================================================
-    //                   Playdate files
-    // ============================================================
+    playdate_module.addImport("game", game_module);
 
     const writer = b.addWriteFiles();
     const source_dir = writer.getDirectory();
@@ -234,9 +125,115 @@ pub fn build(b: *std.Build) !void {
     // copy resources:
     try addCopyDirectory(writer, "assets", ".");
 
-    // ------------------------------------------------------------
+    // ============================================================
+    //                   Dungeons generator
+    // ============================================================
+
+    // const dungeon_generator_module = b.createModule(.{
+    //     .root_source_file = b.path("src/terminal/DungeonsGenerator.zig"),
+    //     .target = target,
+    //     .optimize = optimize,
+    // });
+    // dungeon_generator_module.addImport("game", game_module);
+    //
+    // const dungeons_exe = b.addExecutable(.{
+    //     .name = "dungeons-generator",
+    //     .root_module = dungeon_generator_module,
+    //     .link_libc = true,
+    // });
+    // b.installArtifact(dungeons_exe);
+    //
+    // // Step to build and run the game in terminal
+    // const run_generator_cmd = b.addRunArtifact(dungeons_exe);
+    // if (b.args) |args| {
+    //     run_generator_cmd.addArgs(args);
+    // }
+    // const run_generator_step = b.step("generate", "Run the dungeons generator in the terminal");
+    // run_generator_step.dependOn(&run_generator_cmd.step);
+
+    // ============================================================
+    //                Step to run tests
+    // ============================================================
+
+    const test_filter = b.option(
+        []const []const u8,
+        "test-filter",
+        "Skip tests that do not match any filter",
+    ) orelse &[0][]const u8{};
+
+    const test_runner = std.Build.Step.Compile.TestRunner{
+        .path = b.path("src/test_runner.zig"),
+        .mode = .simple,
+    };
+
+    const game_tests = b.addTest(.{
+        .root_module = game_module,
+        .test_runner = test_runner,
+        .filters = test_filter,
+    });
+    b.installArtifact(game_tests);
+    const run_game_tests = b.addRunArtifact(game_tests);
+
+    const terminal_tests = b.addTest(.{
+        .root_module = terminal_module,
+        .test_runner = test_runner,
+        .filters = test_filter,
+    });
+    b.installArtifact(terminal_tests);
+    const run_terminal_tests = b.addRunArtifact(terminal_tests);
+
+    // const generator_tests = b.addTest(.{
+    //     .root_module = dungeon_generator_module,
+    //     .test_runner = test_runner,
+    //     .filters = test_filter,
+    // });
+    // b.installArtifact(generator_tests);
+    // const run_generator_tests = b.addRunArtifact(generator_tests);
+
+    // Similar to creating the run step earlier, this exposes a `test` step to
+    // the `zig build --help` menu, providing a way for the user to request
+    // running the unit tests.
+    const test_step = b.step("test", "Run unit tests");
+    if (b.args) |args| {
+        run_game_tests.addArgs(args);
+        run_terminal_tests.addArgs(args);
+        // run_generator_tests.addArgs(args);
+    }
+    // run_terminal_tests.has_side_effects = true;
+    // run_generator_tests.has_side_effects = true;
+
+    test_step.dependOn(&run_game_tests.step);
+    test_step.dependOn(&run_terminal_tests.step);
+    // test_step.dependOn(&run_generator_tests.step);
+
+    // ============================================================
+    //                Step to check by zls
+    // ============================================================
+    const check_game = b.addSharedLibrary(.{
+        .name = "check game",
+        .root_module = game_module,
+    });
+    const check_terminal = b.addExecutable(.{
+        .name = "check terminal",
+        .root_module = terminal_module,
+    });
+    // const check_generator = b.addExecutable(.{
+    //     .name = "check generator",
+    //     .root_module = dungeon_generator_module,
+    // });
+    const check_playdate = b.addExecutable(.{
+        .name = "check playdate",
+        .root_module = playdate_module,
+    });
+    const check = b.step("check", "Verify code by zls on save");
+    check.dependOn(&check_game.step);
+    check.dependOn(&check_terminal.step);
+    check.dependOn(&check_playdate.step);
+    // check.dependOn(&check_generator.step);
+
+    // ============================================================
     //                Step to run in emulator
-    // ------------------------------------------------------------
+    // ============================================================
     if (!std.process.hasEnvVarConstant(PLAYDATE_SDK_PATH)) {
         std.debug.print("Playdate SDK was not found. The {s} is absent", .{PLAYDATE_SDK_PATH});
         return;

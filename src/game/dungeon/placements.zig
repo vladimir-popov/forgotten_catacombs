@@ -12,7 +12,7 @@ pub const Doorway = struct {
     placement_from: Placement,
     placement_to: Placement,
     // must be set late on level initialization
-    door_id: g.Entity = 0,
+    door_id: g.Entity = undefined,
 
     pub fn format(
         self: Doorway,
@@ -22,7 +22,7 @@ pub const Doorway = struct {
     ) !void {
         try writer.print(
             "Doorway(id: {d}; from {any}; to: {any})",
-            .{ self.door_id, self.placement_from, self.placement_to },
+            .{ self.door_id.id, self.placement_from, self.placement_to },
         );
     }
 

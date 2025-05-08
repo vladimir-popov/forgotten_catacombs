@@ -81,6 +81,7 @@ const DungeonsGenerator = struct {
         try self.render.init(self.alloc, runtime, g.DUNGEON_ROWS, g.DUNGEON_COLS);
     }
 
+    // TODO: Use the Dungeon only here!
     fn generate(self: *DungeonsGenerator, seed: u64) !void {
         log.info("\n====================\nGenerate level with seed {d}\n====================\n", .{seed});
         const player = g.entities.player(self.alloc);

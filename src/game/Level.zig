@@ -12,102 +12,86 @@ const log = std.log.scoped(.level);
 const Level = @This();
 
 arena: std.heap.ArenaAllocator,
-entities: std.ArrayListUnmanaged(g.Entity),
-// FIXME: extract to ECS struct and move to GameSession
-/// The new new entity id
-next_entity: g.Entity,
-/// Collection of the components of the entities
-components: ecs.ComponentsManager(c.Components),
-//---
-dungeon: d.Dungeon,
-player_placement: d.Placement,
-map: g.LevelMap,
-/// Dijkstra Map to the player
-dijkstra_map: g.DijkstraMap,
+session: *g.GameSession,
 /// The depth of the current level. The session_seed + depth is unique seed for the level.
 depth: u8,
-/// The entity id of the player
-player: g.Entity = undefined,
+/// The list of the entities belong to this level.
+// The ArrayList is used instead of HashMap to provide better performance on iterating over items,
+// coz it happens more often than lookup the items inside this list.
+entities: std.ArrayListUnmanaged(g.Entity),
 visibility_strategy: *const fn (level: *const g.Level, place: p.Point) g.Render.Visibility,
+dungeon: d.Dungeon = undefined,
+player_placement: d.Placement = undefined,
+map: g.LevelMap = undefined,
+/// Dijkstra Map to the player
+dijkstra_map: g.DijkstraMap = undefined,
+
+pub fn init(
+    alloc: std.mem.Allocator,
+    session: *g.GameSession,
+    depth: u8,
+    visibility_strategy: *const fn (level: *const g.Level, place: p.Point) g.Render.Visibility,
+) !Level {
+    var arena = std.heap.ArenaAllocator.init(alloc);
+    var entities: std.ArrayListUnmanaged(g.Entity) = .empty;
+    try entities.append(arena.allocator(), session.player);
+    return .{
+        .arena = arena,
+        .session = session,
+        .depth = depth,
+        .entities = entities,
+        .visibility_strategy = visibility_strategy,
+    };
+}
 
 pub fn deinit(self: *Level) void {
     self.arena.deinit();
+}
+
+pub inline fn addEntity(self: *Level, entity: g.Entity) !void {
+    try self.entities.append(self.arena.allocator(), entity);
+}
+
+pub inline fn removeEntity(self: *Level, entity: g.Entity) !void {
+    try self.session.entities.removeEntity(entity);
+    for (0..self.entities.items.len) |idx| {
+        if (entity.eql(self.entities.items[idx])) {
+            _ = self.entities.swapRemove(idx);
+            return;
+        }
+    }
 }
 
 pub inline fn checkVisibility(self: *const g.Level, place: p.Point) g.Render.Visibility {
     return self.visibility_strategy(self, place);
 }
 
-/// Aggregates requests of few components for the same entities at once
-pub fn query(self: *const Level) ecs.ComponentsQuery(c.Components) {
-    return .{ .entities = self.entities, .components_manager = self.components };
+pub inline fn playerPosition(self: *const Level) *c.Position {
+    return self.session.entities.getUnsafe(self.session.player, c.Position);
 }
 
-pub fn playerPosition(self: *const Level) *c.Position {
-    return self.components.getForEntityUnsafe(self.player, c.Position);
+pub inline fn componentsIterator(self: Level) g.ComponentsIterator {
+    return self.session.entities.iterator(self.entities.items);
 }
 
 pub const EntitiesOnPositionIterator = struct {
+    itr: g.ecs.ComponentsIterator(c.Position),
     place: p.Point,
-    positions: *ecs.ArraySet(c.Position),
     next_idx: u8 = 0,
 
     pub fn next(self: *EntitiesOnPositionIterator) ?g.Entity {
-        while (self.next_idx < self.positions.components.items.len) {
-            const idx = self.next_idx;
-            self.next_idx +|= 1;
-            const place = self.positions.components.items[idx].point;
-            if (self.place.eql(place))
-                return self.positions.index_entity.get(idx);
+        while (true) {
+            if (self.itr.next()) |tuple| {
+                if (self.place.eql(tuple[1].point)) return tuple[0];
+            } else {
+                return null;
+            }
         }
-        return null;
     }
 };
 
-pub fn entityAt(self: Level, place: p.Point) EntitiesOnPositionIterator {
-    return .{ .place = place, .positions = self.components.arrayOf(c.Position) };
-}
-
-pub fn addNewEntity(self: *Level, components: c.Components) !g.Entity {
-    const entity = try self.newEntity();
-    try self.components.setComponentsToEntity(entity, components);
-    return entity;
-}
-
-pub fn newEntity(self: *Level) !g.Entity {
-    const entity = self.generateNextEntityId();
-    try self.entities.append(self.arena.allocator(), entity);
-    return entity;
-}
-
-pub fn generateNextEntityId(self: *Level) g.Entity {
-    const entity = self.next_entity;
-    self.next_entity += 1;
-    return entity;
-}
-
-pub fn removeEntity(self: *Level, entity: g.Entity) !void {
-    try self.components.removeAllForEntity(entity);
-    // this is a rare operation, and O(n) here is not as bad, as good the iteration over elements
-    // in the array in all other cases
-    if (std.mem.indexOfScalar(g.Entity, self.entities.items, entity)) |idx|
-        _ = self.entities.swapRemove(idx);
-}
-
-pub fn addLadder(self: *Level, ladder: c.Ladder, place: p.Point) !void {
-    std.debug.assert(ladder.id < self.next_entity);
-    try self.entities.append(self.arena.allocator(), ladder.id);
-    try self.components.setComponentsToEntity(ladder.id, g.entities.ladder(ladder));
-    try self.components.setToEntity(ladder.id, c.Position{ .point = place });
-}
-
-pub fn addEnemy(level: *Level, rand: std.Random, enemy: c.Components) !void {
-    if (level.randomEmptyPlace(rand)) |place| {
-        const id = try level.addNewEntity(enemy);
-        try level.components.setToEntity(id, c.Position{ .point = place });
-        const state: c.EnemyState = if (rand.uintLessThan(u8, 5) == 0) .sleeping else .walking;
-        try level.components.setToEntity(id, state);
-    }
+pub fn entitiesAt(self: Level, place: p.Point) EntitiesOnPositionIterator {
+    return .{ .place = place, .entities = self.componentsIterator().of(c.Position) };
 }
 
 pub fn randomEmptyPlace(self: Level, rand: std.Random) ?p.Point {
@@ -145,10 +129,10 @@ pub fn obstacleAt(
         else => |cell| return .{ .landscape = cell },
     }
 
-    var itr = self.query().get(c.Position);
+    var itr = self.componentsIterator().of(c.Position);
     while (itr.next()) |tuple| {
         if (tuple[1].point.eql(place)) {
-            if (self.components.getForEntity(tuple[0], c.Door)) |door| {
+            if (self.session.entities.get(tuple[0], c.Door)) |door| {
                 return if (door.state == .closed) .{ .door = tuple[0] } else null;
             } else {
                 return .{ .entity = tuple[0] };

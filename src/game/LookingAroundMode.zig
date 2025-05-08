@@ -39,7 +39,7 @@ pub fn deinit(self: LookingAroundMode) void {
 fn update(self: *LookingAroundMode) !void {
     const alloc = self.arena.allocator();
     self.entities_on_screen.clearRetainingCapacity();
-    var itr = self.session.level.query().get(c.Position);
+    var itr = self.session.level.componentsIterator().of(c.Position);
     while (itr.next()) |tuple| {
         const is_inside_viewport = self.session.viewport.region.containsPoint(tuple[1].point);
         // we should follow the same logic as the render:
@@ -52,7 +52,7 @@ fn update(self: *LookingAroundMode) !void {
                 gop.value_ptr.* = std.ArrayListUnmanaged(g.Entity){};
             }
             try gop.value_ptr.append(alloc, tuple[0]);
-            if (tuple[0] == self.session.level.player) {
+            if (tuple[0].eql(self.session.player)) {
                 self.place_in_focus = tuple[1].point;
                 self.focus_idx = gop.value_ptr.items.len - 1;
             }
@@ -106,10 +106,11 @@ fn drawInfoBar(self: *const LookingAroundMode) !void {
     }
     // Draw the name or health of the entity in focus
     if (self.entityInFocus()) |entity| {
-        if (entity != self.session.level.player) {
-            if (self.session.level.components.getForEntity3(entity, c.Sprite, c.Health, c.Position)) |tuple| {
-                if (tuple[3].point.eql(self.session.level.playerPosition().point)) {
-                    try self.session.render.drawEnemyHealth(tuple[1].codepoint, tuple[2]);
+        if (entity.eql(self.session.player)) {
+            if (self.session.entities.get3(entity, c.Sprite, c.Health, c.Position)) |tuple| {
+                const sprite, const health, const position = tuple;
+                if (position.point.eql(self.session.level.playerPosition().point)) {
+                    try self.session.render.drawEnemyHealth(sprite.codepoint, health);
                 } else {
                     var buf: [g.DISPLAY_COLS]u8 = undefined;
                     const len = @min(try self.statusLine(entity, &buf), g.Render.MIDDLE_ZONE_LENGTH);
@@ -118,7 +119,7 @@ fn drawInfoBar(self: *const LookingAroundMode) !void {
                 return;
             }
         }
-        const name = if (self.session.level.components.getForEntity(entity, c.Description)) |desc|
+        const name = if (self.session.entities.get(entity, c.Description)) |desc|
             desc.name
         else
             "?";
@@ -131,12 +132,12 @@ fn drawInfoBar(self: *const LookingAroundMode) !void {
 fn statusLine(self: LookingAroundMode, entity: g.Entity, line: []u8) !usize {
     var len: usize = 0;
     if (true) {
-        len += (try std.fmt.bufPrint(line[len..], "{d}:", .{entity})).len;
+        len += (try std.fmt.bufPrint(line[len..], "{d}:", .{entity.id})).len;
     }
-    if (self.session.level.components.getForEntity(entity, c.Description)) |description| {
+    if (self.session.entities.get(entity, c.Description)) |description| {
         len += (try std.fmt.bufPrint(line[len..], "{s}", .{description.name})).len;
 
-        if (self.session.level.components.getForEntity(entity, c.EnemyState)) |state| {
+        if (self.session.entities.get(entity, c.EnemyState)) |state| {
             len += (try std.fmt.bufPrint(line[len..], "({s})", .{@tagName(state.*)})).len;
         }
     }
@@ -265,7 +266,7 @@ fn initWindowWithVariants(
     self.window.?.tag = @intFromEnum(WindowType.variants);
     for (variants, 0..) |entity, idx| {
         // Every entity has to have description, or handling indexes become complicated
-        const description = self.session.level.components.getForEntityUnsafe(entity, c.Description);
+        const description = self.session.entities.getUnsafe(entity, c.Description);
         const line = try self.window.?.addOneLine();
         const pad = @divTrunc(g.Window.MAX_WINDOW_WIDTH - description.name.len, 2);
         std.mem.copyForwards(u8, line[pad..], description.name);
@@ -281,21 +282,21 @@ fn initWindowWithDescription(
     self.window = g.Window.init(self.arena.allocator());
     self.window.?.tag = @intFromEnum(WindowType.desription);
     var len: usize = 0;
-    if (self.session.level.components.getForEntity(entity, c.Description)) |description| {
+    if (self.session.entities.get(entity, c.Description)) |description| {
         len += (try std.fmt.bufPrint(&self.window.?.title, "{s}", .{description.name})).len;
     }
     if (true) {
-        len += (try std.fmt.bufPrint(self.window.?.title[len..], " [id: {d}]", .{entity})).len;
+        len += (try std.fmt.bufPrint(self.window.?.title[len..], " [id: {d}]", .{entity.id})).len;
     }
-    if (self.session.level.components.getForEntity(entity, c.EnemyState)) |state| {
+    if (self.session.entities.get(entity, c.EnemyState)) |state| {
         const line = try self.window.?.addOneLine();
         _ = try std.fmt.bufPrint(line[1..], "State: is {s}", .{@tagName(state.*)});
     }
-    if (self.session.level.components.getForEntity(entity, c.Health)) |health| {
+    if (self.session.entities.get(entity, c.Health)) |health| {
         const line = try self.window.?.addOneLine();
         _ = try std.fmt.bufPrint(line[1..], "Health: {d}/{d}", .{ health.current, health.max });
     }
-    if (self.session.level.components.getForEntity(entity, c.Speed)) |speed| {
+    if (self.session.entities.get(entity, c.Speed)) |speed| {
         const line = try self.window.?.addOneLine();
         _ = try std.fmt.bufPrint(line[1..], "Speed: {d}", .{speed.move_points});
     }

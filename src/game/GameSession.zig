@@ -45,7 +45,10 @@ render: g.Render,
 /// Visible area
 viewport: g.Viewport,
 ///
+entities: g.EntitiesManager,
+///
 events: g.events.EventBus,
+player: g.Entity,
 /// The current level
 level: g.Level,
 /// The current mode of the game
@@ -67,13 +70,14 @@ pub fn init(
         .runtime = runtime,
         .render = render,
         .viewport = g.Viewport.init(render.scene_rows, render.scene_cols),
+        .entities = try g.EntitiesManager.init(self.arena.allocator()),
+        .player = try self.entities.addNewEntity(g.entities.player(self.arena.allocator())),
         .events = g.events.EventBus.init(&self.arena),
         .level = undefined,
         .mode = .{ .play = undefined },
     };
-    const player = g.entities.player(self.arena.allocator());
-    try g.Levels.firstLevel(&self.level, self.arena.allocator(), player, true);
-    self.viewport.region.top_left = .{ .row = 1, .col = 1 };
+    try self.equipPlayer();
+    try g.Levels.firstLevel(self.arena.allocator(), self, true);
     try self.events.subscribe(self.viewport.subscriber());
     try self.events.subscribe(self.subscriber());
     try self.mode.play.init(self.arena.allocator(), self, null);
@@ -81,6 +85,17 @@ pub fn init(
 
 pub fn deinit(self: *GameSession) void {
     self.arena.deinit();
+}
+
+fn equipPlayer(self: *GameSession) !void {
+    var equipment: *c.Equipment = self.entities.getUnsafe(self.player, c.Equipment);
+    var invent: *c.Inventory = self.entities.getUnsafe(self.player, c.Inventory);
+    const weapon = try self.entities.addNewEntity(g.entities.Club);
+    const light = try self.entities.addNewEntity(g.entities.Torch);
+    equipment.weapon = weapon;
+    equipment.light = light;
+    try invent.put(weapon);
+    try invent.put(light);
 }
 
 // TODO: Load session from file
@@ -93,10 +108,10 @@ pub fn play(self: *GameSession, entity_in_focus: ?g.Entity) !void {
 }
 
 pub fn inventory(self: *GameSession) !void {
-    if (self.level.components.getForEntity2(self.level.player, c.Equipment, c.Inventory)) |tuple| {
+    if (self.entities.get2(self.player, c.Equipment, c.Inventory)) |tuple| {
         self.mode.deinit();
         self.mode = .{ .inventory = undefined };
-        try self.mode.inventory.init(self.arena.allocator(), self, tuple[1], tuple[2]);
+        try self.mode.inventory.init(self.arena.allocator(), self, tuple[0], tuple[1]);
     }
 }
 
@@ -132,7 +147,7 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
             log.debug("Update target after player hit", .{});
             try self.mode.play.updateQuickActions(event.player_hit.target);
         },
-        .entity_moved => |entity_moved| if (entity_moved.entity == self.level.player) {
+        .entity_moved => |entity_moved| if (entity_moved.entity.id == self.player.id) {
             try self.level.onPlayerMoved(entity_moved);
         },
     }
@@ -141,42 +156,42 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
 /// Handles intentions to do some actions
 pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_speed: g.MovePoints) !g.MovePoints {
     if (std.log.logEnabled(.debug, .action_system) and action != .do_nothing) {
-        log.debug("Do action {s} by the entity {d}", .{ @tagName(action), actor });
+        log.debug("Do action {s} by the entity {d}", .{ @tagName(action), actor.id });
     }
     switch (action) {
         .move => |move| {
-            if (self.level.components.getForEntity(actor, c.Position)) |position|
+            if (self.entities.get(actor, c.Position)) |position|
                 return doMove(self, actor, position, move.target, actor_speed);
         },
-        .hit => |hit| if (self.level.components.getForEntity(hit.target, c.Health)) |health| {
+        .hit => |hit| if (self.entities.get(hit.target, c.Health)) |health| {
             return doHit(self, actor, hit.by_weapon, actor_speed, hit.target, health);
         },
         .open => |door| {
-            try self.level.components.setComponentsToEntity(door, g.entities.OpenedDoor);
+            try self.entities.setComponentsToEntity(door, g.entities.OpenedDoor);
         },
         .close => |door| {
-            try self.level.components.setComponentsToEntity(door, g.entities.ClosedDoor);
+            try self.entities.setComponentsToEntity(door, g.entities.ClosedDoor);
         },
         .move_to_level => |ladder| {
             try self.movePlayerToLevel(ladder);
         },
         .go_sleep => |target| {
-            self.level.components.getForEntityUnsafe(target, c.EnemyState).* = .sleeping;
-            try self.level.components.setToEntity(
+            self.entities.getUnsafe(target, c.EnemyState).* = .sleeping;
+            try self.entities.set(
                 target,
                 c.Animation{ .frames = &c.Animation.FramesPresets.go_sleep },
             );
         },
         .chill => |target| {
-            self.level.components.getForEntityUnsafe(target, c.EnemyState).* = .walking;
-            try self.level.components.setToEntity(
+            self.entities.getUnsafe(target, c.EnemyState).* = .walking;
+            try self.entities.set(
                 target,
                 c.Animation{ .frames = &c.Animation.FramesPresets.relax },
             );
         },
         .get_angry => |target| {
-            self.level.components.getForEntityUnsafe(target, c.EnemyState).* = .aggressive;
-            try self.level.components.setToEntity(
+            self.entities.getUnsafe(target, c.EnemyState).* = .aggressive;
+            try self.entities.set(
                 target,
                 c.Animation{ .frames = &c.Animation.FramesPresets.get_angry },
             );
@@ -205,7 +220,7 @@ fn doMove(
     const event = g.events.Event{
         .entity_moved = .{
             .entity = entity,
-            .is_player = (entity == self.level.player),
+            .is_player = (entity.eql(self.player)),
             .moved_from = from_position.point,
             .target = target,
         },
@@ -221,8 +236,8 @@ fn checkCollision(self: *GameSession, actor: g.Entity, place: p.Point) ?g.Action
             .landscape => return .do_nothing,
             .door => |door| return .{ .open = door },
             .entity => |entity| {
-                if (self.level.components.getForEntity(entity, c.Health)) |_|
-                    if (self.level.components.getForEntity(actor, c.Weapon)) |weapon|
+                if (self.entities.get(entity, c.Health)) |_|
+                    if (self.entities.get(actor, c.Weapon)) |weapon|
                         return .{ .hit = .{ .target = entity, .by_weapon = weapon.* } };
             },
         }
@@ -239,18 +254,15 @@ fn doHit(
     enemy_health: *c.Health,
 ) !g.MovePoints {
     const damage = actor_weapon.generateDamage(self.prng.random());
-    log.debug("The entity {d} received damage {d} from {d}", .{ enemy, damage, actor });
+    log.debug("The entity {d} received damage {d} from {d}", .{ enemy.id, damage, actor.id });
     enemy_health.current -= @as(i16, @intCast(damage));
-    try self.level.components.setToEntity(
-        enemy,
-        c.Animation{ .frames = &c.Animation.FramesPresets.hit },
-    );
-    if (actor == self.level.player) {
+    try self.entities.set(enemy, c.Animation{ .frames = &c.Animation.FramesPresets.hit });
+    if (actor.eql(self.player)) {
         try self.events.sendEvent(.{ .player_hit = .{ .target = enemy } });
     }
     if (enemy_health.current <= 0) {
-        const is_player = enemy == self.level.player;
-        log.debug("The {s} {d} died", .{ if (is_player) "player" else "enemy", enemy });
+        const is_player = enemy.eql(self.player);
+        log.debug("The {s} {d} died", .{ if (is_player) "player" else "enemy", enemy.id });
         try self.level.removeEntity(enemy);
         if (is_player) {
             log.info("Player is dead. Game over.", .{});
@@ -261,7 +273,6 @@ fn doHit(
 }
 
 fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
-    const player = try self.level.components.entityToStruct(self.level.player);
     const new_depth: u8 = switch (by_ladder.direction) {
         .up => self.level.depth - 1,
         .down => self.level.depth + 1,
@@ -279,21 +290,19 @@ fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
     // TODO persist the current level
     self.level.deinit();
     switch (new_depth) {
-        0 => try g.Levels.firstLevel(&self.level, self.arena.allocator(), player, false),
+        0 => try g.Levels.firstLevel(self.arena.allocator(), self, false),
         1 => try g.Levels.cave(
-            &self.level,
             self.arena.allocator(),
+            self,
             self.seed + new_depth,
             new_depth,
-            player,
             by_ladder,
         ),
         else => try g.Levels.catacomb(
-            &self.level,
             self.arena.allocator(),
+            self,
             self.seed + new_depth,
             new_depth,
-            player,
             by_ladder,
         ),
     }
@@ -301,7 +310,7 @@ fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
     self.viewport.centeredAround(self.level.playerPosition().point);
     const event = g.events.Event{
         .entity_moved = .{
-            .entity = self.level.player,
+            .entity = self.player,
             .is_player = true,
             .moved_from = p.Point.init(0, 0),
             .target = .{ .new_place = self.level.playerPosition().point },

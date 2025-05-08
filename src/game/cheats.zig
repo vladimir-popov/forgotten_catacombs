@@ -33,7 +33,7 @@ pub const Cheat = union(enum) {
             },
             .hit => {
                 var itr = std.mem.tokenizeScalar(u8, args, ' ');
-                if (itr.next()) |entity_str| if (tryParse(g.Entity, entity_str)) |target|
+                if (itr.next()) |entity_str| if (g.Entity.parse(entity_str)) |target|
                     if (itr.next()) |value_str| if (tryParse(u8, value_str)) |damage| {
                         return .{
                             .hit = .{
@@ -98,7 +98,7 @@ pub const Cheat = union(enum) {
     pub fn toAction(self: Cheat, session: *const g.GameSession) ?g.Action {
         switch (self) {
             .move_player_to_ladder_up => {
-                var itr = session.level.query().get2(c.Ladder, c.Position);
+                var itr = session.level.componentsIterator().of2(c.Ladder, c.Position);
                 while (itr.next()) |tuple| {
                     if (tuple[1].direction == .up) {
                         return movePlayerToPoint(tuple[2].point);
@@ -106,7 +106,7 @@ pub const Cheat = union(enum) {
                 }
             },
             .move_player_to_ladder_down => {
-                var itr = session.level.query().get2(c.Ladder, c.Position);
+                var itr = session.level.componentsIterator().of2(c.Ladder, c.Position);
                 while (itr.next()) |tuple| {
                     if (tuple[1].direction == .down) {
                         return movePlayerToPoint(tuple[2].point);

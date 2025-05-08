@@ -189,10 +189,10 @@ fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order
 }
 /// Draw sprites inside the screen
 fn drawSpritesToBuffer(self: Render, viewport: g.Viewport, level: *const g.Level, entity_in_focus: ?g.Entity) !void {
-    var itr = level.query().get2(cm.Position, cm.Sprite);
+    var itr = level.componentsIterator().of2(cm.Position, cm.Sprite);
     while (itr.next()) |tuple| {
         if (!viewport.region.containsPoint(tuple[1].point)) continue;
-        const mode: g.DrawingMode = if (tuple[0] == entity_in_focus) .inverted else .normal;
+        const mode: g.DrawingMode = if (tuple[0].eql(entity_in_focus)) .inverted else .normal;
         const visibility = level.checkVisibility(tuple[1].point);
         try self.drawSpriteToBuffer(viewport, tuple[2].*, tuple[1].point, mode, visibility);
     }
@@ -310,13 +310,12 @@ pub fn redrawRegion(self: Render, region: p.Region) !void {
 /// Removes the animation if the last frame was drawn.
 fn drawAnimationsFrame(self: Render, viewport: g.Viewport, level: *g.Level, entity_in_focus: ?g.Entity) !void {
     const now: c_uint = self.runtime.currentMillis();
-    var itr = level.query().get2(cm.Position, cm.Animation);
+    var itr = level.componentsIterator().of2(cm.Position, cm.Animation);
     while (itr.next()) |components| {
-        const position = components[1];
-        const animation = components[2];
+        const entity, const position, const animation = components;
         if (animation.frame(now)) |frame| {
             if (frame > 0 and viewport.region.containsPoint(position.point)) {
-                const mode: g.DrawingMode = if (entity_in_focus == components[0])
+                const mode: g.DrawingMode = if (entity.eql(entity_in_focus))
                     .inverted
                 else
                     .normal;
@@ -329,7 +328,7 @@ fn drawAnimationsFrame(self: Render, viewport: g.Viewport, level: *g.Level, enti
                 );
             }
         } else {
-            try level.components.removeFromEntity(components[0], cm.Animation);
+            try level.session.entities.remove(entity, cm.Animation);
         }
     }
 }
