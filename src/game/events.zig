@@ -101,7 +101,7 @@ test "publish/consume" {
     var subscriber = TestSubscriber{};
     const event = Event{
         .entity_moved = .{
-            .entity = 1,
+            .entity = .{ .id = 1 },
             .is_player = true,
             .moved_from = .{ .row = 1, .col = 1 },
             .target = .{ .new_place = .{ .row = 1, .col = 2 } },

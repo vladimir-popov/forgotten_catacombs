@@ -107,7 +107,7 @@ fn initInventoryWindow(self: *InventoryMode) !void {
 
 fn formatLine(self: *InventoryMode, line: *g.Window.Line, item: g.Entity) !void {
     const name = if (self.session.entities.get(item, c.Description)) |desc|
-        desc.name
+        desc.name()
     else
         "???";
     const using = if (item.eql(self.equipment.weapon) or item.eql(self.equipment.light))

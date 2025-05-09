@@ -7,6 +7,7 @@ pub const ecs = @import("ecs/ecs_pkg.zig");
 pub const entities = @import("entities.zig");
 pub const events = @import("events.zig");
 pub const primitives = @import("primitives.zig");
+pub const text = @import("text.zig");
 pub const visibility = @import("visibility_strategies.zig");
 
 pub const Action = @import("actions.zig").Action;

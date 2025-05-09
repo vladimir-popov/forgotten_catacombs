@@ -123,7 +123,7 @@ fn drawInfoBar(self: *const LookingAroundMode) !void {
             }
         }
         const name = if (self.session.entities.get(entity, c.Description)) |desc|
-            desc.name
+            desc.name()
         else
             "?";
         try self.session.render.drawInfo(name);
@@ -138,7 +138,7 @@ fn statusLine(self: LookingAroundMode, entity: g.Entity, line: []u8) !usize {
         len += (try std.fmt.bufPrint(line[len..], "{d}:", .{entity.id})).len;
     }
     if (self.session.entities.get(entity, c.Description)) |description| {
-        len += (try std.fmt.bufPrint(line[len..], "{s}", .{description.name})).len;
+        len += (try std.fmt.bufPrint(line[len..], "{s}", .{description.name()})).len;
 
         if (self.session.entities.get(entity, c.EnemyState)) |state| {
             len += (try std.fmt.bufPrint(line[len..], "({s})", .{@tagName(state.*)})).len;
@@ -271,8 +271,8 @@ fn initWindowWithVariants(
         // Every entity has to have description, or handling indexes become complicated
         const description = self.session.entities.getUnsafe(entity, c.Description);
         const line = try self.window.?.addEmptyLine();
-        const pad = @divTrunc(g.Window.MAX_WINDOW_WIDTH - description.name.len, 2);
-        std.mem.copyForwards(u8, line[pad..], description.name);
+        const pad = @divTrunc(g.Window.MAX_WINDOW_WIDTH - description.name().len, 2);
+        std.mem.copyForwards(u8, line[pad..], description.name());
         if (idx == selected)
             self.window.?.selected_line = idx;
     }

@@ -18,8 +18,17 @@ pub const Sprite = struct {
 };
 
 pub const Description = struct {
-    name: []const u8,
-    description: []const []const u8 = &.{},
+    key: []const u8,
+
+    pub const empty_description: []const []const u8 = &.{};
+
+    pub fn name(self: *const Description) []const u8 {
+        return g.text.names.get(self.key) orelse "";
+    }
+
+    pub fn description(self: *const Description) []const []const u8 {
+        return g.text.descriptions.get(self.key) orelse empty_description;
+    }
 };
 
 pub const Animation = struct {

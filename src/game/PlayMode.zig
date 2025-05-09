@@ -83,7 +83,7 @@ fn drawInfoBar(self: *const PlayMode) !void {
                 return;
             }
         }
-        const name = if (self.session.entities.get(entity, c.Description)) |desc| desc.name else "?";
+        const name = if (self.session.entities.get(entity, c.Description)) |desc| desc.name() else "?";
         try self.session.render.drawInfo(name);
     } else {
         try self.session.render.cleanInfo();

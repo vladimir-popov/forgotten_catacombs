@@ -237,6 +237,9 @@ fn checkCollision(self: *GameSession, actor: g.Entity, place: p.Point) ?g.Action
             .landscape => return .do_nothing,
             .door => |door| return .{ .open = door },
             .entity => |entity| {
+                if (self.entities.get(entity, c.Ladder)) |_| {
+                    return null;
+                }
                 if (self.entities.get(entity, c.Health)) |_|
                     if (self.getWeapon(actor)) |weapon|
                         return .{ .hit = .{ .target = entity, .by_weapon = weapon.* } };

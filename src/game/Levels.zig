@@ -30,7 +30,7 @@ pub fn firstLevel(
 
     // Add wharf
     var entity = try session.entities.addNewEntity(.{
-        .description = .{ .name = "Wharf" },
+        .description = .{ .key = "whrf" },
         .sprite = .{ .codepoint = cp.ladder_up, .z_order = 2 },
         .position = .{ .point = dungeon.entrance },
     });
@@ -40,7 +40,7 @@ pub fn firstLevel(
     entity = session.entities.newEntity();
     try session.entities.setComponentsToEntity(entity, .{
         .ladder = .{ .direction = .down, .id = entity, .target_ladder = session.entities.newEntity() },
-        .description = .{ .name = "Ladder to caves" },
+        .description = .{ .key = "cldr" },
         .sprite = .{ .codepoint = cp.ladder_down, .z_order = 2 },
         .position = .{ .point = dungeon.exit },
     });
@@ -57,14 +57,14 @@ pub fn firstLevel(
     entity = try session.entities.addNewEntity(.{
         .position = .{ .point = d.FirstLocation.trader_place },
         .sprite = .{ .codepoint = cp.human, .z_order = 3 },
-        .description = .{ .name = "Trader" },
+        .description = .{ .key = "trdr" },
     });
     try session.level.addEntity(entity);
     // Add the scientist
     entity = try session.entities.addNewEntity(.{
         .position = .{ .point = d.FirstLocation.scientist_place },
         .sprite = .{ .codepoint = cp.human, .z_order = 3 },
-        .description = .{ .name = "Scientist" },
+        .description = .{ .key = "scnst" },
     });
     try session.level.addEntity(entity);
 

@@ -210,7 +210,7 @@ test "EntitiesManager: Add/Get/Remove component" {
     try std.testing.expectEqual(123, component.?.state.items[0]);
 
     // should return null for entity, without requested component
-    component = manager.get(entity + 1, TestComponent);
+    component = manager.get(.{ .id = entity.id + 1 }, TestComponent);
     try std.testing.expectEqual(null, component);
 
     // should return null for removed component

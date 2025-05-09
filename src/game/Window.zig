@@ -46,12 +46,12 @@ pub fn info(
 ) !void {
     self.lines.clearRetainingCapacity();
     if (entities.get(entity, c.Description)) |description| {
-        self.setTitle(description.name);
-        for (description.description) |str| {
+        self.setTitle(description.name());
+        for (description.description()) |str| {
             const line = try self.addEmptyLine();
             std.mem.copyForwards(u8, line, str);
         }
-        if (description.description.len > 0) {
+        if (description.description().len > 0) {
             const line = try self.lines.addOne(self.alloc);
             line.* = [1]u8{'-'} ** COLS;
         }
