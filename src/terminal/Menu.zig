@@ -44,7 +44,7 @@ pub fn Menu(comptime ROWS: u8, comptime COLS: u8) type {
                 .up => if (self.selected_item > 0) {
                     self.selected_item -= 1;
                 },
-                .down => if (self.selected_item < MAX_ITEMS_COUNT - 2) {
+                .down => if (self.selected_item < MAX_ITEMS_COUNT - 1) {
                     self.selected_item += 1;
                 },
                 else => {},

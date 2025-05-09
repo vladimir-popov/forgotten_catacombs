@@ -290,7 +290,7 @@ fn initWindowWithVariants(
 ) !void {
     self.window = g.Window.init(self.arena.allocator());
     for (variants, 0..) |qa, idx| {
-        const line = try self.window.?.addOneLine();
+        const line = try self.window.?.addEmptyLine();
         const action_label = qa.action.toString();
         const pad = @divTrunc(g.Window.MAX_WINDOW_WIDTH - action_label.len, 2);
         std.mem.copyForwards(u8, line[pad..], action_label);

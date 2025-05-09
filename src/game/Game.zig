@@ -66,6 +66,7 @@ pub fn tick(self: *Game) !void {
 inline fn welcome(self: *Game) !void {
     self.state = .welcome;
     self.runtime.removeAllMenuItems();
+    try self.render.clearDisplay();
     try self.render.drawWelcomeScreen();
 }
 

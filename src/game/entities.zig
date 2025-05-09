@@ -31,7 +31,10 @@ pub const Club = c.Components{
 };
 
 pub const Torch = c.Components{
-    .description = .{ .name = "Torch" },
+    .description = .{ .name = "Torch", .description =&.{
+        "This is regular",
+        "torch",
+    } },
     .source_of_light = .{ .radius = 5 },
 };
 

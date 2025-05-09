@@ -146,7 +146,7 @@ pub fn redrawScene(self: *Render, session: *g.GameSession, entity_in_focus: ?g.E
     try self.drawScene(session, entity_in_focus, quick_action);
 }
 
-/// Clears both scene and info bar.
+/// Clears both scene and info bar. Resets the inner buffer.
 pub inline fn clearDisplay(self: Render) !void {
     self.scene_buffer.reset();
     try self.runtime.clearDisplay();

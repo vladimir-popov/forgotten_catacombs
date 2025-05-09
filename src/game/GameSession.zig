@@ -87,6 +87,7 @@ pub fn deinit(self: *GameSession) void {
     self.arena.deinit();
 }
 
+/// Creates the initial equipment of the player
 fn equipPlayer(self: *GameSession) !void {
     var equipment: *c.Equipment = self.entities.getUnsafe(self.player, c.Equipment);
     var invent: *c.Inventory = self.entities.getUnsafe(self.player, c.Inventory);
@@ -237,11 +238,23 @@ fn checkCollision(self: *GameSession, actor: g.Entity, place: p.Point) ?g.Action
             .door => |door| return .{ .open = door },
             .entity => |entity| {
                 if (self.entities.get(entity, c.Health)) |_|
-                    if (self.entities.get(actor, c.Weapon)) |weapon|
+                    if (self.getWeapon(actor)) |weapon|
                         return .{ .hit = .{ .target = entity, .by_weapon = weapon.* } };
             },
         }
+        return .do_nothing;
     }
+    return null;
+}
+
+fn getWeapon(self: *GameSession, actor: g.Entity) ?*c.Weapon {
+    if (self.entities.get(actor, c.Weapon)) |weapon| return weapon;
+
+    if (self.entities.get(actor, c.Equipment)) |equipment|
+        if (equipment.weapon) |weapon_id|
+            if (self.entities.get(weapon_id, c.Weapon)) |weapon|
+                return weapon;
+
     return null;
 }
 

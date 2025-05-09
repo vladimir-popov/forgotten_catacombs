@@ -62,8 +62,7 @@ pub fn showTheCurrentPlacement(level: *const g.Level, place: p.Point) g.Render.V
 pub fn showInRadiusOfSourceOfLight(level: *const g.Level, place: p.Point) g.Render.Visibility {
     if (turn_light_on) return .visible;
 
-    var radius: f16 = 2.0;
-    // TODO create a getter for the light
+    var radius: f16 = 1.5;
     if (level.session.entities.get(level.session.player, c.Equipment)) |equipment| {
         if (equipment.light) |light| {
             if (level.session.entities.get(light, c.SourceOfLight)) |sol|

@@ -19,7 +19,7 @@ pub const Sprite = struct {
 
 pub const Description = struct {
     name: []const u8,
-    description: []const u8 = "",
+    description: []const []const u8 = &.{},
 };
 
 pub const Animation = struct {

@@ -9,7 +9,7 @@ const log = std.log.scoped(.looking_around_mode);
 
 const LookingAroundMode = @This();
 const EntitiesOnScreen = std.AutoHashMapUnmanaged(p.Point, std.ArrayListUnmanaged(g.Entity));
-const WindowType = enum { desription, variants };
+const WindowType = enum { description, variants };
 
 arena: std.heap.ArenaAllocator,
 session: *g.GameSession,
@@ -93,12 +93,15 @@ fn draw(self: *const LookingAroundMode) !void {
 
 fn drawInfoBar(self: *const LookingAroundMode) !void {
     if (self.window) |window| {
-        if (window.tag == @intFromEnum(WindowType.variants)) {
-            try self.session.render.hideLeftButton();
-            try self.session.render.drawRightButton("Choose", false);
-        } else {
-            try self.session.render.hideLeftButton();
-            try self.session.render.drawRightButton("Close", false);
+        switch (window.tagAsEnum(WindowType)) {
+            .variants => {
+                try self.session.render.hideLeftButton();
+                try self.session.render.drawRightButton("Choose", false);
+            },
+            .description => {
+                try self.session.render.hideLeftButton();
+                try self.session.render.drawRightButton("Close", false);
+            },
         }
     } else {
         try self.session.render.drawLeftButton("Continue");
@@ -263,11 +266,11 @@ fn initWindowWithVariants(
     selected: usize,
 ) !void {
     self.window = g.Window.init(self.arena.allocator());
-    self.window.?.tag = @intFromEnum(WindowType.variants);
+    self.window.?.setEnumTag(WindowType.variants);
     for (variants, 0..) |entity, idx| {
         // Every entity has to have description, or handling indexes become complicated
         const description = self.session.entities.getUnsafe(entity, c.Description);
-        const line = try self.window.?.addOneLine();
+        const line = try self.window.?.addEmptyLine();
         const pad = @divTrunc(g.Window.MAX_WINDOW_WIDTH - description.name.len, 2);
         std.mem.copyForwards(u8, line[pad..], description.name);
         if (idx == selected)
@@ -280,24 +283,6 @@ fn initWindowWithDescription(
     entity: g.Entity,
 ) !void {
     self.window = g.Window.init(self.arena.allocator());
-    self.window.?.tag = @intFromEnum(WindowType.desription);
-    var len: usize = 0;
-    if (self.session.entities.get(entity, c.Description)) |description| {
-        len += (try std.fmt.bufPrint(&self.window.?.title, "{s}", .{description.name})).len;
-    }
-    if (true) {
-        len += (try std.fmt.bufPrint(self.window.?.title[len..], " [id: {d}]", .{entity.id})).len;
-    }
-    if (self.session.entities.get(entity, c.EnemyState)) |state| {
-        const line = try self.window.?.addOneLine();
-        _ = try std.fmt.bufPrint(line[1..], "State: is {s}", .{@tagName(state.*)});
-    }
-    if (self.session.entities.get(entity, c.Health)) |health| {
-        const line = try self.window.?.addOneLine();
-        _ = try std.fmt.bufPrint(line[1..], "Health: {d}/{d}", .{ health.current, health.max });
-    }
-    if (self.session.entities.get(entity, c.Speed)) |speed| {
-        const line = try self.window.?.addOneLine();
-        _ = try std.fmt.bufPrint(line[1..], "Speed: {d}", .{speed.move_points});
-    }
+    self.window.?.setEnumTag(WindowType.description);
+    try self.window.?.info(self.session.entities, entity);
 }
