@@ -62,9 +62,7 @@ inline fn actionForWalkingEnemy(
     self.rand.shuffle(p.Direction, &directions);
     for (directions) |direction| {
         const place = entity_place.movedTo(direction);
-        if (self.session.level.obstacleAt(place)) |collision| {
-            if (collision == .landscape) continue;
-        }
+        if (self.session.level.isObstacle(place)) continue;
         return .{ .move = .{ .target = .{ .direction = direction } } };
     }
     log.err("Entity {d} is stuck at {any}", .{ entity.id, entity_place });

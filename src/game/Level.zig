@@ -11,6 +11,11 @@ const log = std.log.scoped(.level);
 
 const Level = @This();
 
+pub const Cell = union(enum) {
+    landscape: d.Dungeon.Cell,
+    entities: [3]?g.Entity,
+};
+
 arena: std.heap.ArenaAllocator,
 session: *g.GameSession,
 /// The depth of the current level. The session_seed + depth is unique seed for the level.
@@ -74,72 +79,59 @@ pub inline fn componentsIterator(self: Level) g.ComponentsIterator {
     return self.session.entities.iterator(self.entities.items);
 }
 
-pub const EntitiesOnPositionIterator = struct {
-    itr: g.ecs.ComponentsIterator(c.Position),
-    place: p.Point,
-    next_idx: u8 = 0,
-
-    pub fn next(self: *EntitiesOnPositionIterator) ?g.Entity {
-        while (true) {
-            if (self.itr.next()) |tuple| {
-                if (self.place.eql(tuple[1].point)) return tuple[0];
-            } else {
-                return null;
-            }
-        }
-    }
-};
-
-pub fn entitiesAt(self: Level, place: p.Point) EntitiesOnPositionIterator {
-    return .{ .place = place, .entities = self.componentsIterator().of(c.Position) };
-}
-
 pub fn randomEmptyPlace(self: Level, rand: std.Random) ?p.Point {
     var attempt: u8 = 10;
     while (attempt > 0) : (attempt -= 1) {
         const place = self.dungeon.randomPlace(rand);
-        if (self.obstacleAt(place) == null) return place;
+        switch (self.cellAt(place)) {
+            .landscape => |landscape| if (landscape == .floor) return place,
+            else => return null,
+        }
     }
     return null;
 }
 
 pub fn obstacles(self: *const Level) g.DijkstraMap.Obstacles {
-    return .{ .context = self, .isObstacleFn = isObstacle };
+    return .{ .context = self, .isObstacleFn = isObstacleFn };
 }
 
-// TODO improve
-fn isObstacle(ptr: *const anyopaque, place: p.Point) bool {
+/// This function is used to build the DijkstraMap, that is used to navigate enemies,
+/// and to check collision by the walking enemies.
+fn isObstacleFn(ptr: *const anyopaque, place: p.Point) bool {
     const self: *const Level = @ptrCast(@alignCast(ptr));
-    if (self.obstacleAt(place)) |collision| {
-        return switch (collision) {
-            .landscape, .door => true,
-            else => false,
-        };
+    return isObstacle(self, place);
+}
+
+pub fn isObstacle(self: *const Level, place: p.Point) bool {
+    switch (self.cellAt(place)) {
+        .landscape => |cl| switch (cl) {
+            .floor, .doorway => {},
+            else => return true,
+        },
+        .entities => |entities| if (entities[2] != null) return true,
     }
     return false;
 }
 
-// TODO improve
-pub fn obstacleAt(
-    self: *const Level,
-    place: p.Point,
-) ?union(enum) { landscape: d.Dungeon.Cell, door: g.Entity, entity: g.Entity } {
-    switch (self.dungeon.cellAt(place)) {
-        .floor, .doorway => {},
-        else => |cell| return .{ .landscape = cell },
-    }
-
-    var itr = self.componentsIterator().of(c.Position);
+pub fn cellAt(self: Level, place: p.Point) Cell {
+    const landscape = switch (self.dungeon.cellAt(place)) {
+        .floor, .doorway => |cl| cl,
+        else => |cl| return .{ .landscape = cl },
+    };
+    // OPTIMIZE IT
+    var found_entity = false;
+    var result = [3]?g.Entity{ null, null, null };
+    var itr = self.componentsIterator().of2(c.Position, c.ZOrder);
     while (itr.next()) |tuple| {
-        if (tuple[1].place.eql(place)) {
-            if (self.session.entities.get(tuple[0], c.Door)) |door| {
-                return if (door.state == .closed) .{ .door = tuple[0] } else null;
-            } else {
-                return .{ .entity = tuple[0] };
-            }
+        const entity, const position, const zorder = tuple;
+        if (place.eql(position.place)) {
+            found_entity = true;
+            // only one entity with the same order can be at the same place
+            std.debug.assert(result[zorder.order] == null);
+            result[zorder.order] = entity;
         }
     }
-    return null;
+    return if (found_entity) .{ .entities = result } else .{ .landscape = landscape };
 }
 
 // The level doesn't subscribe to event directly to avoid unsubscription.

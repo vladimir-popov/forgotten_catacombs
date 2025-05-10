@@ -1,6 +1,6 @@
-//! This is the root object for a single game session.
-//! The GameSession has three modes: the `PlayMode`, `LookingAroundMode` and `ExploreMode`.
-//! That modes are part of the GameSession extracted to the separate files to make their maintenance easier.
+//! This is the root object for a single game session. The GameSession has different modes such as:
+//! the `PlayMode`, `LookingAroundMode`, `ExploreMode` and so on. That modes are part of the
+//! GameSession extracted to the separate files to make their maintenance easier.
 const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
@@ -231,23 +231,29 @@ fn doMove(
     return move_speed;
 }
 
+// null means that the move is completed;
+// .do_nothing or any other action means that the move should be aborted, and the action handled;
 fn checkCollision(self: *GameSession, actor: g.Entity, place: p.Point) ?g.Action {
-    if (self.level.obstacleAt(place)) |obstacle| {
-        switch (obstacle) {
-            .landscape => return .do_nothing,
-            .door => |door| return .{ .open = door },
-            .entity => |entity| {
-                if (self.entities.get(entity, c.Ladder)) |_| {
-                    return null;
-                }
+    switch (self.level.cellAt(place)) {
+        .landscape => |cl| if (cl == .floor or cl == .doorway)
+            return null,
+
+        .entities => |entities| {
+            if (entities[2]) |entity| {
+                if (self.entities.get(entity, c.Door)) |_|
+                    return .{ .open = entity };
+
                 if (self.entities.get(entity, c.Health)) |_|
                     if (self.getWeapon(actor)) |weapon|
                         return .{ .hit = .{ .target = entity, .by_weapon = weapon.* } };
-            },
-        }
-        return .do_nothing;
+            } else {
+                // it's possible to step on the ladder, opened door, teleport, dropped item and
+                // other entities with z_order < 2
+                return null;
+            }
+        },
     }
-    return null;
+    return .do_nothing;
 }
 
 fn getWeapon(self: *GameSession, actor: g.Entity) ?*c.Weapon {
