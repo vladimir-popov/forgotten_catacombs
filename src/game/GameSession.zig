@@ -243,7 +243,7 @@ fn checkCollision(self: *GameSession, actor: g.Entity, place: p.Point) ?g.Action
                 if (self.entities.get(entity, c.Door)) |_|
                     return .{ .open = entity };
 
-                if (self.entities.get(entity, c.Health)) |_|
+                if (self.isEnemy(entity))
                     if (self.getWeapon(actor)) |weapon|
                         return .{ .hit = .{ .target = entity, .by_weapon = weapon.* } };
             } else {
@@ -254,17 +254,6 @@ fn checkCollision(self: *GameSession, actor: g.Entity, place: p.Point) ?g.Action
         },
     }
     return .do_nothing;
-}
-
-fn getWeapon(self: *GameSession, actor: g.Entity) ?*c.Weapon {
-    if (self.entities.get(actor, c.Weapon)) |weapon| return weapon;
-
-    if (self.entities.get(actor, c.Equipment)) |equipment|
-        if (equipment.weapon) |weapon_id|
-            if (self.entities.get(weapon_id, c.Weapon)) |weapon|
-                return weapon;
-
-    return null;
 }
 
 fn doHit(
@@ -339,4 +328,19 @@ fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
         },
     };
     try self.events.sendEvent(event);
+}
+
+pub fn getWeapon(self: *GameSession, actor: g.Entity) ?*c.Weapon {
+    if (self.entities.get(actor, c.Weapon)) |weapon| return weapon;
+
+    if (self.entities.get(actor, c.Equipment)) |equipment|
+        if (equipment.weapon) |weapon_id|
+            if (self.entities.get(weapon_id, c.Weapon)) |weapon|
+                return weapon;
+
+    return null;
+}
+
+pub fn isEnemy(self: *GameSession, entity: g.Entity) bool {
+    return self.entities.get(entity, c.Health) != null;
 }

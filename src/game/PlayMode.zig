@@ -77,7 +77,7 @@ fn drawInfoBar(self: *const PlayMode) !void {
 
     // Draw the name or health of the target entity
     if (self.target()) |entity| {
-        if (entity.eql(self.session.player)) {
+        if (!entity.eql(self.session.player)) {
             if (self.session.entities.get2(entity, c.Sprite, c.Health)) |tuple| {
                 try self.session.render.drawEnemyHealth(tuple[0].codepoint, tuple[1]);
                 return;
@@ -223,22 +223,21 @@ pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity) anyerror!vo
     }
     const player_position = self.session.level.playerPosition();
     // Check the nearest entities:
-    const region = p.Region{
-        .top_left = .{
-            .row = @max(player_position.place.row - 1, 1),
-            .col = @max(player_position.place.col - 1, 1),
-        },
-        .rows = 3,
-        .cols = 3,
-    };
     // TODO improve:
     var itr = self.session.level.componentsIterator().of(c.Position);
     while (itr.next()) |tuple| {
         const entity: g.Entity, const position: *c.Position = tuple;
-        if (region.containsPoint(position.place)) {
+        if (position.place.near(player_position.place)) {
             if (entity.eql(self.session.player) or entity.eql(target_entity)) continue;
+            log.debug(
+                "The place {any} near the player {any} with {any}",
+                .{ position.place, player_position.place, entity },
+            );
             if (self.calculateQuickActionForTarget(entity)) |qa| {
+                log.debug("Calculated action is {any}", .{qa});
                 try self.quick_actions.append(self.arena.allocator(), .{ .target = entity, .action = qa });
+            } else {
+                log.warn("No quick action for entity {any}", .{entity});
             }
         }
     }
@@ -264,8 +263,8 @@ fn calculateQuickActionForTarget(
 
             return .{ .move_to_level = ladder.* };
         }
-        if (self.session.entities.get(target_entity, c.Health)) |_| {
-            if (self.session.entities.get(self.session.player, c.Weapon)) |weapon| {
+        if (self.session.isEnemy(target_entity)) {
+            if (self.session.getWeapon(self.session.player)) |weapon| {
                 return .{ .hit = .{ .target = target_entity, .by_weapon = weapon.* } };
             }
         }
