@@ -155,12 +155,11 @@ pub inline fn clearDisplay(self: Render) !void {
 fn drawDungeon(self: Render, viewport: g.Viewport, level: *g.Level) anyerror!void {
     var itr = level.dungeon.cellsInRegion(viewport.region);
     var place = viewport.region.top_left;
-    var sprite = cm.Sprite{ .codepoint = undefined, .z_order = 0 };
     while (itr.next()) |cell| {
         const visibility = level.checkVisibility(place);
         if (visibility == .visible and !level.map.isVisited(place))
             try level.map.addVisitedPlace(place);
-        sprite.codepoint = switch (cell) {
+        const codepoint = switch (cell) {
             .nothing => cp.nothing,
             .floor => cp.floor_visible,
             .wall => cp.wall_visible,
@@ -171,7 +170,7 @@ fn drawDungeon(self: Render, viewport: g.Viewport, level: *g.Level) anyerror!voi
                 else => cp.unknown,
             },
         };
-        try self.drawSpriteToBuffer(viewport, sprite, place, .normal, visibility);
+        try self.drawSpriteToBuffer(viewport, codepoint, place, 0, .normal, visibility);
         place.move(.right);
         if (!viewport.region.containsPoint(place)) {
             place.col = viewport.region.top_left.col;
@@ -189,20 +188,22 @@ fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order
 }
 /// Draw sprites inside the screen
 fn drawSpritesToBuffer(self: Render, viewport: g.Viewport, level: *const g.Level, entity_in_focus: ?g.Entity) !void {
-    var itr = level.componentsIterator().of2(cm.Position, cm.Sprite);
+    var itr = level.componentsIterator().of3(cm.Position, cm.Sprite, cm.ZOrder);
     while (itr.next()) |tuple| {
-        if (!viewport.region.containsPoint(tuple[1].point)) continue;
-        const mode: g.DrawingMode = if (tuple[0].eql(entity_in_focus)) .inverted else .normal;
-        const visibility = level.checkVisibility(tuple[1].point);
-        try self.drawSpriteToBuffer(viewport, tuple[2].*, tuple[1].point, mode, visibility);
+        const entity, const position, const sprite, const zorder = tuple;
+        if (!viewport.region.containsPoint(position.place)) continue;
+        const mode: g.DrawingMode = if (entity.eql(entity_in_focus)) .inverted else .normal;
+        const visibility = level.checkVisibility(tuple[1].place);
+        try self.drawSpriteToBuffer(viewport, sprite.codepoint, position.place, zorder.order, mode, visibility);
     }
 }
 
 fn drawSpriteToBuffer(
     self: Render,
     viewport: g.Viewport,
-    sprite: cm.Sprite,
+    codepoint: g.Codepoint,
     place_in_dungeon: p.Point,
+    z_order: SceneBuffer.ZOrder,
     mode: g.DrawingMode,
     visibility: g.Render.Visibility,
 ) anyerror!void {
@@ -212,9 +213,9 @@ fn drawSpriteToBuffer(
     };
     self.scene_buffer.setSymbol(
         point_on_display,
-        actualCodepoint(sprite.codepoint, visibility),
+        actualCodepoint(codepoint, visibility),
         mode,
-        sprite.z_order,
+        z_order,
     );
 }
 
@@ -314,17 +315,18 @@ fn drawAnimationsFrame(self: Render, viewport: g.Viewport, level: *g.Level, enti
     while (itr.next()) |components| {
         const entity, const position, const animation = components;
         if (animation.frame(now)) |frame| {
-            if (frame > 0 and viewport.region.containsPoint(position.point)) {
+            if (frame > 0 and viewport.region.containsPoint(position.place)) {
                 const mode: g.DrawingMode = if (entity.eql(entity_in_focus))
                     .inverted
                 else
                     .normal;
                 try self.drawSpriteToBuffer(
                     viewport,
-                    .{ .codepoint = frame, .z_order = 3 },
-                    position.point,
+                    frame,
+                    position.place,
+                    3,
                     mode,
-                    level.checkVisibility(position.point),
+                    level.checkVisibility(position.place),
                 );
             }
         } else {
@@ -421,7 +423,7 @@ pub fn setBorderWithArrow(
                     point,
                     codepoint,
                     if (is_middle) .inverted else .normal,
-                    std.math.maxInt(g.ZOrder),
+                    std.math.maxInt(SceneBuffer.ZOrder),
                 );
             }
         },
@@ -438,7 +440,7 @@ pub fn setBorderWithArrow(
                     point,
                     codepoint,
                     if (is_middle) .inverted else .normal,
-                    std.math.maxInt(g.ZOrder),
+                    std.math.maxInt(SceneBuffer.ZOrder),
                 );
             }
         },
@@ -478,9 +480,11 @@ pub const DrawableSymbol = struct {
 };
 
 const SceneBuffer = struct {
+    pub const ZOrder = u3;
+
     const VersionedCell = struct {
         symbol: DrawableSymbol,
-        z_order: g.ZOrder,
+        z_order: ZOrder,
         ver: u1,
         is_changed: bool,
     };
@@ -524,7 +528,7 @@ const SceneBuffer = struct {
         point_in_buffer: p.Point,
         codepoint: g.Codepoint,
         mode: g.DrawingMode,
-        z_order: g.ZOrder,
+        z_order: ZOrder,
     ) void {
         std.debug.assert(point_in_buffer.row > 0);
         std.debug.assert(point_in_buffer.col > 0);

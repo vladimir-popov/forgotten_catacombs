@@ -101,7 +101,7 @@ pub const Cheat = union(enum) {
                 var itr = session.level.componentsIterator().of2(c.Ladder, c.Position);
                 while (itr.next()) |tuple| {
                     if (tuple[1].direction == .up) {
-                        return movePlayerToPoint(tuple[2].point);
+                        return movePlayerToPoint(tuple[2].place);
                     }
                 }
             },
@@ -109,7 +109,7 @@ pub const Cheat = union(enum) {
                 var itr = session.level.componentsIterator().of2(c.Ladder, c.Position);
                 while (itr.next()) |tuple| {
                     if (tuple[1].direction == .down) {
-                        return movePlayerToPoint(tuple[2].point);
+                        return movePlayerToPoint(tuple[2].place);
                     }
                 }
             },

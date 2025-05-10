@@ -192,7 +192,7 @@ pub fn tick(self: *PlayMode) !void {
             const speed = tuple[2];
             if (speed.move_points > initiative.move_points) continue;
             if (self.session.entities.get(entity, c.Position)) |position| {
-                const action = self.session.ai.action(entity, position.point);
+                const action = self.session.ai.action(entity, position.place);
                 const mp = try self.session.doAction(entity, action, speed.move_points);
                 std.debug.assert(0 < mp and mp <= initiative.move_points);
                 initiative.move_points -= mp;
@@ -225,8 +225,8 @@ pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity) anyerror!vo
     // Check the nearest entities:
     const region = p.Region{
         .top_left = .{
-            .row = @max(player_position.point.row - 1, 1),
-            .col = @max(player_position.point.col - 1, 1),
+            .row = @max(player_position.place.row - 1, 1),
+            .col = @max(player_position.place.col - 1, 1),
         },
         .rows = 3,
         .cols = 3,
@@ -235,7 +235,7 @@ pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity) anyerror!vo
     var itr = self.session.level.componentsIterator().of(c.Position);
     while (itr.next()) |tuple| {
         const entity: g.Entity, const position: *c.Position = tuple;
-        if (region.containsPoint(position.point)) {
+        if (region.containsPoint(position.place)) {
             if (entity.eql(self.session.player) or entity.eql(target_entity)) continue;
             if (self.calculateQuickActionForTarget(entity)) |qa| {
                 try self.quick_actions.append(self.arena.allocator(), .{ .target = entity, .action = qa });
@@ -254,11 +254,11 @@ fn calculateQuickActionForTarget(
     const target_position =
         self.session.entities.get(target_entity, c.Position) orelse return null;
 
-    if (player_position.point.near(target_position.point)) {
+    if (player_position.place.near(target_position.place)) {
         if (self.session.entities.get(target_entity, c.Ladder)) |ladder| {
             // the player should be able to go between levels only from the
             // place with the ladder
-            if (!player_position.point.eql(target_position.point)) return null;
+            if (!player_position.place.eql(target_position.place)) return null;
             // It's impossible to go upper the first level
             if (ladder.direction == .up and self.session.level.depth == 0) return null;
 
@@ -271,7 +271,7 @@ fn calculateQuickActionForTarget(
         }
         if (self.session.entities.get(target_entity, c.Door)) |door| {
             // the player should not be able to open/close the door stay in the doorway
-            if (player_position.point.eql(target_position.point)) {
+            if (player_position.place.eql(target_position.place)) {
                 return null;
             }
             return switch (door.state) {

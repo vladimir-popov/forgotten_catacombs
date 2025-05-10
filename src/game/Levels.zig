@@ -30,41 +30,45 @@ pub fn firstLevel(
 
     // Add wharf
     var entity = try session.entities.addNewEntity(.{
-        .description = .{ .key = "whrf" },
-        .sprite = .{ .codepoint = cp.ladder_up, .z_order = 2 },
-        .position = .{ .point = dungeon.entrance },
+        .z_order = .{ .order = 0 },
+        .description = .{ .ptr = &g.Description.wharf },
+        .sprite = .{ .codepoint = cp.ladder_up },
+        .position = .{ .place = dungeon.entrance },
     });
     try session.level.addEntity(entity);
 
     // Add the ladder leads to the bottom dungeons:
     entity = session.entities.newEntity();
     try session.entities.setComponentsToEntity(entity, .{
+        .z_order = .{ .order = 0 },
         .ladder = .{ .direction = .down, .id = entity, .target_ladder = session.entities.newEntity() },
-        .description = .{ .key = "cldr" },
-        .sprite = .{ .codepoint = cp.ladder_down, .z_order = 2 },
-        .position = .{ .point = dungeon.exit },
+        .description = .{ .ptr = &g.Description.ladder_down },
+        .sprite = .{ .codepoint = cp.ladder_down },
+        .position = .{ .place = dungeon.exit },
     });
     try session.level.addEntity(entity);
 
     // Place the player on the level
     log.debug("The player entity id is {d}", .{session.player.id});
     if (first_visit)
-        try session.entities.set(session.player, c.Position{ .point = dungeon.entrance })
+        try session.entities.set(session.player, c.Position{ .place = dungeon.entrance })
     else
-        try session.entities.set(session.player, c.Position{ .point = dungeon.exit });
+        try session.entities.set(session.player, c.Position{ .place = dungeon.exit });
 
     // Add the trader
     entity = try session.entities.addNewEntity(.{
-        .position = .{ .point = d.FirstLocation.trader_place },
-        .sprite = .{ .codepoint = cp.human, .z_order = 3 },
-        .description = .{ .key = "trdr" },
+        .z_order = .{ .order = 2 },
+        .position = .{ .place = d.FirstLocation.trader_place },
+        .sprite = .{ .codepoint = cp.human },
+        .description = .{ .ptr = &g.Description.traider },
     });
     try session.level.addEntity(entity);
     // Add the scientist
     entity = try session.entities.addNewEntity(.{
-        .position = .{ .point = d.FirstLocation.scientist_place },
-        .sprite = .{ .codepoint = cp.human, .z_order = 3 },
-        .description = .{ .key = "scnst" },
+        .z_order = .{ .order = 2 },
+        .position = .{ .place = d.FirstLocation.scientist_place },
+        .sprite = .{ .codepoint = cp.human },
+        .description = .{ .ptr = &g.Description.scientist },
     });
     try session.level.addEntity(entity);
 
@@ -77,7 +81,7 @@ pub fn firstLevel(
     while (doors.next()) |entry| {
         entry.value_ptr.door_id = try session.entities.addNewEntity(g.entities.ClosedDoor);
         try session.level.addEntity(entry.value_ptr.door_id);
-        try session.entities.set(entry.value_ptr.door_id, c.Position{ .point = entry.key_ptr.* });
+        try session.entities.set(entry.value_ptr.door_id, c.Position{ .place = entry.key_ptr.* });
         log.debug(
             "For the doorway on {any} added closed door with id {d}",
             .{ entry.key_ptr.*, entry.value_ptr.door_id.id },
@@ -178,7 +182,7 @@ fn generate(
     try addLadder(session, from_ladder.inverted(), init_place);
     // Generate player on the ladder
     log.debug("The player entity id is {d}", .{session.player.id});
-    try session.entities.set(session.player, c.Position{ .point = init_place });
+    try session.entities.set(session.player, c.Position{ .place = init_place });
 
     // Add ladder to the next level
     try addLadder(session, .{
@@ -197,7 +201,7 @@ fn generate(
         var doors = doorways.iterator();
         while (doors.next()) |entry| {
             entry.value_ptr.door_id = try session.entities.addNewEntity(g.entities.ClosedDoor);
-            try session.entities.set(entry.value_ptr.door_id, c.Position{ .point = entry.key_ptr.* });
+            try session.entities.set(entry.value_ptr.door_id, c.Position{ .place = entry.key_ptr.* });
             try session.level.addEntity(entry.value_ptr.door_id);
             log.debug(
                 "For the doorway on {any} added closed door with id {d}",
@@ -209,7 +213,7 @@ fn generate(
 
 fn addLadder(session: *g.GameSession, ladder: c.Ladder, place: p.Point) !void {
     try session.entities.setComponentsToEntity(ladder.id, g.entities.ladder(ladder));
-    try session.entities.set(ladder.id, c.Position{ .point = place });
+    try session.entities.set(ladder.id, c.Position{ .place = place });
     try session.level.addEntity(ladder.id);
 }
 
@@ -217,7 +221,7 @@ fn addEnemy(session: *g.GameSession, rand: std.Random, enemy: c.Components) !voi
     if (session.level.randomEmptyPlace(rand)) |place| {
         const id = try session.entities.addNewEntity(enemy);
         try session.level.addEntity(id);
-        try session.entities.set(id, c.Position{ .point = place });
+        try session.entities.set(id, c.Position{ .place = place });
         const state: c.EnemyState = if (rand.uintLessThan(u8, 5) == 0) .sleeping else .walking;
         try session.entities.set(id, state);
     }

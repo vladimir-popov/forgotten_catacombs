@@ -64,7 +64,7 @@ pub fn ComponentsIterator(comptime Components: type) type {
                     while (self.idx < self.parent.entities.len) {
                         const entity = self.parent.entities[self.idx];
                         self.idx += 1;
-                        if (self.parent.manager.get2(entity, C1, C2, C3)) |res| {
+                        if (self.parent.manager.get3(entity, C1, C2, C3)) |res| {
                             return .{ entity, res[0], res[1], res[2] };
                         }
                     }

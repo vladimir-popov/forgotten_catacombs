@@ -42,7 +42,7 @@ pub fn showTheCurrentPlacement(level: *const g.Level, place: p.Point) g.Render.V
     if (turn_light_on or level.player_placement.contains(place)) return .visible;
 
     // check visibility of the nearest placement if the player is in the doorway:
-    const player_position = level.playerPosition().point;
+    const player_position = level.playerPosition().place;
     var doorways = level.player_placement.doorways();
     while (doorways.next()) |door_place| {
         if (!door_place.eql(player_position)) continue;
@@ -70,7 +70,7 @@ pub fn showInRadiusOfSourceOfLight(level: *const g.Level, place: p.Point) g.Rend
         }
     }
 
-    if (level.playerPosition().point.distanceTo(place) > radius) {
+    if (level.playerPosition().place.distanceTo(place) > radius) {
         log.debug("The place {any} is out of the light radius {d:.2}", .{ place, radius });
         return chechKnownPlaces(level, place);
     } else {

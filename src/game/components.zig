@@ -1,11 +1,9 @@
 const std = @import("std");
 const g = @import("game_pkg.zig");
-const c = g.components;
 const p = g.primitives;
 
-// FIXME: change to: `const Position = p.Point`
 pub const Position = struct {
-    point: p.Point,
+    place: p.Point,
 };
 
 pub const Door = struct { state: enum { opened, closed } };
@@ -13,21 +11,29 @@ pub const Door = struct { state: enum { opened, closed } };
 /// Describes how and where something should look.
 pub const Sprite = struct {
     codepoint: g.Codepoint,
-    /// The sprite with bigger order should be rendered over the sprite with lower
-    z_order: g.ZOrder,
+};
+
+/// The vertical order of the entities on the same place:
+/// Examples:
+///   0 - opened doors, ladders, teleports;
+///   1 - any dropped items;
+///   2 - player, enemies, npc, closed doors;
+///   3 - reserved;
+/// Any entity with order above 1 counted as obstacle;
+/// The sprite with bigger order should be rendered over the sprite with lower;
+pub const ZOrder = struct {
+    order: u2,
 };
 
 pub const Description = struct {
-    key: []const u8,
-
-    pub const empty_description: []const []const u8 = &.{};
+    ptr: *const g.Description,
 
     pub fn name(self: *const Description) []const u8 {
-        return g.text.names.get(self.key) orelse "";
+        return self.ptr.name;
     }
 
     pub fn description(self: *const Description) []const []const u8 {
-        return g.text.descriptions.get(self.key) orelse empty_description;
+        return self.ptr.description;
     }
 };
 
@@ -150,7 +156,7 @@ pub const SourceOfLight = struct {
 
 pub const Components = struct {
     animation: ?Animation = null,
-    description: ?Description = null,
+    description: ?Description,
     door: ?Door = null,
     equipment: ?Equipment = null,
     health: ?Health = null,
@@ -160,7 +166,8 @@ pub const Components = struct {
     position: ?Position = null,
     source_of_light: ?SourceOfLight = null,
     speed: ?Speed = null,
-    sprite: ?Sprite = null,
+    sprite: ?Sprite,
     state: ?EnemyState = null,
     weapon: ?Weapon = null,
+    z_order: ?ZOrder,
 };

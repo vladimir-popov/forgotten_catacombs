@@ -6,8 +6,9 @@ const p = g.primitives;
 
 pub fn player(alloc: std.mem.Allocator) c.Components {
     return .{
-        .sprite = .{ .codepoint = cp.human, .z_order = 3 },
-        .description = .{ .key = "plr" },
+        .sprite = .{ .codepoint = cp.human },
+        .z_order = .{ .order = 2 },
+        .description = .{ .ptr = &g.Description.player },
         .health = .{ .max = 100, .current = 100 },
         .speed = .{ .move_points = 10 },
         .equipment = .nothing,
@@ -17,8 +18,9 @@ pub fn player(alloc: std.mem.Allocator) c.Components {
 
 pub const Rat = c.Components{
     .initiative = .empty,
-    .sprite = .{ .codepoint = 'r', .z_order = 3 },
-    .description = .{ .key = "rat" },
+    .sprite = .{ .codepoint = 'r' },
+    .z_order = .{ .order = 2 },
+    .description = .{ .ptr = &g.Description.rat },
     .health = .{ .max = 10, .current = 10 },
     .weapon = .{ .min_damage = 1, .max_damage = 3 },
     .speed = .{ .move_points = 14 },
@@ -26,46 +28,55 @@ pub const Rat = c.Components{
 };
 
 pub const Club = c.Components{
-    .description = .{ .key = "clb" },
+    .description = .{ .ptr = &g.Description.club },
+    .z_order = .{ .order = 1 },
+    .sprite = .{ .codepoint = cp.weapon_melee },
     .weapon = .{ .min_damage = 2, .max_damage = 5 },
 };
 
 pub const Torch = c.Components{
-    .description = .{ .key = "trch"},
+    .description = .{ .ptr = &g.Description.torch },
+    .z_order = .{ .order = 1 },
+    .sprite = .{ .codepoint = cp.source_of_light },
     .source_of_light = .{ .radius = 5 },
 };
 
 pub const OpenedDoor = c.Components{
     .door = .{ .state = .opened },
-    .sprite = .{ .codepoint = cp.door_opened, .z_order = 0 },
-    .description = .{ .key = "odr" },
+    .z_order = .{ .order = 0 },
+    .sprite = .{ .codepoint = cp.door_opened },
+    .description = .{ .ptr = &g.Description.opened_door },
 };
 
 pub const ClosedDoor = c.Components{
     .door = .{ .state = .closed },
-    .sprite = .{ .codepoint = cp.door_closed, .z_order = 0 },
-    .description = .{ .key = "cdr" },
+    .z_order = .{ .order = 2 },
+    .sprite = .{ .codepoint = cp.door_closed },
+    .description = .{ .ptr = &g.Description.closed_door },
 };
 
 pub fn ladder(l: c.Ladder) c.Components {
     return switch (l.direction) {
         .up => .{
             .ladder = l,
-            .description = .{ .key = "uldr" },
-            .sprite = .{ .codepoint = cp.ladder_up, .z_order = 2 },
+            .description = .{ .ptr = &g.Description.ladder_up },
+            .z_order = .{ .order = 0 },
+            .sprite = .{ .codepoint = cp.ladder_up },
         },
         .down => .{
             .ladder = l,
-            .description = .{ .key = "dldr" },
-            .sprite = .{ .codepoint = cp.ladder_down, .z_order = 2 },
+            .description = .{ .ptr = &g.Description.ladder_down },
+            .z_order = .{ .order = 0 },
+            .sprite = .{ .codepoint = cp.ladder_down },
         },
     };
 }
 
 pub fn teleport(place: p.Point) c.Components {
     return .{
-        .position = .{ .point = place },
-        .sprite = .{ .codepoint = cp.teleport, .z_order = 1 },
-        .description = .{ .key = "tprt" },
+        .position = .{ .place = place },
+        .z_order = .{ .order = 0 },
+        .sprite = .{ .codepoint = cp.teleport },
+        .description = .{ .ptr = &g.Description.teleport },
     };
 }

@@ -210,10 +210,10 @@ fn doMove(
     move_speed: g.MovePoints,
 ) anyerror!g.MovePoints {
     const new_place = switch (target) {
-        .direction => |direction| from_position.point.movedTo(direction),
+        .direction => |direction| from_position.place.movedTo(direction),
         .new_place => |place| place,
     };
-    if (from_position.point.eql(new_place)) return 0;
+    if (from_position.place.eql(new_place)) return 0;
 
     if (checkCollision(self, entity, new_place)) |action| {
         return try doAction(self, entity, action, move_speed);
@@ -222,12 +222,12 @@ fn doMove(
         .entity_moved = .{
             .entity = entity,
             .is_player = (entity.eql(self.player)),
-            .moved_from = from_position.point,
+            .moved_from = from_position.place,
             .target = target,
         },
     };
     try self.events.sendEvent(event);
-    from_position.point = new_place;
+    from_position.place = new_place;
     return move_speed;
 }
 
@@ -323,13 +323,13 @@ fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
         ),
     }
     try self.mode.play.updateQuickActions(null);
-    self.viewport.centeredAround(self.level.playerPosition().point);
+    self.viewport.centeredAround(self.level.playerPosition().place);
     const event = g.events.Event{
         .entity_moved = .{
             .entity = self.player,
             .is_player = true,
             .moved_from = p.Point.init(0, 0),
-            .target = .{ .new_place = self.level.playerPosition().point },
+            .target = .{ .new_place = self.level.playerPosition().place },
         },
     };
     try self.events.sendEvent(event);

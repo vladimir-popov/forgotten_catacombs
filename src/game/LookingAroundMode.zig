@@ -41,19 +41,19 @@ fn update(self: *LookingAroundMode) !void {
     self.entities_on_screen.clearRetainingCapacity();
     var itr = self.session.level.componentsIterator().of(c.Position);
     while (itr.next()) |tuple| {
-        const is_inside_viewport = self.session.viewport.region.containsPoint(tuple[1].point);
+        const is_inside_viewport = self.session.viewport.region.containsPoint(tuple[1].place);
         // we should follow the same logic as the render:
         // only entities, which should be drawn, can be in focus
-        const is_visible = self.session.level.checkVisibility(tuple[1].point) != .invisible;
+        const is_visible = self.session.level.checkVisibility(tuple[1].place) != .invisible;
 
         if (is_inside_viewport and is_visible) {
-            const gop = try self.entities_on_screen.getOrPut(alloc, tuple[1].point);
+            const gop = try self.entities_on_screen.getOrPut(alloc, tuple[1].place);
             if (!gop.found_existing) {
                 gop.value_ptr.* = std.ArrayListUnmanaged(g.Entity){};
             }
             try gop.value_ptr.append(alloc, tuple[0]);
             if (tuple[0].eql(self.session.player)) {
-                self.place_in_focus = tuple[1].point;
+                self.place_in_focus = tuple[1].place;
                 self.focus_idx = gop.value_ptr.items.len - 1;
             }
         }
@@ -112,7 +112,7 @@ fn drawInfoBar(self: *const LookingAroundMode) !void {
         if (entity.eql(self.session.player)) {
             if (self.session.entities.get3(entity, c.Sprite, c.Health, c.Position)) |tuple| {
                 const sprite, const health, const position = tuple;
-                if (position.point.eql(self.session.level.playerPosition().point)) {
+                if (position.place.eql(self.session.level.playerPosition().place)) {
                     try self.session.render.drawEnemyHealth(sprite.codepoint, health);
                 } else {
                     var buf: [g.DISPLAY_COLS]u8 = undefined;

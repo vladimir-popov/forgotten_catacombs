@@ -7,7 +7,6 @@ pub const ecs = @import("ecs/ecs_pkg.zig");
 pub const entities = @import("entities.zig");
 pub const events = @import("events.zig");
 pub const primitives = @import("primitives.zig");
-pub const text = @import("text.zig");
 pub const visibility = @import("visibility_strategies.zig");
 
 pub const Action = @import("actions.zig").Action;
@@ -15,6 +14,7 @@ pub const AI = @import("AI.zig");
 pub const Button = @import("Button.zig");
 pub const Cheat = @import("cheats.zig").Cheat;
 pub const Codepoint = u21;
+pub const Description = @import("Description.zig");
 pub const DijkstraMap = @import("DijkstraMap.zig");
 pub const DrawingMode = Runtime.DrawingMode;
 pub const Entity = ecs.Entity;
@@ -30,7 +30,6 @@ pub const Render = @import("Render.zig");
 pub const Runtime = @import("Runtime.zig");
 pub const Viewport = @import("Viewport.zig");
 pub const Window = @import("Window.zig");
-pub const ZOrder = u3;
 
 pub const RENDER_DELAY_MS = 150;
 

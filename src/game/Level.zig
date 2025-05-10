@@ -131,7 +131,7 @@ pub fn obstacleAt(
 
     var itr = self.componentsIterator().of(c.Position);
     while (itr.next()) |tuple| {
-        if (tuple[1].point.eql(place)) {
+        if (tuple[1].place.eql(place)) {
             if (self.session.entities.get(tuple[0], c.Door)) |door| {
                 return if (door.state == .closed) .{ .door = tuple[0] } else null;
             } else {
@@ -147,7 +147,7 @@ pub fn obstacleAt(
 pub fn onPlayerMoved(self: *Level, player_moved: g.events.EntityMoved) !void {
     std.debug.assert(player_moved.is_player);
     self.updatePlacement(player_moved.moved_from, player_moved.targetPlace());
-    const player_place = self.playerPosition().point;
+    const player_place = self.playerPosition().place;
     self.dijkstra_map.region.centralizeAround(player_place);
     try self.dijkstra_map.calculate(player_place);
 }

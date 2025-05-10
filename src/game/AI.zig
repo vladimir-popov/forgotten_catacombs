@@ -17,7 +17,7 @@ pub fn action(
     entity: g.Entity,
     entity_place: p.Point,
 ) g.Action {
-    const player_place = self.session.level.playerPosition().point;
+    const player_place = self.session.level.playerPosition().place;
 
     if (self.session.entities.get(entity, c.EnemyState)) |state| {
         const act = switch (state.*) {
