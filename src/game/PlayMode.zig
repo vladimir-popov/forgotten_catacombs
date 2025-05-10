@@ -185,18 +185,15 @@ pub fn tick(self: *PlayMode) !void {
             }
         }
     } else {
-        var itr = self.session.level.componentsIterator().of2(c.Initiative, c.Speed);
+        var itr = self.session.level.componentsIterator().of4(c.Position, c.Initiative, c.Speed, c.EnemyState);
         while (itr.next()) |tuple| {
-            const entity = tuple[0];
-            const initiative = tuple[1];
-            const speed = tuple[2];
+            const entity, const position, const initiative, const speed, const state = tuple;
             if (speed.move_points > initiative.move_points) continue;
-            if (self.session.entities.get(entity, c.Position)) |position| {
-                const action = self.session.ai.action(entity, position.place);
-                const mp = try self.session.doAction(entity, action, speed.move_points);
-                std.debug.assert(0 < mp and mp <= initiative.move_points);
-                initiative.move_points -= mp;
-            }
+
+            const action = self.session.ai.action(entity, position.place, state.*);
+            const mp = try self.session.doAction(entity, action, speed.move_points);
+            std.debug.assert(0 < mp and mp <= initiative.move_points);
+            initiative.move_points -= mp;
         }
         self.is_player_turn = true;
     }

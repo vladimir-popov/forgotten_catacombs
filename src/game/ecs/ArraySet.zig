@@ -62,6 +62,7 @@ pub fn ArraySet(comptime C: anytype) type {
         /// Adds the component of the type `C` for the entity, or replaces existed.
         pub fn setToEntity(self: *Self, entity: Entity, component: C) !void {
             if (self.entity_index.get(entity)) |idx| {
+                self.deinitComponent(idx);
                 self.components.items[idx] = component;
             } else {
                 try self.entity_index.put(self.alloc, entity, @intCast(self.components.items.len));
@@ -98,8 +99,8 @@ pub fn ArraySet(comptime C: anytype) type {
         }
 
         inline fn deinitComponent(self: *Self, idx: usize) void {
-            if (std.meta.hasFn(C, "deinit")) {
-                C.deinit(&self.components.items[idx]);
+            if (@hasDecl(C, "deinit")) {
+                self.components.items[idx].deinit();
             }
         }
     };

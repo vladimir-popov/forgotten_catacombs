@@ -53,7 +53,11 @@ pub const Cheat = union(enum) {
     }
 
     inline fn tryParse(comptime U: type, str: []const u8) ?U {
-        return std.fmt.parseInt(U, str, 10) catch null;
+        return std.fmt.parseInt(
+            U,
+            std.mem.trim(u8, str, " \t"),
+            10,
+        ) catch null;
     }
 
     pub inline fn allAsStrings() [count][]const u8 {

@@ -36,7 +36,7 @@ pub fn ComponentsMap(comptime ComponentsStruct: anytype) type {
             },
             else => {
                 @compileError(std.fmt.comptimePrint(
-                    "All fields in the `{s}` should be optional, but the `{s}: {any}` was found.",
+                    "All fields in the `{s}` should be optional, but the `{s}: {any}` is not.",
                     .{ @typeName(ComponentsStruct), field.name, field.type },
                 ));
             },

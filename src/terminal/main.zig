@@ -14,7 +14,7 @@ pub const std_options: std.Options = .{
         .{ .scope = .render, .level = .warn },
         // .{ .scope = .tty_runtime, .level = .debug },
         // .{ .scope = .visibility, .level = .debug },
-        // .{ .scope = .ai, .level = .debug },
+        .{ .scope = .ai, .level = .debug },
         // .{ .scope = .game, .level = .debug },
         // .{ .scope = .game_session, .level = .debug },
         // .{ .scope = .play_mode, .level = .debug },

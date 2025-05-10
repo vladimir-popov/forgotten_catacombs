@@ -16,19 +16,17 @@ pub fn action(
     self: AI,
     entity: g.Entity,
     entity_place: p.Point,
+    enemy_state: c.EnemyState,
 ) g.Action {
     const player_place = self.session.level.playerPosition().place;
 
-    if (self.session.entities.get(entity, c.EnemyState)) |state| {
-        const act = switch (state.*) {
-            .sleeping => self.actionForSleepingEnemy(entity, entity_place, player_place),
-            .walking => self.actionForWalkingEnemy(entity, entity_place, player_place),
-            .aggressive => self.actionForAggressiveEnemy(entity, entity_place, player_place),
-        };
-        log.debug("The action for the entity {d} in state {s} is {any}", .{ entity.id, @tagName(state.*), act });
-        return act;
-    }
-    return .wait;
+    const act = switch (enemy_state) {
+        .sleeping => self.actionForSleepingEnemy(entity, entity_place, player_place),
+        .walking => self.actionForWalkingEnemy(entity, entity_place, player_place),
+        .aggressive => self.actionForAggressiveEnemy(entity, entity_place, player_place),
+    };
+    log.debug("The action for the entity {d} in state {s} is {any}", .{ entity.id, @tagName(enemy_state), act });
+    return act;
 }
 
 inline fn actionForSleepingEnemy(

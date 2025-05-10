@@ -54,7 +54,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
         keyboard_buffer: ?tty.KeyboardAndMouse.Button = null,
         // The border should not be drawn for DungeonGenerator
         draw_border: bool = true,
-        use_cheats: bool = false,
+        is_dev_mode: bool = false,
         cheat: ?g.Cheat = null,
         // true means that program should be closed
         is_exit: bool = false,
@@ -63,7 +63,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             alloc: std.mem.Allocator,
             draw_border: bool,
             render_in_center: bool,
-            use_cheats: bool,
+            is_dev_mode: bool,
         ) !Self {
             const instance = Self{
                 .alloc = alloc,
@@ -72,9 +72,9 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                 .cmd = try Cmd(display_cols - 2).init(alloc),
                 .termios = tty.Display.enterRawMode(),
                 .draw_border = draw_border,
-                .use_cheats = use_cheats,
+                .is_dev_mode = is_dev_mode,
             };
-            try enableGameMode(use_cheats);
+            try enableGameMode(is_dev_mode);
             should_render_in_center = render_in_center;
             return instance;
         }
@@ -90,6 +90,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             return .{
                 .context = self,
                 .vtable = &.{
+                    .isDevMode = isDevMode,
                     .popCheat = popCheat,
                     .addMenuItem = addMenuItem,
                     .removeAllMenuItems = removeAllMenuItems,
@@ -136,7 +137,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                             self.menu.close()
                         else
                             try self.menu.show();
-                    } else if (self.use_cheats and ch.char == ':') {
+                    } else if (self.is_dev_mode and ch.char == ':') {
                         self.cmd.cleanCmd();
                     },
                     else => {},
@@ -214,6 +215,11 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                 }
             }
             return null;
+        }
+
+        fn isDevMode(ptr: *anyopaque) bool {
+            const self: *Self = @ptrCast(@alignCast(ptr));
+            return self.is_dev_mode;
         }
 
         fn popCheat(ptr: *anyopaque) ?g.Cheat {

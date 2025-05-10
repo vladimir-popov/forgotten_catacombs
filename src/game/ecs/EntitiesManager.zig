@@ -172,24 +172,25 @@ pub fn EntitiesManager(comptime ComponentsStruct: type) type {
     };
 }
 
-test "EntitiesManager: Add/Get/Remove component" {
+test "Add/Get/Remove component" {
+    var deinited: bool = false;
     const TestComponent = struct {
         const Self = @This();
         state: std.ArrayList(u8),
-        deinited: bool = true,
+        deinited: *bool,
 
-        fn init(value: u8) !Self {
+        fn init(value: u8, ptr: *bool) !Self {
             var instance: Self = .{
                 .state = try std.ArrayList(u8).initCapacity(std.testing.allocator, 1),
-                .deinited = false,
+                .deinited = ptr,
             };
             try instance.state.append(value);
             return instance;
         }
 
-        fn deinit(self: *Self) void {
+        pub fn deinit(self: *Self) void {
             self.state.deinit();
-            self.deinited = true;
+            self.deinited.* = true;
         }
     };
 
@@ -202,10 +203,8 @@ test "EntitiesManager: Add/Get/Remove component" {
 
     // should return the component, which was added before
     const entity = manager.newEntity();
-    var component_instance = try TestComponent.init(123);
-    defer component_instance.deinit();
+    try manager.set(entity, try TestComponent.init(123, &deinited));
 
-    try manager.set(entity, component_instance);
     var component = manager.get(entity, TestComponent);
     try std.testing.expectEqual(123, component.?.state.items[0]);
 
@@ -219,12 +218,40 @@ test "EntitiesManager: Add/Get/Remove component" {
     try std.testing.expectEqual(null, component);
 
     // should deinit component on removing it
-    try std.testing.expect(component_instance.deinited);
+    try std.testing.expect(deinited);
 
     // and finally, no memory leak should happened
 }
 
-test "EntitiesManager: get entity as a struct" {
+test "deinit entity on update" {
+    // given:
+    var deinited_1: bool = false;
+    var deinited_2: bool = false;
+    const Cmp = struct {
+        value: u8,
+        deinited: *bool,
+        pub fn deinit(self: *@This()) void {
+            self.deinited.* = true;
+        }
+    };
+    const Components = struct { cmp: ?Cmp };
+
+    defer std.testing.expectEqual(true, deinited_2) catch unreachable;
+    var manager = try EntitiesManager(Components).init(std.testing.allocator);
+    defer manager.deinit();
+
+    const entity = manager.newEntity();
+    try manager.set(entity, Cmp{ .value = 1, .deinited = &deinited_1 });
+
+    // when:
+    try manager.set(entity, Cmp{ .value = 2, .deinited = &deinited_2 });
+
+    // then:
+    try std.testing.expectEqual(2, manager.getUnsafe(entity, Cmp).value);
+    try std.testing.expectEqual(true, deinited_1);
+}
+
+test "get entity as a struct" {
     // given:
     const Foo = struct { value: u8 };
     const Bar = struct { value: bool };
@@ -245,7 +272,7 @@ test "EntitiesManager: get entity as a struct" {
     try std.testing.expectEqualDeep(Bar{ .value = true }, structure.bar.?);
 }
 
-test "EntitiesManager: set components to the entity" {
+test "set all components as a struct to the entity" {
     // given:
     const Foo = struct { value: u8 };
     const Bar = struct { value: bool };

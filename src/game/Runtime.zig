@@ -34,11 +34,16 @@ const VTable = struct {
         mode: DrawingMode,
     ) anyerror!void,
     currentMillis: *const fn (context: *anyopaque) c_uint,
+    isDevMode: *const fn (context: *anyopaque) bool,
     popCheat: *const fn (context: *anyopaque) ?g.Cheat,
 };
 
 context: *anyopaque,
 vtable: *const VTable,
+
+pub inline fn isDevMode(self: Runtime) bool {
+    return self.vtable.isDevMode(self.context);
+}
 
 pub inline fn popCheat(self: Runtime) ?g.Cheat {
     return self.vtable.popCheat(self.context);

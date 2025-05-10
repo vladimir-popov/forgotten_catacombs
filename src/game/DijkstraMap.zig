@@ -5,7 +5,7 @@ const p = g.primitives;
 
 const DijkstraMap = @This();
 
-const VectorsMap = std.AutoHashMap(p.Point, struct { p.Direction, u8 });
+const VectorsMap = std.AutoHashMapUnmanaged(p.Point, struct { p.Direction, u8 });
 
 pub const Obstacles = struct {
     context: *const anyopaque,
@@ -16,6 +16,7 @@ pub const Obstacles = struct {
     }
 };
 
+alloc: std.mem.Allocator,
 region: p.Region,
 /// The Dijkstra map that provides an optimal direction to the player, and counts of moves
 /// needed to achieve the player in that direction.
@@ -24,19 +25,20 @@ vectors: VectorsMap,
 obstacles: Obstacles,
 
 pub fn init(alloc: std.mem.Allocator, region: p.Region, obstacles: Obstacles) DijkstraMap {
-    return .{ .vectors = VectorsMap.init(alloc), .region = region, .obstacles = obstacles };
+    return .{ .alloc = alloc, .vectors = .empty, .region = region, .obstacles = obstacles };
 }
 
 pub fn deinit(self: *DijkstraMap) void {
-    self.vectors.deinit();
+    self.vectors.deinit(self.alloc);
 }
 
 pub fn calculate(self: *DijkstraMap, target: p.Point) !void {
-    var openned = std.ArrayList(struct { p.Point, u8 }).init(self.vectors.allocator);
-    defer openned.deinit();
+    var openned: std.ArrayListUnmanaged(struct { p.Point, u8 }) = .empty;
+    defer openned.deinit(self.alloc);
+
     self.vectors.clearRetainingCapacity();
 
-    try openned.append(.{ target, 0 });
+    try openned.append(self.alloc, .{ target, 0 });
     while (openned.pop()) |tuple| {
         const weight: u8 = tuple[1];
         for (&[_]p.Direction{ .left, .up, .right, .down }) |direction| {
@@ -44,10 +46,10 @@ pub fn calculate(self: *DijkstraMap, target: p.Point) !void {
             if (!self.region.containsPoint(neighbor) or neighbor.eql(target) or self.obstacles.isObstacle(neighbor))
                 continue;
 
-            const gop = try self.vectors.getOrPut(neighbor);
+            const gop = try self.vectors.getOrPut(self.alloc, neighbor);
             if (!gop.found_existing or gop.value_ptr[1] > weight + 1) {
                 gop.value_ptr.* = .{ direction.opposite(), weight + 1 };
-                try openned.append(.{ neighbor, weight + 1 });
+                try openned.append(self.alloc, .{ neighbor, weight + 1 });
             }
         }
     }
@@ -57,7 +59,7 @@ pub fn dumpToLog(self: DijkstraMap) void {
     var buf: [2048]u8 = [_]u8{0} ** 2048;
     var writer = std.io.fixedBufferStream(&buf);
     self.write(writer.writer().any()) catch unreachable;
-    std.log.debug("Dijkstra Map:\n{s}", .{std.mem.sliceTo(&buf, 0)});
+    std.log.debug("Dijkstra Map ({any}):\n{s}", .{ self.region, std.mem.sliceTo(&buf, 0) });
 }
 
 fn write(

@@ -109,24 +109,9 @@ fn drawInfoBar(self: *const LookingAroundMode) !void {
     }
     // Draw the name or health of the entity in focus
     if (self.entityInFocus()) |entity| {
-        if (entity.eql(self.session.player)) {
-            if (self.session.entities.get3(entity, c.Sprite, c.Health, c.Position)) |tuple| {
-                const sprite, const health, const position = tuple;
-                if (position.place.eql(self.session.level.playerPosition().place)) {
-                    try self.session.render.drawEnemyHealth(sprite.codepoint, health);
-                } else {
-                    var buf: [g.DISPLAY_COLS]u8 = undefined;
-                    const len = @min(try self.statusLine(entity, &buf), g.Render.MIDDLE_ZONE_LENGTH);
-                    try self.session.render.drawInfo(buf[0..len]);
-                }
-                return;
-            }
-        }
-        const name = if (self.session.entities.get(entity, c.Description)) |desc|
-            desc.name()
-        else
-            "?";
-        try self.session.render.drawInfo(name);
+        var buf: [g.DISPLAY_COLS]u8 = undefined;
+        const len = @min(try self.statusLine(entity, &buf), g.Render.MIDDLE_ZONE_LENGTH);
+        try self.session.render.drawInfo(buf[0..len]);
     } else {
         try self.session.render.cleanInfo();
     }
@@ -134,7 +119,7 @@ fn drawInfoBar(self: *const LookingAroundMode) !void {
 
 fn statusLine(self: LookingAroundMode, entity: g.Entity, line: []u8) !usize {
     var len: usize = 0;
-    if (true) {
+    if (self.session.runtime.isDevMode()) {
         len += (try std.fmt.bufPrint(line[len..], "{d}:", .{entity.id})).len;
     }
     if (self.session.entities.get(entity, c.Description)) |description| {

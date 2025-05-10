@@ -158,7 +158,8 @@ pub fn build(b: *std.Build) !void {
     const test_filter = b.option(
         []const []const u8,
         "test-filter",
-        "Skip tests that do not match any filter",
+        "Skip tests that do not match the filter:\n" ++
+            "                               `-Dtest-filter=<part of the test name>`",
     ) orelse &[0][]const u8{};
 
     const test_runner = std.Build.Step.Compile.TestRunner{
@@ -190,9 +191,6 @@ pub fn build(b: *std.Build) !void {
     // b.installArtifact(generator_tests);
     // const run_generator_tests = b.addRunArtifact(generator_tests);
 
-    // Similar to creating the run step earlier, this exposes a `test` step to
-    // the `zig build --help` menu, providing a way for the user to request
-    // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
     if (b.args) |args| {
         run_game_tests.addArgs(args);

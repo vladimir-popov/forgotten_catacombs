@@ -19,6 +19,7 @@ playdate: *api.PlaydateAPI,
 alloc: std.mem.Allocator,
 bitmap_table: *api.LCDBitmapTable,
 last_button: *LastButton,
+is_dev_mode: bool = false,
 
 pub fn init(playdate: *api.PlaydateAPI) !PlaydateRuntime {
     const err: ?*[*c]const u8 = null;
@@ -58,6 +59,7 @@ pub fn runtime(self: *PlaydateRuntime) g.Runtime {
     return .{
         .context = self,
         .vtable = &.{
+            .isDevMode = isDevMode,
             .popCheat = popCheat,
             .addMenuItem = addMenuItem,
             .removeAllMenuItems = removeAllMenuItems,
@@ -71,6 +73,11 @@ pub fn runtime(self: *PlaydateRuntime) g.Runtime {
 }
 
 // ======== Private methods: ==============
+
+fn isDevMode(ptr: *anyopaque) bool {
+    const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
+    return self.is_dev_mode;
+}
 
 fn currentMillis(ptr: *anyopaque) c_uint {
     const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
