@@ -330,7 +330,7 @@ fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
     try self.events.sendEvent(event);
 }
 
-pub fn getWeapon(self: *GameSession, actor: g.Entity) ?*c.Weapon {
+pub fn getWeapon(self: *const GameSession, actor: g.Entity) ?*c.Weapon {
     if (self.entities.get(actor, c.Weapon)) |weapon| return weapon;
 
     if (self.entities.get(actor, c.Equipment)) |equipment|
@@ -341,6 +341,6 @@ pub fn getWeapon(self: *GameSession, actor: g.Entity) ?*c.Weapon {
     return null;
 }
 
-pub fn isEnemy(self: *GameSession, entity: g.Entity) bool {
+pub fn isEnemy(self: *const GameSession, entity: g.Entity) bool {
     return self.entities.get(entity, c.Health) != null;
 }

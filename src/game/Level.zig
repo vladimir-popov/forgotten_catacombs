@@ -108,7 +108,12 @@ pub fn isObstacle(self: *const Level, place: p.Point) bool {
             .floor, .doorway => {},
             else => return true,
         },
-        .entities => |entities| if (entities[2] != null) return true,
+        .entities => |entities| if (entities[2]) |entity|
+            // an entity with health points is overcoming obstacle
+            return self.session.entities.get(entity, c.Health) == null
+        else
+            // all other are not
+            return false,
     }
     return false;
 }

@@ -63,7 +63,7 @@ inline fn actionForWalkingEnemy(
         if (self.session.level.isObstacle(place)) continue;
         return .{ .move = .{ .target = .{ .direction = direction } } };
     }
-    log.err("Entity {d} is stuck at {any}", .{ entity.id, entity_place });
+    log.err("Entity {d} is stuck at {any}. Sleep.", .{ entity.id, entity_place });
     return .{ .go_sleep = entity };
 }
 
@@ -73,19 +73,24 @@ inline fn actionForAggressiveEnemy(
     entity_place: p.Point,
     player_place: p.Point,
 ) g.Action {
-    if (self.session.level.dijkstra_map.vectors.get(entity_place)) |vector| {
-        if (entity_place.near(player_place)) {
-            const weapon = self.session.entities.getUnsafe(entity, c.Weapon);
+    if (entity_place.near(player_place)) {
+        if (self.session.getWeapon(entity)) |weapon|
             return .{
                 .hit = .{
                     .target = self.session.player,
                     .by_weapon = weapon.*,
                 },
             };
-        } else {
-            return .{ .move = .{ .target = .{ .direction = vector[0] } } };
-        }
+    }
+
+    if (self.session.level.dijkstra_map.vectors.get(entity_place)) |vector| {
+        log.debug(
+            "Entity {any} moves to the player from {any} in direction {s}",
+            .{ entity, entity_place, @tagName(vector[0]) },
+        );
+        return .{ .move = .{ .target = .{ .direction = vector[0] } } };
     } else {
+        log.info("Player is out of reach for {any} (from {any}). Chill.", .{ entity, entity_place });
         return .{ .chill = entity };
     }
 }
