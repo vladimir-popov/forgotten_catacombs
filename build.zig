@@ -154,6 +154,7 @@ pub fn build(b: *std.Build) !void {
     // ============================================================
     //                Step to run tests
     // ============================================================
+    const test_step = b.step("test", "Run unit tests");
 
     const test_filter = b.option(
         []const []const u8,
@@ -174,6 +175,7 @@ pub fn build(b: *std.Build) !void {
     });
     b.installArtifact(game_tests);
     const run_game_tests = b.addRunArtifact(game_tests);
+    test_step.dependOn(&run_game_tests.step);
 
     const terminal_tests = b.addTest(.{
         .root_module = terminal_module,
@@ -182,6 +184,7 @@ pub fn build(b: *std.Build) !void {
     });
     b.installArtifact(terminal_tests);
     const run_terminal_tests = b.addRunArtifact(terminal_tests);
+    test_step.dependOn(&run_terminal_tests.step);
 
     // const generator_tests = b.addTest(.{
     //     .root_module = dungeon_generator_module,
@@ -190,44 +193,42 @@ pub fn build(b: *std.Build) !void {
     // });
     // b.installArtifact(generator_tests);
     // const run_generator_tests = b.addRunArtifact(generator_tests);
+    // test_step.dependOn(&run_generator_tests.step);
 
-    const test_step = b.step("test", "Run unit tests");
     if (b.args) |args| {
         run_game_tests.addArgs(args);
         run_terminal_tests.addArgs(args);
         // run_generator_tests.addArgs(args);
     }
-    // run_terminal_tests.has_side_effects = true;
-    // run_generator_tests.has_side_effects = true;
-
-    test_step.dependOn(&run_game_tests.step);
-    test_step.dependOn(&run_terminal_tests.step);
-    // test_step.dependOn(&run_generator_tests.step);
 
     // ============================================================
     //                Step to check by zls
     // ============================================================
+    const check = b.step("check", "Verify code by zls on save");
     const check_game = b.addSharedLibrary(.{
         .name = "check game",
         .root_module = game_module,
     });
+    check.dependOn(&check_game.step);
+
     const check_terminal = b.addExecutable(.{
         .name = "check terminal",
         .root_module = terminal_module,
     });
+    check.dependOn(&check_terminal.step);
+
     // const check_generator = b.addExecutable(.{
     //     .name = "check generator",
     //     .root_module = dungeon_generator_module,
     // });
-    const check_playdate = b.addExecutable(.{
-        .name = "check playdate",
-        .root_module = playdate_module,
-    });
-    const check = b.step("check", "Verify code by zls on save");
-    check.dependOn(&check_game.step);
-    check.dependOn(&check_terminal.step);
-    check.dependOn(&check_playdate.step);
     // check.dependOn(&check_generator.step);
+
+    // Checking the playdate module doubles compilation errors in LSP
+    // const check_playdate = b.addExecutable(.{
+    //     .name = "check playdate",
+    //     .root_module = playdate_module,
+    // });
+    // check.dependOn(&check_playdate.step);
 
     // ============================================================
     //                Step to run in emulator

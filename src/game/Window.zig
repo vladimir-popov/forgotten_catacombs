@@ -7,13 +7,24 @@ const p = g.primitives;
 pub const MAX_WINDOW_HEIGHT = g.DISPLAY_ROWS - 2;
 /// The maximum count of columns including borders needed to draw a window
 pub const MAX_WINDOW_WIDTH = g.DISPLAY_COLS - 2;
+/// The minimum count of rows in the `.modal` mode.
+pub const MIN_ROWS_FOR_MODAL = 1;
 
-/// The max length of the visible content of the window
+/// The maximum count of visible symbols in the line.
 /// -2 for borders; -1 for scroll.
-pub const COLS = MAX_WINDOW_WIDTH - 3;
+pub const MAX_LINE_SYMBOLS = MAX_WINDOW_WIDTH - 3;
+// The size of the buffer for a single line.
+// It's bigger than MAX_LINE_SYMBOLS, coz can contains sprite symbol
+const COLS = MAX_WINDOW_WIDTH + 3;
 pub const Line = [COLS]u8;
 
 const Window = @This();
+
+/// The mode to draw the window:
+///   - `.full_screen` means that the region of the window has size `MAX_WINDOW_WIDTH` x `MAX_WINDOW_HEIGHT`;
+///   - `.modal` means that the region of the window has size
+///      `MAX_WINDOW_WIDTH` x `@max(MIN_ROWS_FOR_MODAL, lines.items.len)`;
+pub const Mode = enum { modal, full_screen };
 
 alloc: std.mem.Allocator,
 title: [COLS]u8 = [1]u8{0} ** COLS,
@@ -24,14 +35,27 @@ scroll: usize = 0,
 /// The absolute index of the selected line (includes the lines out of scroll)
 selected_line: ?usize = null,
 tag: u8 = 0,
+mode: Mode = .full_screen,
 
-pub fn init(alloc: std.mem.Allocator) Window {
-    std.log.debug("Init a window", .{});
+pub fn fullScreen(alloc: std.mem.Allocator) Window {
+    std.log.debug("Init a window in full screen", .{});
     return .{
         .alloc = alloc,
         .scroll = 0,
         .title = [1]u8{0} ** COLS,
         .lines = .empty,
+        .mode = .full_screen,
+    };
+}
+
+pub fn modal(alloc: std.mem.Allocator) Window {
+    std.log.debug("Init an adaptive window", .{});
+    return .{
+        .alloc = alloc,
+        .scroll = 0,
+        .title = [1]u8{0} ** COLS,
+        .lines = .empty,
+        .mode = .modal,
     };
 }
 
@@ -88,12 +112,17 @@ pub inline fn setEnumTag(self: *Window, item: anytype) void {
 
 /// Returns the region of the screen occupied by the window including border.
 pub inline fn region(self: Window) p.Region {
+    const min_rows: u8 = switch (self.mode) {
+        .modal => MIN_ROWS_FOR_MODAL,
+        .full_screen => MAX_WINDOW_HEIGHT,
+    };
+    const height = @max(min_rows, self.visibleLines().len + 2);
     return .{
-        .top_left = if (self.lines.items.len > g.Window.MAX_WINDOW_HEIGHT - 2)
+        .top_left = if (height > g.Window.MAX_WINDOW_HEIGHT - 2)
             .{ .row = 1, .col = 2 }
         else
-            .{ .row = @intCast(1 + (g.Window.MAX_WINDOW_HEIGHT - 2 - self.lines.items.len) / 2), .col = 2 },
-        .rows = @intCast(self.visibleLines().len + 2),
+            .{ .row = @intCast(1 + (g.Window.MAX_WINDOW_HEIGHT - 2 - height) / 2), .col = 2 },
+        .rows = @intCast(height),
         .cols = MAX_WINDOW_WIDTH,
     };
 }
@@ -102,6 +131,7 @@ pub inline fn isScrolled(self: Window) bool {
     return self.lines.items.len > g.Window.MAX_WINDOW_HEIGHT - 2;
 }
 
+/// Returns slice of the visible lines only.
 pub fn visibleLines(self: Window) [][g.Window.COLS]u8 {
     return if (self.isScrolled())
         self.lines.items[self.scroll .. self.scroll + g.Window.MAX_WINDOW_HEIGHT - 2]

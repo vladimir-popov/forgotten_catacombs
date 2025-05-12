@@ -250,7 +250,7 @@ fn initWindowWithVariants(
     variants: []const g.Entity,
     selected: usize,
 ) !void {
-    self.window = g.Window.init(self.arena.allocator());
+    self.window = g.Window.modal(self.arena.allocator());
     self.window.?.setEnumTag(WindowType.variants);
     for (variants, 0..) |entity, idx| {
         // Every entity has to have description, or handling indexes become complicated
@@ -267,7 +267,7 @@ fn initWindowWithDescription(
     self: *LookingAroundMode,
     entity: g.Entity,
 ) !void {
-    self.window = g.Window.init(self.arena.allocator());
+    self.window = g.Window.modal(self.arena.allocator());
     self.window.?.setEnumTag(WindowType.description);
     try self.window.?.info(self.session.entities, entity);
 }

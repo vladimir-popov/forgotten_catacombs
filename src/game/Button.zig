@@ -8,7 +8,9 @@ pub const GameButton = enum(u8) {
     right = (1 << 1),
     up = (1 << 2),
     down = (1 << 3),
+    /// Left button
     b = (1 << 4),
+    /// Right button
     a = (1 << 5),
 
     pub fn fromCode(code: c_int) ?GameButton {

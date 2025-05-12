@@ -255,7 +255,36 @@ pub fn drawWindow(
     self: Render,
     window: *const g.Window,
 ) !void {
-    const region = window.region();
+    switch (window.mode) {
+        .full_screen => try self.drawFullScreenWindow(window),
+        .modal => try self.drawModalWindow(window),
+    }
+}
+
+fn drawFullScreenWindow(self: Render, window: *const g.Window) !void {
+    try self.runtime.clearDisplay();
+
+    var str = std.mem.sliceTo(&window.title, 0);
+    try self.runtime.drawTextWithAlign(g.DISPLAY_COLS, str, .{ .row = 1, .col = 1 }, .normal, .center);
+
+    const visible_lines = window.visibleLines();
+    for (visible_lines, 2..) |line, row| {
+        str = std.mem.sliceTo(&line, 0);
+        const mode: g.DrawingMode = if (window.selected_line == row - 2) .inverted else .normal;
+        try self.runtime.drawTextWithAlign(g.DISPLAY_COLS, str, .{ .row = @intCast(row), .col = 1 }, mode, .left);
+    }
+}
+
+fn drawModalWindow(self: Render, window: *const g.Window) !void {
+    const height = @max(g.Window.MIN_ROWS_FOR_MODAL, window.visibleLines().len + 2);
+    const region = p.Region{
+        .top_left = if (height > g.Window.MAX_WINDOW_HEIGHT - 2)
+            .{ .row = 1, .col = 2 }
+        else
+            .{ .row = @intCast(1 + (g.Window.MAX_WINDOW_HEIGHT - 2 - height) / 2), .col = 2 },
+        .rows = @intCast(height),
+        .cols = g.Window.MAX_WINDOW_WIDTH,
+    };
     var itr = region.cells();
     while (itr.next()) |point| {
         if (point.row == region.top_left.row or point.row == region.bottomRightRow()) {

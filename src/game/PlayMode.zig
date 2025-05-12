@@ -284,7 +284,7 @@ fn initWindowWithVariants(
     variants: []const QuickAction,
     selected: usize,
 ) !void {
-    self.window = g.Window.init(self.arena.allocator());
+    self.window = g.Window.modal(self.arena.allocator());
     for (variants, 0..) |qa, idx| {
         const line = try self.window.?.addEmptyLine();
         const action_label = qa.action.toString();
