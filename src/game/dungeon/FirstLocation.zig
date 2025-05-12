@@ -1,42 +1,49 @@
-//! This is the first level of the game
-//! with shops and entrance to the dungeon
+//! This is the first level of the game with shops
+//! and entrance to the dungeon:
+//!
+//! ╔════════════════════════════════════════╗----
+//! ║########################################║  |   The area is a little bit bigger than
+//! ║#..............#  >  #.................#║  |   the visible part of the screen.
+//! ║#...┌───┐......###+###...........┌───┐.#║      It helps to see rocks and water at the
+//! ║#...│.@.'•••••••••@••••••••••••••+ _ │.#║  a   display padding.
+//! ║#...└───┘••••••••••••••••••••••••└───┘.#║  r
+//! ║#...┌───┐••••••••••••••••••••••••......#║  e
+//! ║#...│.@.'••••••••••••••••••••••••......#║  a
+//! ║#...└───┘••••••••••••@•••••••••••......#║
+//! ║~~~~~~~~~~~~~~~~~~~~│<│~~~~~~~~~~~~~~~~~║  |
+//! ║~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~║  |
+//! ║════════════════════════════════════════║  |
 const std = @import("std");
 const g = @import("../game_pkg.zig");
 const p = g.primitives;
 const d = @import("dungeon_pkg.zig");
 
-// ╔════════════════════════════════════════╗
-// ║########################################║
-// ║#..............#  >  #.................#║
-// ║#...┌───┐......###+###...........┌───┐.#║
-// ║#...│.@.'•••••••••@••••••••••••••+ _ │.#║
-// ║#...└───┘••••••••••••••••••••••••└───┘.#║
-// ║#...┌───┐••••••••••••••••••••••••......#║
-// ║#...│.@.'••••••••••••••••••••••••......#║
-// ║#...└───┘••••••••••••••••@•••••••......#║
-// ║~~~~~~~~~~~~~~~~~~~~~~~~│<│~~~~~~~~~~~~~║
-// ║~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~║
-// ║════════════════════════════════════════║
 const FirstLocation = @This();
 
-pub const rows = g.DISPLAY_ROWS - 2;
-pub const cols = g.DISPLAY_COLS - 1;
+const pad = 10;
 
-const whole_region: p.Region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = rows, .cols = cols };
+// the dungeon region should include a little bit more rows and cols
+// to fill the display padding
+const dungeon_region: p.Region = p.Region{
+    .top_left = .{ .row = 1, .col = 1 },
+    .rows = g.DISPLAY_ROWS + pad,
+    .cols = g.DISPLAY_COLS + 2 * pad,
+};
 // The square - place between tents
-const square: p.Region = .{ .top_left = .{ .row = 4, .col = 9 }, .rows = 6, .cols = 23 };
+const square: p.Region = .{ .top_left = .{ .row = 4, .col = pad + 9 }, .rows = 6, .cols = 23 };
 /// It leads to the catacombs
-const ladder: p.Point = .{ .row = 2, .col = 18 };
-const ladder_room: p.Region = .{ .top_left = .{ .row = 1, .col = 15 }, .rows = 3, .cols = 7 };
+const ladder: p.Point = .{ .row = 2, .col = pad + 18 };
+const ladder_room: p.Region = .{ .top_left = .{ .row = 1, .col = pad + 15 }, .rows = 3, .cols = 7 };
 /// This is the entrance to this level
-const wharf: p.Point = .{ .row = 9, .col = 25 };
-const traider_tent: p.Region = p.Region{ .top_left = .{ .row = 3, .col = 5 }, .rows = 3, .cols = 5 };
+const wharf: p.Point = .{ .row = 9, .col = pad + 21 };
+const traider_tent: p.Region = p.Region{ .top_left = .{ .row = 3, .col = pad + 5 }, .rows = 3, .cols = 5 };
 pub const trader_place: p.Point = traider_tent.center();
-const scientist_tent: p.Region = p.Region{ .top_left = .{ .row = 6, .col = 5 }, .rows = 3, .cols = 5 };
+const scientist_tent: p.Region = p.Region{ .top_left = .{ .row = 6, .col = pad + 5 }, .rows = 3, .cols = 5 };
 pub const scientist_place = scientist_tent.center();
-const teleport_tent: p.Region = p.Region{ .top_left = .{ .row = 3, .col = 33 }, .rows = 3, .cols = 5 };
+const teleport_tent: p.Region = p.Region{ .top_left = .{ .row = 3, .col = pad + 33 }, .rows = 3, .cols = 5 };
 pub const teleport_place = teleport_tent.center();
 
+// the area should include wharf and few lines of water to make them visible
 area: d.Area,
 /// Index of all doorways by their place
 doorways: std.AutoHashMapUnmanaged(p.Point, d.Doorway),
@@ -45,7 +52,7 @@ pub fn generateDungeon(arena: *std.heap.ArenaAllocator) !d.Dungeon {
     const alloc = arena.allocator();
     const first_location = try alloc.create(FirstLocation);
     first_location.* = .{
-        .area = d.Area.init(arena, whole_region),
+        .area = d.Area.init(arena, dungeon_region),
         .doorways = .empty,
     };
 
@@ -68,8 +75,8 @@ fn createRoom(self: *FirstLocation, alloc: std.mem.Allocator, region: p.Region, 
 fn dungeon(self: *FirstLocation) d.Dungeon {
     return .{
         .parent = self,
-        .rows = rows,
-        .cols = cols,
+        .rows = self.area.region.rows + 2,
+        .cols = self.area.region.cols,
         .entrance = wharf,
         .exit = ladder,
         .doorways = &self.doorways,
@@ -84,6 +91,27 @@ fn dungeon(self: *FirstLocation) d.Dungeon {
 fn cellAt(ptr: *const anyopaque, place: p.Point) d.Dungeon.Cell {
     const self: *const FirstLocation = @ptrCast(@alignCast(ptr));
 
+    if (place.row <= self.area.region.top_left.row) {
+        return .rock;
+    }
+    if (place.row < wharf.row) {
+        if (place.col <= self.area.region.top_left.col + pad) {
+            return .rock;
+        }
+        if (place.col >= self.area.region.bottomRightCol() - pad) {
+            return .rock;
+        }
+    }
+    if (place.row == wharf.row) {
+        // under the wharf have to be the floor, not water!
+        if (place.eql(wharf)) return .floor;
+        if (place.col == wharf.col - 1 or place.col == wharf.col + 1) return .@"│";
+        return .water;
+    }
+    if (place.row > wharf.row) {
+        return .water;
+    }
+
     for (self.area.inner_rooms.items, 0..) |room, i| {
         if (room.region.containsPoint(place)) {
             // the room with ladder down should be part of the cave
@@ -95,19 +123,10 @@ fn cellAt(ptr: *const anyopaque, place: p.Point) d.Dungeon.Cell {
             }
         }
     }
-    if (place.row == whole_region.bottomRightRow() - 1) {
-        if (place.col == wharf.col - 1 or place.col == wharf.col + 1) return .@"│";
-        return .water;
-    }
-    if (place.row > whole_region.bottomRightRow() - 1) {
-        return .water;
-    }
-    return floorOrRock(self.area.region, place);
+    return .floor;
 }
 
 fn floorOrRock(region: p.Region, place: p.Point) d.Dungeon.Cell {
-    if (!region.containsPoint(place)) return .nothing;
-
     if (place.row == region.top_left.row or place.row == region.bottomRightRow()) {
         return .rock;
     }
@@ -118,8 +137,6 @@ fn floorOrRock(region: p.Region, place: p.Point) d.Dungeon.Cell {
 }
 
 fn cellForTheTent(room: *const d.Room, place: p.Point) d.Dungeon.Cell {
-    if (!room.region.containsPoint(place)) return .nothing;
-
     if (room.doorways.get(place)) |_| return .doorway;
 
     if (room.region.top_left.row == place.row) {
