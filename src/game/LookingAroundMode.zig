@@ -269,5 +269,5 @@ fn initWindowWithDescription(
 ) !void {
     self.window = g.Window.modal(self.arena.allocator());
     self.window.?.setEnumTag(WindowType.description);
-    try self.window.?.info(self.session.entities, entity);
+    try self.window.?.info(self.session.entities, entity, self.session.runtime.isDevMode());
 }

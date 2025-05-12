@@ -182,5 +182,5 @@ fn initInfoWindow(self: *InventoryMode, idx: usize) !void {
     const item = self.inventory.items.items[idx];
     log.debug("Show info about item {d}", .{item.id});
 
-    try self.window.info(self.session.entities, item);
+    try self.window.info(self.session.entities, item, self.session.runtime.isDevMode());
 }

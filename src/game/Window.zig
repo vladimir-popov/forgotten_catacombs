@@ -67,6 +67,7 @@ pub fn info(
     self: *Window,
     entities: g.EntitiesManager,
     entity: g.Entity,
+    dev_mode: bool,
 ) !void {
     self.lines.clearRetainingCapacity();
     if (entities.get(entity, c.Description)) |description| {
@@ -78,6 +79,14 @@ pub fn info(
         if (description.description().len > 0) {
             const line = try self.lines.addOne(self.alloc);
             line.* = [1]u8{'-'} ** COLS;
+        }
+    }
+    if (dev_mode) {
+        var line = try self.addEmptyLine();
+        _ = try std.fmt.bufPrint(line[1..], "Id: {d}", .{entity.id});
+        if (entities.get(entity, c.Position)) |position| {
+            line = try self.addEmptyLine();
+            _ = try std.fmt.bufPrint(line[1..], "Position: {any}", .{position.place});
         }
     }
     if (entities.get(entity, c.EnemyState)) |state| {
