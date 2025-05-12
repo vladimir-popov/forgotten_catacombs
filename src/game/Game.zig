@@ -103,7 +103,7 @@ fn inventoryMenu(ptr: ?*anyopaque) callconv(.C) void {
     if (ptr == null) return;
     const self: *Game = @ptrCast(@alignCast(ptr.?));
     std.debug.assert(self.state == .game);
-    self.game_session.inventory() catch @panic("Error on switching to the Inventory mode");
+    self.game_session.manageInventory() catch @panic("Error on switching to the Inventory mode");
 }
 
 fn exploreMenu(ptr: ?*anyopaque) callconv(.C) void {

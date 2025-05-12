@@ -24,12 +24,6 @@ pub const Action = union(enum) {
     do_nothing,
     /// Skip the round
     wait,
-    /// Change the state of the entity to sleep
-    go_sleep: g.Entity,
-    /// Change the state of the entity to chill
-    chill: g.Entity,
-    /// Change the state of the entity to hunt
-    get_angry: g.Entity,
     /// An entity is going to move in the direction
     move: Move,
     /// An entity is going to open a door
@@ -38,10 +32,16 @@ pub const Action = union(enum) {
     close: g.Entity,
     /// An entity which should be hit
     hit: Hit,
-    /// An entity is going to take the item
-    take: g.Entity,
+    /// The id of an item that someone is going to take from the floor
+    pickup:  g.Entity,
     /// The player moves from the level to another level
     move_to_level: c.Ladder,
+    /// Change the state of the entity to sleep
+    go_sleep: g.Entity,
+    /// Change the state of the entity to chill
+    chill: g.Entity,
+    /// Change the state of the entity to hunt
+    get_angry: g.Entity,
 
     pub fn toString(action: Action) []const u8 {
         return switch (action) {
@@ -53,7 +53,8 @@ pub const Action = union(enum) {
                 .up => "Go up",
                 .down => "Go down",
             },
-            else => "",
+            .pickup => "Pickup",
+            else => "???",
         };
     }
 };

@@ -109,7 +109,7 @@ pub fn play(self: *GameSession, entity_in_focus: ?g.Entity) !void {
     try self.mode.play.init(self.arena.allocator(), self, entity_in_focus);
 }
 
-pub fn inventory(self: *GameSession) !void {
+pub fn manageInventory(self: *GameSession) !void {
     if (self.entities.get2(self.player, c.Equipment, c.Inventory)) |tuple| {
         self.mode.deinit();
         self.mode = .{ .inventory = undefined };
@@ -174,6 +174,21 @@ pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_spe
         },
         .close => |door| {
             try self.entities.setComponentsToEntity(door, g.entities.ClosedDoor);
+        },
+        .pickup => |item| {
+            const inventory = self.entities.getUnsafe(self.player, c.Inventory);
+            if (self.entities.get(item, c.Pile)) |pile| {
+                try self.takeFromPile(item, pile, inventory);
+            } else {
+                try inventory.put(item);
+                try self.entities.remove(item, c.Position);
+                for(self.level.entities.items, 0..) |entity, idx| {
+                    if (entity.eql(item)) {
+                       _ = self.level.entities.swapRemove(idx);
+                        break;
+                    }
+                }
+            }
         },
         .move_to_level => |ladder| {
             try self.movePlayerToLevel(ladder);
@@ -258,6 +273,14 @@ fn checkCollision(self: *GameSession, actor: g.Entity, place: p.Point) ?g.Action
         },
     }
     return .do_nothing;
+}
+
+fn takeFromPile(self: *GameSession, item: g.Entity, pile: *c.Pile, inventory: *c.Inventory) !void {
+    _ = self;
+    _ = item;
+    _ = pile;
+    _ = inventory;
+    log.err("Taking from a pile is not implemented yet", .{});
 }
 
 fn doHit(
