@@ -96,7 +96,28 @@ pub const Speed = struct {
     pub const default: Speed = .{ .move_points = 10 };
 };
 
-// TODO: Add docs here!
+pub const Pile = struct {
+    alloc: std.mem.Allocator,
+    items: std.ArrayListUnmanaged(g.Entity),
+
+    pub fn empty(alloc: std.mem.Allocator) Pile {
+        return .{ .alloc = alloc, .items = .empty };
+    }
+
+    pub fn deinit(self: *Pile) void {
+        self.items.deinit(self.alloc);
+    }
+
+    pub inline fn add(self: *Pile, item: g.Entity) !void {
+        try self.items.append(self.alloc, item);
+    }
+
+    pub fn take(self: *Pile, idx: usize) !g.Entity {
+        std.debug.assert(self.items.items.len > idx);
+        return self.items.swapRemove(idx);
+    }
+};
+
 pub const Inventory = struct {
     alloc: std.mem.Allocator,
     items: std.ArrayListUnmanaged(g.Entity),
@@ -163,6 +184,7 @@ pub const Components = struct {
     initiative: ?Initiative = null,
     inventory: ?Inventory = null,
     ladder: ?Ladder = null,
+    pile: ?Pile = null,
     position: ?Position = null,
     source_of_light: ?SourceOfLight = null,
     speed: ?Speed = null,

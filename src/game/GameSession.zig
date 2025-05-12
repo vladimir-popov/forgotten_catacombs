@@ -71,13 +71,14 @@ pub fn init(
         .render = render,
         .viewport = g.Viewport.init(render.scene_rows, render.scene_cols),
         .entities = try g.EntitiesManager.init(self.arena.allocator()),
-        .player = try self.entities.addNewEntity(g.entities.player(self.arena.allocator())),
+        .player = try self.entities.addNewEntityAllocate(g.entities.player),
         .events = g.events.EventBus.init(&self.arena),
         .level = undefined,
         .mode = .{ .play = undefined },
     };
     try self.equipPlayer();
     try g.Levels.firstLevel(self.arena.allocator(), self, true);
+    self.viewport.centeredAround(self.level.playerPosition().place);
     try self.events.subscribe(self.viewport.subscriber());
     try self.events.subscribe(self.subscriber());
     try self.mode.play.init(self.arena.allocator(), self, null);
@@ -160,6 +161,7 @@ pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_spe
         log.debug("Do action {s} by the entity {d}", .{ @tagName(action), actor.id });
     }
     switch (action) {
+        .do_nothing => return 0,
         .move => |move| {
             if (self.entities.get(actor, c.Position)) |position|
                 return doMove(self, actor, position, move.target, actor_speed);
@@ -246,11 +248,13 @@ fn checkCollision(self: *GameSession, actor: g.Entity, place: p.Point) ?g.Action
                 if (self.isEnemy(entity))
                     if (self.getWeapon(actor)) |weapon|
                         return .{ .hit = .{ .target = entity, .by_weapon = weapon.* } };
-            } else {
-                // it's possible to step on the ladder, opened door, teleport, dropped item and
-                // other entities with z_order < 2
-                return null;
+
+                // the player should not step on the place with entity with z-order = 2
+                return .do_nothing;
             }
+            // it's possible to step on the ladder, opened door, teleport, dropped item and
+            // other entities with z_order < 2
+            return null;
         },
     }
     return .do_nothing;
@@ -265,7 +269,7 @@ fn doHit(
     enemy_health: *c.Health,
 ) !g.MovePoints {
     const damage = actor_weapon.generateDamage(self.prng.random());
-    log.debug("The entity {d} received damage {d} from {d}", .{ enemy.id, damage, actor.id });
+    log.debug("The entity {d} received damage {d} from entity {d}", .{ enemy.id, damage, actor.id });
     enemy_health.current -= @as(i16, @intCast(damage));
     try self.entities.set(enemy, c.Animation{ .frames = &c.Animation.FramesPresets.hit });
     if (actor.eql(self.player)) {

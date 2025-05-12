@@ -57,7 +57,7 @@ pub inline fn addEntity(self: *Level, entity: g.Entity) !void {
     try self.entities.append(self.arena.allocator(), entity);
 }
 
-pub inline fn removeEntity(self: *Level, entity: g.Entity) !void {
+pub fn removeEntity(self: *Level, entity: g.Entity) !void {
     try self.session.entities.removeEntity(entity);
     for (0..self.entities.items.len) |idx| {
         if (entity.eql(self.entities.items[idx])) {
@@ -65,6 +65,45 @@ pub inline fn removeEntity(self: *Level, entity: g.Entity) !void {
             return;
         }
     }
+}
+
+pub fn addEntityAtPlace(self: *Level, item: g.Entity, place: p.Point) !void {
+    switch (self.cellAt(place)) {
+        .entities => |entities| {
+            // if some item already exists on the place
+            if (entities[1]) |entity| {
+                // and that item is a pile
+                if (self.session.entities.get(entity, c.Pile)) |pile| {
+                    log.debug("Adding item {any} into the pile {any} at {any}", .{ item, entity, place });
+                    // add a new item to the pile
+                    try pile.add(item);
+                    log.debug("Items in the pile {any}: {any}", .{ entity, pile.items.items });
+                } else {
+                    // or create a new pile
+                    const pile_id = try self.session.entities.addNewEntityAllocate(g.entities.pile);
+                    try self.session.entities.set(pile_id, c.Position{ .place = place });
+                    try self.addEntity(pile_id);
+                    const pile = self.session.entities.getUnsafe(pile_id, c.Pile);
+
+                    // move the existed item to this pile
+                    try pile.add(entity);
+                    try self.session.entities.remove(entity, c.Position);
+
+                    // add the item to the pile
+                    try pile.add(item);
+                    log.debug(
+                        "Created a pile {any} at {any} with items {any}",
+                        .{ pile_id, place, pile.items.items },
+                    );
+                }
+                return;
+            }
+        },
+        else => {},
+    }
+    log.debug("Adding item {any} to the empty place {any}", .{ item, place });
+    try self.session.entities.set(item, c.Position{ .place = place });
+    try self.addEntity(item);
 }
 
 pub inline fn checkVisibility(self: *const g.Level, place: p.Point) g.Render.Visibility {
@@ -118,6 +157,12 @@ pub fn isObstacle(self: *const Level, place: p.Point) bool {
     return false;
 }
 
+/// Returns the cell of the level:
+///   - `.landscape` - any kind of the walls or the empty floor/doorway;
+///   - `.entities` - an array of the entities on the place:
+///       0 - opened doors, ladders, teleports;
+///       1 - any dropped items;
+///       2 - player, enemies, npc, closed doors;
 pub fn cellAt(self: Level, place: p.Point) Cell {
     const landscape = switch (self.dungeon.cellAt(place)) {
         .floor, .doorway => |cl| cl,

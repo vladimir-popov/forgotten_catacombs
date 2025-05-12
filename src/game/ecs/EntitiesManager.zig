@@ -59,6 +59,15 @@ pub fn EntitiesManager(comptime ComponentsStruct: type) type {
             return entity;
         }
 
+        pub fn addNewEntityAllocate(
+            self: Self,
+            init_components: *const fn (alloc: std.mem.Allocator) anyerror!ComponentsStruct,
+        ) !Entity {
+            const entity = self.newEntity();
+            try self.setComponentsToEntityAllocate(entity, init_components);
+            return entity;
+        }
+
         /// Aggregates requests of few components for the same entities at once
         pub fn iterator(self: Self, entities: []const Entity) ComponentsIterator(ComponentsStruct) {
             return .{ .entities = entities, .manager = self };
@@ -125,6 +134,17 @@ pub fn EntitiesManager(comptime ComponentsStruct: type) type {
             try @field(self.inner_state.components_map, @typeName(C)).setToEntity(entity, component);
         }
 
+        pub fn setAllocate(
+            self: Self,
+            comptime C: type,
+            entity: Entity,
+            init_component: *const fn (alloc: std.mem.Allocator) anyerror!C,
+        ) !void {
+            std.debug.assert(@hasDecl(C, "deinit"));
+            const component = try init_component(self.inner_state.alloc);
+            try @field(self.inner_state.components_map, @typeName(C)).setToEntity(entity, component);
+        }
+
         pub fn getAll(self: Self, comptime C: type) []C {
             return @field(self.inner_state.components_map, @typeName(C)).components.items;
         }
@@ -168,6 +188,15 @@ pub fn EntitiesManager(comptime ComponentsStruct: type) type {
                     try self.set(entity, component);
                 }
             }
+        }
+
+        pub fn setComponentsToEntityAllocate(
+            self: Self,
+            entity: Entity,
+            init_components: *const fn (alloc: std.mem.Allocator) anyerror!ComponentsStruct,
+        ) !void {
+            const components = try init_components(self.inner_state.alloc);
+            try self.setComponentsToEntity(entity, components);
         }
     };
 }

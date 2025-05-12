@@ -4,7 +4,7 @@ const g = @import("game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
-pub fn player(alloc: std.mem.Allocator) c.Components {
+pub fn player(alloc: std.mem.Allocator) !c.Components {
     return .{
         .sprite = .{ .codepoint = cp.human },
         .z_order = .{ .order = 2 },
@@ -78,5 +78,14 @@ pub fn teleport(place: p.Point) c.Components {
         .z_order = .{ .order = 0 },
         .sprite = .{ .codepoint = cp.teleport },
         .description = .{ .ptr = &g.Description.teleport },
+    };
+}
+
+pub fn pile(alloc: std.mem.Allocator) !c.Components {
+    return .{
+        .z_order = .{ .order = 1 },
+        .sprite = .{ .codepoint = cp.pile },
+        .description = .{ .ptr = &g.Description.pile },
+        .pile = c.Pile.empty(alloc),
     };
 }

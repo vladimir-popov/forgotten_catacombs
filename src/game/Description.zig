@@ -12,6 +12,7 @@ pub const ladder_down: Description = .{ .name = "Ladder down" };
 pub const ladder_to_caves: Description = .{ .name = "Ladder to caves" };
 pub const ladder_up: Description = .{ .name = "Ladder up" };
 pub const opened_door: Description = .{ .name = "Opened door" };
+pub const pile: Description = .{ .name = "Pile of items" };
 pub const player: Description = .{ .name = "You" };
 pub const rat: Description = .{ .name = "Rat" };
 pub const scientist: Description = .{ .name = "Scientist" };

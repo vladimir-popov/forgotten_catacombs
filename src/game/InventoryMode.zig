@@ -75,8 +75,10 @@ pub fn tick(self: *InventoryMode) !void {
             .right => if (self.window.tag == 0) {
                 if (self.window.selected_line) |idx| try self.useItem(idx);
             },
-            // .left => if (self.window.selected_line) |idx| try self.dropItem(idx),
-            else => {},
+            .left => if (self.window.tag == 0) {
+                if (self.window.selected_line) |idx|
+                    try self.dropItem(idx, self.session.level.playerPosition().place);
+            },
         }
         try self.draw();
     }
@@ -86,8 +88,10 @@ fn draw(self: *InventoryMode) !void {
     try self.session.render.drawWindow(&self.window);
     if (self.window.tag == 0) {
         try self.session.render.drawLeftButton("Close");
-        try self.session.render.drawRightButton("Info", false);
-        try self.session.render.drawInfo("drop < | > use");
+        if (self.inventory.items.items.len > 0) {
+            try self.session.render.drawRightButton("Info", false);
+            try self.session.render.drawInfo("drop < | > use");
+        }
     } else {
         try self.session.render.drawRightButton("Close", false);
         try self.session.render.drawLeftButton("Use");
@@ -123,7 +127,8 @@ fn isTool(self: *InventoryMode, item: g.Entity) bool {
 }
 
 fn useItem(self: *InventoryMode, idx: usize) !void {
-    std.debug.assert(idx < self.inventory.items.items.len);
+    if (idx >= self.inventory.items.items.len) return;
+
     const item = self.inventory.items.items[idx];
     log.debug("Use item {d} ({any})", .{ item.id, self.equipment });
 
@@ -139,6 +144,25 @@ fn useItem(self: *InventoryMode, idx: usize) !void {
     }
 
     try self.formatLine(&self.window.lines.items[idx], item);
+}
+
+fn dropItem(self: *InventoryMode, idx: usize, place: p.Point) !void {
+    if (idx >= self.inventory.items.items.len) return;
+
+    const item = self.inventory.items.orderedRemove(idx);
+    _ = self.window.lines.orderedRemove(idx);
+    if (self.window.lines.items.len == 0)
+        self.window.selected_line = null;
+
+    log.debug("Drop item {d} at {any}", .{ item.id, place });
+
+    if (item.eql(self.equipment.weapon)) {
+        self.equipment.weapon = null;
+    }
+    if (item.eql(self.equipment.light)) {
+        self.equipment.light = null;
+    }
+    try self.session.level.addEntityAtPlace(item, place);
 }
 
 fn initInfoWindow(self: *InventoryMode, idx: usize) !void {
