@@ -194,7 +194,14 @@ fn drawSpritesToBuffer(self: Render, viewport: g.Viewport, level: *const g.Level
         if (!viewport.region.containsPoint(position.place)) continue;
         const mode: g.DrawingMode = if (entity.eql(entity_in_focus)) .inverted else .normal;
         const visibility = level.checkVisibility(tuple[1].place);
-        try self.drawSpriteToBuffer(viewport, sprite.codepoint, position.place, zorder.order, mode, visibility);
+        try self.drawSpriteToBuffer(
+            viewport,
+            sprite.codepoint,
+            position.place,
+            @intFromEnum(zorder.order),
+            mode,
+            visibility,
+        );
     }
 }
 

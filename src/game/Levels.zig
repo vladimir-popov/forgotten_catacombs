@@ -30,7 +30,7 @@ pub fn firstLevel(
 
     // Add wharf
     var entity = try session.entities.addNewEntity(.{
-        .z_order = .{ .order = 0 },
+        .z_order = .{ .order = .floor },
         .description = .{ .ptr = &g.Description.wharf },
         .sprite = .{ .codepoint = cp.ladder_up },
         .position = .{ .place = dungeon.entrance },
@@ -40,7 +40,7 @@ pub fn firstLevel(
     // Add the ladder leads to the bottom dungeons:
     entity = session.entities.newEntity();
     try session.entities.setComponentsToEntity(entity, .{
-        .z_order = .{ .order = 0 },
+        .z_order = .{ .order = .floor },
         .ladder = .{ .direction = .down, .id = entity, .target_ladder = session.entities.newEntity() },
         .description = .{ .ptr = &g.Description.ladder_down },
         .sprite = .{ .codepoint = cp.ladder_down },
@@ -57,7 +57,7 @@ pub fn firstLevel(
 
     // Add the trader
     entity = try session.entities.addNewEntity(.{
-        .z_order = .{ .order = 2 },
+        .z_order = .{ .order = .obstacle },
         .position = .{ .place = d.FirstLocation.trader_place },
         .sprite = .{ .codepoint = cp.human },
         .description = .{ .ptr = &g.Description.traider },
@@ -65,7 +65,7 @@ pub fn firstLevel(
     try session.level.addEntity(entity);
     // Add the scientist
     entity = try session.entities.addNewEntity(.{
-        .z_order = .{ .order = 2 },
+        .z_order = .{ .order = .obstacle },
         .position = .{ .place = d.FirstLocation.scientist_place },
         .sprite = .{ .codepoint = cp.human },
         .description = .{ .ptr = &g.Description.scientist },

@@ -13,16 +13,17 @@ pub const Sprite = struct {
     codepoint: g.Codepoint,
 };
 
-/// The vertical order of the entities on the same place:
-/// Examples:
-///   0 - opened doors, ladders, teleports;
-///   1 - any dropped items;
-///   2 - player, enemies, npc, closed doors;
-///   3 - reserved;
-/// Any entity with order above 1 counted as obstacle;
-/// The sprite with bigger order should be rendered over the sprite with lower;
+/// The vertical order of the entities on the same place.
+/// The sprite with bigger order should be rendered over the sprite with lower.
 pub const ZOrder = struct {
-    order: u2,
+    order: enum {
+        /// opened doors, ladders, teleports...
+        floor,
+        /// any dropped items, piles...
+        item,
+        /// player, enemies, npc, closed doors...
+        obstacle,
+    },
 };
 
 pub const Description = struct {

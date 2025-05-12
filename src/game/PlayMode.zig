@@ -251,9 +251,8 @@ fn calculateQuickActionForTarget(
         self.session.entities.get(target_entity, c.Position) orelse return null;
 
     if (player_position.place.eql(target_position.place)) {
-        // TODO: How about changing the ZOrder to the enum EntityType?
         if (self.session.entities.get(target_entity, c.ZOrder)) |zorder| {
-            if (zorder.order == 1) {
+            if (zorder.order == .item) {
                 return .{ .pickup = target_entity };
             }
         }

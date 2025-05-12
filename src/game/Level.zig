@@ -174,11 +174,12 @@ pub fn cellAt(self: Level, place: p.Point) Cell {
     var itr = self.componentsIterator().of2(c.Position, c.ZOrder);
     while (itr.next()) |tuple| {
         const entity, const position, const zorder = tuple;
+        const order = @intFromEnum(zorder.order);
         if (place.eql(position.place)) {
             found_entity = true;
             // only one entity with the same order can be at the same place
-            std.debug.assert(result[zorder.order] == null);
-            result[zorder.order] = entity;
+            std.debug.assert(result[order] == null);
+            result[order] = entity;
         }
     }
     return if (found_entity) .{ .entities = result } else .{ .landscape = landscape };

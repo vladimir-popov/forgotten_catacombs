@@ -33,7 +33,7 @@ pub const Action = union(enum) {
     /// An entity which should be hit
     hit: Hit,
     /// The id of an item that someone is going to take from the floor
-    pickup:  g.Entity,
+    pickup: g.Entity,
     /// The player moves from the level to another level
     move_to_level: c.Ladder,
     /// Change the state of the entity to sleep

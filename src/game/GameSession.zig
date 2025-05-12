@@ -182,9 +182,9 @@ pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_spe
             } else {
                 try inventory.put(item);
                 try self.entities.remove(item, c.Position);
-                for(self.level.entities.items, 0..) |entity, idx| {
+                for (self.level.entities.items, 0..) |entity, idx| {
                     if (entity.eql(item)) {
-                       _ = self.level.entities.swapRemove(idx);
+                        _ = self.level.entities.swapRemove(idx);
                         break;
                     }
                 }
