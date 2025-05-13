@@ -1,5 +1,5 @@
 //! This is the root object for a single game session. The GameSession has different modes such as:
-//! the `PlayMode`, `LookingAroundMode`, `ExploreMode` and so on. That modes are part of the
+//! the `PlayMode`, `ExploreMode`, `ExploreLevelMode` and so on. That modes are part of the
 //! GameSession extracted to the separate files to make their maintenance easier.
 const std = @import("std");
 const g = @import("game_pkg.zig");
@@ -10,7 +10,7 @@ const ecs = g.ecs;
 const PlayMode = @import("PlayMode.zig");
 const InventoryMode = @import("InventoryMode.zig");
 const ExploreMode = @import("ExploreMode.zig");
-const LookingAroundMode = @import("LookingAroundMode.zig");
+const ExploreLevelMode = @import("ExploreLevelMode.zig");
 
 const log = std.log.scoped(.game_session);
 
@@ -20,14 +20,14 @@ pub const Mode = union(enum) {
     play: PlayMode,
     inventory: InventoryMode,
     explore: ExploreMode,
-    looking_around: LookingAroundMode,
+    explore_level: ExploreLevelMode,
 
     inline fn deinit(self: *Mode) void {
         switch (self.*) {
             .play => self.play.deinit(),
             .inventory => self.inventory.deinit(),
-            .looking_around => self.looking_around.deinit(),
-            .explore => {},
+            .explore => self.explore.deinit(),
+            .explore_level => {},
         }
     }
 };
@@ -79,6 +79,7 @@ pub fn init(
     try self.equipPlayer();
     try g.Levels.firstLevel(self.arena.allocator(), self, true);
     self.viewport.centeredAround(self.level.playerPosition().place);
+    self.viewport.region.top_left.moveNTimes(.up, 3);
     try self.events.subscribe(self.viewport.subscriber());
     try self.events.subscribe(self.subscriber());
     try self.mode.play.init(self.arena.allocator(), self, null);
@@ -119,13 +120,13 @@ pub fn manageInventory(self: *GameSession) !void {
 
 pub fn explore(self: *GameSession) !void {
     self.mode.deinit();
-    self.mode = .{ .explore = try ExploreMode.init(self) };
+    self.mode = .{ .explore_level = try ExploreLevelMode.init(self) };
 }
 
 pub fn lookAround(self: *GameSession) !void {
     self.mode.deinit();
-    self.mode = .{ .looking_around = undefined };
-    try self.mode.looking_around.init(self.arena.allocator(), self);
+    self.mode = .{ .explore = undefined };
+    try self.mode.explore.init(self.arena.allocator(), self);
 }
 
 pub inline fn tick(self: *GameSession) !void {
@@ -133,7 +134,7 @@ pub inline fn tick(self: *GameSession) !void {
         .play => try self.mode.play.tick(),
         .inventory => try self.mode.inventory.tick(),
         .explore => try self.mode.explore.tick(),
-        .looking_around => try self.mode.looking_around.tick(),
+        .explore_level => try self.mode.explore_level.tick(),
     }
     try self.events.notifySubscribers();
 }

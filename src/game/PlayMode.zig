@@ -71,6 +71,7 @@ fn drawInfoBar(self: *const PlayMode) !void {
     if (self.session.entities.get(self.session.player, c.Health)) |health| {
         try self.session.render.drawPlayerHp(health);
     }
+    try self.session.render.drawLeftButton("Explore");
     const qa = self.quickAction();
     const action_label = qa.toString();
     try self.session.render.drawRightButton(action_label, self.quick_actions.items.len > 1);

@@ -9,7 +9,7 @@ pub fn player(alloc: std.mem.Allocator) !c.Components {
         .sprite = .{ .codepoint = cp.human },
         .z_order = .{ .order = .obstacle },
         .description = .{ .ptr = &g.Description.player },
-        .health = .{ .max = 100, .current = 100 },
+        .health = .{ .max = 30, .current = 30 },
         .speed = .{ .move_points = 10 },
         .equipment = .nothing,
         .inventory = c.Inventory.empty(alloc),

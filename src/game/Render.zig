@@ -7,9 +7,9 @@
 //!
 //! The game scene is drawing not directly to the screen, but to the buffer.
 //! It makes it possible to calculate changed symbols and draw only them.
-//!
+//!                                         HP
 //!   ╔═══════════════════════════════════════╗-------
-//!   ║                                       ║ |   |
+//!   ║                                     99║ |   |
 //!   ║                                       ║ V
 //!   ║                                       ║ i
 //!   ║                                       ║ e   D
@@ -20,10 +20,10 @@
 //!   ║                                       ║ t   a
 //!   ║                                       ║ |   y
 //!   ║═══════════════════════════════════════║---
-//!   ║HP: 100     Rat:||||||||||||||| Attack ║     | <- the InfoBar is not buffered
+//!   ║ Rat:|||||||||||||||    Info    Attack ║     | <- the InfoBar is not buffered
 //!   ╚═══════════════════════════════════════╝-------
-//!   | Zone 0 |        Zone 1       | Zone 2 |
-//!   |Button B|                     |Button A|
+//!   | Zone 0              | Zone 1 | Zone 2 |
+//!   |        Info         |Button B|Button A|
 //!
 const std = @import("std");
 const g = @import("game_pkg.zig");
@@ -36,8 +36,8 @@ const log = std.log.scoped(.render);
 
 pub const Window = @import("Window.zig").Window;
 
-pub const SIDE_ZONE_LENGTH = 8;
-pub const MIDDLE_ZONE_LENGTH = g.DISPLAY_COLS - (SIDE_ZONE_LENGTH + 1) * 2 - 2;
+pub const BUTTON_ZONE_LENGTH = 8;
+pub const INFO_ZONE_LENGTH = g.DISPLAY_COLS - (BUTTON_ZONE_LENGTH + 1) * 2 - 2;
 
 pub const Visibility = enum { visible, known, invisible };
 
@@ -377,23 +377,41 @@ fn drawHorizontalBorderLine(self: Render) !void {
     }
 }
 
-/// Draws the label for the B button
-pub inline fn drawLeftButton(self: Render, text: []const u8) !void {
-    try self.drawZone(0, text, .inverted);
-}
-
 pub fn drawPlayerHp(self: Render, health: *const cm.Health) !void {
-    var buf = [_]u8{0} ** SIDE_ZONE_LENGTH;
+    var buf = [_]u8{0} ** BUTTON_ZONE_LENGTH;
     const text = if (health.current > 0)
         // hack to avoid showing '+'
-        try std.fmt.bufPrint(&buf, "HP:{d:3}", .{@abs(health.current)})
+        try std.fmt.bufPrint(&buf, "{d:2}", .{@abs(health.current)})
     else
-        try std.fmt.bufPrint(&buf, "HP:{d:3}", .{health.current});
-    try self.drawZone(0, text, .normal);
+        try std.fmt.bufPrint(&buf, "{d:2}", .{health.current});
+    try self.runtime.drawText(text, .{ .row = 1, .col = g.DISPLAY_COLS - 1 }, .inverted);
+}
+
+pub fn drawEnemyHealth(self: Render, codepoint: g.Codepoint, health: *const cm.Health) !void {
+    var buf: [INFO_ZONE_LENGTH]u8 = undefined;
+    inline for (0..INFO_ZONE_LENGTH) |i| buf[i] = filler;
+    // +1 for padding between the right zone
+    var len: u8 = try std.unicode.utf8Encode(codepoint, buf[1..]) + 1;
+
+    buf[len] = ':';
+    len += 1;
+    const hp = @max(health.current, 0);
+    const free_length = INFO_ZONE_LENGTH - 3; // padding + codepoint (usually 1 byte for enemies) + ':'
+    const hp_length = @divFloor(free_length * hp, health.max);
+    for (0..hp_length) |i| {
+        buf[len + i] = '|';
+    }
+    len += free_length;
+    try self.drawZone(0, buf[0..len], .normal);
+}
+
+/// Draws the label for the B button
+pub inline fn drawLeftButton(self: Render, text: []const u8) !void {
+    try self.drawZone(1, text, .inverted);
 }
 
 pub inline fn hideLeftButton(self: Render) !void {
-    try self.cleanZone(0);
+    try self.cleanZone(1);
 }
 
 /// Draws the label for the A button
@@ -410,29 +428,11 @@ pub inline fn hideRightButton(self: Render) !void {
 }
 
 pub inline fn drawInfo(self: Render, text: []const u8) !void {
-    try self.drawZone(1, text, .normal);
-}
-
-pub fn drawEnemyHealth(self: Render, codepoint: g.Codepoint, health: *const cm.Health) !void {
-    var buf: [MIDDLE_ZONE_LENGTH]u8 = undefined;
-    inline for (0..MIDDLE_ZONE_LENGTH) |i| buf[i] = filler;
-    // +1 for padding between the right zone
-    var len: u8 = try std.unicode.utf8Encode(codepoint, buf[1..]) + 1;
-
-    buf[len] = ':';
-    len += 1;
-    const hp = @max(health.current, 0);
-    const free_length = MIDDLE_ZONE_LENGTH - 3; // padding + codepoint (usually 1 byte for enemies) + ':'
-    const hp_length = @divFloor(free_length * hp, health.max);
-    for (0..hp_length) |i| {
-        buf[len + i] = '|';
-    }
-    len += free_length;
-    try self.drawZone(1, buf[0..len], .normal);
+    try self.drawZone(0, text, .normal);
 }
 
 pub inline fn cleanInfo(self: Render) !void {
-    try self.cleanZone(1);
+    try self.cleanZone(0);
 }
 
 /// Sets the line of spaces as a board on the passed side. Inverts the draw mode
@@ -489,22 +489,22 @@ inline fn drawZone(
     text: []const u8,
     mode: g.DrawingMode,
 ) !void {
-    const zone_len = if (zone == 1) MIDDLE_ZONE_LENGTH - 2 else SIDE_ZONE_LENGTH;
+    const zone_len = if (zone == 0) INFO_ZONE_LENGTH - 2 else BUTTON_ZONE_LENGTH;
     const pos = switch (zone) {
         0 => p.Point{ .row = g.DISPLAY_ROWS, .col = 1 },
-        1 => p.Point{ .row = g.DISPLAY_ROWS, .col = SIDE_ZONE_LENGTH + 2 },
-        2 => p.Point{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS - SIDE_ZONE_LENGTH + 1 },
+        1 => p.Point{ .row = g.DISPLAY_ROWS, .col = INFO_ZONE_LENGTH + 2 },
+        2 => p.Point{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS - BUTTON_ZONE_LENGTH + 1 },
         else => unreachable,
     };
     try self.runtime.drawTextWithAlign(zone_len, text, pos, mode, .center);
 }
 
 inline fn cleanZone(self: Render, comptime zone: u8) !void {
-    const zone_len = if (zone == 1) MIDDLE_ZONE_LENGTH else SIDE_ZONE_LENGTH;
+    const zone_len = if (zone == 1) INFO_ZONE_LENGTH else BUTTON_ZONE_LENGTH;
     const pos = switch (zone) {
         0 => p.Point{ .row = g.DISPLAY_ROWS, .col = 1 },
-        1 => p.Point{ .row = g.DISPLAY_ROWS, .col = SIDE_ZONE_LENGTH + 1 },
-        2 => p.Point{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS - SIDE_ZONE_LENGTH + 1 },
+        1 => p.Point{ .row = g.DISPLAY_ROWS, .col = INFO_ZONE_LENGTH + 1 },
+        2 => p.Point{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS - BUTTON_ZONE_LENGTH + 1 },
         else => unreachable,
     };
     try self.runtime.drawTextWithAlign(zone_len, &.{filler}, pos, .normal, .left);

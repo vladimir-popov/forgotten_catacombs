@@ -1,3 +1,4 @@
+//! Codepoints for the special
 const std = @import("std");
 
 pub const door_closed = '+';
