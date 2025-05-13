@@ -34,8 +34,6 @@ const p = g.primitives;
 
 const log = std.log.scoped(.render);
 
-pub const Window = @import("Window.zig").Window;
-
 pub const BUTTON_ZONE_LENGTH = 8;
 pub const INFO_ZONE_LENGTH = g.DISPLAY_COLS - (BUTTON_ZONE_LENGTH + 1) * 2 - 2;
 
@@ -77,21 +75,21 @@ pub fn deinit(self: *Render) void {
 pub fn drawWelcomeScreen(self: Render) !void {
     try self.runtime.clearDisplay();
     const vertical_middle = g.DISPLAY_ROWS / 2;
-    try self.runtime.drawTextWithAlign(
+    try self.drawTextWithAlign(
         g.DISPLAY_COLS,
         "Welcome",
         .{ .row = vertical_middle - 1, .col = 1 },
         .normal,
         .center,
     );
-    try self.runtime.drawTextWithAlign(
+    try self.drawTextWithAlign(
         g.DISPLAY_COLS,
         "to",
         .{ .row = vertical_middle, .col = 1 },
         .normal,
         .center,
     );
-    try self.runtime.drawTextWithAlign(
+    try self.drawTextWithAlign(
         g.DISPLAY_COLS,
         "Forgotten catacombs",
         .{ .row = vertical_middle + 1, .col = 1 },
@@ -103,7 +101,7 @@ pub fn drawWelcomeScreen(self: Render) !void {
 pub fn drawGameOverScreen(self: Render) !void {
     try self.runtime.clearDisplay();
     self.scene_buffer.reset();
-    try self.runtime.drawTextWithAlign(
+    try self.drawTextWithAlign(
         g.DISPLAY_COLS,
         "You are dead",
         .{ .row = g.DISPLAY_ROWS / 2, .col = 1 },
@@ -126,7 +124,7 @@ pub fn drawScene(self: Render, session: *g.GameSession, entity_in_focus: ?g.Enti
     log.debug("Draw animations", .{});
     try self.drawAnimationsFrame(session.viewport, &session.level, entity_in_focus);
     log.debug("Draw the horizontal line of the border", .{});
-    try self.drawHorizontalBorderLine();
+    try self.drawHorizontalLine('═', .{ .row = self.scene_rows + 1, .col = 1 }, self.scene_cols);
     log.debug("Draw changed symbols", .{});
     try self.drawChangedSymbols();
 }
@@ -257,90 +255,19 @@ fn drawChangedSymbols(self: Render) !void {
     }
 }
 
-/// Uses the runtime to draw the window directly to the screen.
-pub fn drawWindow(
-    self: Render,
-    window: *const g.Window,
-) !void {
-    switch (window.mode) {
-        .full_screen => try self.drawFullScreenWindow(window),
-        .modal => try self.drawModalWindow(window),
-    }
-}
-
-fn drawFullScreenWindow(self: Render, window: *const g.Window) !void {
-    try self.runtime.clearDisplay();
-
-    var str = std.mem.sliceTo(&window.title, 0);
-    try self.runtime.drawTextWithAlign(g.DISPLAY_COLS, str, .{ .row = 1, .col = 1 }, .normal, .center);
-
-    const visible_lines = window.visibleLines();
-    for (visible_lines, 2..) |line, row| {
-        str = std.mem.sliceTo(&line, 0);
-        const mode: g.DrawingMode = if (window.selected_line == row - 2) .inverted else .normal;
-        try self.runtime.drawTextWithAlign(g.DISPLAY_COLS, str, .{ .row = @intCast(row), .col = 1 }, mode, .left);
-    }
-}
-
-fn drawModalWindow(self: Render, window: *const g.Window) !void {
-    const height = @max(g.Window.MIN_ROWS_FOR_MODAL, window.visibleLines().len + 2);
-    const region = p.Region{
-        .top_left = if (height > g.Window.MAX_WINDOW_HEIGHT - 2)
-            .{ .row = 1, .col = 2 }
-        else
-            .{ .row = @intCast(1 + (g.Window.MAX_WINDOW_HEIGHT - 2 - height) / 2), .col = 2 },
-        .rows = @intCast(height),
-        .cols = g.Window.MAX_WINDOW_WIDTH,
-    };
-    var itr = region.cells();
-    while (itr.next()) |point| {
-        if (point.row == region.top_left.row or point.row == region.bottomRightRow()) {
-            try self.runtime.drawSprite('─', point, .normal);
-        } else if (point.col == region.top_left.col or point.col == region.bottomRightCol()) {
-            try self.runtime.drawSprite('│', point, .normal);
-        } else {
-            const row_idx = point.row - region.top_left.row - 1 + window.scroll;
-            const col_idx = point.col - region.top_left.col - 1;
-            const mode: g.DrawingMode = if (window.selected_line == row_idx) .inverted else .normal;
-            if (row_idx < window.lines.items.len and col_idx < region.cols - 3) { // -3 for borders and scroll
-                try self.runtime.drawSprite(window.lines.items[row_idx][col_idx], point, mode);
-            } else {
-                try self.runtime.drawSprite(' ', point, mode);
-            }
-        }
-    }
-    //
-    // Draw the title
-    //
-    const title = std.mem.sliceTo(&window.title, 0);
-    const padding: u8 = @intCast(region.cols - title.len);
-    var point = region.top_left.movedToNTimes(.right, padding / 2);
-    for (title) |char| {
-        try self.runtime.drawSprite(char, point, .normal);
-        point.move(.right);
-    }
-    //
-    // Draw the corners
-    //
-    try self.runtime.drawSprite('┌', region.top_left, .normal);
-    try self.runtime.drawSprite('└', region.top_left.movedToNTimes(.down, region.rows - 1), .normal);
-    try self.runtime.drawSprite('┐', region.top_left.movedToNTimes(.right, region.cols - 1), .normal);
-    try self.runtime.drawSprite(
-        '┘',
-        region.top_left.movedToNTimes(.down, region.rows - 1).movedToNTimes(.right, region.cols - 1),
-        .normal,
-    );
-}
-
 /// Copies sprites from the scene buffer to the screen.
 /// `region` - is a region inside the scene.
-pub fn redrawRegion(self: Render, region: p.Region) !void {
+pub fn redrawRegionFromBuffer(self: Render, region: p.Region) !void {
     var itr = region.cells();
     while (itr.next()) |point| {
         if (self.scene_buffer.getSymbol(point)) |symbol| {
             try self.runtime.drawSprite(symbol.codepoint, point, symbol.mode);
         }
     }
+}
+
+pub fn redrawFromBuffer(self: Render) !void {
+    try self.redrawRegionFromBuffer(self.scene_buffer.region());
 }
 
 /// Draws a single frame from every animation.
@@ -371,9 +298,26 @@ fn drawAnimationsFrame(self: Render, viewport: g.Viewport, level: *g.Level, enti
     }
 }
 
-fn drawHorizontalBorderLine(self: Render) !void {
-    for (0..self.scene_cols) |col| {
-        try self.runtime.drawSprite('═', .{ .row = self.scene_rows + 1, .col = @intCast(col + 1) }, .normal);
+pub fn drawBorder(self: Render, region: p.Region) !void {
+    var itr = region.cells();
+    while (itr.next()) |point| {
+        if (point.row == region.top_left.row or point.row == region.bottomRightRow()) {
+            try self.runtime.drawSprite('─', point, .normal);
+        } else if (point.col == region.top_left.col or point.col == region.bottomRightCol()) {
+            try self.runtime.drawSprite('│', point, .normal);
+        }
+    }
+    try self.runtime.drawSprite('┌', region.top_left, .normal);
+    try self.runtime.drawSprite('└', region.bottomLeft(), .normal);
+    try self.runtime.drawSprite('┐', region.topRight(), .normal);
+    try self.runtime.drawSprite('┘', region.bottomRight(), .normal);
+}
+
+pub fn drawHorizontalLine(self: Render, codepoint: u21, left_point: p.Point, length: u8) !void {
+    var point = left_point;
+    for (0..length) |_| {
+        try self.runtime.drawSprite(codepoint, point, .normal);
+        point.move(.right);
     }
 }
 
@@ -496,18 +440,46 @@ inline fn drawZone(
         2 => p.Point{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS - BUTTON_ZONE_LENGTH + 1 },
         else => unreachable,
     };
-    try self.runtime.drawTextWithAlign(zone_len, text, pos, mode, .center);
+    try self.drawTextWithAlign(zone_len, text, pos, mode, .center);
 }
 
-inline fn cleanZone(self: Render, comptime zone: u8) !void {
-    const zone_len = if (zone == 1) INFO_ZONE_LENGTH else BUTTON_ZONE_LENGTH;
+fn cleanZone(self: Render, comptime zone: u8) !void {
+    const zone_len = if (zone == 0) INFO_ZONE_LENGTH else BUTTON_ZONE_LENGTH;
     const pos = switch (zone) {
         0 => p.Point{ .row = g.DISPLAY_ROWS, .col = 1 },
         1 => p.Point{ .row = g.DISPLAY_ROWS, .col = INFO_ZONE_LENGTH + 1 },
         2 => p.Point{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS - BUTTON_ZONE_LENGTH + 1 },
         else => unreachable,
     };
-    try self.runtime.drawTextWithAlign(zone_len, &.{filler}, pos, .normal, .left);
+    try self.drawTextWithAlign(zone_len, &.{filler}, pos, .normal, .left);
+}
+
+pub fn drawTextWithAlign(
+    self: Render,
+    zone_length: u8,
+    text: []const u8,
+    absolut_position: p.Point,
+    mode: g.DrawingMode,
+    aln: g.TextAlign,
+) !void {
+    const text_length = @min(zone_length, text.len);
+    const left_pad = switch (aln) {
+        .left => 0,
+        .center => (zone_length - text_length) / 2,
+        .right => zone_length - text_length,
+    };
+    const right_pad = zone_length - text_length - left_pad;
+    var cursor = absolut_position;
+    for (0..left_pad) |_| {
+        try self.runtime.drawText(" ", cursor, mode);
+        cursor.move(.right);
+    }
+    try self.runtime.drawText(text[0..text_length], cursor, mode);
+    cursor.moveNTimes(.right, text_length);
+    for (0..right_pad) |_| {
+        try self.runtime.drawText(" ", cursor, mode);
+        cursor.move(.right);
+    }
 }
 
 pub const DrawableSymbol = struct {
@@ -548,6 +520,10 @@ const SceneBuffer = struct {
                 cell.is_changed = false;
             }
         }
+    }
+
+    pub fn region(self: SceneBuffer) p.Region {
+        return p.Region.init(@intCast(self.rows.len), @intCast(self.rows[0].len));
     }
 
     fn getSymbol(self: SceneBuffer, point: p.Point) ?DrawableSymbol {

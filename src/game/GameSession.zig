@@ -114,7 +114,8 @@ pub fn manageInventory(self: *GameSession) !void {
     if (self.entities.get2(self.player, c.Equipment, c.Inventory)) |tuple| {
         self.mode.deinit();
         self.mode = .{ .inventory = undefined };
-        try self.mode.inventory.init(self.arena.allocator(), self, tuple[0], tuple[1]);
+        const drop = self.level.itemAt(self.level.playerPosition().place);
+        try self.mode.inventory.init(self.arena.allocator(), self, tuple[0], tuple[1], drop);
     }
 }
 
@@ -178,8 +179,9 @@ pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_spe
         },
         .pickup => |item| {
             const inventory = self.entities.getUnsafe(self.player, c.Inventory);
-            if (self.entities.get(item, c.Pile)) |pile| {
-                try self.takeFromPile(item, pile, inventory);
+            if (self.entities.get(item, c.Pile)) |_| {
+                try self.manageInventory();
+                return 0;
             } else {
                 try inventory.put(item);
                 try self.entities.remove(item, c.Position);
@@ -276,14 +278,6 @@ fn checkCollision(self: *GameSession, actor: g.Entity, place: p.Point) ?g.Action
     return .do_nothing;
 }
 
-fn takeFromPile(self: *GameSession, item: g.Entity, pile: *c.Pile, inventory: *c.Inventory) !void {
-    _ = self;
-    _ = item;
-    _ = pile;
-    _ = inventory;
-    log.err("Taking from a pile is not implemented yet", .{});
-}
-
 fn doHit(
     self: *GameSession,
     actor: g.Entity,
@@ -371,4 +365,9 @@ pub fn getWeapon(self: *const GameSession, actor: g.Entity) ?*c.Weapon {
 
 pub fn isEnemy(self: *const GameSession, entity: g.Entity) bool {
     return self.entities.get(entity, c.Health) != null;
+}
+
+pub fn isTool(self: *const GameSession, item: g.Entity) bool {
+    return (self.entities.get(item, c.Weapon) != null) or
+        (self.entities.get(item, c.SourceOfLight) != null);
 }

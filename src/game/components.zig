@@ -2,6 +2,14 @@ const std = @import("std");
 const g = @import("game_pkg.zig");
 const p = g.primitives;
 
+fn Set(comptime A: type) type {
+    return std.AutoHashMapUnmanaged(A, void);
+}
+
+fn SetIterator(comptime A: type) type {
+    return Set(A).KeyIterator;
+}
+
 pub const Position = struct {
     place: p.Point,
 };
@@ -99,7 +107,7 @@ pub const Speed = struct {
 
 pub const Pile = struct {
     alloc: std.mem.Allocator,
-    items: std.ArrayListUnmanaged(g.Entity),
+    items: Set(g.Entity),
 
     pub fn empty(alloc: std.mem.Allocator) Pile {
         return .{ .alloc = alloc, .items = .empty };
@@ -109,19 +117,22 @@ pub const Pile = struct {
         self.items.deinit(self.alloc);
     }
 
-    pub inline fn add(self: *Pile, item: g.Entity) !void {
-        try self.items.append(self.alloc, item);
+    pub fn iterator(self: *const Pile) SetIterator(g.Entity) {
+        return self.items.keyIterator();
     }
 
-    pub fn take(self: *Pile, idx: usize) !g.Entity {
-        std.debug.assert(self.items.items.len > idx);
-        return self.items.swapRemove(idx);
+    pub inline fn add(self: *Pile, item: g.Entity) !void {
+        try self.items.put(self.alloc, item, {});
+    }
+
+    pub fn take(self: *Pile, item: g.Entity) void {
+        std.debug.assert(self.items.remove(item));
     }
 };
 
 pub const Inventory = struct {
     alloc: std.mem.Allocator,
-    items: std.ArrayListUnmanaged(g.Entity),
+    items: Set(g.Entity),
 
     pub fn empty(alloc: std.mem.Allocator) Inventory {
         return .{ .alloc = alloc, .items = .empty };
@@ -131,13 +142,16 @@ pub const Inventory = struct {
         self.items.deinit(self.alloc);
     }
 
-    pub inline fn put(self: *Inventory, item: g.Entity) !void {
-        try self.items.append(self.alloc, item);
+    pub fn iterator(self: *const Inventory) SetIterator(g.Entity) {
+        self.items.keyIterator();
     }
 
-    pub fn drop(self: *Inventory, idx: usize) !g.Entity {
-        std.debug.assert(self.items.items.len > idx);
-        return self.items.swapRemove(idx);
+    pub inline fn put(self: *Inventory, item: g.Entity) !void {
+        try self.items.put(self.alloc, item, {});
+    }
+
+    pub fn drop(self: *Inventory, item: g.Entity) void {
+        std.debug.assert(self.items.remove(item));
     }
 };
 

@@ -67,7 +67,17 @@ pub fn removeEntity(self: *Level, entity: g.Entity) !void {
     }
 }
 
-pub fn addEntityAtPlace(self: *Level, item: g.Entity, place: p.Point) !void {
+/// Adds an item to the list of entities on this level, and put it at the place.
+/// Three possible scenario can happened here:
+///   - If no one other item on the place, then the item will be dropped as is:
+///     the position and appropriate sprite will be added to the item;
+///   - If some item (not a pile) is on the place, then a new pile
+///     will be created and added at the place(a position, zorder and sprite will be added),
+///     and both items will be added to that pile;
+///   - If a pile is on the place, the item will be added to this pile;
+///
+/// Returns entity id for the pile if it was created;
+pub fn addEntityAtPlace(self: *Level, item: g.Entity, place: p.Point) !?g.Entity {
     switch (self.cellAt(place)) {
         .entities => |entities| {
             // if some item already exists on the place
@@ -77,26 +87,23 @@ pub fn addEntityAtPlace(self: *Level, item: g.Entity, place: p.Point) !void {
                     log.debug("Adding item {any} into the pile {any} at {any}", .{ item, entity, place });
                     // add a new item to the pile
                     try pile.add(item);
-                    log.debug("Items in the pile {any}: {any}", .{ entity, pile.items.items });
+                    return entity;
                 } else {
-                    // or create a new pile
+                    // or create a new pile and add the item to the pile
                     const pile_id = try self.session.entities.addNewEntityAllocate(g.entities.pile);
                     try self.session.entities.set(pile_id, c.Position{ .place = place });
                     try self.addEntity(pile_id);
                     const pile = self.session.entities.getUnsafe(pile_id, c.Pile);
-
-                    // move the existed item to this pile
-                    try pile.add(entity);
-                    try self.session.entities.remove(entity, c.Position);
+                    log.debug("Created a pile {any} at {any}", .{ pile_id, place });
 
                     // add the item to the pile
                     try pile.add(item);
-                    log.debug(
-                        "Created a pile {any} at {any} with items {any}",
-                        .{ pile_id, place, pile.items.items },
-                    );
+
+                    // move the existed item to the pile
+                    try pile.add(entity);
+                    try self.session.entities.remove(entity, c.Position);
+                    return pile_id;
                 }
-                return;
             }
         },
         else => {},
@@ -104,6 +111,7 @@ pub fn addEntityAtPlace(self: *Level, item: g.Entity, place: p.Point) !void {
     log.debug("Adding item {any} to the empty place {any}", .{ item, place });
     try self.session.entities.set(item, c.Position{ .place = place });
     try self.addEntity(item);
+    return null;
 }
 
 pub inline fn checkVisibility(self: *const g.Level, place: p.Point) g.Render.Visibility {
@@ -178,11 +186,29 @@ pub fn cellAt(self: Level, place: p.Point) Cell {
         if (place.eql(position.place)) {
             found_entity = true;
             // only one entity with the same order can be at the same place
-            std.debug.assert(result[order] == null);
+            if (result[order]) |existed_item| {
+                std.debug.panic("Both items {any} and {any} at same place {any}", .{ existed_item, entity, place });
+            }
             result[order] = entity;
         }
     }
     return if (found_entity) .{ .entities = result } else .{ .landscape = landscape };
+}
+
+// OPTIMIZE IT
+pub fn itemAt(self: Level, place: p.Point) ?g.Entity {
+    switch (self.dungeon.cellAt(place)) {
+        .floor, .doorway => {},
+        else => return null,
+    }
+    var itr = self.componentsIterator().of2(c.Position, c.ZOrder);
+    while (itr.next()) |tuple| {
+        const entity, const position, const zorder = tuple;
+        if (place.eql(position.place) and zorder.order == .item) {
+            return entity;
+        }
+    }
+    return null;
 }
 
 // The level doesn't subscribe to event directly to avoid unsubscription.

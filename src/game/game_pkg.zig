@@ -8,6 +8,7 @@ pub const entities = @import("entities.zig");
 pub const events = @import("events.zig");
 pub const primitives = @import("primitives.zig");
 pub const visibility = @import("visibility_strategies.zig");
+pub const windows = @import("windows/windows_pkg.zig");
 
 pub const Action = @import("actions.zig").Action;
 pub const AI = @import("AI.zig");
@@ -28,8 +29,8 @@ pub const Levels = @import("Levels.zig");
 pub const MovePoints = @import("actions.zig").MovePoints;
 pub const Render = @import("Render.zig");
 pub const Runtime = @import("Runtime.zig");
+pub const TextAlign = Runtime.TextAlign;
 pub const Viewport = @import("Viewport.zig");
-pub const Window = @import("Window.zig");
 
 pub const RENDER_DELAY_MS = 150;
 

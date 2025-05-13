@@ -3,6 +3,7 @@ const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
+const w = g.windows;
 
 const log = std.log.scoped(.play_mode);
 
@@ -17,7 +18,7 @@ quick_actions: std.ArrayListUnmanaged(QuickAction),
 // The index of the quick action for the target entity
 target_idx: usize = 0,
 is_player_turn: bool = true,
-window: ?g.Window = null,
+quick_actions_window: ?w.OptionsWindow(void) = null,
 
 pub fn init(
     self: *PlayMode,
@@ -37,129 +38,6 @@ pub fn init(
 
 pub fn deinit(self: PlayMode) void {
     self.arena.deinit();
-}
-
-inline fn target(self: PlayMode) ?g.Entity {
-    return if (self.target_idx > self.quick_actions.items.len - 1)
-        null
-    else if (self.quick_actions.items[self.target_idx].action == .wait)
-        null
-    else
-        self.quick_actions.items[self.target_idx].target;
-}
-
-inline fn quickAction(self: PlayMode) g.Action {
-    return self.quick_actions.items[self.target_idx].action;
-}
-
-fn draw(self: *const PlayMode) !void {
-    if (self.window) |*window| {
-        try self.session.render.drawWindow(window);
-    } else {
-        try self.session.render.drawScene(self.session, self.target(), self.quickAction());
-        try self.drawInfoBar();
-    }
-}
-
-fn drawInfoBar(self: *const PlayMode) !void {
-    if (self.window) |_| {
-        try self.session.render.hideLeftButton();
-        try self.session.render.drawRightButton("Choose", false);
-        return;
-    }
-
-    if (self.session.entities.get(self.session.player, c.Health)) |health| {
-        try self.session.render.drawPlayerHp(health);
-    }
-    try self.session.render.drawLeftButton("Explore");
-    const qa = self.quickAction();
-    const action_label = qa.toString();
-    try self.session.render.drawRightButton(action_label, self.quick_actions.items.len > 1);
-
-    // Draw the name or health of the target entity
-    if (self.target()) |entity| {
-        if (!entity.eql(self.session.player)) {
-            if (self.session.entities.get2(entity, c.Sprite, c.Health)) |tuple| {
-                try self.session.render.drawEnemyHealth(tuple[0].codepoint, tuple[1]);
-                return;
-            }
-        }
-        const name = if (self.session.entities.get(entity, c.Description)) |desc| desc.name() else "?";
-        try self.session.render.drawInfo(name);
-    } else {
-        try self.session.render.cleanInfo();
-    }
-}
-
-fn closeWindow(self: *PlayMode, window: *g.Window) !void {
-    try self.session.render.redrawRegion(window.region());
-    window.deinit();
-    self.window = null;
-}
-
-fn handleInput(self: *PlayMode) !?g.Action {
-    if (try self.session.runtime.readPushedButtons()) |button| {
-        switch (button.game_button) {
-            .a => {
-                if (self.window) |*window| {
-                    self.target_idx = window.selected_line orelse 0;
-                    try self.closeWindow(window);
-                    try self.drawInfoBar();
-                } else {
-                    switch (button.state) {
-                        .released => return self.quickAction(),
-                        .hold => if (self.quick_actions.items.len > 0) {
-                            try self.initWindowWithVariants(self.quick_actions.items, self.target_idx);
-                            try self.draw();
-                        },
-                    }
-                }
-                return null;
-            },
-            .b => if (button.state == .released) {
-                try self.session.lookAround();
-                // we have to handle changing the state right after this function
-                return null;
-            },
-            .left, .right, .up, .down => if (self.window) |*window| {
-                if (button.game_button == .up) {
-                    window.selectPreviousLine();
-                    try self.session.render.drawWindow(window);
-                    try self.drawInfoBar();
-                }
-                if (button.game_button == .down) {
-                    window.selectNextLine();
-                    try self.session.render.drawWindow(window);
-                    try self.drawInfoBar();
-                }
-                return null;
-            } else {
-                return g.Action{
-                    .move = .{
-                        .target = .{ .direction = button.toDirection().? },
-                        .keep_moving = false, // btn.state == .double_pressed,
-                    },
-                };
-            },
-        }
-    }
-    if (self.session.runtime.popCheat()) |cheat| {
-        log.debug("Cheat {any}", .{cheat});
-        switch (cheat) {
-            .dump_vector_field => self.session.level.dijkstra_map.dumpToLog(),
-            .turn_light_on => g.visibility.turn_light_on = true,
-            .turn_light_off => g.visibility.turn_light_on = false,
-            .set_health => |hp| {
-                if (self.session.entities.get(self.session.player, c.Health)) |health| {
-                    health.current = hp;
-                }
-            },
-            else => if (cheat.toAction(self.session)) |action| {
-                return action;
-            },
-        }
-    }
-    return null;
 }
 
 pub fn tick(self: *PlayMode) !void {
@@ -198,6 +76,106 @@ pub fn tick(self: *PlayMode) !void {
         }
         self.is_player_turn = true;
     }
+}
+
+fn handleInput(self: *PlayMode) !?g.Action {
+    if (try self.session.runtime.readPushedButtons()) |btn| {
+        if (self.quick_actions_window) |*window| {
+            if (btn.game_button == .b) {
+                try window.close(self.arena.allocator(), self.session.render);
+                self.quick_actions_window = null;
+            } else {
+                _ = try window.handleButton(btn);
+                try window.draw(self.session.render);
+            }
+        } else {
+            switch (btn.game_button) {
+                .a => switch (btn.state) {
+                    .released => return self.quickAction(),
+                    .hold => if (self.quick_actions.items.len > 0) {
+                        self.quick_actions_window =
+                            try self.windowWithQuickActions(self.quick_actions.items, self.target_idx);
+                        try self.quick_actions_window.?.draw(self.session.render);
+                        return null;
+                    },
+                },
+                .b => if (btn.state == .released) {
+                    try self.session.lookAround();
+                    // we have to handle changing the state right after this function
+                    return null;
+                },
+                .left, .right, .up, .down => {
+                    return g.Action{
+                        .move = .{
+                            .target = .{ .direction = btn.toDirection().? },
+                            .keep_moving = false, // btn.state == .double_pressed,
+                        },
+                    };
+                },
+            }
+        }
+    }
+    if (self.session.runtime.popCheat()) |cheat| {
+        log.debug("Cheat {any}", .{cheat});
+        switch (cheat) {
+            .dump_vector_field => self.session.level.dijkstra_map.dumpToLog(),
+            .turn_light_on => g.visibility.turn_light_on = true,
+            .turn_light_off => g.visibility.turn_light_on = false,
+            .set_health => |hp| {
+                if (self.session.entities.get(self.session.player, c.Health)) |health| {
+                    health.current = hp;
+                }
+            },
+            else => if (cheat.toAction(self.session)) |action| {
+                return action;
+            },
+        }
+    }
+    return null;
+}
+
+fn draw(self: *const PlayMode) !void {
+    if (self.quick_actions_window == null) {
+        try self.session.render.drawScene(self.session, self.target(), self.quickAction());
+        try self.drawInfoBar();
+    }
+}
+
+fn drawInfoBar(self: *const PlayMode) !void {
+    if (self.session.entities.get(self.session.player, c.Health)) |health| {
+        try self.session.render.drawPlayerHp(health);
+    }
+    try self.session.render.drawLeftButton("Explore");
+    const qa = self.quickAction();
+    const action_label = qa.toString();
+    try self.session.render.drawRightButton(action_label, self.quick_actions.items.len > 1);
+
+    // Draw the name or health of the target entity
+    if (self.target()) |entity| {
+        if (!entity.eql(self.session.player)) {
+            if (self.session.entities.get2(entity, c.Sprite, c.Health)) |tuple| {
+                try self.session.render.drawEnemyHealth(tuple[0].codepoint, tuple[1]);
+                return;
+            }
+        }
+        const name = if (self.session.entities.get(entity, c.Description)) |desc| desc.name() else "?";
+        try self.session.render.drawInfo(name);
+    } else {
+        try self.session.render.cleanInfo();
+    }
+}
+
+fn target(self: PlayMode) ?g.Entity {
+    return if (self.target_idx > self.quick_actions.items.len - 1)
+        null
+    else if (self.quick_actions.items[self.target_idx].action == .wait)
+        null
+    else
+        self.quick_actions.items[self.target_idx].target;
+}
+
+fn quickAction(self: PlayMode) g.Action {
+    return self.quick_actions.items[self.target_idx].action;
 }
 
 pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity) anyerror!void {
@@ -285,18 +263,21 @@ fn calculateQuickActionForTarget(
     return null;
 }
 
-fn initWindowWithVariants(
+fn windowWithQuickActions(
     self: *PlayMode,
     variants: []const QuickAction,
     selected: usize,
-) !void {
-    self.window = g.Window.modal(self.arena.allocator());
+) !w.OptionsWindow(void) {
+    var window = w.OptionsWindow(void).init(self, .modal, "Close", "Choose");
     for (variants, 0..) |qa, idx| {
-        const line = try self.window.?.addEmptyLine();
-        const action_label = qa.action.toString();
-        const pad = @divTrunc(g.Window.MAX_WINDOW_WIDTH - action_label.len, 2);
-        std.mem.copyForwards(u8, line[pad..], action_label);
+        try window.addOption(self.arena.allocator(), qa.action.toString(), {}, chooseEntity, null);
         if (idx == selected)
-            self.window.?.selected_line = idx;
+            window.selected_line = idx;
     }
+    return window;
+}
+
+fn chooseEntity(ptr: *anyopaque, line_idx: usize, _: void) anyerror!void {
+    const self: *PlayMode = @ptrCast(@alignCast(ptr));
+    self.target_idx = line_idx;
 }

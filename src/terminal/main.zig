@@ -12,6 +12,7 @@ pub const std_options: std.Options = .{
     .log_scope_levels = &[_]std.log.ScopeLevel{
         .{ .scope = .default, .level = .debug },
         // .{ .scope = .render, .level = .warn },
+        // .{ .scope = .windows, .level = .debug },
         // .{ .scope = .tty_runtime, .level = .debug },
         // .{ .scope = .visibility, .level = .debug },
         // .{ .scope = .ai, .level = .debug },

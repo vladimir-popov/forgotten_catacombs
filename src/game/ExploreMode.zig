@@ -4,116 +4,95 @@ const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
+const w = g.windows;
 
 const log = std.log.scoped(.explore_mode);
 
 const ExploreMode = @This();
-const EntitiesOnScreen = std.AutoHashMapUnmanaged(p.Point, std.ArrayListUnmanaged(g.Entity));
-const WindowType = enum { description, variants };
+const EntitiesOnScreen = std.AutoHashMapUnmanaged(p.Point, [3]?g.Entity);
 
 arena: std.heap.ArenaAllocator,
 session: *g.GameSession,
 /// Map of entities and their positions on the screen
 entities_on_screen: EntitiesOnScreen,
-/// Highlighted a place in the dungeon
-place_in_focus: p.Point = .{},
-/// Index of the focused entity in the map with entities on screen
-focus_idx: usize = 0,
-/// The window to show description or variants
-window: ?g.Window = null,
+entity_in_focus: g.Entity,
+/// Highlighted a focused place in the dungeon
+place_in_focus: p.Point,
+/// The window to show list of entities on the place in focus
+entities_window: ?w.OptionsWindow(g.Entity) = null,
+description_window: ?w.DescriptionWindow = null,
 
 pub fn init(self: *ExploreMode, alloc: std.mem.Allocator, session: *g.GameSession) !void {
     log.debug("Init LookingAroundMode", .{});
     self.* = .{
         .arena = std.heap.ArenaAllocator.init(alloc),
         .session = session,
-        .entities_on_screen = EntitiesOnScreen{},
+        .entity_in_focus = session.player,
+        .place_in_focus = session.level.playerPosition().place,
+        .entities_on_screen = .empty,
     };
-    try self.update();
+    try self.updateEntitiesOnScreen();
+    try self.draw();
 }
 
 pub fn deinit(self: ExploreMode) void {
     self.arena.deinit();
 }
 
-fn update(self: *ExploreMode) !void {
-    const alloc = self.arena.allocator();
-    self.entities_on_screen.clearRetainingCapacity();
-    var itr = self.session.level.componentsIterator().of(c.Position);
-    while (itr.next()) |tuple| {
-        const is_inside_viewport = self.session.viewport.region.containsPoint(tuple[1].place);
-        // we should follow the same logic as the render:
-        // only entities, which should be drawn, can be in focus
-        const is_visible = self.session.level.checkVisibility(tuple[1].place) != .invisible;
-
-        if (is_inside_viewport and is_visible) {
-            const gop = try self.entities_on_screen.getOrPut(alloc, tuple[1].place);
-            if (!gop.found_existing) {
-                gop.value_ptr.* = std.ArrayListUnmanaged(g.Entity){};
+pub fn tick(self: *ExploreMode) anyerror!void {
+    // Nothing should happened until the player push a button
+    if (try self.session.runtime.readPushedButtons()) |btn| {
+        if (self.description_window) |*description_window| {
+            if (try description_window.handleButton(btn)) {
+                try description_window.close(self.arena.allocator(), self.session.render);
+                self.description_window = null;
             }
-            try gop.value_ptr.append(alloc, tuple[0]);
-            if (tuple[0].eql(self.session.player)) {
-                self.place_in_focus = tuple[1].place;
-                self.focus_idx = gop.value_ptr.items.len - 1;
+        } else if (self.entities_window) |*entities_window| {
+            switch (try entities_window.handleButton(btn)) {
+                .close_btn => {
+                    try entities_window.close(self.arena.allocator(), self.session.render);
+                    self.entities_window = null;
+                },
+                .chose_btn => try entities_window.hide(self.session.render),
+                else => {},
+            }
+        } else {
+            switch (btn.game_button) {
+                .a => {
+                    if (btn.state == .hold and self.countOfEntitiesInFocus() > 1) {
+                        if (self.entitiesInFocus()) |entities| {
+                            self.entities_window = try self.windowWithEntities(entities);
+                        }
+                    } else {
+                        self.description_window = try self.windowWithDescription();
+                    }
+                },
+                .b => {
+                    try self.session.play(self.entity_in_focus);
+                    return;
+                },
+                .left, .right, .up, .down => {
+                    self.moveFocus(btn.toDirection().?);
+                },
             }
         }
+        try self.draw();
     }
-    try self.draw();
-    log.debug("ExploreMode has been refreshed. Entities on screen:\n{any}", .{self.entities_on_screen});
-}
-
-inline fn entityInFocus(self: ExploreMode) ?g.Entity {
-    if (self.entitiesInFocus()) |entities|
-        return entities.items[self.focus_idx];
-
-    return null;
-}
-
-inline fn entitiesInFocus(self: ExploreMode) ?std.ArrayListUnmanaged(g.Entity) {
-    if (self.entities_on_screen.get(self.place_in_focus)) |entities|
-        return entities;
-    return null;
-}
-
-inline fn countOfEntitiesInFocus(self: ExploreMode) usize {
-    if (self.entities_on_screen.get(self.place_in_focus)) |entities|
-        return entities.items.len;
-
-    return 0;
 }
 
 fn draw(self: *const ExploreMode) !void {
-    if (self.window) |*window| {
-        try self.session.render.drawWindow(window);
+    if (self.description_window) |*window| {
+        try window.draw(self.session.render);
+    } else if (self.entities_window) |*window| {
+        try window.draw(self.session.render);
     } else {
-        try self.session.render.drawScene(self.session, self.entityInFocus(), null);
-        try self.drawInfoBar();
-    }
-}
-
-fn drawInfoBar(self: *const ExploreMode) !void {
-    if (self.window) |window| {
-        switch (window.tagAsEnum(WindowType)) {
-            .variants => {
-                try self.session.render.hideLeftButton();
-                try self.session.render.drawRightButton("Choose", false);
-            },
-            .description => {
-                try self.session.render.hideLeftButton();
-                try self.session.render.drawRightButton("Close", false);
-            },
-        }
-    } else {
+        try self.session.render.drawScene(self.session, self.entity_in_focus, null);
         try self.session.render.drawLeftButton("Continue");
         try self.session.render.drawRightButton("Describe", self.countOfEntitiesInFocus() > 1);
-    }
-    // Draw the name or health of the entity in focus
-    if (self.entityInFocus()) |entity| {
+        // Draw the name or health of the entity in focus
         var buf: [g.DISPLAY_COLS]u8 = undefined;
-        const len = @min(try self.statusLine(entity, &buf), g.Render.INFO_ZONE_LENGTH);
+        const len = @min(try self.statusLine(self.entity_in_focus, &buf), g.Render.INFO_ZONE_LENGTH);
         try self.session.render.drawInfo(buf[0..len]);
-    } else {
-        try self.session.render.cleanInfo();
     }
 }
 
@@ -132,86 +111,68 @@ fn statusLine(self: ExploreMode, entity: g.Entity, line: []u8) !usize {
     return len;
 }
 
-fn closeWindow(self: *ExploreMode, window: *g.Window) !void {
-    try self.session.render.redrawRegion(window.region());
-    window.deinit();
-    self.window = null;
-}
+fn updateEntitiesOnScreen(self: *ExploreMode) !void {
+    const alloc = self.arena.allocator();
+    self.entities_on_screen.clearRetainingCapacity();
+    var itr = self.session.level.componentsIterator().of2(c.Position, c.ZOrder);
+    while (itr.next()) |tuple| {
+        const entity = tuple[0];
+        const place = tuple[1].place;
+        const zorder = tuple[2].order;
+        if (!self.session.viewport.region.containsPoint(place))
+            continue;
 
-pub fn tick(self: *ExploreMode) anyerror!void {
-    // Nothing should happened until the player push a button
-    if (try self.session.runtime.readPushedButtons()) |btn| {
-        switch (btn.game_button) {
-            .a => if (self.window) |*window| {
-                if (window.tag == @intFromEnum(WindowType.variants)) {
-                    self.focus_idx = window.selected_line orelse 0;
-                }
-                try self.closeWindow(window);
-                try self.drawInfoBar();
-            } else {
-                if (btn.state == .hold and self.countOfEntitiesInFocus() > 1) {
-                    if (self.entitiesInFocus()) |entities| {
-                        try self.initWindowWithVariants(entities.items, self.focus_idx);
-                        try self.session.render.drawWindow(&self.window.?);
-                        try self.drawInfoBar();
-                    }
-                } else if (self.entityInFocus()) |entity| {
-                    try self.initWindowWithDescription(entity);
-                    try self.session.render.drawWindow(&self.window.?);
-                    try self.drawInfoBar();
-                }
-            },
-            .b => if (btn.state == .released and self.window == null) {
-                try self.session.play(self.entityInFocus());
-                return;
-            },
-            .left, .right, .up, .down => if (self.window) |*window| {
-                if (window.tag == @intFromEnum(WindowType.variants)) {
-                    if (btn.game_button == .up) {
-                        window.selectPreviousLine();
-                        try self.session.render.drawWindow(window);
-                        try self.drawInfoBar();
-                    }
-                    if (btn.game_button == .down) {
-                        window.selectNextLine();
-                        try self.session.render.drawWindow(window);
-                        try self.drawInfoBar();
-                    }
-                }
-            } else {
-                self.place_in_focus = chooseNextEntity(
-                    self.place_in_focus,
-                    btn.toDirection().?,
-                    self.entities_on_screen,
-                );
-                self.focus_idx = 0;
-                try self.draw();
-            },
+        // we should follow the same logic as the render:
+        // only entities, which should be drawn, can be in focus
+        if (self.session.level.checkVisibility(place) != .invisible) {
+            const gop = try self.entities_on_screen.getOrPut(alloc, place);
+            if (!gop.found_existing) {
+                gop.value_ptr.* = @splat(null);
+            }
+            gop.value_ptr[@intFromEnum(zorder)] = entity;
         }
     }
+    log.debug("ExploreMode has been refreshed. Entities on screen:\n{any}", .{self.entities_on_screen});
 }
 
-fn chooseNextEntity(
-    current_place: p.Point,
-    direction: p.Direction,
-    entities_on_screen: EntitiesOnScreen,
-) p.Point {
-    var nearest_place = current_place;
+fn entitiesInFocus(self: ExploreMode) ?[3]?g.Entity {
+    if (self.entities_on_screen.get(self.place_in_focus)) |entities|
+        return entities;
+    return null;
+}
+
+fn countOfEntitiesInFocus(self: ExploreMode) usize {
+    var count: usize = 0;
+    if (self.entities_on_screen.get(self.place_in_focus)) |entities| {
+        for (entities) |entity| {
+            if (entity != null)
+                count += 1;
+        }
+    }
+
+    return count;
+}
+
+fn moveFocus(self: *ExploreMode, direction: p.Direction) void {
+    var nearest_place = self.place_in_focus;
     var min_distance: f16 = std.math.floatMax(f16);
-    var itr = entities_on_screen.iterator();
+    var itr = self.entities_on_screen.iterator();
     while (itr.next()) |entry| {
         const place = entry.key_ptr.*;
-
-        const d: f16 = distance(current_place, place, direction);
-        log.debug("Distance to {any} is {d} (entity {any})", .{ place, d, entry.value_ptr.items });
-
+        const d: f16 = distance(self.place_in_focus, place, direction);
         if (d > 0 and d < min_distance) {
-            log.debug("New closest place {any}. min {d}", .{ place, d });
             min_distance = d;
             nearest_place = place;
         }
     }
-    return nearest_place;
+    self.place_in_focus = nearest_place;
+    const entities = self.entities_on_screen.get(nearest_place).?;
+    for (&[3]u8{ 2, 1, 0 }) |idx| {
+        if (entities[idx]) |entity| {
+            self.entity_in_focus = entity;
+            return;
+        }
+    }
 }
 
 /// Returns the distance between two points. If the target point is outside of the region
@@ -219,7 +180,7 @@ fn chooseNextEntity(
 ///
 ///    Example:
 ///  ------
-/// |  *   |
+/// |  o   |
 /// |  |  *|
 /// |  f-->|
 /// |  |*  |
@@ -245,29 +206,35 @@ inline fn sub(x: u8, y: u8) u8 {
     return if (y > x) y - x else x - y;
 }
 
-fn initWindowWithVariants(
+fn windowWithEntities(
     self: *ExploreMode,
-    variants: []const g.Entity,
-    selected: usize,
-) !void {
-    self.window = g.Window.modal(self.arena.allocator());
-    self.window.?.setEnumTag(WindowType.variants);
-    for (variants, 0..) |entity, idx| {
-        // Every entity has to have description, or handling indexes become complicated
-        const description = self.session.entities.getUnsafe(entity, c.Description);
-        const line = try self.window.?.addEmptyLine();
-        const pad = @divTrunc(g.Window.MAX_WINDOW_WIDTH - description.name().len, 2);
-        std.mem.copyForwards(u8, line[pad..], description.name());
-        if (idx == selected)
-            self.window.?.selected_line = idx;
+    variants: [3]?g.Entity,
+) !w.OptionsWindow(g.Entity) {
+    var window = w.OptionsWindow(g.Entity).init(self, .modal, "Close", "Choose");
+    for (variants) |maybe_entity| {
+        if (maybe_entity) |entity| {
+            // Every entity has to have description, or handling indexes become complicated
+            const description = self.session.entities.getUnsafe(entity, c.Description);
+            try window.addOption(self.arena.allocator(), description.name(), entity, describeEntity, null);
+            if (entity.eql(self.entity_in_focus))
+                // the variants array has to have at least one (focused) entity
+                try window.selectLine(window.options.items.len - 1);
+        }
     }
+    return window;
 }
 
-fn initWindowWithDescription(
-    self: *ExploreMode,
-    entity: g.Entity,
-) !void {
-    self.window = g.Window.modal(self.arena.allocator());
-    self.window.?.setEnumTag(WindowType.description);
-    try self.window.?.info(self.session.entities, entity, self.session.runtime.isDevMode());
+fn describeEntity(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!void {
+    const self: *ExploreMode = @ptrCast(@alignCast(ptr));
+    self.entity_in_focus = entity;
+    self.description_window = try self.windowWithDescription();
+}
+
+fn windowWithDescription(self: *ExploreMode) !w.DescriptionWindow {
+    return try w.DescriptionWindow.init(
+        self.arena.allocator(),
+        self.session.entities,
+        self.entity_in_focus,
+        self.session.runtime.isDevMode(),
+    );
 }

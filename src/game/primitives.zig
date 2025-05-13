@@ -149,8 +149,9 @@ pub const Region = struct {
     /// The count of columns in this region.
     cols: u8,
 
-    pub fn init(rows: u8, cols: u8) Region {
-        return .{ .top_left = .{ .row = 1, .col = 1 }, .rows = rows, .cols = cols };
+    /// Creates a region with size `rows`x`cols` and top left corner at Point(top_left_row, top_left_col)
+    pub fn init(top_left_row: u8, top_left_col: u8, rows: u8, cols: u8) Region {
+        return .{ .top_left = .{ .row = top_left_row, .col = top_left_col }, .rows = rows, .cols = cols };
     }
 
     pub fn format(
@@ -479,6 +480,7 @@ pub const Region = struct {
         }
     };
 
+    /// Returns an iterator of all cells inside the region, include borders.
     pub fn cells(self: Region) CellsIterator {
         return .{ .region = self, .cursor = self.top_left };
     }
