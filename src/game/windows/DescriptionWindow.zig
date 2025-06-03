@@ -92,6 +92,6 @@ pub fn draw(self: *const DescriptionWindow, render: g.Render) !void {
 
 pub fn close(self: *DescriptionWindow, alloc: std.mem.Allocator, render: g.Render) !void {
     log.debug("Close description window for {any}", .{self.entity});
-    try render.redrawRegionFromBuffer(self.text_area.region());
+    try render.redrawRegionFromSceneBuffer(self.text_area.region());
     self.deinit(alloc);
 }

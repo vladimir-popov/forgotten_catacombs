@@ -49,6 +49,9 @@ pub fn OptionWindow(comptime Item: type) type {
         options: std.ArrayListUnmanaged(Option),
         left_button_label: []const u8,
         right_button_label: []const u8,
+        // if the window is above scene, the buffer should be drawn to hide the window,
+        // or fill the region with spaces
+        above_scene: bool = true,
 
         pub fn init(
             handler: *anyopaque,
@@ -164,7 +167,10 @@ pub fn OptionWindow(comptime Item: type) type {
         }
 
         pub fn hide(self: *Self, render: g.Render) !void {
-            try render.redrawRegionFromBuffer(self.text_area.region());
+            if (self.above_scene)
+                try render.redrawRegionFromSceneBuffer(self.text_area.region())
+            else
+                try render.fillRegion(' ', .normal, self.text_area.region());
         }
 
         pub fn close(self: *Self, alloc: std.mem.Allocator, render: g.Render) !void {

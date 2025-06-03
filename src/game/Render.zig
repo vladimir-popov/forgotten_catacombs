@@ -144,6 +144,13 @@ pub fn redrawScene(self: *Render, session: *g.GameSession, entity_in_focus: ?g.E
     try self.drawScene(session, entity_in_focus, quick_action);
 }
 
+pub fn fillRegion(self: Render, symbol: u21, mode: g.DrawingMode, region: p.Region) !void {
+    var itr = region.cells();
+    while (itr.next()) |cell| {
+        try self.runtime.drawSprite(symbol, cell, mode);
+    }
+}
+
 /// Clears both scene and info bar. Resets the inner buffer.
 pub inline fn clearDisplay(self: Render) !void {
     self.scene_buffer.reset();
@@ -257,7 +264,7 @@ fn drawChangedSymbols(self: Render) !void {
 
 /// Copies sprites from the scene buffer to the screen.
 /// `region` - is a region inside the scene.
-pub fn redrawRegionFromBuffer(self: Render, region: p.Region) !void {
+pub fn redrawRegionFromSceneBuffer(self: Render, region: p.Region) !void {
     var itr = region.cells();
     while (itr.next()) |point| {
         if (self.scene_buffer.getSymbol(point)) |symbol| {
@@ -266,8 +273,8 @@ pub fn redrawRegionFromBuffer(self: Render, region: p.Region) !void {
     }
 }
 
-pub fn redrawFromBuffer(self: Render) !void {
-    try self.redrawRegionFromBuffer(self.scene_buffer.region());
+pub fn redrawFromSceneBuffer(self: Render) !void {
+    try self.redrawRegionFromSceneBuffer(self.scene_buffer.region());
 }
 
 /// Draws a single frame from every animation.
@@ -436,7 +443,7 @@ inline fn drawZone(
     const zone_len = if (zone == 0) INFO_ZONE_LENGTH - 2 else BUTTON_ZONE_LENGTH;
     const pos = switch (zone) {
         0 => p.Point{ .row = g.DISPLAY_ROWS, .col = 1 },
-        1 => p.Point{ .row = g.DISPLAY_ROWS, .col = INFO_ZONE_LENGTH + 2 },
+        1 => p.Point{ .row = g.DISPLAY_ROWS, .col = INFO_ZONE_LENGTH + 1 },
         2 => p.Point{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS - BUTTON_ZONE_LENGTH + 1 },
         else => unreachable,
     };
@@ -445,13 +452,16 @@ inline fn drawZone(
 
 fn cleanZone(self: Render, comptime zone: u8) !void {
     const zone_len = if (zone == 0) INFO_ZONE_LENGTH else BUTTON_ZONE_LENGTH;
-    const pos = switch (zone) {
+    var pos = switch (zone) {
         0 => p.Point{ .row = g.DISPLAY_ROWS, .col = 1 },
         1 => p.Point{ .row = g.DISPLAY_ROWS, .col = INFO_ZONE_LENGTH + 1 },
         2 => p.Point{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS - BUTTON_ZONE_LENGTH + 1 },
         else => unreachable,
     };
-    try self.drawTextWithAlign(zone_len, &.{filler}, pos, .normal, .left);
+    for (0..zone_len) |_| {
+        try self.runtime.drawText(" ", pos, .normal);
+        pos.move(.right);
+    }
 }
 
 pub fn drawTextWithAlign(

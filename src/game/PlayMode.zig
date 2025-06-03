@@ -213,7 +213,7 @@ pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity) anyerror!vo
                 log.debug("Calculated action is {any}", .{qa});
                 try self.quick_actions.append(self.arena.allocator(), .{ .target = entity, .action = qa });
             } else {
-                log.warn("No quick action for entity {any}", .{entity});
+                log.debug("No quick action for entity {any}", .{entity});
             }
         }
     }

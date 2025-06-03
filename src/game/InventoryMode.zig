@@ -116,12 +116,14 @@ pub fn tick(self: *InventoryMode) !void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (self.description_window) |*window| {
             if (try window.handleButton(btn)) {
+                std.log.debug("Close description window", .{});
                 try window.close(self.alloc, self.session.render);
                 self.description_window = null;
             }
         } else if (self.actions_window) |*window| {
             switch (try window.handleButton(btn)) {
                 .close_btn, .chose_btn => {
+                    std.log.debug("Close actions window", .{});
                     try window.close(self.alloc, self.session.render);
                     self.actions_window = null;
                 },
@@ -219,6 +221,7 @@ fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     log.debug("Buttons is helt. Show modal window for {any}", .{item});
     const alloc = tab.parent.alloc;
     var window = w.OptionsWindow(g.Entity).init(tab, .modal, "Cancel", "Use");
+    window.above_scene = false;
     try window.addOption(alloc, "Use", item, useSelectedItem, null);
     try window.addOption(alloc, "Drop", item, dropSelectedItem, null);
     try window.addOption(alloc, "Describe", item, describeSelectedItem, null);
