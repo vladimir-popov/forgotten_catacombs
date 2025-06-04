@@ -5,7 +5,8 @@ const p = g.primitives;
 
 const DijkstraMap = @This();
 
-const VectorsMap = std.AutoHashMapUnmanaged(p.Point, struct { p.Direction, u8 });
+const Vector = struct { direction: p.Direction, distance: u8 };
+const VectorsMap = std.AutoHashMapUnmanaged(p.Point, Vector);
 
 pub const Obstacles = struct {
     context: *const anyopaque,
@@ -47,8 +48,8 @@ pub fn calculate(self: *DijkstraMap, target: p.Point) !void {
                 continue;
 
             const gop = try self.vectors.getOrPut(self.alloc, neighbor);
-            if (!gop.found_existing or gop.value_ptr[1] > weight + 1) {
-                gop.value_ptr.* = .{ direction.opposite(), weight + 1 };
+            if (!gop.found_existing or gop.value_ptr.distance > weight + 1) {
+                gop.value_ptr.* = .{ .direction = direction.opposite(), .distance = weight + 1 };
                 try openned.append(self.alloc, .{ neighbor, weight + 1 });
             }
         }
@@ -66,16 +67,21 @@ fn write(
     self: DijkstraMap,
     writer: std.io.AnyWriter,
 ) !void {
+    try writer.print("   |", .{});
+    for (0..self.region.cols) |col_idx| {
+        try writer.print("{d:3}|", .{col_idx + 1});
+    }
+    try writer.writeByte('\n');
     for (0..self.region.rows) |row_idx| {
-        try writer.writeByte('|');
+        try writer.print("{d:3}|", .{row_idx + 1});
         for (0..self.region.cols) |col_idx| {
             const place = p.Point{
                 .row = @intCast(row_idx + self.region.top_left.row),
                 .col = @intCast(col_idx + self.region.top_left.col),
             };
-            if (self.vectors.get(place)) |tuple| {
-                const char = directionToArrow(tuple[0]);
-                try writer.print("{c}{d:2}|", .{ char, tuple[1] });
+            if (self.vectors.get(place)) |vector| {
+                const char = directionToArrow(vector.direction);
+                try writer.print("{c}{d:2}|", .{ char, vector.distance });
             } else {
                 _ = try writer.write("? 0|");
             }

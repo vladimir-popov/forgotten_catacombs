@@ -55,6 +55,7 @@ pub fn tick(self: *PlayMode) !void {
             const speed = self.session.entities.getUnsafe(self.session.player, c.Speed);
             const mp = try self.session.doAction(self.session.player, action, speed.move_points);
             if (mp > 0) {
+                log.info("Spent {d} move points", .{mp});
                 log.debug("Update quick actions after action {any}", .{action});
                 try self.updateQuickActions(self.target());
                 var itr = self.session.level.componentsIterator().of(c.Initiative);
