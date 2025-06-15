@@ -31,7 +31,7 @@ map: g.LevelMap = undefined,
 /// Dijkstra Map to the player
 dijkstra_map: g.DijkstraMap = undefined,
 
-pub fn init(
+pub fn preinit(
     alloc: std.mem.Allocator,
     session: *g.GameSession,
     depth: u8,

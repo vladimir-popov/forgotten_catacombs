@@ -14,15 +14,16 @@ const log = std.log.scoped(.levels);
 /// @param level should be not initialized.
 pub fn firstLevel(
     alloc: std.mem.Allocator,
+    level: *g.Level,
     session: *g.GameSession,
     first_visit: bool,
 ) !void {
-    session.level = try g.Level.init(alloc, session, 0, g.visibility.showTheCurrentPlacement);
+    level.* = try g.Level.preinit(alloc, session, 0, g.visibility.showTheCurrentPlacement);
     log.debug("Begin creation of the first level. Is first visit? {any}", .{first_visit});
-    const dungeon = try d.FirstLocation.generateDungeon(&session.level.arena);
+    const dungeon = try d.FirstLocation.generateDungeon(&level.arena);
     log.debug("The dungeon has been created successfully", .{});
     try initWithDungeon(
-        &session.level,
+        level,
         dungeon,
         dungeon.entrance,
     );
@@ -35,7 +36,7 @@ pub fn firstLevel(
         .sprite = .{ .codepoint = cp.ladder_up },
         .position = .{ .place = dungeon.entrance },
     });
-    try session.level.addEntity(entity);
+    try level.addEntity(entity);
 
     // Add the ladder leads to the bottom dungeons:
     entity = session.entities.newEntity();
@@ -46,7 +47,7 @@ pub fn firstLevel(
         .sprite = .{ .codepoint = cp.ladder_down },
         .position = .{ .place = dungeon.exit },
     });
-    try session.level.addEntity(entity);
+    try level.addEntity(entity);
 
     // Place the player on the level
     log.debug("The player entity id is {d}", .{session.player.id});
@@ -62,7 +63,7 @@ pub fn firstLevel(
         .sprite = .{ .codepoint = cp.human },
         .description = .{ .ptr = &g.Description.traider },
     });
-    try session.level.addEntity(entity);
+    try level.addEntity(entity);
     // Add the scientist
     entity = try session.entities.addNewEntity(.{
         .z_order = .{ .order = .obstacle },
@@ -70,17 +71,17 @@ pub fn firstLevel(
         .sprite = .{ .codepoint = cp.human },
         .description = .{ .ptr = &g.Description.scientist },
     });
-    try session.level.addEntity(entity);
+    try level.addEntity(entity);
 
     // Add the teleport
     entity = try session.entities.addNewEntity(g.entities.teleport(d.FirstLocation.teleport_place));
-    try session.level.addEntity(entity);
+    try level.addEntity(entity);
 
     // Add doors
-    var doors = session.level.dungeon.doorways.?.iterator();
+    var doors = level.dungeon.doorways.?.iterator();
     while (doors.next()) |entry| {
         entry.value_ptr.door_id = try session.entities.addNewEntity(g.entities.ClosedDoor);
-        try session.level.addEntity(entry.value_ptr.door_id);
+        try level.addEntity(entry.value_ptr.door_id);
         try session.entities.set(entry.value_ptr.door_id, c.Position{ .place = entry.key_ptr.* });
         log.debug(
             "For the doorway on {any} added closed door with id {d}",
@@ -91,6 +92,7 @@ pub fn firstLevel(
 
 pub inline fn cave(
     alloc: std.mem.Allocator,
+    level: *g.Level,
     session: *g.GameSession,
     seed: u64,
     depth: u8,
@@ -98,6 +100,7 @@ pub inline fn cave(
 ) !void {
     try generate(
         alloc,
+        level,
         session,
         seed,
         depth,
@@ -110,6 +113,7 @@ pub inline fn cave(
 /// This methods generates a new level of the catacombs.
 pub inline fn catacomb(
     alloc: std.mem.Allocator,
+    level: *g.Level,
     session: *g.GameSession,
     seed: u64,
     depth: u8,
@@ -117,6 +121,7 @@ pub inline fn catacomb(
 ) !void {
     try generate(
         alloc,
+        level,
         session,
         seed,
         depth,
@@ -131,22 +136,23 @@ pub inline fn catacomb(
 
 // The arena should be already initialized
 fn initWithDungeon(
-    self: *g.Level,
+    level: *g.Level,
     dungeon: d.Dungeon,
     player_place: p.Point,
 ) !void {
-    self.map = try g.LevelMap.init(&self.arena, dungeon.rows, dungeon.cols);
-    self.dijkstra_map = g.DijkstraMap.init(
-        self.arena.allocator(),
+    level.map = try g.LevelMap.init(&level.arena, dungeon.rows, dungeon.cols);
+    level.dijkstra_map = g.DijkstraMap.init(
+        level.arena.allocator(),
         .{ .top_left = .{ .row = 1, .col = 1 }, .rows = 12, .cols = 25 },
-        self.obstacles(),
+        level.obstacles(),
     );
-    self.dungeon = dungeon;
-    self.player_placement = dungeon.placementWith(player_place).?;
+    level.dungeon = dungeon;
+    level.player_placement = dungeon.placementWith(player_place).?;
 }
 
 fn generate(
     alloc: std.mem.Allocator,
+    level: *g.Level,
     session: *g.GameSession,
     seed: u64,
     depth: u8,
@@ -154,7 +160,7 @@ fn generate(
     visibility_strategy: *const fn (level: *const g.Level, place: p.Point) g.Render.Visibility,
     from_ladder: c.Ladder,
 ) !void {
-    session.level = try g.Level.init(alloc, session, depth, visibility_strategy);
+    level.* = try g.Level.preinit(alloc, session, depth, visibility_strategy);
     log.debug(
         "Generate level {s} on depth {d} with seed {d} from ladder {any}",
         .{ @tagName(from_ladder.direction), depth, seed, from_ladder },
@@ -162,7 +168,7 @@ fn generate(
     // This prng is used to generate entity on this level. But the dungeon should have its own prng
     // to be able to be regenerated when the player travels from level to level.
     var prng = std.Random.DefaultPrng.init(seed);
-    const dungeon = try generator.generateDungeon(&session.level.arena, prng.random());
+    const dungeon = try generator.generateDungeon(&level.arena, prng.random());
     if (std.log.logEnabled(.debug, .levels)) {
         log.debug("The dungeon has been generated", .{});
         dungeon.dumpToLog();
@@ -176,16 +182,16 @@ fn generate(
         .up => dungeon.entrance,
         .down => dungeon.exit,
     };
-    try initWithDungeon(&session.level, dungeon, init_place);
+    try initWithDungeon(level, dungeon, init_place);
 
     // Add ladder by which the player has come to this level
-    try addLadder(session, from_ladder.inverted(), init_place);
+    try addLadder(level, session, from_ladder.inverted(), init_place);
     // Generate player on the ladder
     log.debug("The player entity id is {d}", .{session.player.id});
     try session.entities.set(session.player, c.Position{ .place = init_place });
 
     // Add ladder to the next level
-    try addLadder(session, .{
+    try addLadder(level, session, .{
         .direction = from_ladder.direction,
         .id = session.entities.newEntity(),
         .target_ladder = session.entities.newEntity(),
@@ -193,16 +199,16 @@ fn generate(
 
     // Add enemies
     for (0..prng.random().uintLessThan(u8, 10) + 10) |_| {
-        try addEnemy(session, prng.random(), g.entities.Rat);
+        try addEnemy(level, session, prng.random(), g.entities.Rat);
     }
 
     // Add doors
-    if (session.level.dungeon.doorways) |doorways| {
+    if (level.dungeon.doorways) |doorways| {
         var doors = doorways.iterator();
         while (doors.next()) |entry| {
             entry.value_ptr.door_id = try session.entities.addNewEntity(g.entities.ClosedDoor);
             try session.entities.set(entry.value_ptr.door_id, c.Position{ .place = entry.key_ptr.* });
-            try session.level.addEntity(entry.value_ptr.door_id);
+            try level.addEntity(entry.value_ptr.door_id);
             log.debug(
                 "For the doorway on {any} added closed door with id {d}",
                 .{ entry.key_ptr.*, entry.value_ptr.door_id.id },
@@ -211,16 +217,16 @@ fn generate(
     }
 }
 
-fn addLadder(session: *g.GameSession, ladder: c.Ladder, place: p.Point) !void {
+fn addLadder(level: *g.Level, session: *g.GameSession, ladder: c.Ladder, place: p.Point) !void {
     try session.entities.setComponentsToEntity(ladder.id, g.entities.ladder(ladder));
     try session.entities.set(ladder.id, c.Position{ .place = place });
-    try session.level.addEntity(ladder.id);
+    try level.addEntity(ladder.id);
 }
 
-fn addEnemy(session: *g.GameSession, rand: std.Random, enemy: c.Components) !void {
-    if (session.level.randomEmptyPlace(rand)) |place| {
+fn addEnemy(level: *g.Level, session: *g.GameSession, rand: std.Random, enemy: c.Components) !void {
+    if (level.randomEmptyPlace(rand)) |place| {
         const id = try session.entities.addNewEntity(enemy);
-        try session.level.addEntity(id);
+        try level.addEntity(id);
         try session.entities.set(id, c.Position{ .place = place });
         const state: c.EnemyState = if (rand.uintLessThan(u8, 5) == 0) .sleeping else .walking;
         try session.entities.set(id, state);

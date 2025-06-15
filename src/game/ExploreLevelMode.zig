@@ -40,7 +40,7 @@ fn draw(session: *g.GameSession) !void {
     if (session.viewport.region.bottomRightCol() < g.DUNGEON_COLS)
         session.render.setBorderWithArrow(session.viewport, .right);
 
-    try session.render.drawScene(session, null, null);
+    try session.render.drawScene(session, null);
 }
 
 pub fn tick(self: *ExploreLevelMode) anyerror!void {

@@ -34,6 +34,11 @@ pub fn init(
     };
     try self.updateQuickActions(target_entity);
     try self.draw();
+    try self.session.render.drawHorizontalLine(
+        '═',
+        .{ .row = self.session.viewport.region.rows + 1, .col = 1 },
+        self.session.viewport.region.cols,
+    );
 }
 
 pub fn deinit(self: PlayMode) void {
@@ -55,7 +60,7 @@ pub fn tick(self: *PlayMode) !void {
             const speed = self.session.entities.getUnsafe(self.session.player, c.Speed);
             const mp = try self.session.doAction(self.session.player, action, speed.move_points);
             if (mp > 0) {
-                log.info("Spent {d} move points", .{mp});
+                log.debug("Spent {d} move points", .{mp});
                 log.debug("Update quick actions after action {any}", .{action});
                 try self.updateQuickActions(self.target());
                 var itr = self.session.level.componentsIterator().of(c.Initiative);
@@ -137,7 +142,7 @@ fn handleInput(self: *PlayMode) !?g.Action {
 
 fn draw(self: *const PlayMode) !void {
     if (self.quick_actions_window == null) {
-        try self.session.render.drawScene(self.session, self.target(), self.quickAction());
+        try self.session.render.drawScene(self.session, self.target());
         try self.drawInfoBar();
     }
 }

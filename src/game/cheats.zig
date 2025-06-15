@@ -3,6 +3,8 @@ const g = @import("game_pkg.zig");
 const p = g.primitives;
 const c = g.components;
 
+const log = std.log.scoped(.cheats);
+
 pub const Cheat = union(enum) {
     pub const Tag = std.meta.Tag(Cheat);
     pub const count = std.meta.fields(Tag).len;
@@ -27,9 +29,21 @@ pub const Cheat = union(enum) {
                             if (tryParse(u8, b_str)) |b| {
                                 return .{ .goto = p.Point.init(a, b) };
                             };
+                log.warn(
+                    \\Wrong arguments '{s}' for 'goto' command. 
+                    \\It expects a number of the target row and a number of the target column
+                    \\in the dungeon's coordinates.
+                ,
+                    .{args},
+                );
             },
             .set_health => if (tryParse(u8, args)) |hp| {
                 return .{ .set_health = hp };
+            } else {
+                log.warn(
+                    "Wrong arguments '{s}' for 'set health' command. It expects a number value to set.",
+                    .{args},
+                );
             },
             .hit => {
                 var itr = std.mem.tokenizeScalar(u8, args, ' ');
@@ -42,6 +56,10 @@ pub const Cheat = union(enum) {
                             },
                         };
                     };
+                log.warn(
+                    "Wrong arguments '{s}' for 'hit' command. It expects an ID of the target and a damage amount.",
+                    .{args},
+                );
             },
             .dump_vector_field => return .dump_vector_field,
             .move_player_to_ladder_up => return .move_player_to_ladder_up,
@@ -99,7 +117,7 @@ pub const Cheat = union(enum) {
         return null;
     }
 
-    pub fn toAction(self: Cheat, session: *const g.GameSession) ?g.Action {
+    pub fn toAction(self: Cheat, session: *g.GameSession) ?g.Action {
         switch (self) {
             .move_player_to_ladder_up => {
                 var itr = session.level.componentsIterator().of2(c.Ladder, c.Position);

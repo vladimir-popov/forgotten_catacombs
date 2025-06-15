@@ -228,7 +228,7 @@ pub const Display = struct {
     pub fn handleWindowResize(act: *std.posix.Sigaction, handler: *align(1) const fn (i32) callconv(.C) void) void {
         act.flags = std.posix.SA.RESTART;
         act.handler = .{ .handler = handler };
-        act.mask = std.posix.empty_sigset;
+        act.mask = std.posix.sigemptyset();
         std.posix.sigaction(std.posix.SIG.WINCH, act, null);
     }
 };

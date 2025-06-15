@@ -58,9 +58,10 @@ inline fn actionForWalkingEnemy(
 
     var directions = [4]p.Direction{ .left, .up, .right, .down };
     self.rand.shuffle(p.Direction, &directions);
+    const level = &self.session.level;
     for (directions) |direction| {
         const place = entity_place.movedTo(direction);
-        if (self.session.level.isObstacle(place)) continue;
+        if (level.isObstacle(place)) continue;
         return .{ .move = .{ .target = .{ .direction = direction } } };
     }
     log.err("Entity {d} is stuck at {any}. Sleep.", .{ entity.id, entity_place });
@@ -82,8 +83,8 @@ inline fn actionForAggressiveEnemy(
                 },
             };
     }
-
-    if (self.session.level.dijkstra_map.vectors.get(entity_place)) |vector| {
+    const level = &self.session.level;
+    if (level.dijkstra_map.vectors.get(entity_place)) |vector| {
         log.debug(
             "Entity {any} moves to the player from {any} in direction {s}",
             .{ entity, entity_place, @tagName(vector.direction) },

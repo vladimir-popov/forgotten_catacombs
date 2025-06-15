@@ -86,7 +86,7 @@ fn draw(self: *const ExploreMode) !void {
     } else if (self.entities_window) |*window| {
         try window.draw(self.session.render);
     } else {
-        try self.session.render.drawScene(self.session, self.entity_in_focus, null);
+        try self.session.render.drawScene(self.session, self.entity_in_focus);
         try self.session.render.drawLeftButton("Continue");
         try self.session.render.drawRightButton("Describe", self.countOfEntitiesInFocus() > 1);
         // Draw the name or health of the entity in focus
@@ -114,7 +114,8 @@ fn statusLine(self: ExploreMode, entity: g.Entity, line: []u8) !usize {
 fn updateEntitiesOnScreen(self: *ExploreMode) !void {
     const alloc = self.arena.allocator();
     self.entities_on_screen.clearRetainingCapacity();
-    var itr = self.session.level.componentsIterator().of2(c.Position, c.ZOrder);
+    const level = &self.session.level;
+    var itr = level.componentsIterator().of2(c.Position, c.ZOrder);
     while (itr.next()) |tuple| {
         const entity = tuple[0];
         const place = tuple[1].place;
@@ -124,7 +125,7 @@ fn updateEntitiesOnScreen(self: *ExploreMode) !void {
 
         // we should follow the same logic as the render:
         // only entities, which should be drawn, can be in focus
-        if (self.session.level.checkVisibility(place) != .invisible) {
+        if (level.checkVisibility(place) != .invisible) {
             const gop = try self.entities_on_screen.getOrPut(alloc, place);
             if (!gop.found_existing) {
                 gop.value_ptr.* = @splat(null);

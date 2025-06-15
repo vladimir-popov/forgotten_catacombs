@@ -77,7 +77,7 @@ pub fn init(
         .mode = .{ .play = undefined },
     };
     try self.equipPlayer();
-    try g.Levels.firstLevel(self.arena.allocator(), self, true);
+    try g.Levels.firstLevel(self.arena.allocator(), &self.level, self, true);
     self.viewport.centeredAround(self.level.playerPosition().place);
     self.viewport.region.top_left.moveNTimes(.up, 3);
     try self.events.subscribe(self.viewport.subscriber());
@@ -323,9 +323,10 @@ fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
     // TODO persist the current level
     self.level.deinit();
     switch (new_depth) {
-        0 => try g.Levels.firstLevel(self.arena.allocator(), self, false),
+        0 => try g.Levels.firstLevel(self.arena.allocator(), &self.level, self, false),
         1 => try g.Levels.cave(
             self.arena.allocator(),
+            &self.level,
             self,
             self.seed + new_depth,
             new_depth,
@@ -333,6 +334,7 @@ fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
         ),
         else => try g.Levels.catacomb(
             self.arena.allocator(),
+            &self.level,
             self,
             self.seed + new_depth,
             new_depth,

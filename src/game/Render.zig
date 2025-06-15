@@ -110,38 +110,13 @@ pub fn drawGameOverScreen(self: Render) !void {
     );
 }
 
-/// Draws dungeon, sprites, animations, and stats on the screen.
-/// Removes completed animations.
-pub fn drawScene(self: Render, session: *g.GameSession, entity_in_focus: ?g.Entity, quick_action: ?g.Action) !void {
-    log.debug(
-        "Draw scene of the level {d}; entity in focus {any}; quick action {any}",
-        .{ session.level, entity_in_focus, quick_action },
-    );
-    log.debug("Draw dungeon", .{});
-    try self.drawDungeon(session.viewport, &session.level);
-    log.debug("Draw sprites", .{});
-    try self.drawSpritesToBuffer(session.viewport, &session.level, entity_in_focus);
-    log.debug("Draw animations", .{});
-    try self.drawAnimationsFrame(session.viewport, &session.level, entity_in_focus);
-    log.debug("Draw the horizontal line of the border", .{});
-    try self.drawHorizontalLine('═', .{ .row = self.scene_rows + 1, .col = 1 }, self.scene_cols);
-    log.debug("Draw changed symbols", .{});
+/// Draws the dungeon, sprites and animations on the screen.
+pub fn drawScene(self: Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
+    const level = &session.level;
+    try self.drawDungeon(session.viewport, level);
+    try self.drawSpritesToBuffer(session.viewport, level, entity_in_focus);
+    try self.drawAnimationsFrames(session.viewport, level, entity_in_focus);
     try self.drawChangedSymbols();
-}
-
-// Should be used in DungeonGenerator only
-pub fn drawLevelOnly(self: *Render, viewport: g.Viewport, level: *g.Level) !void {
-    self.scene_buffer.reset();
-    try self.drawDungeon(viewport, level);
-    try self.drawSpritesToBuffer(viewport, level, null);
-    try self.drawChangedSymbols();
-}
-
-/// Clears the screen and draw all from scratch.
-/// Removes completed animations.
-pub fn redrawScene(self: *Render, session: *g.GameSession, entity_in_focus: ?g.Entity, quick_action: ?g.Action) !void {
-    try self.clearDisplay();
-    try self.drawScene(session, entity_in_focus, quick_action);
 }
 
 pub fn fillRegion(self: Render, symbol: u21, mode: g.DrawingMode, region: p.Region) !void {
@@ -157,7 +132,7 @@ pub inline fn clearDisplay(self: Render) !void {
     try self.runtime.clearDisplay();
 }
 
-fn drawDungeon(self: Render, viewport: g.Viewport, level: *g.Level) anyerror!void {
+pub fn drawDungeon(self: Render, viewport: g.Viewport, level: *g.Level) anyerror!void {
     var itr = level.dungeon.cellsInRegion(viewport.region);
     var place = viewport.region.top_left;
     while (itr.next()) |cell| {
@@ -192,7 +167,7 @@ fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order
         return .gt;
 }
 /// Draw sprites inside the screen
-fn drawSpritesToBuffer(self: Render, viewport: g.Viewport, level: *const g.Level, entity_in_focus: ?g.Entity) !void {
+pub fn drawSpritesToBuffer(self: Render, viewport: g.Viewport, level: *const g.Level, entity_in_focus: ?g.Entity) !void {
     var itr = level.componentsIterator().of3(cm.Position, cm.Sprite, cm.ZOrder);
     while (itr.next()) |tuple| {
         const entity, const position, const sprite, const zorder = tuple;
@@ -210,7 +185,7 @@ fn drawSpritesToBuffer(self: Render, viewport: g.Viewport, level: *const g.Level
     }
 }
 
-fn drawSpriteToBuffer(
+pub fn drawSpriteToBuffer(
     self: Render,
     viewport: g.Viewport,
     codepoint: g.Codepoint,
@@ -232,9 +207,11 @@ fn drawSpriteToBuffer(
 }
 
 /// This method validates visibility of the passed place, and
-/// return the passed codepoint if the place is visible, and  'nothing' if the place
-/// invisible, or the codepoint for invisible but known place.
-inline fn actualCodepoint(codepoint: g.Codepoint, visibility: g.Render.Visibility) g.Codepoint {
+/// returns:
+///  - the passed codepoint if the place is visible;
+///  - the codepoint for invisible but known place;
+///  - 'nothing' (space) if the place is invisible.
+fn actualCodepoint(codepoint: g.Codepoint, visibility: g.Render.Visibility) g.Codepoint {
     return switch (visibility) {
         .visible => codepoint,
         .invisible => cp.nothing,
@@ -255,7 +232,7 @@ inline fn actualCodepoint(codepoint: g.Codepoint, visibility: g.Render.Visibilit
 
 /// Invokes the runtime to draw only changed symbols.
 /// After drawing all changes, the number of the viewport.buffer.iteration will be incremented.
-fn drawChangedSymbols(self: Render) !void {
+pub fn drawChangedSymbols(self: Render) !void {
     var itr = self.scene_buffer.changedSymbols();
     while (itr.next()) |tuple| {
         try self.runtime.drawSprite(tuple[1].codepoint, tuple[0], tuple[1].mode);
@@ -279,7 +256,7 @@ pub fn redrawFromSceneBuffer(self: Render) !void {
 
 /// Draws a single frame from every animation.
 /// Removes the animation if the last frame was drawn.
-fn drawAnimationsFrame(self: Render, viewport: g.Viewport, level: *g.Level, entity_in_focus: ?g.Entity) !void {
+pub fn drawAnimationsFrames(self: Render, viewport: g.Viewport, level: *g.Level, entity_in_focus: ?g.Entity) !void {
     const now: c_uint = self.runtime.currentMillis();
     var itr = level.componentsIterator().of2(cm.Position, cm.Animation);
     while (itr.next()) |components| {
@@ -294,7 +271,7 @@ fn drawAnimationsFrame(self: Render, viewport: g.Viewport, level: *g.Level, enti
                     viewport,
                     frame,
                     position.place,
-                    3,
+                    3, // animations have top z order
                     mode,
                     level.checkVisibility(position.place),
                 );
