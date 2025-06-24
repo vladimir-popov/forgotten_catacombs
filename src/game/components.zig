@@ -37,6 +37,10 @@ pub const ZOrder = struct {
 pub const Description = struct {
     ptr: *const g.Description,
 
+    pub fn init(key: u8) @This() {
+        return .{ .ptr = g.Description.fromKey(key) };
+    }
+
     pub fn name(self: *const Description) []const u8 {
         return self.ptr.name;
     }
@@ -48,6 +52,7 @@ pub const Description = struct {
 
 pub const Animation = struct {
     pub const FramesPresets = struct {
+        pub const empty: [0]g.Codepoint = [_]g.Codepoint{};
         pub const hit: [3]g.Codepoint = [_]g.Codepoint{ 0, '×', 0 };
         pub const miss: [1]g.Codepoint = [_]g.Codepoint{'.'};
         pub const go_sleep: [6]g.Codepoint = [_]g.Codepoint{ 0, 'z', 'z', 0, 'z', 'z' };
@@ -60,6 +65,17 @@ pub const Animation = struct {
     current_frame: u8 = 0,
     previous_render_time: c_uint = 0,
     lag: u32 = 0,
+
+    pub fn init(key: u8) @This() {
+        switch (key) {
+            0 => .{ .frames = &FramesPresets.hit },
+            1 => .{ .frames = &FramesPresets.miss },
+            2 => .{ .frames = &FramesPresets.go_sleep },
+            3 => .{ .frames = &FramesPresets.relax },
+            4 => .{ .frames = &FramesPresets.get_angry },
+            else => .{ .frames = &FramesPresets.empty },
+        }
+    }
 
     pub fn frame(self: *Animation, now: u32) ?g.Codepoint {
         self.lag += now - self.previous_render_time;
@@ -131,6 +147,8 @@ pub const Pile = struct {
 };
 
 pub const Inventory = struct {
+    const Self = @This();
+
     alloc: std.mem.Allocator,
     items: Set(g.Entity),
 
@@ -152,6 +170,33 @@ pub const Inventory = struct {
 
     pub fn drop(self: *Inventory, item: g.Entity) void {
         std.debug.assert(self.items.remove(item));
+    }
+
+    pub fn jsonStringify(self: *const Self, jws: anytype) !void {
+        try jws.beginArray();
+        var itr = self.items.keyIterator();
+        while (itr.next()) |item_id| {
+            try jws.write(item_id);
+        }
+        jws.endArray();
+    }
+
+    pub fn jsonParse(alloc: std.mem.Allocator, source: anytype, options: std.json.ParseOptions) !Self {
+        if (source.next() != .array_begin) {
+            return error.UnexpectedToken;
+        }
+        var result: Self = .{ .alloc = alloc, .items = .empty };
+        while (try source.nextAlloc(alloc, options.allocate)) |token| {
+            switch (token) {
+                inline .number, .allocated_number, .string, .allocated_string => |slice| {
+                    defer alloc.free(token);
+                    try result.items.put(alloc, try std.fmt.parseInt(g.Entity, slice), {});
+                },
+                .endArray => break,
+                else => return error.UnexpectedToken,
+            }
+        }
+        return result;
     }
 };
 
@@ -208,3 +253,8 @@ pub const Components = struct {
     weapon: ?Weapon = null,
     z_order: ?ZOrder,
 };
+
+test "Components should be serializable" {
+    // TODO write a test to serialize and deserialize the Component structure.
+    try std.testing.expect(false);
+}

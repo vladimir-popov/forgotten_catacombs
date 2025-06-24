@@ -51,6 +51,8 @@ events: g.events.EventBus,
 player: g.Entity,
 /// The current level
 level: g.Level,
+/// The deepest achieved level
+max_depth: u8 = 0,
 /// The current mode of the game
 mode: Mode,
 
@@ -71,13 +73,13 @@ pub fn init(
         .render = render,
         .viewport = g.Viewport.init(render.scene_rows, render.scene_cols),
         .entities = try g.EntitiesManager.init(self.arena.allocator()),
-        .player = try self.entities.addNewEntityAllocate(g.entities.player),
+        .player = try self.entities.addNewEntity(g.entities.player(self.arena.allocator())),
         .events = g.events.EventBus.init(&self.arena),
         .level = undefined,
         .mode = .{ .play = undefined },
     };
+    try self.level.generateFirstLevel(self);
     try self.equipPlayer();
-    try g.Levels.firstLevel(self.arena.allocator(), &self.level, self, true);
     self.viewport.centeredAround(self.level.playerPosition().place);
     self.viewport.region.top_left.moveNTimes(.up, 3);
     try self.events.subscribe(self.viewport.subscriber());
@@ -87,6 +89,31 @@ pub fn init(
 
 pub fn deinit(self: *GameSession) void {
     self.arena.deinit();
+}
+
+pub fn loadLevel(self: *GameSession, depth: u8) !void {
+    const alloc = self.arena.allocator();
+    _ = depth;
+    const file_path: []const u8 = undefined;
+    const file, const reader = try self.runtime.readFile(file_path);
+    defer self.runtime.closeFile(file);
+
+    var buffered = std.io.bufferedReader(reader);
+    var json_reader = std.json.reader(alloc, buffered.reader());
+    defer json_reader.deinit();
+
+    const parsed = try std.json.parseFromTokenSource(g.io.Level, alloc, &json_reader, .{
+        .allocate = .alloc_always,
+    });
+    defer parsed.deinit();
+
+    try self.level.init(parsed.depth, parsed.dungeon_seed, self);
+    for (parsed.entities) |entity| {
+        try self.entities.copyComponentsToEntity(entity.id, entity.components);
+        try self.level.entities.append(self.level.arena.allocator(), entity.id);
+    }
+    try self.level.addVisitedPlaces(parsed.visited_places);
+    try self.level.addRememberedObjects(parsed.remembered_objects);
 }
 
 /// Creates the initial equipment of the player
@@ -320,26 +347,11 @@ fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
         .{ @tagName(by_ladder.direction), self.level.depth, new_depth, by_ladder },
     );
 
-    // TODO persist the current level
     self.level.deinit();
-    switch (new_depth) {
-        0 => try g.Levels.firstLevel(self.arena.allocator(), &self.level, self, false),
-        1 => try g.Levels.cave(
-            self.arena.allocator(),
-            &self.level,
-            self,
-            self.seed + new_depth,
-            new_depth,
-            by_ladder,
-        ),
-        else => try g.Levels.catacomb(
-            self.arena.allocator(),
-            &self.level,
-            self,
-            self.seed + new_depth,
-            new_depth,
-            by_ladder,
-        ),
+    if (new_depth > self.max_depth) {
+        try self.level.generate(new_depth, self, by_ladder);
+    } else {
+        try self.loadLevel(new_depth);
     }
     try self.mode.play.updateQuickActions(null);
     self.viewport.centeredAround(self.level.playerPosition().place);

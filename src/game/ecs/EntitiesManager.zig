@@ -59,13 +59,29 @@ pub fn EntitiesManager(comptime ComponentsStruct: type) type {
             return entity;
         }
 
-        pub fn addNewEntityAllocate(
-            self: Self,
-            init_components: *const fn (alloc: std.mem.Allocator) anyerror!ComponentsStruct,
-        ) !Entity {
-            const entity = self.newEntity();
-            try self.setComponentsToEntityAllocate(entity, init_components);
-            return entity;
+        /// Sets all defined fields from the `ComponentsStruct` to the entity as the components.
+        ///
+        /// **Note:** for every component should be used the same allocator that was used to initialize
+        /// this EntityManager, that allocator will be used to deinit components on removing.
+        pub fn setComponentsToEntity(self: Self, entity: Entity, components: ComponentsStruct) !void {
+            inline for (@typeInfo(ComponentsStruct).@"struct".fields) |field| {
+                if (@field(components, field.name)) |component| {
+                    try self.set(entity, component);
+                }
+            }
+        }
+
+        /// The same as `setComponentsToEntity`, but makes a copy of the components with inner allocator.
+        /// This method have to be used to load components from an external source like a file.
+        pub fn copyComponentsToEntity(self: Self, entity: Entity, components: ComponentsStruct) !void {
+            inline for (@typeInfo(ComponentsStruct).@"struct".fields) |field| {
+                if (@field(components, field.name)) |component| {
+                    try self.set(
+                        entity,
+                        if (std.meta.hasFn("clone")) try component.clone(self.inner_state.alloc) else component,
+                    );
+                }
+            }
         }
 
         /// Aggregates requests of few components for the same entities at once
@@ -179,24 +195,6 @@ pub fn EntitiesManager(comptime ComponentsStruct: type) type {
                     @field(structure, field.name) = null;
             }
             return structure;
-        }
-
-        /// Sets all defined fields from the `ComponentsStruct` to the entity as the components
-        pub fn setComponentsToEntity(self: Self, entity: Entity, components: ComponentsStruct) !void {
-            inline for (@typeInfo(ComponentsStruct).@"struct".fields) |field| {
-                if (@field(components, field.name)) |component| {
-                    try self.set(entity, component);
-                }
-            }
-        }
-
-        pub fn setComponentsToEntityAllocate(
-            self: Self,
-            entity: Entity,
-            init_components: *const fn (alloc: std.mem.Allocator) anyerror!ComponentsStruct,
-        ) !void {
-            const components = try init_components(self.inner_state.alloc);
-            try self.setComponentsToEntity(entity, components);
         }
     };
 }
