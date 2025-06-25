@@ -47,6 +47,8 @@ pub const VTable = struct {
     randomPlaceFn: *const fn (ptr: *const anyopaque, rand: std.Random) p.Point,
 };
 
+/// The seed that was used to generate this dungeon
+seed: u64,
 /// The pointer to the original implementation of the dungeon.
 parent: *anyopaque,
 rows: u8,

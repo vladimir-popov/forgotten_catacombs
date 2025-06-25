@@ -2,7 +2,8 @@
 /// The level consist of the dungeon and entities.
 const std = @import("std");
 const g = @import("game_pkg.zig");
-const cp = g.components;
+const c = g.components;
+const cp = g.codepoints;
 const d = g.dungeon;
 const ecs = g.ecs;
 const p = g.primitives;
@@ -34,27 +35,24 @@ player_placement: d.Placement = undefined,
 
 pub fn init(self: *Level, depth: u8, dungeon_seed: u64, session: *g.GameSession) !void {
     const dungeon_type = d.DungeonType.accordingToDepth(depth);
-    var dungeon_prng = std.Random.DefaultPrng.init(dungeon_seed);
-    const dungeon_generator = switch (dungeon_type) {
-        .first_location => d.FirstLocation,
-        .cave => d.CavesGenerator(g.DISPLAY_ROWS * 2, g.DISPLAY_COLS * 2){},
-        .catacomb => d.CatacombGenerator{},
-    };
-    const visibility_strategy = switch (dungeon_type) {
-        .first_location => g.visibility.showTheCurrentPlacement,
-        .cave => g.visibility.showInRadiusOfSourceOfLight,
-        .catacomb => if (depth < 3)
-            g.visibility.showTheCurrentPlacement
-        else
-            g.visibility.showTheCurrentPlacementInLight,
-    };
     self.* = .{
         .arena = std.heap.ArenaAllocator.init(session.arena.allocator()),
         .session = session,
         .depth = depth,
         .entities = .empty,
-        .visibility_strategy = visibility_strategy,
-        .dungeon = try dungeon_generator.generateDungeon(&self.arena, dungeon_prng.random()),
+        .dungeon = switch (dungeon_type) {
+            .first_location => try d.FirstLocation.generateDungeon(&self.arena),
+            .cave => try d.CavesGenerator.generateDungeon(&self.arena, dungeon_seed, .{}),
+            .catacomb => try d.CatacombGenerator.generateDungeon(&self.arena, dungeon_seed, .{}),
+        },
+        .visibility_strategy = switch (dungeon_type) {
+            .first_location => g.visibility.showTheCurrentPlacement,
+            .cave => g.visibility.showInRadiusOfSourceOfLight,
+            .catacomb => if (depth < 3)
+                g.visibility.showTheCurrentPlacement
+            else
+                g.visibility.showTheCurrentPlacementInLight,
+        },
         .map = try g.LevelMap.init(&self.arena, self.dungeon.rows, self.dungeon.cols),
         .dijkstra_map = g.DijkstraMap.init(
             self.arena.allocator(),
@@ -66,6 +64,27 @@ pub fn init(self: *Level, depth: u8, dungeon_seed: u64, session: *g.GameSession)
 
 pub fn deinit(self: *Level) void {
     self.arena.deinit();
+}
+
+pub fn load(self: *Level, session: *g.GameSession, reader: anytype) !void {
+    var buffered = std.io.bufferedReader(reader);
+    var json_reader = std.json.reader(session.arena.allocator(), buffered.reader());
+    defer json_reader.deinit();
+
+    const parsed = try std.json.parseFromTokenSource(g.io.Level, session.arena.allocator(), &json_reader, .{
+        .allocate = .alloc_always,
+    });
+    defer parsed.deinit();
+
+    try self.init(parsed.depth, parsed.dungeon_seed, session);
+    const alloc = self.arena.allocator();
+    for (parsed.entities) |entity| {
+        try session.entities.copyComponentsToEntity(entity.id, entity.components);
+        try self.entities.append(alloc, entity.id);
+    }
+    try self.addVisitedPlaces(parsed.visited_places);
+    try self.addRememberedObjects(parsed.remembered_objects);
+    self.player_placement = self.dungeon.placementWith(self.playerPosition()).?;
 }
 
 pub fn addVisitedPlaces(self: *Level, visited_places: [][]usize) !void {
@@ -113,7 +132,7 @@ pub fn addEntityAtPlace(self: *Level, item: g.Entity, place: p.Point) !?g.Entity
             // if some item already exists on the place
             if (entities[1]) |entity| {
                 // and that item is a pile
-                if (self.session.entities.get(entity, cp.Pile)) |pile| {
+                if (self.session.entities.get(entity, c.Pile)) |pile| {
                     log.debug("Adding item {any} into the pile {any} at {any}", .{ item, entity, place });
                     // add a new item to the pile
                     try pile.add(item);
@@ -121,9 +140,9 @@ pub fn addEntityAtPlace(self: *Level, item: g.Entity, place: p.Point) !?g.Entity
                 } else {
                     // or create a new pile and add the item to the pile
                     const pile_id = try self.session.entities.addNewEntityAllocate(g.entities.pile);
-                    try self.session.entities.set(pile_id, cp.Position{ .place = place });
+                    try self.session.entities.set(pile_id, c.Position{ .place = place });
                     try self.addEntity(pile_id);
-                    const pile = self.session.entities.getUnsafe(pile_id, cp.Pile);
+                    const pile = self.session.entities.getUnsafe(pile_id, c.Pile);
                     log.debug("Created a pile {any} at {any}", .{ pile_id, place });
 
                     // add the item to the pile
@@ -131,7 +150,7 @@ pub fn addEntityAtPlace(self: *Level, item: g.Entity, place: p.Point) !?g.Entity
 
                     // move the existed item to the pile
                     try pile.add(entity);
-                    try self.session.entities.remove(entity, cp.Position);
+                    try self.session.entities.remove(entity, c.Position);
                     return pile_id;
                 }
             }
@@ -139,7 +158,7 @@ pub fn addEntityAtPlace(self: *Level, item: g.Entity, place: p.Point) !?g.Entity
         else => {},
     }
     log.debug("Adding item {any} to the empty place {any}", .{ item, place });
-    try self.session.entities.set(item, cp.Position{ .place = place });
+    try self.session.entities.set(item, c.Position{ .place = place });
     try self.addEntity(item);
     return null;
 }
@@ -148,8 +167,8 @@ pub inline fn checkVisibility(self: *const g.Level, place: p.Point) g.Render.Vis
     return self.visibility_strategy(self, place);
 }
 
-pub inline fn playerPosition(self: *const Level) *cp.Position {
-    return self.session.entities.getUnsafe(self.session.player, cp.Position);
+pub inline fn playerPosition(self: *const Level) *c.Position {
+    return self.session.entities.getUnsafe(self.session.player, c.Position);
 }
 
 pub inline fn componentsIterator(self: Level) g.ComponentsIterator {
@@ -187,7 +206,7 @@ pub fn isObstacle(self: *const Level, place: p.Point) bool {
         },
         .entities => |entities| if (entities[2]) |entity|
             // an entity with health points is overcoming obstacle
-            return self.session.entities.get(entity, cp.Health) == null
+            return self.session.entities.get(entity, c.Health) == null
         else
             // all other are not
             return false,
@@ -209,7 +228,7 @@ pub fn cellAt(self: Level, place: p.Point) Cell {
     // OPTIMIZE IT
     var found_entity = false;
     var result = [3]?g.Entity{ null, null, null };
-    var itr = self.componentsIterator().of2(cp.Position, cp.ZOrder);
+    var itr = self.componentsIterator().of2(c.Position, c.ZOrder);
     while (itr.next()) |tuple| {
         const entity, const position, const zorder = tuple;
         const order = @intFromEnum(zorder.order);
@@ -231,7 +250,7 @@ pub fn itemAt(self: Level, place: p.Point) ?g.Entity {
         .floor, .doorway => {},
         else => return null,
     }
-    var itr = self.componentsIterator().of2(cp.Position, cp.ZOrder);
+    var itr = self.componentsIterator().of2(c.Position, c.ZOrder);
     while (itr.next()) |tuple| {
         const entity, const position, const zorder = tuple;
         if (place.eql(position.place) and zorder.order == .item) {
@@ -301,7 +320,7 @@ pub fn generateFirstLevel(self: *g.Level, session: *g.GameSession) !void {
 
     // Place the player on the level
     log.debug("The player entity id is {d}", .{self.session.player.id});
-    try self.session.entities.set(self.session.player, cp.Position{ .place = self.dungeon.entrance });
+    try self.session.entities.set(self.session.player, c.Position{ .place = self.dungeon.entrance });
 
     // Add the trader
     entity = try self.session.entities.addNewEntity(.{
@@ -330,16 +349,16 @@ pub fn generateFirstLevel(self: *g.Level, session: *g.GameSession) !void {
     while (doors.next()) |entry| {
         entry.value_ptr.door_id = try self.session.entities.addNewEntity(g.entities.ClosedDoor);
         try self.addEntity(entry.value_ptr.door_id);
-        try self.session.entities.set(entry.value_ptr.door_id, cp.Position{ .place = entry.key_ptr.* });
+        try self.session.entities.set(entry.value_ptr.door_id, c.Position{ .place = entry.key_ptr.* });
         log.debug(
             "For the doorway on {any} added closed door with id {d}",
             .{ entry.key_ptr.*, entry.value_ptr.door_id.id },
         );
     }
-    self.player_placement = self.dungeon.placementWith(self.playerPosition()).?;
+    self.player_placement = self.dungeon.placementWith(self.playerPosition().place).?;
 }
 
-pub fn generate(self: *Level, depth: u8, session: *g.GameSession, from_ladder: cp.Ladder) !void {
+pub fn generate(self: *Level, depth: u8, session: *g.GameSession, from_ladder: c.Ladder) !void {
     log.debug(
         "Generate level {s} on depth {d} from ladder {any}",
         .{ @tagName(from_ladder.direction), depth, from_ladder },
@@ -357,7 +376,7 @@ pub fn generate(self: *Level, depth: u8, session: *g.GameSession, from_ladder: c
     // Add ladder by which the player has come to this level
     try self.addLadder(from_ladder.inverted(), init_place);
     // Generate player on the ladder
-    try self.session.entities.set(self.session.player, cp.Position{ .place = init_place });
+    try self.session.entities.set(self.session.player, c.Position{ .place = init_place });
 
     // Add ladder to the next level
     try self.addLadder(.{
@@ -377,7 +396,7 @@ pub fn generate(self: *Level, depth: u8, session: *g.GameSession, from_ladder: c
         var doors = doorways.iterator();
         while (doors.next()) |entry| {
             entry.value_ptr.door_id = try self.session.entities.addNewEntity(g.entities.ClosedDoor);
-            try self.session.entities.set(entry.value_ptr.door_id, cp.Position{ .place = entry.key_ptr.* });
+            try self.session.entities.set(entry.value_ptr.door_id, c.Position{ .place = entry.key_ptr.* });
             try self.addEntity(entry.value_ptr.door_id);
             log.debug(
                 "For the doorway on {any} added closed door with id {d}",
@@ -386,21 +405,21 @@ pub fn generate(self: *Level, depth: u8, session: *g.GameSession, from_ladder: c
         }
     }
 
-    self.player_placement = self.dungeon.placementWith(self.playerPosition()).?;
+    self.player_placement = self.dungeon.placementWith(self.playerPosition().place).?;
 }
 
-fn addLadder(self: *g.Level, ladder: cp.Ladder, place: p.Point) !void {
+fn addLadder(self: *g.Level, ladder: c.Ladder, place: p.Point) !void {
     try self.session.entities.setComponentsToEntity(ladder.id, g.entities.ladder(ladder));
-    try self.session.entities.set(ladder.id, cp.Position{ .place = place });
+    try self.session.entities.set(ladder.id, c.Position{ .place = place });
     try self.addEntity(ladder.id);
 }
 
-fn addEnemy(self: *g.Level, rand: std.Random, enemy: cp.Components) !void {
+fn addEnemy(self: *g.Level, rand: std.Random, enemy: c.Components) !void {
     if (self.randomEmptyPlace(rand)) |place| {
         const id = try self.session.entities.addNewEntity(enemy);
         try self.addEntity(id);
-        try self.session.entities.set(id, cp.Position{ .place = place });
-        const state: cp.EnemyState = if (rand.uintLessThan(u8, 5) == 0) .sleeping else .walking;
+        try self.session.entities.set(id, c.Position{ .place = place });
+        const state: c.EnemyState = if (rand.uintLessThan(u8, 5) == 0) .sleeping else .walking;
         try self.session.entities.set(id, state);
     }
 }

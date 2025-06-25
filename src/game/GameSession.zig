@@ -73,7 +73,7 @@ pub fn init(
         .render = render,
         .viewport = g.Viewport.init(render.scene_rows, render.scene_cols),
         .entities = try g.EntitiesManager.init(self.arena.allocator()),
-        .player = try self.entities.addNewEntity(g.entities.player(self.arena.allocator())),
+        .player = try self.entities.addNewEntityAllocate(g.entities.player),
         .events = g.events.EventBus.init(&self.arena),
         .level = undefined,
         .mode = .{ .play = undefined },
@@ -89,31 +89,6 @@ pub fn init(
 
 pub fn deinit(self: *GameSession) void {
     self.arena.deinit();
-}
-
-pub fn loadLevel(self: *GameSession, depth: u8) !void {
-    const alloc = self.arena.allocator();
-    _ = depth;
-    const file_path: []const u8 = undefined;
-    const file, const reader = try self.runtime.readFile(file_path);
-    defer self.runtime.closeFile(file);
-
-    var buffered = std.io.bufferedReader(reader);
-    var json_reader = std.json.reader(alloc, buffered.reader());
-    defer json_reader.deinit();
-
-    const parsed = try std.json.parseFromTokenSource(g.io.Level, alloc, &json_reader, .{
-        .allocate = .alloc_always,
-    });
-    defer parsed.deinit();
-
-    try self.level.init(parsed.depth, parsed.dungeon_seed, self);
-    for (parsed.entities) |entity| {
-        try self.entities.copyComponentsToEntity(entity.id, entity.components);
-        try self.level.entities.append(self.level.arena.allocator(), entity.id);
-    }
-    try self.level.addVisitedPlaces(parsed.visited_places);
-    try self.level.addRememberedObjects(parsed.remembered_objects);
 }
 
 /// Creates the initial equipment of the player
@@ -155,6 +130,26 @@ pub fn lookAround(self: *GameSession) !void {
     self.mode.deinit();
     self.mode = .{ .explore = undefined };
     try self.mode.explore.init(self.arena.allocator(), self);
+}
+
+pub fn getWeapon(self: *const GameSession, actor: g.Entity) ?*c.Weapon {
+    if (self.entities.get(actor, c.Weapon)) |weapon| return weapon;
+
+    if (self.entities.get(actor, c.Equipment)) |equipment|
+        if (equipment.weapon) |weapon_id|
+            if (self.entities.get(weapon_id, c.Weapon)) |weapon|
+                return weapon;
+
+    return null;
+}
+
+pub fn isEnemy(self: *const GameSession, entity: g.Entity) bool {
+    return self.entities.get(entity, c.Health) != null;
+}
+
+pub fn isTool(self: *const GameSession, item: g.Entity) bool {
+    return (self.entities.get(item, c.Weapon) != null) or
+        (self.entities.get(item, c.SourceOfLight) != null);
 }
 
 pub inline fn tick(self: *GameSession) !void {
@@ -366,22 +361,11 @@ fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
     try self.events.sendEvent(event);
 }
 
-pub fn getWeapon(self: *const GameSession, actor: g.Entity) ?*c.Weapon {
-    if (self.entities.get(actor, c.Weapon)) |weapon| return weapon;
+fn loadLevel(self: *GameSession, depth: u8) !void {
+    _ = depth;
+    const file_path: []const u8 = undefined;
+    const file, const reader = try self.runtime.readFile(file_path);
+    defer self.runtime.closeFile(file);
 
-    if (self.entities.get(actor, c.Equipment)) |equipment|
-        if (equipment.weapon) |weapon_id|
-            if (self.entities.get(weapon_id, c.Weapon)) |weapon|
-                return weapon;
-
-    return null;
-}
-
-pub fn isEnemy(self: *const GameSession, entity: g.Entity) bool {
-    return self.entities.get(entity, c.Health) != null;
-}
-
-pub fn isTool(self: *const GameSession, item: g.Entity) bool {
-    return (self.entities.get(item, c.Weapon) != null) or
-        (self.entities.get(item, c.SourceOfLight) != null);
+    try self.level.load(self, reader);
 }

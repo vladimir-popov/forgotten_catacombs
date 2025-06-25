@@ -16,25 +16,36 @@ const Catacomb = @import("Catacomb.zig");
 
 const log = std.log.scoped(.bsp_generator);
 
-const CatacombGenerator = @This();
+pub const rows = 3 * g.DISPLAY_ROWS;
+pub const cols = 3 * g.DISPLAY_COLS;
 
-/// The minimal rows count in the final region after BSP splitting
-region_min_rows: u8 = 10,
-/// The minimal columns count in the final region after BSP splitting
-region_min_cols: u8 = 20,
-/// Minimal scale rate to prevent too small rooms.
-/// The small values make the dungeon looked more random.
-min_scale: f16 = 0.6,
-/// This is rows/cols ratio of the square.
-/// In case of ascii graphics it's not 1.0
-square_ratio: f16 = 0.4,
+const Options = struct {
+    /// The minimal rows count in the final region after BSP splitting
+    region_min_rows: u8 = 10,
+    /// The minimal columns count in the final region after BSP splitting
+    region_min_cols: u8 = 20,
+    /// Minimal scale rate to prevent too small rooms.
+    /// The small values make the dungeon looked more random.
+    min_scale: f16 = 0.6,
+    /// This is rows/cols ratio of the square.
+    /// In case of ascii graphics it's not 1.0
+    square_ratio: f16 = 0.4,
+
+    /// Minimal area of the room
+    inline fn minArea(opts: @This()) u16 {
+        return opts.region_min_rows *| opts.region_min_cols;
+    }
+};
 
 /// Creates the dungeon with BSP algorithm.
 pub fn generateDungeon(
-    self: CatacombGenerator,
     arena: *std.heap.ArenaAllocator,
-    rand: std.Random,
+    init_seed: u64,
+    opts: Options,
 ) !d.Dungeon {
+    var prng = std.Random.DefaultPrng.init(init_seed);
+    const rand = prng.random();
+
     // this arena is used to build a BSP tree, which can be destroyed
     // right after completing the dungeon.
     var bsp_arena = std.heap.ArenaAllocator.init(arena.allocator());
@@ -44,18 +55,20 @@ pub fn generateDungeon(
     const root = try BspTree.build(
         &bsp_arena,
         rand,
-        g.DUNGEON_ROWS,
-        g.DUNGEON_COLS,
-        .{ .min_rows = self.region_min_rows, .min_cols = self.region_min_cols, .square_ratio = self.square_ratio },
+        // g.DUNGEON_ROWS,
+        // g.DUNGEON_COLS,
+        rows,
+        cols,
+        .{ .min_rows = opts.region_min_rows, .min_cols = opts.region_min_cols, .square_ratio = opts.square_ratio },
     );
 
     const catacomb = try arena.allocator().create(Catacomb);
     catacomb.* = try Catacomb.init(arena);
     // visit every BSP node and generate rooms in the leafs
     var createRooms: TraverseAndCreateRooms = .{
-        .generator = &self,
         .dungeon = catacomb,
         .rand = rand,
+        .opts = opts,
     };
     try root.traverse(&bsp_arena, createRooms.handler());
     log.debug("The rooms have been created", .{});
@@ -72,13 +85,13 @@ pub fn generateDungeon(
     catacomb.entrance = (try catacomb.firstRoom()).randomPlace(rand);
     catacomb.exit = (try catacomb.lastRoom()).randomPlace(rand);
 
-    return catacomb.dungeon();
+    return catacomb.dungeon(init_seed);
 }
 
 const TraverseAndCreateRooms = struct {
-    generator: *const CatacombGenerator,
     dungeon: *Catacomb,
     rand: std.Random,
+    opts: Options,
 
     fn handler(self: *TraverseAndCreateRooms) BspTree.Node.TraverseHandler {
         return .{ .ptr = self, .handle = TraverseAndCreateRooms.createRoom };
@@ -87,7 +100,7 @@ const TraverseAndCreateRooms = struct {
     fn createRoom(ptr: *anyopaque, node: *BspTree.Node) anyerror!void {
         if (!node.isLeaf()) return;
         const self: *TraverseAndCreateRooms = @ptrCast(@alignCast(ptr));
-        const region_for_room = try self.generator.createRandomRegionInside(node.value, self.rand);
+        const region_for_room = try createRandomRegionInside(node.value, self.rand, self.opts);
         try self.dungeon.generateAndAddRoom(region_for_room);
     }
 };
@@ -122,30 +135,25 @@ const CreatePassageBetweenRegions = struct {
 /// |       |
 /// |       |
 /// ---------
-fn createRandomRegionInside(self: CatacombGenerator, region: p.Region, rand: std.Random) !p.Region {
+fn createRandomRegionInside(region: p.Region, rand: std.Random, opts: Options) !p.Region {
     var room: p.Region = region;
-    if (!std.math.approxEqAbs(f16, self.square_ratio, region.ratio(), 0.1)) {
+    if (!std.math.approxEqAbs(f16, opts.square_ratio, region.ratio(), 0.1)) {
         // make the region 'more square'
-        if (region.ratio() > self.square_ratio) {
+        if (region.ratio() > opts.square_ratio) {
             room.rows = @max(
-                self.region_min_rows,
-                @as(u8, @intFromFloat(@round(@as(f16, @floatFromInt(region.cols)) * self.square_ratio))),
+                opts.region_min_rows,
+                @as(u8, @intFromFloat(@round(@as(f16, @floatFromInt(region.cols)) * opts.square_ratio))),
             );
         } else {
             room.cols = @max(
-                self.region_min_cols,
-                @as(u8, @intFromFloat(@round(@as(f16, @floatFromInt(region.rows)) / self.square_ratio))),
+                opts.region_min_cols,
+                @as(u8, @intFromFloat(@round(@as(f16, @floatFromInt(region.rows)) / opts.square_ratio))),
             );
         }
     }
-    var scale: f16 = @floatFromInt(1 + rand.uintAtMost(u16, room.area() - self.minArea()));
+    var scale: f16 = @floatFromInt(1 + rand.uintAtMost(u16, room.area() - opts.minArea()));
     scale = scale / @as(f16, @floatFromInt(room.area()));
-    scale = @max(self.min_scale, scale);
+    scale = @max(opts.min_scale, scale);
     room.scale(scale, scale);
     return room;
-}
-
-/// Minimal area of the room
-inline fn minArea(self: CatacombGenerator) u16 {
-    return self.region_min_rows *| self.region_min_cols;
 }

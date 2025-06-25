@@ -55,8 +55,9 @@ pub fn init(arena: *std.heap.ArenaAllocator) !Catacomb {
     };
 }
 
-pub fn dungeon(self: *Catacomb) Dungeon {
+pub fn dungeon(self: *Catacomb, seed: u64) Dungeon {
     return .{
+        .seed = seed,
         .parent = self,
         .rows = rows,
         .cols = cols,

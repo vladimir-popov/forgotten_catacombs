@@ -24,8 +24,9 @@ pub fn Cave(comptime rows: u8, cols: u8) type {
             };
         }
 
-        pub fn dungeon(self: *Self) d.Dungeon {
+        pub fn dungeon(self: *Self, seed: u64) d.Dungeon {
             return .{
+                .seed = seed,
                 .parent = self,
                 .rows = rows,
                 .cols = cols,

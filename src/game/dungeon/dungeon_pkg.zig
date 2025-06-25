@@ -12,7 +12,7 @@ pub const Cave = @import("Cave.zig").Cave;
 pub const Catacomb = @import("Catacomb.zig");
 
 pub const CatacombGenerator = @import("CatacombGenerator.zig");
-pub const CavesGenerator = @import("CavesGenerator.zig").CavesGenerator;
+pub const CavesGenerator = @import("CavesGenerator.zig");
 
 pub const DungeonType = enum {
     first_location,

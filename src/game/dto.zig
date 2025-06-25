@@ -1,5 +1,5 @@
 const std = @import("std");
-const g = @import("../game_pkg.zig");
+const g = @import("game_pkg.zig");
 const p = g.primitives;
 
 pub const Entity = struct {

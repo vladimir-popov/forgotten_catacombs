@@ -48,7 +48,7 @@ area: d.Area,
 /// Index of all doorways by their place
 doorways: std.AutoHashMapUnmanaged(p.Point, d.Doorway),
 
-pub fn generateDungeon(arena: *std.heap.ArenaAllocator, _: std.Random) !d.Dungeon {
+pub fn generateDungeon(arena: *std.heap.ArenaAllocator) !d.Dungeon {
     const alloc = arena.allocator();
     const first_location = try alloc.create(FirstLocation);
     first_location.* = .{
@@ -74,6 +74,7 @@ fn createRoom(self: *FirstLocation, alloc: std.mem.Allocator, region: p.Region, 
 
 fn dungeon(self: *FirstLocation) d.Dungeon {
     return .{
+        .seed = 0,
         .parent = self,
         .rows = self.area.region.rows + 2,
         .cols = self.area.region.cols,

@@ -47,16 +47,21 @@ pub fn EntitiesManager(comptime ComponentsStruct: type) type {
             self.inner_state = undefined;
         }
 
-        pub fn newEntity(self: Self) Entity {
-            const entity = self.inner_state.next_entity;
-            self.inner_state.next_entity.id += 1;
-            return entity;
+        /// Adds the component of the type `C` to the entity, or replace existed.
+        pub fn set(self: Self, entity: Entity, component: anytype) !void {
+            const C = @TypeOf(component);
+            try @field(self.inner_state.components_map, @typeName(C)).setToEntity(entity, component);
         }
 
-        pub fn addNewEntity(self: Self, components: ComponentsStruct) !Entity {
-            const entity = self.newEntity();
-            try self.setComponentsToEntity(entity, components);
-            return entity;
+        pub fn setAllocate(
+            self: Self,
+            comptime C: type,
+            entity: Entity,
+            init_component: *const fn (alloc: std.mem.Allocator) anyerror!C,
+        ) !void {
+            std.debug.assert(@hasDecl(C, "deinit"));
+            const component = try init_component(self.inner_state.alloc);
+            try @field(self.inner_state.components_map, @typeName(C)).setToEntity(entity, component);
         }
 
         /// Sets all defined fields from the `ComponentsStruct` to the entity as the components.
@@ -71,6 +76,16 @@ pub fn EntitiesManager(comptime ComponentsStruct: type) type {
             }
         }
 
+        /// Passes the inner allocator to the function to create a structure with components,
+        /// and passes the result to the `setComponentsToEntity` method.
+        pub fn setComponentsToEntityAllocate(
+            self: Self,
+            entity: Entity,
+            init_components: *const fn (alloc: std.mem.Allocator) anyerror!ComponentsStruct,
+        ) !void {
+            try self.setComponentsToEntity(entity, try init_components(self.inner_state.alloc));
+        }
+
         /// The same as `setComponentsToEntity`, but makes a copy of the components with inner allocator.
         /// This method have to be used to load components from an external source like a file.
         pub fn copyComponentsToEntity(self: Self, entity: Entity, components: ComponentsStruct) !void {
@@ -82,6 +97,27 @@ pub fn EntitiesManager(comptime ComponentsStruct: type) type {
                     );
                 }
             }
+        }
+
+        pub fn newEntity(self: Self) Entity {
+            const entity = self.inner_state.next_entity;
+            self.inner_state.next_entity.id += 1;
+            return entity;
+        }
+
+        pub fn addNewEntity(self: Self, components: ComponentsStruct) !Entity {
+            const entity = self.newEntity();
+            try self.setComponentsToEntity(entity, components);
+            return entity;
+        }
+
+        pub fn addNewEntityAllocate(
+            self: Self,
+            init_components: *const fn (alloc: std.mem.Allocator) anyerror!ComponentsStruct,
+        ) !Entity {
+            const entity = self.newEntity();
+            try self.setComponentsToEntityAllocate(entity, init_components);
+            return entity;
         }
 
         /// Aggregates requests of few components for the same entities at once
@@ -142,23 +178,6 @@ pub fn EntitiesManager(comptime ComponentsStruct: type) type {
                 }
             }
             return null;
-        }
-
-        /// Adds the component of the type `C` to the entity, or replace existed.
-        pub fn set(self: Self, entity: Entity, component: anytype) !void {
-            const C = @TypeOf(component);
-            try @field(self.inner_state.components_map, @typeName(C)).setToEntity(entity, component);
-        }
-
-        pub fn setAllocate(
-            self: Self,
-            comptime C: type,
-            entity: Entity,
-            init_component: *const fn (alloc: std.mem.Allocator) anyerror!C,
-        ) !void {
-            std.debug.assert(@hasDecl(C, "deinit"));
-            const component = try init_component(self.inner_state.alloc);
-            try @field(self.inner_state.components_map, @typeName(C)).setToEntity(entity, component);
         }
 
         pub fn getAll(self: Self, comptime C: type) []C {
