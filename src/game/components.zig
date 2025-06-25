@@ -182,7 +182,7 @@ pub const Inventory = struct {
     }
 
     pub fn jsonParse(alloc: std.mem.Allocator, source: anytype, options: std.json.ParseOptions) !Self {
-        if (source.next() != .array_begin) {
+        if (try source.next() != .array_begin) {
             return error.UnexpectedToken;
         }
         var result: Self = .{ .alloc = alloc, .items = .empty };

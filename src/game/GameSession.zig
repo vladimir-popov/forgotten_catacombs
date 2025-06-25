@@ -364,8 +364,8 @@ fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
 fn loadLevel(self: *GameSession, depth: u8) !void {
     _ = depth;
     const file_path: []const u8 = undefined;
-    const file, const reader = try self.runtime.readFile(file_path);
-    defer self.runtime.closeFile(file);
+    const reader = try self.runtime.fileReader(file_path);
+    defer reader.close();
 
     try self.level.load(self, reader);
 }

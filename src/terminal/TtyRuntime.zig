@@ -99,6 +99,10 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                     .clearDisplay = clearDisplay,
                     .drawSprite = drawSprite,
                     .drawText = drawText,
+                    .openFile = openFile,
+                    .closeFile = closeFile,
+                    .readFile = readFile,
+                    .writeFile = writeFile,
                 },
             };
         }
@@ -255,6 +259,34 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
         ) !void {
             const self: *Self = @ptrCast(@alignCast(ptr));
             self.buffer.setAsciiText(text, position_on_display.row, position_on_display.col, mode);
+        }
+
+        fn openFile(ptr: *anyopaque, file_path: []const u8, mode: g.Runtime.FileMode) anyerror!*anyopaque {
+            const self: *Self = @ptrCast(@alignCast(ptr));
+            const file_mode = switch (mode) {
+                .read => std.fs.File.OpenMode.read_only,
+                .write => std.fs.File.OpenMode.write_only,
+            };
+            const file = try self.alloc.create(std.fs.File);
+            file.* = try std.fs.cwd().openFile(file_path, .{ .mode = file_mode });
+            return file;
+        }
+
+        fn closeFile(ptr: *anyopaque, file_ptr: *anyopaque) void {
+            const self: *Self = @ptrCast(@alignCast(ptr));
+            const file: *std.fs.File = @ptrCast(@alignCast(file_ptr));
+            file.close();
+            self.alloc.destroy(file.reader());
+        }
+
+        fn readFile(_: *anyopaque, file_ptr: *anyopaque, buffer: []u8) anyerror!usize {
+            const file: *std.fs.File = @ptrCast(@alignCast(file_ptr));
+            return try file.read(buffer);
+        }
+
+        fn writeFile(_: *anyopaque, file_ptr: *anyopaque, bytes: []const u8) anyerror!usize {
+            const file: *std.fs.File = @ptrCast(@alignCast(file_ptr));
+            return try file.write(bytes);
         }
     };
 }

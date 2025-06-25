@@ -68,6 +68,10 @@ pub fn runtime(self: *PlaydateRuntime) g.Runtime {
             .clearDisplay = clearDisplay,
             .drawSprite = drawSprite,
             .drawText = drawText,
+            .openFile = openFile,
+            .closeFile = closeFile,
+            .readFile = readFile,
+            .writeFile = writeFile,
         },
     };
 }
@@ -188,4 +192,37 @@ fn popCheat(_: *anyopaque) ?g.Cheat {
 
 fn serialMessageCallback(data: [*c]const u8) callconv(.C) void {
     cheat = g.Cheat.parse(std.mem.span(data));
+}
+
+fn openFile(ptr: *anyopaque, file_path: []const u8, mode: g.Runtime.FileMode) anyerror!*anyopaque {
+    const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
+    const file_options = switch (mode) {
+        .read => api.FILE_READ_DATA,
+        .write => api.FILE_WRITE,
+    };
+    return self.playdate.file.open(file_path, file_options) orelse {
+        std.debug.panic("{s}", .{self.playdate.file.geterr()});
+    };
+}
+
+fn closeFile(ptr: *anyopaque, file: *anyopaque) void {
+    const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
+    if (self.playdate.file.close(file) < 0)
+        std.debug.panic("{s}", .{self.playdate.file.geterr()});
+}
+
+fn readFile(ptr: *anyopaque, file: *anyopaque, buffer: []u8) anyerror!usize {
+    const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
+    const result = self.playdate.file.read(file, buffer.ptr, buffer.len);
+    if (result < 0)
+        std.debug.panic("{s}", .{self.playdate.file.geterr()});
+    return @intCast(result);
+}
+
+fn writeFile(ptr: *anyopaque, file: *anyopaque, bytes: []const u8) anyerror!usize {
+    const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
+    const result = self.playdate.file.write(file, bytes.ptr, bytes.len);
+    if (result < 0)
+        std.debug.panic("{s}", .{self.playdate.file.geterr()});
+    return @intCast(result);
 }

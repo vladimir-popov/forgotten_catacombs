@@ -66,24 +66,25 @@ pub fn deinit(self: *Level) void {
     self.arena.deinit();
 }
 
+/// Reads json from the reader, deserializes and initializes the level.
 pub fn load(self: *Level, session: *g.GameSession, reader: anytype) !void {
     var buffered = std.io.bufferedReader(reader);
     var json_reader = std.json.reader(session.arena.allocator(), buffered.reader());
     defer json_reader.deinit();
 
-    const parsed = try std.json.parseFromTokenSource(g.io.Level, session.arena.allocator(), &json_reader, .{
+    const parsed = try std.json.parseFromTokenSource(g.dto.Level, session.arena.allocator(), &json_reader, .{
         .allocate = .alloc_always,
     });
     defer parsed.deinit();
 
-    try self.init(parsed.depth, parsed.dungeon_seed, session);
+    try self.init(parsed.value.depth, parsed.value.dungeon_seed, session);
     const alloc = self.arena.allocator();
-    for (parsed.entities) |entity| {
+    for (parsed.value.entities) |entity| {
         try session.entities.copyComponentsToEntity(entity.id, entity.components);
         try self.entities.append(alloc, entity.id);
     }
-    try self.addVisitedPlaces(parsed.visited_places);
-    try self.addRememberedObjects(parsed.remembered_objects);
+    try self.addVisitedPlaces(parsed.value.visited_places);
+    try self.addRememberedObjects(parsed.value.remembered_objects);
     self.player_placement = self.dungeon.placementWith(self.playerPosition()).?;
 }
 
