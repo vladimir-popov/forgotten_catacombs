@@ -276,7 +276,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             const self: *Self = @ptrCast(@alignCast(ptr));
             const file: *std.fs.File = @ptrCast(@alignCast(file_ptr));
             file.close();
-            self.alloc.destroy(file.reader());
+            self.alloc.destroy(file);
         }
 
         fn readFile(_: *anyopaque, file_ptr: *anyopaque, buffer: []u8) anyerror!usize {

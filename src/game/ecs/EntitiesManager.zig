@@ -86,14 +86,18 @@ pub fn EntitiesManager(comptime ComponentsStruct: type) type {
             try self.setComponentsToEntity(entity, try init_components(self.inner_state.alloc));
         }
 
-        /// The same as `setComponentsToEntity`, but makes a copy of the components with inner allocator.
+        /// The same as `setComponentsToEntity`, but makes a copy of the components with inner allocator
+        /// by invoking method `clone`.
         /// This method have to be used to load components from an external source like a file.
         pub fn copyComponentsToEntity(self: Self, entity: Entity, components: ComponentsStruct) !void {
             inline for (@typeInfo(ComponentsStruct).@"struct".fields) |field| {
                 if (@field(components, field.name)) |component| {
                     try self.set(
                         entity,
-                        if (std.meta.hasFn("clone")) try component.clone(self.inner_state.alloc) else component,
+                        if (std.meta.hasFn(@TypeOf(component), "clone"))
+                            try component.clone(self.inner_state.alloc)
+                        else
+                            component,
                     );
                 }
             }

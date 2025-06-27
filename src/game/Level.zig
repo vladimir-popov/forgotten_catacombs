@@ -85,7 +85,7 @@ pub fn load(self: *Level, session: *g.GameSession, reader: anytype) !void {
     }
     try self.addVisitedPlaces(parsed.value.visited_places);
     try self.addRememberedObjects(parsed.value.remembered_objects);
-    self.player_placement = self.dungeon.placementWith(self.playerPosition()).?;
+    self.player_placement = self.dungeon.placementWith(self.playerPosition().place).?;
 }
 
 pub fn addVisitedPlaces(self: *Level, visited_places: [][]usize) !void {

@@ -35,18 +35,14 @@ pub const ZOrder = struct {
 };
 
 pub const Description = struct {
-    ptr: *const g.Description,
-
-    pub fn init(key: u8) @This() {
-        return .{ .ptr = g.Description.fromKey(key) };
-    }
+    key: u8,
 
     pub fn name(self: *const Description) []const u8 {
-        return self.ptr.name;
+        return g.descriptions.static(self.key).name;
     }
 
     pub fn description(self: *const Description) []const []const u8 {
-        return self.ptr.description;
+        return g.descriptions.static(self.key).description;
     }
 };
 
@@ -58,33 +54,37 @@ pub const Animation = struct {
         pub const go_sleep: [6]g.Codepoint = [_]g.Codepoint{ 0, 'z', 'z', 0, 'z', 'z' };
         pub const relax: [6]g.Codepoint = [_]g.Codepoint{ 0, '?', '?', 0, '?', '?' };
         pub const get_angry: [6]g.Codepoint = [_]g.Codepoint{ 0, '!', '!', 0, '!', '!' };
+
+        pub fn frames(key: u8) []const g.Codepoint {
+            switch (key) {
+                0 => &FramesPresets.hit,
+                1 => &FramesPresets.miss,
+                2 => &FramesPresets.go_sleep,
+                3 => &FramesPresets.relax,
+                4 => &FramesPresets.get_angry,
+                else => &FramesPresets.empty,
+            }
+        }
     };
 
-    /// Frames of the animation. One frame per render circle will be shown.
-    frames: []const g.Codepoint,
+    key: u8,
     current_frame: u8 = 0,
     previous_render_time: c_uint = 0,
     lag: u32 = 0,
 
     pub fn init(key: u8) @This() {
-        switch (key) {
-            0 => .{ .frames = &FramesPresets.hit },
-            1 => .{ .frames = &FramesPresets.miss },
-            2 => .{ .frames = &FramesPresets.go_sleep },
-            3 => .{ .frames = &FramesPresets.relax },
-            4 => .{ .frames = &FramesPresets.get_angry },
-            else => .{ .frames = &FramesPresets.empty },
-        }
+        return .{ .key = key };
     }
 
     pub fn frame(self: *Animation, now: u32) ?g.Codepoint {
+        const frames = FramesPresets.frames(self.key);
         self.lag += now - self.previous_render_time;
         self.previous_render_time = now;
         if (self.lag > g.RENDER_DELAY_MS) {
             self.lag = 0;
             self.current_frame += 1;
         }
-        return if (self.current_frame <= self.frames.len) self.frames[self.current_frame - 1] else null;
+        return if (self.current_frame <= frames.len) frames[self.current_frame - 1] else null;
     }
 };
 
@@ -122,6 +122,8 @@ pub const Speed = struct {
 };
 
 pub const Pile = struct {
+    const Self = @This();
+
     alloc: std.mem.Allocator,
     items: Set(g.Entity),
 
@@ -143,6 +145,32 @@ pub const Pile = struct {
 
     pub fn take(self: *Pile, item: g.Entity) void {
         std.debug.assert(self.items.remove(item));
+    }
+
+    pub fn jsonStringify(self: *const Self, jws: anytype) !void {
+        try jws.beginArray();
+        var itr = self.items.keyIterator();
+        while (itr.next()) |item_id| {
+            try jws.write(item_id);
+        }
+        jws.endArray();
+    }
+
+    pub fn jsonParse(alloc: std.mem.Allocator, source: anytype, _: std.json.ParseOptions) !Self {
+        if (try source.next() != .array_begin) {
+            return error.UnexpectedToken;
+        }
+        var result: Self = .{ .alloc = alloc, .items = .empty };
+        while (true) {
+            switch (try source.next()) {
+                inline .number => |slice| {
+                    try result.items.put(alloc, try std.fmt.parseInt(g.Entity, slice, 10), {});
+                },
+                .array_end => break,
+                else => return error.UnexpectedToken,
+            }
+        }
+        return result;
     }
 };
 
@@ -181,18 +209,17 @@ pub const Inventory = struct {
         jws.endArray();
     }
 
-    pub fn jsonParse(alloc: std.mem.Allocator, source: anytype, options: std.json.ParseOptions) !Self {
+    pub fn jsonParse(alloc: std.mem.Allocator, source: anytype, _: std.json.ParseOptions) !Self {
         if (try source.next() != .array_begin) {
             return error.UnexpectedToken;
         }
         var result: Self = .{ .alloc = alloc, .items = .empty };
-        while (try source.nextAlloc(alloc, options.allocate)) |token| {
-            switch (token) {
-                inline .number, .allocated_number, .string, .allocated_string => |slice| {
-                    defer alloc.free(token);
-                    try result.items.put(alloc, try std.fmt.parseInt(g.Entity, slice), {});
+        while (true) {
+            switch (try source.next()) {
+                inline .number => |slice| {
+                    try result.items.put(alloc, try std.fmt.parseInt(g.Entity, slice, 10), {});
                 },
-                .endArray => break,
+                .array_end => break,
                 else => return error.UnexpectedToken,
             }
         }

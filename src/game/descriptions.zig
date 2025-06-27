@@ -1,10 +1,27 @@
 const std = @import("std");
 const g = @import("game_pkg.zig");
 
-const Description = @This();
+pub const Description = struct {
+    name: []const u8,
+    description: []const []const u8 = &.{},
+};
 
-name: []const u8,
-description: []const []const u8 = &.{},
+pub const Preset = enum {
+    closed_door,
+    club,
+    ladder_down,
+    ladder_to_caves,
+    ladder_up,
+    opened_door,
+    pile,
+    player,
+    rat,
+    scientist,
+    teleport,
+    torch,
+    traider,
+    wharf,
+};
 
 pub const unknown_key: Description = .{ .name = "Unknown" };
 
@@ -23,22 +40,22 @@ pub const torch: Description = .{ .name = "Torch" };
 pub const traider: Description = .{ .name = "Traider" };
 pub const wharf: Description = .{ .name = "Wharf" };
 
-pub fn fromKey(key: u8) *const Description {
+pub fn static(key: u8) *const Description {
     switch (key) {
-        0 => &closed_door,
-        1 => &club,
-        2 => &ladder_down,
-        3 => &ladder_to_caves,
-        4 => &ladder_up,
-        5 => &opened_door,
-        6 => &pile,
-        7 => &player,
-        8 => &rat,
-        9 => &scientist,
-        10 => &teleport,
-        11 => &torch,
-        12 => &traider,
-        13 => &wharf,
+        .closed_door => .{ .name = "Closed door" },
+        .club,
+        .ladder_down,
+        .ladder_to_caves,
+        .ladder_up,
+        .opened_door,
+        .pile,
+        .player,
+        .rat,
+        .scientist,
+        .teleport,
+        .torch,
+        .traider,
+        .wharf,
         else => &unknown_key,
     }
 }

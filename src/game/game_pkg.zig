@@ -2,6 +2,7 @@ const std = @import("std");
 
 pub const codepoints = @import("codepoints.zig");
 pub const components = @import("components.zig");
+pub const descriptions = @import("descriptions.zig");
 pub const dungeon = @import("dungeon/dungeon_pkg.zig");
 pub const ecs = @import("ecs/ecs_pkg.zig");
 pub const entities = @import("entities.zig");
@@ -16,7 +17,6 @@ pub const AI = @import("AI.zig");
 pub const Button = @import("Button.zig");
 pub const Cheat = @import("cheats.zig").Cheat;
 pub const Codepoint = u21;
-pub const Description = @import("Description.zig");
 pub const DijkstraMap = @import("DijkstraMap.zig");
 pub const DrawingMode = Runtime.DrawingMode;
 pub const Entity = ecs.Entity;
