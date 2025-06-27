@@ -23,24 +23,18 @@ pub fn Preset(comptime S: type) type {
             ));
     }
 
-    return struct {
-        const Self = @This();
+    const KV = struct { []const u8, *const T };
+    comptime var kvs: [struct_fields.len]KV = undefined;
+    inline for (struct_fields, 0..) |field, i| {
+        kvs[i] = .{ field.name, @ptrCast(@alignCast(field.default_value_ptr)) };
+    }
+    const stringMap = std.StaticStringMap(*const T).initComptime(&kvs);
 
+    return struct {
         pub const Keys = StructFields(S);
 
-        underlying: std.StaticStringMap(*const T),
-
-        pub inline fn initComptime() Self {
-            const KV = struct { []const u8, *const T };
-            comptime var kvs: [struct_fields.len]KV = undefined;
-            inline for (struct_fields, 0..) |field, i| {
-                kvs[i] = .{ field.name, @ptrCast(@alignCast(field.default_value_ptr)) };
-            }
-            return .{ .underlying = std.StaticStringMap(*const T).initComptime(&kvs) };
-        }
-
-        pub fn get(self: Self, key: Keys) *const T {
-            return self.underlying.get(@tagName(key)).?;
+        pub fn get(key: Keys) *const T {
+            return stringMap.get(@tagName(key)).?;
         }
     };
 }
@@ -70,7 +64,7 @@ test Preset {
     const p = Preset(struct {
         foo: []const u8 = "Hello",
         bar: []const u8 = "world",
-    }).initComptime();
+    });
 
     try std.testing.expectEqualStrings("Hello", p.get(.foo).*);
     try std.testing.expectEqualStrings("world", p.get(.bar).*);

@@ -99,8 +99,8 @@ fn equipPlayer(self: *GameSession) !void {
     const light = try self.entities.addNewEntity(g.entities.Torch);
     equipment.weapon = weapon;
     equipment.light = light;
-    try invent.put(weapon);
-    try invent.put(light);
+    try invent.items.add(weapon);
+    try invent.items.add(light);
 }
 
 // TODO: Load session from file
@@ -205,7 +205,7 @@ pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_spe
                 try self.manageInventory();
                 return 0;
             } else {
-                try inventory.put(item);
+                try inventory.items.add(item);
                 try self.entities.remove(item, c.Position);
                 for (self.level.entities.items, 0..) |entity, idx| {
                     if (entity.eql(item)) {
@@ -222,21 +222,21 @@ pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_spe
             self.entities.getUnsafe(target, c.EnemyState).* = .sleeping;
             try self.entities.set(
                 target,
-                c.Animation{ .frames = &c.Animation.FramesPresets.go_sleep },
+                c.Animation{ .preset = .go_sleep },
             );
         },
         .chill => |target| {
             self.entities.getUnsafe(target, c.EnemyState).* = .walking;
             try self.entities.set(
                 target,
-                c.Animation{ .frames = &c.Animation.FramesPresets.relax },
+                c.Animation{ .preset = .relax },
             );
         },
         .get_angry => |target| {
             self.entities.getUnsafe(target, c.EnemyState).* = .aggressive;
             try self.entities.set(
                 target,
-                c.Animation{ .frames = &c.Animation.FramesPresets.get_angry },
+                c.Animation{ .preset = .get_angry },
             );
         },
         else => {},
@@ -311,7 +311,7 @@ fn doHit(
     const damage = actor_weapon.generateDamage(self.prng.random());
     log.debug("The entity {d} received damage {d} from entity {d}", .{ enemy.id, damage, actor.id });
     enemy_health.current -= @as(i16, @intCast(damage));
-    try self.entities.set(enemy, c.Animation{ .frames = &c.Animation.FramesPresets.hit });
+    try self.entities.set(enemy, c.Animation{ .preset = .hit });
     if (actor.eql(self.player)) {
         try self.events.sendEvent(.{ .player_hit = .{ .target = enemy } });
     }

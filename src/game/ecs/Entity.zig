@@ -1,10 +1,10 @@
+//! Numeric identifier of an entity wrapped to a structure for type safety.
 const std = @import("std");
 
 /// The id of an entity.
 id: u32,
 
-// TODO benchmark
-pub fn eql(self: @This(), other: anytype) bool {
+pub inline fn eql(self: @This(), other: anytype) bool {
     return switch (@typeInfo(@TypeOf(other))) {
         .optional => if (other == null) false else std.meta.eql(self, other.?),
         .@"struct" => std.meta.eql(self, other),

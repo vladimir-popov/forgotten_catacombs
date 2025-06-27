@@ -1,61 +1,26 @@
 const std = @import("std");
 const g = @import("game_pkg.zig");
+const Preset = @import("Preset.zig").Preset;
 
 pub const Description = struct {
     name: []const u8,
     description: []const []const u8 = &.{},
 };
 
-pub const Preset = enum {
-    closed_door,
-    club,
-    ladder_down,
-    ladder_to_caves,
-    ladder_up,
-    opened_door,
-    pile,
-    player,
-    rat,
-    scientist,
-    teleport,
-    torch,
-    traider,
-    wharf,
-};
+pub const Presets = Preset(@This());
 
-pub const unknown_key: Description = .{ .name = "Unknown" };
-
-pub const closed_door: Description = .{ .name = "Closed door" };
-pub const club: Description = .{ .name = "Club" };
-pub const ladder_down: Description = .{ .name = "Ladder down" };
-pub const ladder_to_caves: Description = .{ .name = "Ladder to caves" };
-pub const ladder_up: Description = .{ .name = "Ladder up" };
-pub const opened_door: Description = .{ .name = "Opened door" };
-pub const pile: Description = .{ .name = "Pile of items" };
-pub const player: Description = .{ .name = "You" };
-pub const rat: Description = .{ .name = "Rat" };
-pub const scientist: Description = .{ .name = "Scientist" };
-pub const teleport: Description = .{ .name = "Teleport" };
-pub const torch: Description = .{ .name = "Torch" };
-pub const traider: Description = .{ .name = "Traider" };
-pub const wharf: Description = .{ .name = "Wharf" };
-
-pub fn static(key: u8) *const Description {
-    switch (key) {
-        .closed_door => .{ .name = "Closed door" },
-        .club,
-        .ladder_down,
-        .ladder_to_caves,
-        .ladder_up,
-        .opened_door,
-        .pile,
-        .player,
-        .rat,
-        .scientist,
-        .teleport,
-        .torch,
-        .traider,
-        .wharf,
-        else => &unknown_key,
-    }
-}
+unknown_key: Description = .{ .name = "Unknown" },
+closed_door: Description = .{ .name = "Closed door" },
+club: Description = .{ .name = "Club" },
+ladder_down: Description = .{ .name = "Ladder down" },
+ladder_to_caves: Description = .{ .name = "Ladder to caves" },
+ladder_up: Description = .{ .name = "Ladder up" },
+opened_door: Description = .{ .name = "Opened door" },
+pile: Description = .{ .name = "Pile of items" },
+player: Description = .{ .name = "You" },
+rat: Description = .{ .name = "Rat" },
+scientist: Description = .{ .name = "Scientist" },
+teleport: Description = .{ .name = "Teleport" },
+torch: Description = .{ .name = "Torch" },
+traider: Description = .{ .name = "Traider" },
+wharf: Description = .{ .name = "Wharf" },

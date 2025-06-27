@@ -1,14 +1,83 @@
 const std = @import("std");
+const Preset = @import("Preset.zig").Preset;
 const g = @import("game_pkg.zig");
 const p = g.primitives;
 
-fn Set(comptime A: type) type {
-    return std.AutoHashMapUnmanaged(A, void);
-}
+/// A set of entities ids. Used in the component-containers such as inventory or pile.
+const EntitiesSet = struct {
+    const Self = @This();
 
-fn SetIterator(comptime A: type) type {
-    return Set(A).KeyIterator;
-}
+    const UnderlyingMap = std.AutoHashMapUnmanaged(g.Entity, void);
+    pub const Iterator = UnderlyingMap.KeyIterator;
+
+    alloc: std.mem.Allocator,
+    underlying_map: UnderlyingMap = .empty,
+
+    pub fn empty(alloc: std.mem.Allocator) Self {
+        return .{ .alloc = alloc, .underlying_map = .empty };
+    }
+
+    pub fn deinit(self: *Self) void {
+        self.underlying_map.deinit(self.alloc);
+    }
+
+    pub fn size(self: Self) usize {
+        return self.underlying_map.size;
+    }
+
+    pub fn iterator(self: Self) Iterator {
+        return self.underlying_map.keyIterator();
+    }
+
+    pub fn add(self: *Self, item: g.Entity) !void {
+        try self.underlying_map.put(self.alloc, item, {});
+    }
+
+    pub fn remove(self: *Self, item: g.Entity) bool {
+        return self.underlying_map.remove(item);
+    }
+
+    pub fn jsonStringify(self: *const Self, jws: anytype) !void {
+        try jws.beginArray();
+        var itr = self.underlying_map.keyIterator();
+        while (itr.next()) |item_id| {
+            try jws.write(item_id.id);
+        }
+        try jws.endArray();
+    }
+
+    pub fn jsonParse(alloc: std.mem.Allocator, source: anytype, _: std.json.ParseOptions) !Self {
+        if (try source.next() != .array_begin) {
+            return error.UnexpectedToken;
+        }
+        var result: Self = .{ .alloc = alloc, .underlying_map = .empty };
+        while (true) {
+            switch (try source.next()) {
+                inline .number => |slice| {
+                    try result.underlying_map.put(alloc, g.Entity.parse(slice).?, {});
+                },
+                .array_end => break,
+                else => return error.UnexpectedToken,
+            }
+        }
+        return result;
+    }
+
+    pub fn eql(self: Self, other: Self) bool {
+        if (self.underlying_map.size != other.underlying_map.size)
+            return false;
+
+        var self_itr = self.underlying_map.keyIterator();
+        var other_itr = self.underlying_map.keyIterator();
+        while (self_itr.next()) |s| {
+            while (other_itr.next()) |o| {
+                if (!std.meta.eql(s, o))
+                    return false;
+            }
+        }
+        return true;
+    }
+};
 
 pub const Position = struct {
     place: p.Point,
@@ -35,49 +104,34 @@ pub const ZOrder = struct {
 };
 
 pub const Description = struct {
-    key: u8,
+    preset: g.descriptions.Presets.Keys,
 
     pub fn name(self: *const Description) []const u8 {
-        return g.descriptions.static(self.key).name;
+        return g.descriptions.Presets.get(self.preset).name;
     }
 
     pub fn description(self: *const Description) []const []const u8 {
-        return g.descriptions.static(self.key).description;
+        return g.descriptions.Presets.get(self.preset).description;
     }
 };
 
 pub const Animation = struct {
-    pub const FramesPresets = struct {
-        pub const empty: [0]g.Codepoint = [_]g.Codepoint{};
-        pub const hit: [3]g.Codepoint = [_]g.Codepoint{ 0, '×', 0 };
-        pub const miss: [1]g.Codepoint = [_]g.Codepoint{'.'};
-        pub const go_sleep: [6]g.Codepoint = [_]g.Codepoint{ 0, 'z', 'z', 0, 'z', 'z' };
-        pub const relax: [6]g.Codepoint = [_]g.Codepoint{ 0, '?', '?', 0, '?', '?' };
-        pub const get_angry: [6]g.Codepoint = [_]g.Codepoint{ 0, '!', '!', 0, '!', '!' };
+    pub const FramesPresets = Preset(struct {
+        empty: []const g.Codepoint = &[0]g.Codepoint{},
+        hit: []const g.Codepoint = &[3]g.Codepoint{ 0, '×', 0 },
+        miss: []const g.Codepoint = &[1]g.Codepoint{'.'},
+        go_sleep: []const g.Codepoint = &[6]g.Codepoint{ 0, 'z', 'z', 0, 'z', 'z' },
+        relax: []const g.Codepoint = &[6]g.Codepoint{ 0, '?', '?', 0, '?', '?' },
+        get_angry: []const g.Codepoint = &[6]g.Codepoint{ 0, '!', '!', 0, '!', '!' },
+    });
 
-        pub fn frames(key: u8) []const g.Codepoint {
-            switch (key) {
-                0 => &FramesPresets.hit,
-                1 => &FramesPresets.miss,
-                2 => &FramesPresets.go_sleep,
-                3 => &FramesPresets.relax,
-                4 => &FramesPresets.get_angry,
-                else => &FramesPresets.empty,
-            }
-        }
-    };
-
-    key: u8,
+    preset: FramesPresets.Keys,
     current_frame: u8 = 0,
     previous_render_time: c_uint = 0,
     lag: u32 = 0,
 
-    pub fn init(key: u8) @This() {
-        return .{ .key = key };
-    }
-
     pub fn frame(self: *Animation, now: u32) ?g.Codepoint {
-        const frames = FramesPresets.frames(self.key);
+        const frames: []const g.Codepoint = FramesPresets.get(self.preset).*;
         self.lag += now - self.previous_render_time;
         self.previous_render_time = now;
         if (self.lag > g.RENDER_DELAY_MS) {
@@ -124,106 +178,28 @@ pub const Speed = struct {
 pub const Pile = struct {
     const Self = @This();
 
-    alloc: std.mem.Allocator,
-    items: Set(g.Entity),
+    items: EntitiesSet,
 
     pub fn empty(alloc: std.mem.Allocator) Pile {
-        return .{ .alloc = alloc, .items = .empty };
+        return .{ .items = .{ .alloc = alloc } };
     }
 
     pub fn deinit(self: *Pile) void {
-        self.items.deinit(self.alloc);
-    }
-
-    pub fn iterator(self: *const Pile) SetIterator(g.Entity) {
-        return self.items.keyIterator();
-    }
-
-    pub inline fn add(self: *Pile, item: g.Entity) !void {
-        try self.items.put(self.alloc, item, {});
-    }
-
-    pub fn take(self: *Pile, item: g.Entity) void {
-        std.debug.assert(self.items.remove(item));
-    }
-
-    pub fn jsonStringify(self: *const Self, jws: anytype) !void {
-        try jws.beginArray();
-        var itr = self.items.keyIterator();
-        while (itr.next()) |item_id| {
-            try jws.write(item_id);
-        }
-        jws.endArray();
-    }
-
-    pub fn jsonParse(alloc: std.mem.Allocator, source: anytype, _: std.json.ParseOptions) !Self {
-        if (try source.next() != .array_begin) {
-            return error.UnexpectedToken;
-        }
-        var result: Self = .{ .alloc = alloc, .items = .empty };
-        while (true) {
-            switch (try source.next()) {
-                inline .number => |slice| {
-                    try result.items.put(alloc, try std.fmt.parseInt(g.Entity, slice, 10), {});
-                },
-                .array_end => break,
-                else => return error.UnexpectedToken,
-            }
-        }
-        return result;
+        self.items.deinit();
     }
 };
 
 pub const Inventory = struct {
     const Self = @This();
 
-    alloc: std.mem.Allocator,
-    items: Set(g.Entity),
+    items: EntitiesSet,
 
     pub fn empty(alloc: std.mem.Allocator) Inventory {
-        return .{ .alloc = alloc, .items = .empty };
+        return .{ .items = .{ .alloc = alloc } };
     }
 
     pub fn deinit(self: *Inventory) void {
-        self.items.deinit(self.alloc);
-    }
-
-    pub fn iterator(self: *const Inventory) SetIterator(g.Entity) {
-        self.items.keyIterator();
-    }
-
-    pub inline fn put(self: *Inventory, item: g.Entity) !void {
-        try self.items.put(self.alloc, item, {});
-    }
-
-    pub fn drop(self: *Inventory, item: g.Entity) void {
-        std.debug.assert(self.items.remove(item));
-    }
-
-    pub fn jsonStringify(self: *const Self, jws: anytype) !void {
-        try jws.beginArray();
-        var itr = self.items.keyIterator();
-        while (itr.next()) |item_id| {
-            try jws.write(item_id);
-        }
-        jws.endArray();
-    }
-
-    pub fn jsonParse(alloc: std.mem.Allocator, source: anytype, _: std.json.ParseOptions) !Self {
-        if (try source.next() != .array_begin) {
-            return error.UnexpectedToken;
-        }
-        var result: Self = .{ .alloc = alloc, .items = .empty };
-        while (true) {
-            switch (try source.next()) {
-                inline .number => |slice| {
-                    try result.items.put(alloc, try std.fmt.parseInt(g.Entity, slice, 10), {});
-                },
-                .array_end => break,
-                else => return error.UnexpectedToken,
-            }
-        }
-        return result;
+        self.items.deinit();
     }
 };
 
@@ -282,6 +258,56 @@ pub const Components = struct {
 };
 
 test "Components should be serializable" {
-    // TODO write a test to serialize and deserialize the Component structure.
-    try std.testing.expect(false);
+    var inventory = Inventory.empty(std.testing.allocator);
+    try inventory.items.add(.{ .id = 7 });
+    defer inventory.deinit();
+
+    var pile = Pile.empty(std.testing.allocator);
+    try pile.items.add(.{ .id = 9 });
+    defer pile.deinit();
+
+    // Random components to check serialization:
+    const prototype = Components{
+        .animation = Animation{ .preset = .hit },
+        .description = Description{ .preset = .player },
+        .door = Door{ .state = .opened },
+        .equipment = Equipment{ .weapon = .{ .id = 1 }, .light = .{ .id = 12 } },
+        .health = Health{ .current = 42, .max = 100 },
+        .initiative = Initiative{ .move_points = 5 },
+        .inventory = inventory,
+        .ladder = Ladder{ .id = .{ .id = 2 }, .direction = .down, .target_ladder = .{ .id = 3 } },
+        .pile = pile,
+        .position = Position{ .place = p.Point.init(12, 42) },
+        .source_of_light = SourceOfLight{ .radius = 4 },
+        .speed = Speed{ .move_points = 12 },
+        .sprite = Sprite{ .codepoint = g.codepoints.human },
+        .state = .walking,
+        .weapon = Weapon{ .min_damage = 3, .max_damage = 32 },
+        .z_order = ZOrder{ .order = .obstacle },
+    };
+
+    const buffer: []u8 = try std.json.stringifyAlloc(std.testing.allocator, prototype, .{});
+    defer std.testing.allocator.free(buffer);
+
+    const parsed = try std.json.parseFromSlice(Components, std.testing.allocator, buffer, .{});
+    defer parsed.deinit();
+
+    try expectEql(prototype, parsed.value);
+}
+
+fn expectEql(expected: anytype, actual: anytype) !void {
+    try std.testing.expectEqual(@TypeOf(expected), @TypeOf(actual));
+
+    switch (@typeInfo(@TypeOf(expected))) {
+        .pointer => try expectEql(expected.*, actual.*),
+        .optional => try expectEql(expected.?, actual.?),
+        .@"struct" => |s| inline for (s.fields) |field| {
+            if (@hasDecl(@TypeOf(expected), "eql")) {
+                try std.testing.expect(expected.eql(actual));
+            } else {
+                try expectEql(@field(expected, field.name), @field(actual, field.name));
+            }
+        },
+        else => try std.testing.expectEqual(expected, actual),
+    }
 }

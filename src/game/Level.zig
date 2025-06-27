@@ -60,6 +60,7 @@ pub fn init(self: *Level, depth: u8, dungeon_seed: u64, session: *g.GameSession)
             self.obstacles(),
         ),
     };
+    try self.addEntity(session.player);
 }
 
 pub fn deinit(self: *Level) void {
@@ -136,7 +137,7 @@ pub fn addEntityAtPlace(self: *Level, item: g.Entity, place: p.Point) !?g.Entity
                 if (self.session.entities.get(entity, c.Pile)) |pile| {
                     log.debug("Adding item {any} into the pile {any} at {any}", .{ item, entity, place });
                     // add a new item to the pile
-                    try pile.add(item);
+                    try pile.items.add(item);
                     return entity;
                 } else {
                     // or create a new pile and add the item to the pile
@@ -147,10 +148,10 @@ pub fn addEntityAtPlace(self: *Level, item: g.Entity, place: p.Point) !?g.Entity
                     log.debug("Created a pile {any} at {any}", .{ pile_id, place });
 
                     // add the item to the pile
-                    try pile.add(item);
+                    try pile.items.add(item);
 
                     // move the existed item to the pile
-                    try pile.add(entity);
+                    try pile.items.add(entity);
                     try self.session.entities.remove(entity, c.Position);
                     return pile_id;
                 }
@@ -298,7 +299,7 @@ pub fn generateFirstLevel(self: *g.Level, session: *g.GameSession) !void {
     // Add wharf
     var entity = try self.session.entities.addNewEntity(.{
         .z_order = .{ .order = .floor },
-        .description = .{ .ptr = &g.Description.wharf },
+        .description = .{ .preset = .wharf },
         .sprite = .{ .codepoint = cp.ladder_up },
         .position = .{ .place = self.dungeon.entrance },
     });
@@ -313,7 +314,7 @@ pub fn generateFirstLevel(self: *g.Level, session: *g.GameSession) !void {
             .id = entity,
             .target_ladder = self.session.entities.newEntity(),
         },
-        .description = .{ .ptr = &g.Description.ladder_down },
+        .description = .{ .preset = .ladder_down },
         .sprite = .{ .codepoint = cp.ladder_down },
         .position = .{ .place = self.dungeon.exit },
     });
@@ -328,7 +329,7 @@ pub fn generateFirstLevel(self: *g.Level, session: *g.GameSession) !void {
         .z_order = .{ .order = .obstacle },
         .position = .{ .place = d.FirstLocation.trader_place },
         .sprite = .{ .codepoint = cp.human },
-        .description = .{ .ptr = &g.Description.traider },
+        .description = .{ .preset = .traider },
     });
     try self.addEntity(entity);
 
@@ -337,7 +338,7 @@ pub fn generateFirstLevel(self: *g.Level, session: *g.GameSession) !void {
         .z_order = .{ .order = .obstacle },
         .position = .{ .place = d.FirstLocation.scientist_place },
         .sprite = .{ .codepoint = cp.human },
-        .description = .{ .ptr = &g.Description.scientist },
+        .description = .{ .preset = .scientist },
     });
     try self.addEntity(entity);
 

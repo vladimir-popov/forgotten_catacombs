@@ -119,11 +119,12 @@ test "vectors for the middle of the empty region 5x5" {
     var fbs = std.io.fixedBufferStream(&buf);
     try field.write(fbs.writer().any());
     const expected =
-        \\|> 4|> 3|v 2|v 3|v 4|
-        \\|> 3|> 2|v 1|v 2|v 3|
-        \\|> 2|> 1|? 0|< 1|< 2|
-        \\|> 3|> 2|^ 1|< 2|< 3|
-        \\|> 4|> 3|^ 2|< 3|< 4|
+        \\   |  1|  2|  3|  4|  5|
+        \\  1|> 4|> 3|v 2|v 3|v 4|
+        \\  2|> 3|> 2|v 1|v 2|v 3|
+        \\  3|> 2|> 1|? 0|< 1|< 2|
+        \\  4|> 3|> 2|^ 1|< 2|< 3|
+        \\  5|> 4|> 3|^ 2|< 3|< 4|
         \\
     ;
 
@@ -156,11 +157,12 @@ test "vectors for the region with obstacles" {
     var fbs = std.io.fixedBufferStream(&buf);
     try field.write(fbs.writer().any());
     const expected =
-        \\|v 8|? 0|v 2|v 3|v 4|
-        \\|v 7|? 0|v 1|< 2|< 3|
-        \\|v 6|? 0|? 0|? 0|v 4|
-        \\|v 5|? 0|^ 1|< 2|< 3|
-        \\|> 4|> 3|^ 2|< 3|< 4|
+        \\   |  1|  2|  3|  4|  5|
+        \\  1|v 8|? 0|v 2|v 3|v 4|
+        \\  2|v 7|? 0|v 1|< 2|< 3|
+        \\  3|v 6|? 0|? 0|? 0|v 4|
+        \\  4|v 5|? 0|^ 1|< 2|< 3|
+        \\  5|> 4|> 3|^ 2|< 3|< 4|
         \\
     ;
 

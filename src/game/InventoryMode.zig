@@ -179,7 +179,7 @@ fn draw(self: *InventoryMode) !void {
 fn updateInventoryTab(self: *InventoryMode, tab: *Tab) !void {
     const selected_line = tab.window.selected_line orelse 0;
     tab.window.clearRetainingCapacity();
-    var itr = self.inventory.items.keyIterator();
+    var itr = self.inventory.items.iterator();
     while (itr.next()) |item_ptr| {
         var buffer: w.TextArea.Line = undefined;
         try tab.window.addOption(
@@ -263,7 +263,7 @@ fn dropSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const place = self.session.level.playerPosition().place;
     log.debug("Drop item {d} at {any}", .{ item.id, place });
 
-    self.inventory.drop(item);
+    std.debug.assert(self.inventory.items.remove(item));
     if (item.eql(self.equipment.weapon)) {
         self.equipment.weapon = null;
     }
@@ -295,7 +295,7 @@ fn updateDropTab(self: *InventoryMode, tab: *Tab, drop: g.Entity) !void {
     const selected_line = tab.window.selected_line orelse 0;
     tab.window.clearRetainingCapacity();
     if (self.session.entities.get(drop, c.Pile)) |pile| {
-        var itr = pile.iterator();
+        var itr = pile.items.iterator();
         while (itr.next()) |item_ptr| {
             try self.addDropOption(tab, item_ptr.*);
         }
@@ -338,12 +338,12 @@ fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
 fn takeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const tab: *Tab = @ptrCast(@alignCast(ptr));
     const self = tab.parent;
-    try self.inventory.put(item);
+    try self.inventory.items.add(item);
     const entity = self.drop orelse @panic("Attempt to take an item when dropped item is not defined");
     if (self.session.entities.get(entity, c.Pile)) |pile| {
-        pile.take(item);
+        _ = pile.items.remove(item);
         // Remove the pile only if it is became empty
-        if (pile.items.count() == 0) {
+        if (pile.items.size() == 0) {
             try self.session.entities.removeEntity(entity);
             self.tabs_count = 1;
             self.active_tab_idx = 0;
