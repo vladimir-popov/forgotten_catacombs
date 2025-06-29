@@ -1,6 +1,7 @@
 .zig-cache/
 zig-cache/
 zig-out/
+save/
 game.log
 **.bkp
 **.dtmp

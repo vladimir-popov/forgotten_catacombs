@@ -10,7 +10,7 @@ const p = g.primitives;
 
 const log = std.log.scoped(.level);
 
-const Level = @This();
+const Self = @This();
 
 pub const Cell = union(enum) {
     landscape: d.Dungeon.Cell,
@@ -27,13 +27,16 @@ depth: u8,
 entities: std.ArrayListUnmanaged(g.Entity) = .empty,
 visibility_strategy: *const fn (level: *const g.Level, place: p.Point) g.Render.Visibility,
 dungeon: d.Dungeon,
-map: g.LevelMap,
+/// Already visited places in the dungeon.
+visited_places: []std.DynamicBitSetUnmanaged,
+/// All static objects (doors, ladders, items) met previously.
+remembered_objects: std.AutoHashMapUnmanaged(p.Point, g.Entity),
 /// Dijkstra Map of direction to the player. Used to find a path to the player.
 dijkstra_map: g.DijkstraMap,
 /// The placement where the player right now. It's used for optimization.
 player_placement: d.Placement = undefined,
 
-pub fn init(self: *Level, depth: u8, dungeon_seed: u64, session: *g.GameSession) !void {
+pub fn init(self: *Self, depth: u8, dungeon_seed: u64, session: *g.GameSession) !void {
     const dungeon_type = d.DungeonType.accordingToDepth(depth);
     self.* = .{
         .arena = std.heap.ArenaAllocator.init(session.arena.allocator()),
@@ -53,62 +56,50 @@ pub fn init(self: *Level, depth: u8, dungeon_seed: u64, session: *g.GameSession)
             else
                 g.visibility.showTheCurrentPlacementInLight,
         },
-        .map = try g.LevelMap.init(&self.arena, self.dungeon.rows, self.dungeon.cols),
+        .visited_places = try self.arena.allocator().alloc(std.DynamicBitSetUnmanaged, self.dungeon.rows),
+        .remembered_objects = std.AutoHashMapUnmanaged(p.Point, g.Entity){},
         .dijkstra_map = g.DijkstraMap.init(
             self.arena.allocator(),
             .{ .top_left = .{ .row = 1, .col = 1 }, .rows = 12, .cols = 25 },
             self.obstacles(),
         ),
     };
+    const alloc = self.arena.allocator();
+    for (0..self.dungeon.rows) |r0| {
+        self.visited_places[r0] = try std.DynamicBitSetUnmanaged.initEmpty(alloc, self.dungeon.cols);
+    }
     try self.addEntity(session.player);
 }
 
-pub fn deinit(self: *Level) void {
+pub fn deinit(self: *Self) void {
     self.arena.deinit();
 }
 
-/// Reads json from the reader, deserializes and initializes the level.
-pub fn load(self: *Level, session: *g.GameSession, reader: anytype) !void {
-    var buffered = std.io.bufferedReader(reader);
-    var json_reader = std.json.reader(session.arena.allocator(), buffered.reader());
-    defer json_reader.deinit();
-
-    const parsed = try std.json.parseFromTokenSource(g.dto.Level, session.arena.allocator(), &json_reader, .{
-        .allocate = .alloc_always,
-    });
-    defer parsed.deinit();
-
-    try self.init(parsed.value.depth, parsed.value.dungeon_seed, session);
-    const alloc = self.arena.allocator();
-    for (parsed.value.entities) |entity| {
-        try session.entities.copyComponentsToEntity(entity.id, entity.components);
-        try self.entities.append(alloc, entity.id);
-    }
-    try self.addVisitedPlaces(parsed.value.visited_places);
-    try self.addRememberedObjects(parsed.value.remembered_objects);
-    self.player_placement = self.dungeon.placementWith(self.playerPosition().place).?;
-}
-
-pub fn addVisitedPlaces(self: *Level, visited_places: [][]usize) !void {
-    for (visited_places, 0..) |row, row_idx| {
-        for (row) |bit| {
-            self.map.visited_places[row_idx].set(bit);
-        }
-    }
-}
-
-pub fn addRememberedObjects(self: *Level, remembered_objects: []struct { p.Point, g.Entity }) !void {
-    const alloc = self.arena.allocator();
-    for (remembered_objects) |kv| {
-        try self.map.remembered_objects.put(alloc, kv[0], kv[1]);
-    }
-}
-
-pub inline fn addEntity(self: *Level, entity: g.Entity) !void {
+inline fn addEntity(self: *Self, entity: g.Entity) !void {
     try self.entities.append(self.arena.allocator(), entity);
 }
 
-pub fn removeEntity(self: *Level, entity: g.Entity) !void {
+pub fn isVisited(self: Self, place: p.Point) bool {
+    if (place.row > self.dungeon.rows or place.col > self.dungeon.cols) return false;
+    return self.visited_places[place.row - 1].isSet(place.col - 1);
+}
+
+pub fn addVisitedPlace(self: *Self, visited_place: p.Point) !void {
+    if (visited_place.row > self.dungeon.rows or visited_place.col > self.dungeon.cols) return;
+    self.visited_places[visited_place.row - 1].set(visited_place.col - 1);
+}
+
+pub fn rememberObject(self: *Self, entity: g.Entity, place: p.Point) !void {
+    log.debug("Remember object {any} at {any}", .{ entity, place });
+    self.remembered_objects.put(self.arena.allocator(), place, entity);
+}
+
+pub fn forgetObject(self: *Self, place: p.Point) !void {
+    log.debug("Forget object at {any}", .{place});
+    _ = try self.remembered_objects.remove(place);
+}
+
+pub fn removeEntity(self: *Self, entity: g.Entity) !void {
     try self.session.entities.removeEntity(entity);
     for (0..self.entities.items.len) |idx| {
         if (entity.eql(self.entities.items[idx])) {
@@ -128,7 +119,7 @@ pub fn removeEntity(self: *Level, entity: g.Entity) !void {
 ///   - If a pile is on the place, the item will be added to this pile;
 ///
 /// Returns entity id for the pile if it was created;
-pub fn addEntityAtPlace(self: *Level, item: g.Entity, place: p.Point) !?g.Entity {
+pub fn addEntityAtPlace(self: *Self, item: g.Entity, place: p.Point) !?g.Entity {
     switch (self.cellAt(place)) {
         .entities => |entities| {
             // if some item already exists on the place
@@ -169,15 +160,15 @@ pub inline fn checkVisibility(self: *const g.Level, place: p.Point) g.Render.Vis
     return self.visibility_strategy(self, place);
 }
 
-pub inline fn playerPosition(self: *const Level) *c.Position {
+pub inline fn playerPosition(self: *const Self) *c.Position {
     return self.session.entities.getUnsafe(self.session.player, c.Position);
 }
 
-pub inline fn componentsIterator(self: Level) g.ComponentsIterator {
+pub inline fn componentsIterator(self: Self) g.ComponentsIterator {
     return self.session.entities.iterator(self.entities.items);
 }
 
-pub fn randomEmptyPlace(self: Level, rand: std.Random) ?p.Point {
+pub fn randomEmptyPlace(self: Self, rand: std.Random) ?p.Point {
     var attempt: u8 = 10;
     while (attempt > 0) : (attempt -= 1) {
         const place = self.dungeon.randomPlace(rand);
@@ -189,18 +180,18 @@ pub fn randomEmptyPlace(self: Level, rand: std.Random) ?p.Point {
     return null;
 }
 
-pub fn obstacles(self: *const Level) g.DijkstraMap.Obstacles {
+pub fn obstacles(self: *const Self) g.DijkstraMap.Obstacles {
     return .{ .context = self, .isObstacleFn = isObstacleFn };
 }
 
 /// This function is used to build the DijkstraMap, that is used to navigate enemies,
 /// and to check collision by the walking enemies.
 fn isObstacleFn(ptr: *const anyopaque, place: p.Point) bool {
-    const self: *const Level = @ptrCast(@alignCast(ptr));
+    const self: *const Self = @ptrCast(@alignCast(ptr));
     return isObstacle(self, place);
 }
 
-pub fn isObstacle(self: *const Level, place: p.Point) bool {
+pub fn isObstacle(self: *const Self, place: p.Point) bool {
     switch (self.cellAt(place)) {
         .landscape => |cl| switch (cl) {
             .floor, .doorway => {},
@@ -222,7 +213,7 @@ pub fn isObstacle(self: *const Level, place: p.Point) bool {
 ///       0 - opened doors, ladders, teleports;
 ///       1 - any dropped items;
 ///       2 - player, enemies, npc, closed doors;
-pub fn cellAt(self: Level, place: p.Point) Cell {
+pub fn cellAt(self: Self, place: p.Point) Cell {
     const landscape = switch (self.dungeon.cellAt(place)) {
         .floor, .doorway => |cl| cl,
         else => |cl| return .{ .landscape = cl },
@@ -247,7 +238,7 @@ pub fn cellAt(self: Level, place: p.Point) Cell {
 }
 
 // OPTIMIZE IT
-pub fn itemAt(self: Level, place: p.Point) ?g.Entity {
+pub fn itemAt(self: Self, place: p.Point) ?g.Entity {
     switch (self.dungeon.cellAt(place)) {
         .floor, .doorway => {},
         else => return null,
@@ -264,7 +255,7 @@ pub fn itemAt(self: Level, place: p.Point) ?g.Entity {
 
 // The level doesn't subscribe to event directly to avoid unsubscription.
 // Instead, the PlayMode delegates events to the actual level.
-pub fn onPlayerMoved(self: *Level, player_moved: g.events.EntityMoved) !void {
+pub fn onPlayerMoved(self: *Self, player_moved: g.events.EntityMoved) !void {
     std.debug.assert(player_moved.is_player);
     self.updatePlacement(player_moved.moved_from, player_moved.targetPlace());
     const player_place = self.playerPosition().place;
@@ -272,7 +263,7 @@ pub fn onPlayerMoved(self: *Level, player_moved: g.events.EntityMoved) !void {
     try self.dijkstra_map.calculate(player_place);
 }
 
-fn updatePlacement(self: *Level, player_moved_from: p.Point, player_moved_to: p.Point) void {
+fn updatePlacement(self: *Self, player_moved_from: p.Point, player_moved_to: p.Point) void {
     if (self.player_placement.contains(player_moved_to)) return;
 
     if (self.dungeon.doorwayAt(player_moved_from)) |doorway| {
@@ -360,7 +351,7 @@ pub fn generateFirstLevel(self: *g.Level, session: *g.GameSession) !void {
     self.player_placement = self.dungeon.placementWith(self.playerPosition().place).?;
 }
 
-pub fn generate(self: *Level, depth: u8, session: *g.GameSession, from_ladder: c.Ladder) !void {
+pub fn generate(self: *Self, depth: u8, session: *g.GameSession, from_ladder: c.Ladder) !void {
     log.debug(
         "Generate level {s} on depth {d} from ladder {any}",
         .{ @tagName(from_ladder.direction), depth, from_ladder },
@@ -423,5 +414,165 @@ fn addEnemy(self: *g.Level, rand: std.Random, enemy: c.Components) !void {
         try self.session.entities.set(id, c.Position{ .place = place });
         const state: c.EnemyState = if (rand.uintLessThan(u8, 5) == 0) .sleeping else .walking;
         try self.session.entities.set(id, state);
+    }
+}
+
+const JsonTag = enum {
+    depth,
+    dungeon_seed,
+    entities,
+    entity,
+    place,
+    remembered_objects,
+    visited_places,
+
+    pub fn writeAsField(self: JsonTag, jws: anytype) !void {
+        try jws.objectField(@tagName(self));
+    }
+
+    pub fn readFromField(json: anytype) !JsonTag {
+        const next = try json.next();
+        if (next == .string) {
+            return std.meta.stringToEnum(JsonTag, next.string) orelse error.WrongTag;
+        } else {
+            log.err("Expected a string with tag, but had {any}", .{next});
+            return error.WrongTag;
+        }
+    }
+};
+
+/// Reads json from the reader, deserializes and initializes the level.
+pub fn load(self: *Self, session: *g.GameSession, reader: g.Runtime.FileReader) !void {
+    var buffered = std.io.bufferedReader(reader);
+    var json = std.json.reader(session.arena.allocator(), buffered.reader());
+    defer json.deinit();
+
+    assertEql(try json.next(), .object_begin);
+
+    // Read the depth and dungeon seed to initialize the level.
+    // They have to be the first two fields in the current json object
+    var depth: ?u8 = null;
+    var dungeon_seed: ?u64 = null;
+    var next_tag: JsonTag = undefined;
+    while (true) {
+        next_tag = try JsonTag.readFromField(&json);
+        switch (next_tag) {
+            .depth => depth = try std.fmt.parseInt(u8, (try json.next()).number, 10),
+            .dungeon_seed => dungeon_seed = try std.fmt.parseInt(u64, (try json.next()).number, 10),
+            else => break,
+        }
+    }
+    try self.init(depth.?, dungeon_seed.?, session);
+    const alloc = self.arena.allocator();
+
+    // Read other fields and set them to the already initialized level
+    loop: while (true) {
+        switch (next_tag) {
+            .entities => {
+                assertEql(try json.next(), .object_begin);
+                while (try json.peekNextTokenType() != .object_end) {
+                    const entity = g.Entity.parse((try json.next()).string).?;
+                    var value = try std.json.Value.jsonParse(alloc, &json, .{ .max_value_len = 1024 });
+                    defer value.object.deinit();
+                    const parsed_components = try std.json.parseFromValue(c.Components, alloc, value, .{});
+                    defer parsed_components.deinit();
+                    try self.addEntity(entity);
+                    try self.session.entities.copyComponentsToEntity(entity, parsed_components.value);
+                }
+                std.debug.assert(try json.next() == .object_end);
+            },
+            .visited_places => {
+                assertEql(try json.next(), .array_begin);
+                for (0..self.visited_places.len) |i| {
+                    var value = try std.json.Value.jsonParse(alloc, &json, .{ .max_value_len = 1024 });
+                    defer value.array.deinit();
+                    for (value.array.items) |idx| {
+                        self.visited_places[i].set(@intCast(idx.integer));
+                    }
+                }
+                assertEql(try json.next(), .array_end);
+            },
+            .remembered_objects => {
+                assertEql(try json.next(), .array_begin);
+                while (try json.peekNextTokenType() != .array_end) {
+                    var value = try std.json.Value.jsonParse(alloc, &json, .{ .max_value_len = 1024 });
+                    defer value.object.deinit();
+                    const entity = g.Entity{ .id = @intCast(value.object.get("entity").?.integer) };
+                    const place = value.object.get("place").?;
+                    try self.remembered_objects.put(alloc, try p.Point.jsonParseFromValue(alloc, place, .{}), entity);
+                }
+                assertEql(try json.next(), .array_end);
+            },
+            else => break :loop,
+        }
+        switch (try json.peekNextTokenType()) {
+            .string => {
+                next_tag = try JsonTag.readFromField(&json);
+            },
+            .object_end => {
+                _ = try json.next();
+                break :loop;
+            },
+            else => |unexpected| {
+                log.err("Unexpected token `{any}`", .{unexpected});
+                return error.UnexpectedToken;
+            },
+        }
+    }
+    assertEql(try json.next(), .end_of_document);
+    self.player_placement = self.dungeon.placementWith(self.playerPosition().place).?;
+}
+
+pub fn save(self: *Self, writer: g.Runtime.FileWriter) !void {
+    const alloc = self.arena.allocator();
+    var jws = std.json.writeStreamArbitraryDepth(alloc, writer.writer(), .{ .emit_null_optional_fields = false });
+    defer jws.deinit();
+
+    try jws.beginObject();
+    try JsonTag.depth.writeAsField(&jws);
+    try jws.write(self.depth);
+    try JsonTag.dungeon_seed.writeAsField(&jws);
+    try jws.write(self.dungeon.seed);
+    try JsonTag.entities.writeAsField(&jws);
+    try jws.beginObject();
+    for (self.entities.items) |entity| {
+        var buf: [5]u8 = undefined;
+        try jws.objectField(try std.fmt.bufPrint(&buf, "{d}", .{entity.id}));
+        try jws.write(try self.session.entities.entityToStruct(entity));
+    }
+    try jws.endObject();
+    try JsonTag.visited_places.writeAsField(&jws);
+    try jws.beginArray();
+    for (self.visited_places) |visited_row| {
+        try jws.beginArray();
+        var itr = visited_row.iterator(.{});
+        while (itr.next()) |idx| {
+            try jws.write(idx);
+        }
+        try jws.endArray();
+    }
+    try jws.endArray();
+
+    try JsonTag.remembered_objects.writeAsField(&jws);
+    var kvs = self.remembered_objects.iterator();
+    try jws.beginArray();
+    while (kvs.next()) |kv| {
+        try jws.beginObject();
+        try JsonTag.place.writeAsField(&jws);
+        try jws.write(kv.key_ptr.*);
+        try JsonTag.entity.writeAsField(&jws);
+        try jws.write(kv.value_ptr.id);
+        try jws.endObject();
+    }
+    try jws.endArray();
+    try jws.endObject();
+}
+
+fn assertEql(actual: anytype, expected: anytype) void {
+    switch (@import("builtin").mode) {
+        .Debug, .ReleaseSafe => if (expected != actual) {
+            std.debug.panic("Expected {any}, but was {any}", .{ expected, actual });
+        },
+        else => {},
     }
 }

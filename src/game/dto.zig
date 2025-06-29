@@ -11,9 +11,7 @@ pub const Level = struct {
     depth: u8,
     dungeon_seed: u64,
     entities: []const Entity,
-    /// An array of arrays of toggled indexes inside the one row of the BitSet
-    visited_places: [][]usize,
-    remembered_objects: []struct { p.Point, g.Entity },
+    map: std.json.Value,
 };
 
 pub const GameSession = struct {

@@ -1,8 +1,10 @@
 //! Numeric identifier of an entity wrapped to a structure for type safety.
 const std = @import("std");
 
+pub const IdType = u32;
+
 /// The id of an entity.
-id: u32,
+id: IdType,
 
 pub inline fn eql(self: @This(), other: anytype) bool {
     return switch (@typeInfo(@TypeOf(other))) {
@@ -13,5 +15,5 @@ pub inline fn eql(self: @This(), other: anytype) bool {
 }
 
 pub fn parse(str: []const u8) ?@This() {
-    return .{ .id = std.fmt.parseInt(u32, str, 10) catch return null };
+    return .{ .id = std.fmt.parseInt(IdType, str, 10) catch return null };
 }

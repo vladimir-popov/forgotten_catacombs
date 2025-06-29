@@ -342,6 +342,7 @@ fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
         .{ @tagName(by_ladder.direction), self.level.depth, new_depth, by_ladder },
     );
 
+    try self.saveLevel();
     self.level.deinit();
     if (new_depth > self.max_depth) {
         try self.level.generate(new_depth, self, by_ladder);
@@ -362,10 +363,25 @@ fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
 }
 
 fn loadLevel(self: *GameSession, depth: u8) !void {
-    _ = depth;
-    const file_path: []const u8 = undefined;
+    var buf: [50]u8 = undefined;
+    const file_path = try pathToLevelFile(&buf, depth);
+    log.debug("Load level on depth {d} from {s}", .{ depth, file_path });
     const reader = try self.runtime.fileReader(file_path);
-    defer reader.close();
+    defer reader.deinit();
 
     try self.level.load(self, reader);
+}
+
+fn saveLevel(self: *GameSession) !void {
+    var buf: [50]u8 = undefined;
+    const file_path = try pathToLevelFile(&buf, self.level.depth);
+    log.debug("Save level on depth {d} to {s}", .{ self.level.depth, file_path });
+    const writer = try self.runtime.fileWriter(file_path);
+    defer writer.deinit();
+
+    try self.level.save(writer);
+}
+
+fn pathToLevelFile(buf: []u8, depth: u8) ![]const u8 {
+    return try std.fmt.bufPrint(buf, "level_{d}.json", .{depth});
 }

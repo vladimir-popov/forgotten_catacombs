@@ -137,8 +137,8 @@ pub fn drawDungeon(self: Render, viewport: g.Viewport, level: *g.Level) anyerror
     var place = viewport.region.top_left;
     while (itr.next()) |cell| {
         const visibility = level.checkVisibility(place);
-        if (visibility == .visible and !level.map.isVisited(place))
-            try level.map.addVisitedPlace(place);
+        if (visibility == .visible and !level.isVisited(place))
+            try level.addVisitedPlace(place);
         const codepoint = switch (cell) {
             .nothing => cp.nothing,
             .floor => cp.floor_visible,

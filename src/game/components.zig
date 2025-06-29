@@ -21,6 +21,10 @@ const EntitiesSet = struct {
         self.underlying_map.deinit(self.alloc);
     }
 
+    pub fn clone(self: Self, alloc: std.mem.Allocator) !Self {
+        return .{ .alloc = alloc, .underlying_map = try self.underlying_map.clone(alloc) };
+    }
+
     pub fn size(self: Self) usize {
         return self.underlying_map.size;
     }
@@ -40,25 +44,22 @@ const EntitiesSet = struct {
     pub fn jsonStringify(self: *const Self, jws: anytype) !void {
         try jws.beginArray();
         var itr = self.underlying_map.keyIterator();
-        while (itr.next()) |item_id| {
-            try jws.write(item_id.id);
+        while (itr.next()) |entity| {
+            try jws.write(entity.id);
         }
         try jws.endArray();
     }
 
-    pub fn jsonParse(alloc: std.mem.Allocator, source: anytype, _: std.json.ParseOptions) !Self {
-        if (try source.next() != .array_begin) {
-            return error.UnexpectedToken;
-        }
+    pub fn jsonParse(alloc: std.mem.Allocator, source: anytype, opts: std.json.ParseOptions) !Self {
+        const value = try std.json.Value.jsonParse(alloc, source, opts);
+        defer value.array.deinit();
+        return try jsonParseFromValue(alloc, value, opts);
+    }
+
+    pub fn jsonParseFromValue(alloc: std.mem.Allocator, value: std.json.Value, _: std.json.ParseOptions) !Self {
         var result: Self = .{ .alloc = alloc, .underlying_map = .empty };
-        while (true) {
-            switch (try source.next()) {
-                inline .number => |slice| {
-                    try result.underlying_map.put(alloc, g.Entity.parse(slice).?, {});
-                },
-                .array_end => break,
-                else => return error.UnexpectedToken,
-            }
+        for (value.array.items) |v| {
+            try result.underlying_map.put(alloc, .{ .id = @intCast(v.integer) }, {});
         }
         return result;
     }
@@ -187,6 +188,10 @@ pub const Pile = struct {
     pub fn deinit(self: *Pile) void {
         self.items.deinit();
     }
+
+    pub fn clone(self: Pile, alloc: std.mem.Allocator) !Pile {
+        return .{ .items = try self.items.clone(alloc) };
+    }
 };
 
 pub const Inventory = struct {
@@ -200,6 +205,10 @@ pub const Inventory = struct {
 
     pub fn deinit(self: *Inventory) void {
         self.items.deinit();
+    }
+
+    pub fn clone(self: Inventory, alloc: std.mem.Allocator) !Inventory {
+        return .{ .items = try self.items.clone(alloc) };
     }
 };
 

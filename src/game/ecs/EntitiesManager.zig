@@ -5,6 +5,8 @@ const ArraySet = @import("ArraySet.zig").ArraySet;
 const ComponentsMap = @import("ComponentsMap.zig").ComponentsMap;
 const ComponentsIterator = @import("ComponentsIterator.zig").ComponentsIterator;
 
+const log = std.log.scoped(.ecs);
+
 /// The manager of the entities and components.
 pub fn EntitiesManager(comptime ComponentsStruct: type) type {
     return struct {
@@ -96,11 +98,36 @@ pub fn EntitiesManager(comptime ComponentsStruct: type) type {
                         entity,
                         if (std.meta.hasFn(@TypeOf(component), "clone"))
                             try component.clone(self.inner_state.alloc)
-                        else
-                            component,
+                        else if (shouldBeCloned(@TypeOf(component))) {
+                            const type_name = @typeName(@typeInfo(field.type).optional.child);
+                            log.err(
+                                "{s} must have method `fn clone(self: {s}, alloc: std.mem.Allocator) anyerror!{s}` to avoid issues with memory",
+                                .{ type_name, type_name, type_name },
+                            );
+                            return error.MethodCloneIsRequired;
+                        } else component,
                     );
                 }
             }
+        }
+
+        fn shouldBeCloned(comptime T: type) bool {
+            switch (@typeInfo(T)) {
+                .pointer, .@"opaque", .array => return true,
+                .optional => |op| return shouldBeCloned(op.child),
+                .@"struct" => |s| {
+                    inline for (s.fields) |field| {
+                        if (shouldBeCloned(field.type)) return true;
+                    }
+                },
+                .@"union" => |u| {
+                    inline for (u.fields) |field| {
+                        if (shouldBeCloned(field.type)) return true;
+                    }
+                },
+                else => {},
+            }
+            return false;
         }
 
         pub fn newEntity(self: Self) Entity {

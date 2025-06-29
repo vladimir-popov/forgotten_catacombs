@@ -15,6 +15,9 @@ const PlaydateRuntime = @This();
 // serialMessageCallback doesn't receive custom data
 var cheat: ?g.Cheat = null;
 
+// The path to the dir with save files
+const save_dir: [:0]const u8 = "save";
+
 playdate: *api.PlaydateAPI,
 alloc: std.mem.Allocator,
 bitmap_table: *api.LCDBitmapTable,
@@ -41,6 +44,8 @@ pub fn init(playdate: *api.PlaydateAPI) !PlaydateRuntime {
 
     playdate.system.setSerialMessageCallback(serialMessageCallback);
     playdate.system.setButtonCallback(LastButton.handleEvent, last_button, 1);
+    if (playdate.file.mkdir(save_dir.ptr) < 0)
+        std.debug.panic("Error on creating dir {s}", .{save_dir});
 
     return .{
         .playdate = playdate,
@@ -196,33 +201,44 @@ fn serialMessageCallback(data: [*c]const u8) callconv(.C) void {
 
 fn openFile(ptr: *anyopaque, file_path: []const u8, mode: g.Runtime.FileMode) anyerror!*anyopaque {
     const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
-    const file_options = switch (mode) {
+    const file_options: c_int = switch (mode) {
         .read => api.FILE_READ_DATA,
         .write => api.FILE_WRITE,
     };
-    return self.playdate.file.open(file_path, file_options) orelse {
-        std.debug.panic("{s}", .{self.playdate.file.geterr()});
+    var buf: [50]u8 = undefined;
+    const full_path = try std.fmt.bufPrint(&buf, "{s}/{s}", .{ save_dir, file_path });
+    buf[full_path.len] = 0;
+    return self.playdate.file.open(full_path.ptr, file_options) orelse {
+        std.debug.panic(
+            "Error on opening file {s} in mode {s}: {s}",
+            .{ full_path, @tagName(mode), self.playdate.file.geterr() },
+        );
     };
 }
 
 fn closeFile(ptr: *anyopaque, file: *anyopaque) void {
     const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
-    if (self.playdate.file.close(file) < 0)
-        std.debug.panic("{s}", .{self.playdate.file.geterr()});
+    const sdfile: ?*api.SDFile = @ptrCast(@alignCast(file));
+    if (self.playdate.file.flush(sdfile) < 0)
+        std.debug.panic("Error on flushing file {any}: {s}", .{ file, self.playdate.file.geterr() });
+    if (self.playdate.file.close(sdfile) < 0)
+        std.debug.panic("Error on closing file {any}: {s}", .{ file, self.playdate.file.geterr() });
 }
 
 fn readFile(ptr: *anyopaque, file: *anyopaque, buffer: []u8) anyerror!usize {
     const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
-    const result = self.playdate.file.read(file, buffer.ptr, buffer.len);
+    const sdfile: ?*api.SDFile = @ptrCast(@alignCast(file));
+    const result = self.playdate.file.read(sdfile, buffer.ptr, @intCast(buffer.len));
     if (result < 0)
-        std.debug.panic("{s}", .{self.playdate.file.geterr()});
+        std.debug.panic("Error on reading the file {any}: {s}", .{ file, self.playdate.file.geterr() });
     return @intCast(result);
 }
 
 fn writeFile(ptr: *anyopaque, file: *anyopaque, bytes: []const u8) anyerror!usize {
     const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
-    const result = self.playdate.file.write(file, bytes.ptr, bytes.len);
+    const sdfile: ?*api.SDFile = @ptrCast(@alignCast(file));
+    const result = self.playdate.file.write(sdfile, bytes.ptr, @intCast(bytes.len));
     if (result < 0)
-        std.debug.panic("{s}", .{self.playdate.file.geterr()});
+        std.debug.panic("Error on writing to the file {any}: {s}", .{ file, self.playdate.file.geterr() });
     return @intCast(result);
 }

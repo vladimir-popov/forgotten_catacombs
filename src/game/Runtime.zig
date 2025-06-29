@@ -113,14 +113,44 @@ pub const FileReader = struct {
     file: File,
 
     pub fn read(self: FileReader, buffer: []u8) Error!usize {
-        return self.runtime.readFile(self.file, buffer);
+        return try self.runtime.readFile(self.file, buffer);
     }
 
-    pub fn close(self: FileReader) void {
+    pub fn deinit(self: FileReader) void {
         self.runtime.closeFile(self.file);
     }
 };
 
 pub fn fileReader(self: Runtime, file_path: []const u8) !FileReader {
     return .{ .runtime = self, .file = try self.openFile(file_path, .read) };
+}
+
+pub const FileWriter = struct {
+    pub const Error = anyerror;
+    pub const Writer = std.io.Writer(FileWriter, Error, write);
+
+    runtime: Runtime,
+    file: File,
+
+    pub fn deinit(self: FileWriter) void {
+        self.runtime.closeFile(self.file);
+    }
+
+    pub fn write(self: FileWriter, bytes: []const u8) Error!usize {
+        return try self.runtime.writeFile(self.file, bytes);
+    }
+
+    pub fn writeAll(self: FileWriter, bytes: []const u8) Error!void {
+        const len = try self.write(bytes);
+        if (len < bytes.len)
+            return error.NoSpaceLeft;
+    }
+
+    pub fn writer(self: FileWriter) Writer {
+        return .{ .context = self };
+    }
+};
+
+pub fn fileWriter(self: Runtime, file_path: []const u8) !FileWriter {
+    return .{ .runtime = self, .file = try self.openFile(file_path, .write) };
 }

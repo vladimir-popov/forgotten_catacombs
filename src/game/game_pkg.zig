@@ -25,7 +25,6 @@ pub const ComponentsIterator = ecs.ComponentsIterator(components.Components);
 pub const Game = @import("Game.zig");
 pub const GameSession = @import("GameSession.zig");
 pub const Level = @import("Level.zig");
-pub const LevelMap = @import("LevelMap.zig");
 pub const MovePoints = @import("actions.zig").MovePoints;
 pub const Render = @import("Render.zig");
 pub const Runtime = @import("Runtime.zig");

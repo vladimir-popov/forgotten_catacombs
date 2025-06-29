@@ -80,7 +80,7 @@ pub fn showInRadiusOfSourceOfLight(level: *const g.Level, place: p.Point) g.Rend
 
 /// Checks known places, to mark invisible, but previously visited places as known.
 fn chechKnownPlaces(level: *const g.Level, place: p.Point) g.Render.Visibility {
-    if (level.map.isVisited(place)) {
+    if (level.isVisited(place)) {
         switch (level.player_placement) {
             // mark invisible everything inside the inner rooms
             .area => |area| if (area.isInsideInnerRoom(place)) {

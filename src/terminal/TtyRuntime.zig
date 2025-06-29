@@ -58,6 +58,8 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
         cheat: ?g.Cheat = null,
         // true means that program should be closed
         is_exit: bool = false,
+        // The path to the dir with save files
+        saves_dir: std.fs.Dir,
 
         pub fn init(
             alloc: std.mem.Allocator,
@@ -73,6 +75,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                 .termios = tty.Display.enterRawMode(),
                 .draw_border = draw_border,
                 .is_dev_mode = is_dev_mode,
+                .saves_dir = try std.fs.cwd().makeOpenPath("save", .{}),
             };
             try enableGameMode(is_dev_mode);
             should_render_in_center = render_in_center;
@@ -263,12 +266,11 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
 
         fn openFile(ptr: *anyopaque, file_path: []const u8, mode: g.Runtime.FileMode) anyerror!*anyopaque {
             const self: *Self = @ptrCast(@alignCast(ptr));
-            const file_mode = switch (mode) {
-                .read => std.fs.File.OpenMode.read_only,
-                .write => std.fs.File.OpenMode.write_only,
-            };
             const file = try self.alloc.create(std.fs.File);
-            file.* = try std.fs.cwd().openFile(file_path, .{ .mode = file_mode });
+            switch (mode) {
+                .read => file.* = try self.saves_dir.openFile(file_path, .{ .mode = std.fs.File.OpenMode.read_only }),
+                .write => file.* = try self.saves_dir.createFile(file_path, .{}),
+            }
             return file;
         }
 
