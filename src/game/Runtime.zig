@@ -108,6 +108,7 @@ pub inline fn writeFile(self: Runtime, file: File, bytes: []const u8) anyerror!u
 
 pub const FileReader = struct {
     pub const Error = anyerror;
+    pub const Reader = std.io.Reader(FileReader, Error, read);
 
     runtime: Runtime,
     file: File,
@@ -118,6 +119,10 @@ pub const FileReader = struct {
 
     pub fn deinit(self: FileReader) void {
         self.runtime.closeFile(self.file);
+    }
+
+    pub fn reader(self: FileReader) Reader {
+        return .{ .context = self };
     }
 };
 

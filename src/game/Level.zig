@@ -443,8 +443,7 @@ const JsonTag = enum {
 
 /// Reads json from the reader, deserializes and initializes the level.
 pub fn load(self: *Self, session: *g.GameSession, reader: g.Runtime.FileReader) !void {
-    var buffered = std.io.bufferedReader(reader);
-    var json = std.json.reader(session.arena.allocator(), buffered.reader());
+    var json = std.json.reader(session.arena.allocator(), reader.reader());
     defer json.deinit();
 
     assertEql(try json.next(), .object_begin);
@@ -481,29 +480,33 @@ pub fn load(self: *Self, session: *g.GameSession, reader: g.Runtime.FileReader) 
                 }
                 std.debug.assert(try json.next() == .object_end);
             },
-            .visited_places => {
-                assertEql(try json.next(), .array_begin);
-                for (0..self.visited_places.len) |i| {
-                    var value = try std.json.Value.jsonParse(alloc, &json, .{ .max_value_len = 1024 });
-                    defer value.array.deinit();
-                    for (value.array.items) |idx| {
-                        self.visited_places[i].set(@intCast(idx.integer));
-                    }
-                }
-                assertEql(try json.next(), .array_end);
+            // .visited_places => {
+            //     assertEql(try json.next(), .array_begin);
+            //     for (0..self.visited_places.len) |i| {
+            //         var value = try std.json.Value.jsonParse(alloc, &json, .{ .max_value_len = 1024 });
+            //         defer value.array.deinit();
+            //         for (value.array.items) |idx| {
+            //             self.visited_places[i].set(@intCast(idx.integer));
+            //         }
+            //     }
+            //     assertEql(try json.next(), .array_end);
+            // },
+            // .remembered_objects => {
+            //     assertEql(try json.next(), .array_begin);
+            //     while (try json.peekNextTokenType() != .array_end) {
+            //         var value = try std.json.Value.jsonParse(alloc, &json, .{ .max_value_len = 1024 });
+            //         defer value.object.deinit();
+            //         const entity = g.Entity{ .id = @intCast(value.object.get("entity").?.integer) };
+            //         const place = value.object.get("place").?;
+            //         try self.remembered_objects.put(alloc, try p.Point.jsonParseFromValue(alloc, place, .{}), entity);
+            //     }
+            //     assertEql(try json.next(), .array_end);
+            // },
+            // else => break :loop,
+            else => {
+                self.player_placement = self.dungeon.placementWith(self.playerPosition().place).?;
+                return;
             },
-            .remembered_objects => {
-                assertEql(try json.next(), .array_begin);
-                while (try json.peekNextTokenType() != .array_end) {
-                    var value = try std.json.Value.jsonParse(alloc, &json, .{ .max_value_len = 1024 });
-                    defer value.object.deinit();
-                    const entity = g.Entity{ .id = @intCast(value.object.get("entity").?.integer) };
-                    const place = value.object.get("place").?;
-                    try self.remembered_objects.put(alloc, try p.Point.jsonParseFromValue(alloc, place, .{}), entity);
-                }
-                assertEql(try json.next(), .array_end);
-            },
-            else => break :loop,
         }
         switch (try json.peekNextTokenType()) {
             .string => {

@@ -8,7 +8,7 @@ pub const std_options = std.Options{
     .log_level = .info,
     .logFn = writeLog,
     .log_scope_levels = &[_]std.log.ScopeLevel{
-        .{ .scope = .default, .level = .debug },
+        // .{ .scope = .default, .level = .debug },
         // .{ .scope = .playdate_runtime, .level = .debug },
         // .{ .scope = .last_button, .level = .debug },
         // .{ .scope = .runtime, .level = .debug },
@@ -16,14 +16,12 @@ pub const std_options = std.Options{
         // .{ .scope = .visibility, .level = .debug },
         // .{ .scope = .ai, .level = .debug },
         // .{ .scope = .game, .level = .debug },
-        // .{ .scope = .game_session, .level = .debug },
+        .{ .scope = .game_session, .level = .debug },
         // .{ .scope = .play_mode, .level = .debug },
         // .{ .scope = .explore_mode, .level = .debug },
         // .{ .scope = .looking_around_mode, .level = .debug },
-        // .{ .scope = .levels, .level = .debug },
         // .{ .scope = .level, .level = .debug },
         // .{ .scope = .cmd, .level = .debug },
-        // .{ .scope = .level_map, .level = .debug },
         // .{ .scope = .events, .level = .debug },
         // .{ .scope = .action_system, .level = .debug },
     },
@@ -37,7 +35,7 @@ fn writeLog(
 ) void {
     var buffer = [_]u8{0} ** 128;
     _ = std.fmt.bufPrint(&buffer, format, args) catch |err|
-        std.debug.panic("Error {any} on log {s}", .{ err, format });
+        std.debug.panic("Unhandled error {any} on log {s}", .{ err, format });
     playdate_log_to_console("%s (%s) %s", @tagName(lvl), @tagName(scope), (&buffer).ptr);
 }
 

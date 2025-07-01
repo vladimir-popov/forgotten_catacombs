@@ -52,7 +52,7 @@ player: g.Entity,
 /// The current level
 level: g.Level,
 /// The deepest achieved level
-max_depth: u8 = 0,
+max_depth: u8,
 /// The current mode of the game
 mode: Mode,
 
@@ -77,6 +77,7 @@ pub fn init(
         .events = g.events.EventBus.init(&self.arena),
         .level = undefined,
         .mode = .{ .play = undefined },
+        .max_depth = 0,
     };
     try self.level.generateFirstLevel(self);
     try self.equipPlayer();
@@ -335,16 +336,16 @@ fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
     log.debug(
         \\
         \\--------------------
-        \\Move {s} from the level {d} to {d}
-        \\By the {any}
+        \\Moving {s} from the level {d} to {d} (max depth is {d})
         \\--------------------
     ,
-        .{ @tagName(by_ladder.direction), self.level.depth, new_depth, by_ladder },
+        .{ @tagName(by_ladder.direction), self.level.depth, new_depth, self.max_depth },
     );
 
     try self.saveLevel();
     self.level.deinit();
     if (new_depth > self.max_depth) {
+        log.debug("Generate level {s} on depth {d}", .{ @tagName(by_ladder.direction), new_depth });
         try self.level.generate(new_depth, self, by_ladder);
     } else {
         try self.loadLevel(new_depth);
@@ -360,6 +361,7 @@ fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
         },
     };
     try self.events.sendEvent(event);
+    log.debug("Level {d} is ready.", .{new_depth});
 }
 
 fn loadLevel(self: *GameSession, depth: u8) !void {

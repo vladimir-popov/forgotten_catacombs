@@ -213,8 +213,8 @@ pub const Inventory = struct {
 };
 
 pub const Equipment = struct {
-    weapon: ?g.Entity,
-    light: ?g.Entity,
+    weapon: ?g.Entity = null,
+    light: ?g.Entity = null,
 
     pub const nothing: Equipment = .{ .weapon = null, .light = null };
 };
