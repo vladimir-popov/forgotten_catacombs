@@ -6,6 +6,10 @@ const p = g.primitives;
 
 const log = std.log.scoped(.events);
 
+pub const ChangingLevel = struct {
+    by_ladder: c.Ladder,
+};
+
 pub const EntityMoved = struct {
     entity: g.Entity,
     is_player: bool,
@@ -25,6 +29,7 @@ pub const PlayerHit = struct { target: g.Entity };
 pub const Event = union(enum) {
     const Tag = @typeInfo(Event).@"union".tag_type.?;
 
+    changing_level: ChangingLevel,
     entity_moved: EntityMoved,
     player_hit: PlayerHit,
 

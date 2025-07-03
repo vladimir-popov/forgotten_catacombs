@@ -1,6 +1,6 @@
 //! This is the main mode of the game in which player travels through the dungeons.
 const std = @import("std");
-const g = @import("game_pkg.zig");
+const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 const w = g.windows;
@@ -63,14 +63,14 @@ pub fn tick(self: *PlayMode) !void {
                 log.debug("Spent {d} move points", .{mp});
                 log.debug("Update quick actions after action {any}", .{action});
                 try self.updateQuickActions(self.target());
-                var itr = self.session.level.componentsIterator().of(c.Initiative);
+                var itr = self.session.entities.query(c.Initiative);
                 while (itr.next()) |initiative| {
                     initiative[1].move_points += mp;
                 }
             }
         }
     } else {
-        var itr = self.session.level.componentsIterator().of4(c.Position, c.Initiative, c.Speed, c.EnemyState);
+        var itr = self.session.entities.query4(c.Position, c.Initiative, c.Speed, c.EnemyState);
         while (itr.next()) |tuple| {
             const entity, const position, const initiative, const speed, const state = tuple;
             if (speed.move_points > initiative.move_points) continue;
@@ -172,7 +172,7 @@ fn drawInfoBar(self: *const PlayMode) !void {
 }
 
 fn target(self: PlayMode) ?g.Entity {
-    return if (self.target_idx > self.quick_actions.items.len - 1)
+    return if (self.quick_actions.items.len == 0 or self.target_idx > self.quick_actions.items.len - 1)
         null
     else if (self.quick_actions.items[self.target_idx].action == .wait)
         null
@@ -206,7 +206,7 @@ pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity) anyerror!vo
     const player_position = self.session.level.playerPosition();
     // Check the nearest entities:
     // TODO improve:
-    var itr = self.session.level.componentsIterator().of(c.Position);
+    var itr = self.session.entities.query(c.Position);
     while (itr.next()) |tuple| {
         const entity: g.Entity, const position: *c.Position = tuple;
         if (position.place.near(player_position.place)) {

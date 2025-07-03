@@ -1,4 +1,5 @@
 const std = @import("std");
+
 const Type = std.builtin.Type;
 
 pub fn Preset(comptime S: type) type {

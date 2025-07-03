@@ -18,7 +18,7 @@ const g = @import("../game_pkg.zig");
 const p = g.primitives;
 const d = @import("dungeon_pkg.zig");
 
-const FirstLocation = @This();
+const Self = @This();
 
 const pad = 10;
 
@@ -43,38 +43,41 @@ pub const scientist_place = scientist_tent.center();
 const teleport_tent: p.Region = p.Region{ .top_left = .{ .row = 3, .col = pad + 33 }, .rows = 3, .cols = 5 };
 pub const teleport_place = teleport_tent.center();
 
+alloc: std.mem.Allocator,
 // the area should include wharf and few lines of water to make them visible
 area: d.Area,
 /// Index of all doorways by their place
 doorways: std.AutoHashMapUnmanaged(p.Point, d.Doorway),
 
+/// Uses arena to create a self instance and trying to generate a dungeon with passed seed.
 pub fn generateDungeon(arena: *std.heap.ArenaAllocator) !d.Dungeon {
     const alloc = arena.allocator();
-    const first_location = try alloc.create(FirstLocation);
-    first_location.* = .{
-        .area = d.Area.init(arena, dungeon_region),
+    const self = try alloc.create(Self);
+    self.* = init(alloc);
+    return try self.dungeon();
+}
+
+pub fn init(alloc: std.mem.Allocator) Self {
+    return .{
+        .alloc = alloc,
+        .area = d.Area.init(dungeon_region),
         .doorways = .empty,
     };
-
-    try first_location.createRoom(alloc, ladder_room, ladder.movedTo(.down));
-    try first_location.createRoom(alloc, traider_tent, traider_tent.bottomRight().movedTo(.up));
-    try first_location.createRoom(alloc, scientist_tent, scientist_tent.bottomRight().movedTo(.up));
-    try first_location.createRoom(alloc, teleport_tent, teleport_tent.top_left.movedTo(.down));
-    // the pointer to the first_location will be removed on arena.deinit
-    return first_location.dungeon();
 }
 
-fn createRoom(self: *FirstLocation, alloc: std.mem.Allocator, region: p.Region, door: p.Point) !void {
-    const doorway = d.Doorway{
-        .placement_from = .{ .area = &self.area },
-        .placement_to = .{ .room = try self.area.addRoom(region, door) },
-    };
-    try self.doorways.put(alloc, door, doorway);
+pub fn deinit(self: *Self) void {
+    self.area.deinit(self.alloc);
+    self.doorways.deinit(self.alloc);
 }
 
-fn dungeon(self: *FirstLocation) d.Dungeon {
+pub fn dungeon(self: *Self) !d.Dungeon {
+    try self.createRoom(ladder_room, ladder.movedTo(.down));
+    try self.createRoom(traider_tent, traider_tent.bottomRight().movedTo(.up));
+    try self.createRoom(scientist_tent, scientist_tent.bottomRight().movedTo(.up));
+    try self.createRoom(teleport_tent, teleport_tent.top_left.movedTo(.down));
     return .{
         .seed = 0,
+        .type = .first_location,
         .parent = self,
         .rows = self.area.region.rows + 2,
         .cols = self.area.region.cols,
@@ -89,8 +92,16 @@ fn dungeon(self: *FirstLocation) d.Dungeon {
     };
 }
 
+fn createRoom(self: *Self, region: p.Region, door: p.Point) !void {
+    const doorway = d.Doorway{
+        .placement_from = .{ .area = &self.area },
+        .placement_to = .{ .room = try self.area.addRoom(self.alloc, region, door) },
+    };
+    try self.doorways.put(self.alloc, door, doorway);
+}
+
 fn cellAt(ptr: *const anyopaque, place: p.Point) d.Dungeon.Cell {
-    const self: *const FirstLocation = @ptrCast(@alignCast(ptr));
+    const self: *const Self = @ptrCast(@alignCast(ptr));
 
     if (place.row <= self.area.region.top_left.row) {
         return .rock;
@@ -113,7 +124,9 @@ fn cellAt(ptr: *const anyopaque, place: p.Point) d.Dungeon.Cell {
         return .water;
     }
 
-    for (self.area.inner_rooms.items, 0..) |room, i| {
+    var i: usize = 0;
+    var itr = self.area.inner_rooms.constIterator(0);
+    while (itr.next()) |room| : (i += 1) {
         if (room.region.containsPoint(place)) {
             // the room with ladder down should be part of the cave
             if (i == 0) {
@@ -175,9 +188,10 @@ inline fn replaceWallsByTheRock(cell: d.Dungeon.Cell) d.Dungeon.Cell {
 }
 
 fn placementWith(ptr: *anyopaque, place: p.Point) ?d.Placement {
-    const self: *FirstLocation = @ptrCast(@alignCast(ptr));
+    const self: *Self = @ptrCast(@alignCast(ptr));
 
-    for (self.area.inner_rooms.items) |room| {
+    var itr = self.area.inner_rooms.iterator(0);
+    while (itr.next()) |room| {
         if (room.region.containsPoint(place)) {
             return .{ .room = room };
         }

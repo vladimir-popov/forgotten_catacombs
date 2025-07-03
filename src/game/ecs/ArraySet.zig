@@ -15,16 +15,16 @@ pub fn ArraySet(comptime C: anytype) type {
 
         alloc: std.mem.Allocator,
         components: std.ArrayListUnmanaged(C),
-        entity_index: std.AutoHashMapUnmanaged(Entity, u8),
-        index_entity: std.AutoHashMapUnmanaged(u8, Entity),
+        entity_index: std.AutoHashMapUnmanaged(Entity, usize),
+        index_entity: std.AutoHashMapUnmanaged(usize, Entity),
 
         /// Creates instances of the inner storages.
         pub fn init(alloc: std.mem.Allocator) Self {
             return .{
                 .alloc = alloc,
-                .components = std.ArrayListUnmanaged(C){},
-                .entity_index = std.AutoHashMapUnmanaged(Entity, u8){},
-                .index_entity = std.AutoHashMapUnmanaged(u8, Entity){},
+                .components = .empty,
+                .entity_index = .empty,
+                .index_entity = .empty,
             };
         }
 
@@ -50,6 +50,25 @@ pub fn ArraySet(comptime C: anytype) type {
             self.index_entity.clearAndFree(self.alloc);
         }
 
+        pub const Iterator = struct {
+            parent: *const Self,
+            idx: usize = 0,
+
+            pub fn next(self: *Iterator) ?struct { Entity, *C } {
+                if (self.idx < self.parent.components.items.len) {
+                    if (self.parent.index_entity.get(self.idx)) |entity| {
+                        self.idx += 1;
+                        return .{ entity, &self.parent.components.items[self.idx - 1] };
+                    }
+                }
+                return null;
+            }
+        };
+
+        pub fn iterator(self: *const Self) Iterator {
+            return .{ .parent = self };
+        }
+
         /// Returns the pointer to the component for the entity if it was added before, or null.
         pub fn getForEntity(self: Self, entity: Entity) ?*C {
             if (self.entity_index.get(entity)) |idx| {
@@ -65,8 +84,8 @@ pub fn ArraySet(comptime C: anytype) type {
                 self.deinitComponent(idx);
                 self.components.items[idx] = component;
             } else {
-                try self.entity_index.put(self.alloc, entity, @intCast(self.components.items.len));
-                try self.index_entity.put(self.alloc, @intCast(self.components.items.len), entity);
+                try self.entity_index.put(self.alloc, entity, self.components.items.len);
+                try self.index_entity.put(self.alloc, self.components.items.len, entity);
                 try self.components.append(self.alloc, component);
             }
         }

@@ -1,13 +1,12 @@
 const std = @import("std");
 const g = @import("game_pkg.zig");
-const Preset = @import("Preset.zig").Preset;
 
 pub const Description = struct {
     name: []const u8,
     description: []const []const u8 = &.{},
 };
 
-pub const Presets = Preset(@This());
+pub const Presets = g.utils.Preset(@This());
 
 unknown_key: Description = .{ .name = "Unknown" },
 closed_door: Description = .{ .name = "Closed door" },

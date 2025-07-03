@@ -7,10 +7,11 @@ const c = g.components;
 const p = g.primitives;
 const ecs = g.ecs;
 
-const PlayMode = @import("PlayMode.zig");
-const InventoryMode = @import("InventoryMode.zig");
-const ExploreMode = @import("ExploreMode.zig");
-const ExploreLevelMode = @import("ExploreLevelMode.zig");
+const PlayMode = @import("game_modes/PlayMode.zig");
+const InventoryMode = @import("game_modes/InventoryMode.zig");
+const ExploreMode = @import("game_modes/ExploreMode.zig");
+const ExploreLevelMode = @import("game_modes/ExploreLevelMode.zig");
+const LoadLevelMode = @import("game_modes/LoadLevelMode.zig");
 
 const log = std.log.scoped(.game_session);
 
@@ -21,6 +22,7 @@ pub const Mode = union(enum) {
     inventory: InventoryMode,
     explore: ExploreMode,
     explore_level: ExploreLevelMode,
+    load_level: LoadLevelMode,
 
     inline fn deinit(self: *Mode) void {
         switch (self.*) {
@@ -28,6 +30,7 @@ pub const Mode = union(enum) {
             .inventory => self.inventory.deinit(),
             .explore => self.explore.deinit(),
             .explore_level => {},
+            .load_level => self.load_level.deinit(),
         }
     }
 };
@@ -79,7 +82,7 @@ pub fn init(
         .mode = .{ .play = undefined },
         .max_depth = 0,
     };
-    try self.level.generateFirstLevel(self);
+    try self.level.firstLevel(self);
     try self.equipPlayer();
     self.viewport.centeredAround(self.level.playerPosition().place);
     self.viewport.region.top_left.moveNTimes(.up, 3);
@@ -133,6 +136,25 @@ pub fn lookAround(self: *GameSession) !void {
     try self.mode.explore.init(self.arena.allocator(), self);
 }
 
+fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
+    try self.events.sendEvent(.{ .changing_level = .{ .by_ladder = by_ladder } });
+}
+
+pub fn playerMovedToLevel(self: *GameSession) !void {
+    try self.play(null);
+    try self.mode.play.updateQuickActions(null);
+    self.viewport.centeredAround(self.level.playerPosition().place);
+    const event = g.events.Event{
+        .entity_moved = .{
+            .entity = self.player,
+            .is_player = true,
+            .moved_from = g.primitives.Point.init(0, 0),
+            .target = .{ .new_place = self.level.playerPosition().place },
+        },
+    };
+    try self.events.sendEvent(event);
+}
+
 pub fn getWeapon(self: *const GameSession, actor: g.Entity) ?*c.Weapon {
     if (self.entities.get(actor, c.Weapon)) |weapon| return weapon;
 
@@ -159,6 +181,7 @@ pub inline fn tick(self: *GameSession) !void {
         .inventory => try self.mode.inventory.tick(),
         .explore => try self.mode.explore.tick(),
         .explore_level => try self.mode.explore_level.tick(),
+        .load_level => try self.mode.load_level.tick(),
     }
     try self.events.notifySubscribers();
 }
@@ -170,6 +193,10 @@ pub fn subscriber(self: *GameSession) g.events.Subscriber {
 fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
     const self: *GameSession = @ptrCast(@alignCast(ptr));
     switch (event) {
+        .changing_level => |lvl| {
+            self.mode.deinit();
+            self.mode = .{ .load_level = try LoadLevelMode.loadOrGenerateLevel(self, lvl.by_ladder) };
+        },
         .player_hit => {
             log.debug("Update target after player hit", .{});
             try self.mode.play.updateQuickActions(event.player_hit.target);
@@ -208,12 +235,6 @@ pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_spe
             } else {
                 try inventory.items.add(item);
                 try self.entities.remove(item, c.Position);
-                for (self.level.entities.items, 0..) |entity, idx| {
-                    if (entity.eql(item)) {
-                        _ = self.level.entities.swapRemove(idx);
-                        break;
-                    }
-                }
             }
         },
         .move_to_level => |ladder| {
@@ -319,71 +340,11 @@ fn doHit(
     if (enemy_health.current <= 0) {
         const is_player = enemy.eql(self.player);
         log.debug("The {s} {d} died", .{ if (is_player) "player" else "enemy", enemy.id });
-        try self.level.removeEntity(enemy);
+        try self.entities.removeEntity(enemy);
         if (is_player) {
             log.info("Player is dead. Game over.", .{});
             return error.GameOver;
         }
     }
     return actor_speed;
-}
-
-fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
-    const new_depth: u8 = switch (by_ladder.direction) {
-        .up => self.level.depth - 1,
-        .down => self.level.depth + 1,
-    };
-    log.debug(
-        \\
-        \\--------------------
-        \\Moving {s} from the level {d} to {d} (max depth is {d})
-        \\--------------------
-    ,
-        .{ @tagName(by_ladder.direction), self.level.depth, new_depth, self.max_depth },
-    );
-
-    try self.saveLevel();
-    self.level.deinit();
-    if (new_depth > self.max_depth) {
-        log.debug("Generate level {s} on depth {d}", .{ @tagName(by_ladder.direction), new_depth });
-        try self.level.generate(new_depth, self, by_ladder);
-    } else {
-        try self.loadLevel(new_depth);
-    }
-    try self.mode.play.updateQuickActions(null);
-    self.viewport.centeredAround(self.level.playerPosition().place);
-    const event = g.events.Event{
-        .entity_moved = .{
-            .entity = self.player,
-            .is_player = true,
-            .moved_from = p.Point.init(0, 0),
-            .target = .{ .new_place = self.level.playerPosition().place },
-        },
-    };
-    try self.events.sendEvent(event);
-    log.debug("Level {d} is ready.", .{new_depth});
-}
-
-fn loadLevel(self: *GameSession, depth: u8) !void {
-    var buf: [50]u8 = undefined;
-    const file_path = try pathToLevelFile(&buf, depth);
-    log.debug("Load level on depth {d} from {s}", .{ depth, file_path });
-    const reader = try self.runtime.fileReader(file_path);
-    defer reader.deinit();
-
-    try self.level.load(self, reader);
-}
-
-fn saveLevel(self: *GameSession) !void {
-    var buf: [50]u8 = undefined;
-    const file_path = try pathToLevelFile(&buf, self.level.depth);
-    log.debug("Save level on depth {d} to {s}", .{ self.level.depth, file_path });
-    const writer = try self.runtime.fileWriter(file_path);
-    defer writer.deinit();
-
-    try self.level.save(writer);
-}
-
-fn pathToLevelFile(buf: []u8, depth: u8) ![]const u8 {
-    return try std.fmt.bufPrint(buf, "level_{d}.json", .{depth});
 }

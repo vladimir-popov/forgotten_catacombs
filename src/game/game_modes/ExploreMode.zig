@@ -1,7 +1,7 @@
 //! This is the mode in which the player is able to look around,
 //! get the info about entities on the screen, and change the target entity.
 const std = @import("std");
-const g = @import("game_pkg.zig");
+const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 const w = g.windows;
@@ -115,7 +115,7 @@ fn updateEntitiesOnScreen(self: *ExploreMode) !void {
     const alloc = self.arena.allocator();
     self.entities_on_screen.clearRetainingCapacity();
     const level = &self.session.level;
-    var itr = level.componentsIterator().of2(c.Position, c.ZOrder);
+    var itr = level.session.entities.query2(c.Position, c.ZOrder);
     while (itr.next()) |tuple| {
         const entity = tuple[0];
         const place = tuple[1].place;

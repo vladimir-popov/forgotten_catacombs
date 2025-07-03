@@ -38,6 +38,7 @@ pub const Doorway = struct {
 };
 
 /// The tagged union of the pointers to the possible placement implementations.
+/// This is can be circled graph where rooms are bind together by passages.
 pub const Placement = union(enum) {
     pub const DoorwaysIterator = std.AutoHashMap(p.Point, void).KeyIterator;
 
@@ -46,30 +47,20 @@ pub const Placement = union(enum) {
     room: *Room,
 
     pub fn createArea(arena: *std.heap.ArenaAllocator, region: p.Region) !*Area {
-        const alloc = arena.allocator();
-        const area = try alloc.create(Area);
-        area.* = Area.init(alloc, region);
+        const area = try arena.allocator().create(Area);
+        area.* = Area.init(region);
         return area;
     }
 
     pub fn createRoom(arena: *std.heap.ArenaAllocator, region: p.Region) !*Room {
-        const alloc = arena.allocator();
-        const room = try alloc.create(Room);
-        room.* = .{
-            .arena = arena,
-            .region = region,
-            .doorways = std.AutoHashMapUnmanaged(p.Point, void){},
-        };
+        const room = try arena.allocator().create(Room);
+        room.* = Room.init(region);
         return room;
     }
 
     pub fn createPassage(arena: *std.heap.ArenaAllocator) !*Passage {
         const passage = try arena.allocator().create(Passage);
-        passage.* = .{
-            .arena = arena,
-            .turns = std.ArrayListUnmanaged(Passage.Turn){},
-            .doorways = std.AutoHashMapUnmanaged(p.Point, void){},
-        };
+        passage.* = .{ .turns = .empty, .doorways = .empty };
         return passage;
     }
 
@@ -100,11 +91,11 @@ pub const Placement = union(enum) {
         };
     }
 
-    pub fn addDoor(self: Placement, place: p.Point) !void {
+    pub fn addDoor(self: Placement, arena: *std.heap.ArenaAllocator, place: p.Point) !void {
         switch (self) {
-            .area => try self.area.addDoorway(place),
-            .room => try self.room.addDoorway(place),
-            .passage => try self.passage.addDoorway(place),
+            .area => try self.area.addDoorway(arena.allocator(), place),
+            .room => try self.room.addDoorway(arena.allocator(), place),
+            .passage => try self.passage.addDoorway(arena.allocator(), place),
         }
     }
 
@@ -120,19 +111,18 @@ pub const Placement = union(enum) {
 /// The square placement including the border. Can contain the inner rooms,
 /// which should not cross each other or the border of this area.
 pub const Area = struct {
-    arena: *std.heap.ArenaAllocator,
     /// The region of this area including the borders
     region: p.Region,
     doorways: std.AutoHashMapUnmanaged(p.Point, void),
-    inner_rooms: std.ArrayListUnmanaged(*Room),
+    inner_rooms: std.SegmentedList(Room, 8),
 
-    pub fn init(arena: *std.heap.ArenaAllocator, region: p.Region) Area {
-        return .{
-            .arena = arena,
-            .region = region,
-            .doorways = std.AutoHashMapUnmanaged(p.Point, void){},
-            .inner_rooms = std.ArrayListUnmanaged(*Room){},
-        };
+    pub fn init(region: p.Region) Area {
+        return .{ .region = region, .doorways = .empty, .inner_rooms = std.SegmentedList(Room, 8){} };
+    }
+
+    pub fn deinit(self: *Area, alloc: std.mem.Allocator) void {
+        self.doorways.deinit(alloc);
+        self.inner_rooms.deinit(alloc);
     }
 
     pub fn format(
@@ -142,20 +132,23 @@ pub const Area = struct {
         writer: anytype,
     ) !void {
         try writer.print("Area({any}; inner rooms: [", .{self.region});
-        for (self.inner_rooms.items) |ir|
+        var itr = self.inner_rooms.constIterator(0);
+        while (itr.next()) |ir| {
             try writer.print("{any};", .{ir});
+        }
         try writer.print("])", .{});
     }
 
-    pub fn addDoorway(self: *Area, place: p.Point) !void {
-        try self.doorways.put(self.arena.allocator(), place, {});
+    pub fn addDoorway(self: *Area, alloc: std.mem.Allocator, place: p.Point) !void {
+        try self.doorways.put(alloc, place, {});
     }
 
     /// Returns true if the place is inside the area or on its border, but not
     /// inside the inner rooms.
     pub fn contains(self: Area, place: p.Point) bool {
         if (!self.region.containsPoint(place)) return false;
-        for (self.inner_rooms.items) |ir| {
+        var itr = self.inner_rooms.constIterator(0);
+        while (itr.next()) |ir| {
             if (ir.region.containsPointInside(place)) return false;
         }
         return true;
@@ -163,7 +156,8 @@ pub const Area = struct {
 
     /// Returns true if the place is inside one of the inner room of the area.
     pub fn isInsideInnerRoom(self: Area, place: p.Point) bool {
-        for (self.inner_rooms.items) |ir| {
+        var itr = self.inner_rooms.constIterator(0);
+        while (itr.next()) |ir| {
             if (ir.innerRegion().containsPoint(place)) return true;
         }
         return false;
@@ -177,39 +171,38 @@ pub const Area = struct {
         };
     }
 
-    pub fn addRoom(self: *Area, region: p.Region, door: p.Point) !*Room {
-        const alloc = self.arena.allocator();
-        const room = try alloc.create(Room);
-        room.* = Room.initAsInner(self.arena, region, self);
-        try room.addDoorway(door);
-        try self.inner_rooms.append(alloc, room);
-        try self.addDoorway(door);
+    pub fn addRoom(self: *Area, alloc: std.mem.Allocator, region: p.Region, door: p.Point) !*Room {
+        const room = try self.inner_rooms.addOne(alloc);
+        room.* = Room.initAsInner(region, self);
+        try room.addDoorway(alloc, door);
+        try self.addDoorway(alloc, door);
         return room;
     }
 };
 
 pub const Room = struct {
-    arena: *std.heap.ArenaAllocator,
     /// The region of the room including the borders
     region: p.Region,
     doorways: std.AutoHashMapUnmanaged(p.Point, void),
     host_area: ?*const Area = null,
 
-    pub fn init(arena: *std.heap.ArenaAllocator, region: p.Region) Room {
+    pub fn init(region: p.Region) Room {
         return .{
-            .arena = arena,
             .region = region,
             .doorways = std.AutoHashMapUnmanaged(p.Point, void){},
         };
     }
 
-    pub fn initAsInner(arena: *std.heap.ArenaAllocator, region: p.Region, host: *const Area) Room {
+    pub fn initAsInner(region: p.Region, host: *const Area) Room {
         return .{
-            .arena = arena,
             .region = region,
             .doorways = std.AutoHashMapUnmanaged(p.Point, void){},
             .host_area = host,
         };
+    }
+
+    pub fn deinit(self: *Room, alloc: std.mem.Allocator) void {
+        self.doorways.deinit(alloc);
     }
 
     pub fn format(
@@ -225,8 +218,8 @@ pub const Room = struct {
         try writer.print("])", .{});
     }
 
-    pub fn addDoorway(self: *Room, place: p.Point) !void {
-        try self.doorways.put(self.arena.allocator(), place, {});
+    pub fn addDoorway(self: *Room, alloc: std.mem.Allocator, place: p.Point) !void {
+        try self.doorways.put(alloc, place, {});
     }
 
     /// Returns the region inside the room (exclude borders).
@@ -264,7 +257,6 @@ pub const Passage = struct {
         }
     };
 
-    arena: *std.heap.ArenaAllocator,
     // the last turn - is a place where the passage is ended, the turn direction is not important there.
     turns: std.ArrayListUnmanaged(Turn),
     doorways: std.AutoHashMapUnmanaged(p.Point, void),
@@ -285,8 +277,8 @@ pub const Passage = struct {
         try writer.print(")", .{});
     }
 
-    pub fn addDoorway(self: *Passage, place: p.Point) !void {
-        try self.doorways.put(self.arena.allocator(), place, {});
+    pub fn addDoorway(self: *Passage, alloc: std.mem.Allocator, place: p.Point) !void {
+        try self.doorways.put(alloc, place, {});
     }
 
     /// Returns true if the passed place is inside this passage, or on the wall of
@@ -325,17 +317,17 @@ pub const Passage = struct {
         return @min(x, y) <= value and value <= @max(x, y);
     }
 
-    pub fn turnAt(self: *Passage, place: p.Point, direction: p.Direction) !Turn {
+    pub fn turnAt(self: *Passage, alloc: std.mem.Allocator, place: p.Point, direction: p.Direction) !Turn {
         const turn: Turn = .{ .place = place, .to_direction = direction };
-        try self.turns.append(self.arena.allocator(), turn);
+        try self.turns.append(alloc, turn);
         return turn;
     }
 
-    pub fn turnToPoint(self: *Passage, at: p.Point, to: p.Point) !Turn {
+    pub fn turnToPoint(self: *Passage, alloc: std.mem.Allocator, at: p.Point, to: p.Point) !Turn {
         const direction: p.Direction = if (at.row == to.row)
             if (at.col < to.col) .right else .left
         else if (at.row < to.row) .down else .up;
-        return try self.turnAt(at, direction);
+        return try self.turnAt(alloc, at, direction);
     }
 
     pub fn randomPlace(passage: Passage, rand: std.Random) p.Point {
@@ -396,9 +388,9 @@ test "places iterator" {
     defer arena.deinit();
     const passage = try Placement.createPassage(&arena);
 
-    _ = try passage.turnAt(.{ .row = 1, .col = 1 }, .right);
-    _ = try passage.turnAt(.{ .row = 1, .col = 3 }, .down);
-    _ = try passage.turnAt(.{ .row = 3, .col = 3 }, .down);
+    _ = try passage.turnAt(arena.allocator(), .{ .row = 1, .col = 1 }, .right);
+    _ = try passage.turnAt(arena.allocator(), .{ .row = 1, .col = 3 }, .down);
+    _ = try passage.turnAt(arena.allocator(), .{ .row = 3, .col = 3 }, .down);
 
     const expected_places: [5]p.Point = .{
         .{ .row = 1, .col = 1 },
@@ -407,13 +399,13 @@ test "places iterator" {
         .{ .row = 2, .col = 3 },
         .{ .row = 3, .col = 3 },
     };
-    var actual_places = std.ArrayList(p.Point).init(std.testing.allocator);
-    defer actual_places.deinit();
+    var actual_places: std.ArrayListUnmanaged(p.Point) = .empty;
+    defer actual_places.deinit(std.testing.allocator);
 
     // when:
     var itr = passage.places();
     while (itr.next()) |place| {
-        try actual_places.append(place);
+        try actual_places.append(std.testing.allocator, place);
     }
 
     // then:

@@ -1,6 +1,6 @@
 //! This is a limited area with precalculated directions lead to the player.
 const std = @import("std");
-const g = @import("game_pkg.zig");
+const g = @import("../game_pkg.zig");
 const p = g.primitives;
 
 const DijkstraMap = @This();

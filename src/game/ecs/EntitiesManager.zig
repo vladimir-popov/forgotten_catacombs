@@ -3,7 +3,6 @@ const Type = std.builtin.Type;
 const Entity = @import("Entity.zig");
 const ArraySet = @import("ArraySet.zig").ArraySet;
 const ComponentsMap = @import("ComponentsMap.zig").ComponentsMap;
-const ComponentsIterator = @import("ComponentsIterator.zig").ComponentsIterator;
 
 const log = std.log.scoped(.ecs);
 
@@ -151,11 +150,6 @@ pub fn EntitiesManager(comptime ComponentsStruct: type) type {
             return entity;
         }
 
-        /// Aggregates requests of few components for the same entities at once
-        pub fn iterator(self: Self, entities: []const Entity) ComponentsIterator(ComponentsStruct) {
-            return .{ .entities = entities, .manager = self };
-        }
-
         /// Returns the pointer to the component for the entity, if it was added before, or null.
         pub fn get(self: Self, entity: Entity, comptime C: type) ?*C {
             return @field(self.inner_state.components_map, @typeName(C)).getForEntity(entity);
@@ -213,6 +207,82 @@ pub fn EntitiesManager(comptime ComponentsStruct: type) type {
 
         pub fn getAll(self: Self, comptime C: type) []C {
             return @field(self.inner_state.components_map, @typeName(C)).components.items;
+        }
+
+        pub fn query(self: Self, comptime C: type) ArraySet(C).Iterator {
+            return @field(self.inner_state.components_map, @typeName(C)).iterator();
+        }
+
+        pub fn Iterator2(comptime C1: type, C2: type) type {
+            return struct {
+                manager: Self,
+                main_iterator: ArraySet(C1).Iterator,
+
+                pub fn next(self: *@This()) ?struct { Entity, *C1, *C2 } {
+                    while (self.main_iterator.next()) |tuple| {
+                        const entity: Entity = tuple[0];
+                        const c1: *C1 = tuple[1];
+                        if (self.manager.get(entity, C2)) |c2|
+                            return .{ entity, c1, c2 };
+                    }
+                    return null;
+                }
+            };
+        }
+
+        pub fn query2(self: Self, comptime C1: type, C2: type) Iterator2(C1, C2) {
+            return .{
+                .manager = self,
+                .main_iterator = @field(self.inner_state.components_map, @typeName(C1)).iterator(),
+            };
+        }
+
+        pub fn Iterator3(comptime C1: type, C2: type, C3: type) type {
+            return struct {
+                manager: Self,
+                main_iterator: ArraySet(C1).Iterator,
+
+                pub fn next(self: *@This()) ?struct { Entity, *C1, *C2, *C3 } {
+                    while (self.main_iterator.next()) |tuple| {
+                        const entity: Entity = tuple[0];
+                        const c1: *C1 = tuple[1];
+                        if (self.manager.get2(entity, C2, C3)) |cc|
+                            return .{ entity, c1, cc[0], cc[1] };
+                    }
+                    return null;
+                }
+            };
+        }
+
+        pub fn query3(self: Self, comptime C1: type, C2: type, C3: type) Iterator3(C1, C2, C3) {
+            return .{
+                .manager = self,
+                .main_iterator = @field(self.inner_state.components_map, @typeName(C1)).iterator(),
+            };
+        }
+
+        pub fn Iterator4(comptime C1: type, C2: type, C3: type, C4: type) type {
+            return struct {
+                manager: Self,
+                main_iterator: ArraySet(C1).Iterator,
+
+                pub fn next(self: *@This()) ?struct { Entity, *C1, *C2, *C3, *C4 } {
+                    while (self.main_iterator.next()) |tuple| {
+                        const entity: Entity = tuple[0];
+                        const c1: *C1 = tuple[1];
+                        if (self.manager.get3(entity, C2, C3, C4)) |cc|
+                            return .{ entity, c1, cc[0], cc[1], cc[2] };
+                    }
+                    return null;
+                }
+            };
+        }
+
+        pub fn query4(self: Self, comptime C1: type, C2: type, C3: type, C4: type) Iterator4(C1, C2, C3, C4) {
+            return .{
+                .manager = self,
+                .main_iterator = @field(self.inner_state.components_map, @typeName(C1)).iterator(),
+            };
         }
 
         /// Removes the component of the type `C` from the entity if it was added before, or does nothing.

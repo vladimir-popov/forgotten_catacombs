@@ -1,6 +1,6 @@
 //! This is a mode in which the player are able to explore the whole dungeon.
 const std = @import("std");
-const g = @import("game_pkg.zig");
+const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 

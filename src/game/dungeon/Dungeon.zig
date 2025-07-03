@@ -6,6 +6,12 @@ const d = @import("dungeon_pkg.zig");
 
 const log = std.log.scoped(.dungeon);
 
+pub const Type = enum {
+    first_location,
+    cave,
+    catacomb,
+};
+
 /// Possible types of objects inside the dungeon.
 /// This is not part of ecs, but the part of the landscape.
 pub const Cell = enum(u6) {
@@ -39,16 +45,17 @@ const Dungeon = @This();
 
 pub const VTable = struct {
     /// Should return the cell of the dungeon on the passed place
-    cellAtFn: *const fn (ptr: *const anyopaque, place: p.Point) Cell,
+    cellAtFn: *const fn (parent: *const anyopaque, place: p.Point) Cell,
     /// Should return the placement that contains the passed place, or nothing,
     /// if the place is outside of all placements.
-    placementWithFn: *const fn (ptr: *anyopaque, place: p.Point) ?d.Placement,
+    placementWithFn: *const fn (parent: *anyopaque, place: p.Point) ?d.Placement,
     /// Should return random place to put an enemy.
-    randomPlaceFn: *const fn (ptr: *const anyopaque, rand: std.Random) p.Point,
+    randomPlaceFn: *const fn (parent: *const anyopaque, rand: std.Random) p.Point,
 };
 
 /// The seed that was used to generate this dungeon
 seed: u64,
+type: Type,
 /// The pointer to the original implementation of the dungeon.
 parent: *anyopaque,
 rows: u8,

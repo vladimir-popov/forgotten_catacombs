@@ -2,6 +2,7 @@ const std = @import("std");
 const g = @import("../game_pkg.zig");
 const d = g.dungeon;
 const p = g.primitives;
+const u = g.utils;
 
 const log = std.log.scoped(.cellural_automata);
 
@@ -26,13 +27,13 @@ pub fn generate(
     comptime cols: u8,
     arena: *std.heap.ArenaAllocator,
     rand: std.Random,
-) !*p.BitMap(rows, cols) {
-    var generations = [_]*p.BitMap(rows, cols){
-        try arena.allocator().create(p.BitMap(rows, cols)),
-        try arena.allocator().create(p.BitMap(rows, cols)),
+) !*u.BitMap(rows, cols) {
+    var generations = [_]*u.BitMap(rows, cols){
+        try arena.allocator().create(u.BitMap(rows, cols)),
+        try arena.allocator().create(u.BitMap(rows, cols)),
     };
-    generations[0].* = try p.BitMap(rows, cols).initEmpty(arena.allocator());
-    generations[1].* = try p.BitMap(rows, cols).initFull(arena.allocator());
+    generations[0].* = try u.BitMap(rows, cols).initEmpty(arena.allocator());
+    generations[1].* = try u.BitMap(rows, cols).initFull(arena.allocator());
     var i: u1 = 0;
     // Generate noise and border for the first generation
     for (0..rows) |r0| {
@@ -87,7 +88,7 @@ fn neighbors(bitmap: anytype, row_idx: usize, col_idx: usize) [2]u8 {
 fn dumpToLog(
     comptime rows: usize,
     comptime cols: usize,
-    bitmap: *const p.BitMap(rows, cols),
+    bitmap: *const u.BitMap(rows, cols),
 ) !void {
     var buf: [rows * (cols + 1)]u8 = undefined;
     var writer = std.io.fixedBufferStream(&buf);
@@ -98,7 +99,7 @@ fn dumpToLog(
 fn write(
     comptime rows: u8,
     comptime cols: u8,
-    bitmap: *const p.BitMap(rows, cols),
+    bitmap: *const u.BitMap(rows, cols),
     writer: std.io.AnyWriter,
 ) !void {
     for (1..rows + 1) |r| {
