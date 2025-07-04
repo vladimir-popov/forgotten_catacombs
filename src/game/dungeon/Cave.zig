@@ -3,7 +3,6 @@ const g = @import("../game_pkg.zig");
 const d = @import("dungeon_pkg.zig");
 const p = g.primitives;
 const u = g.utils;
-const CelluralAutomata = @import("CelluralAutomata.zig");
 
 const log = std.log.scoped(.cave);
 
@@ -15,7 +14,7 @@ const min_area: usize = @divTrunc(rows * cols * 4, 10);
 const Self = @This();
 
 alloc: std.mem.Allocator,
-cellural_automata: CelluralAutomata,
+cellural_automata: d.CelluralAutomata,
 // The room of this cave with rocks inside
 room: d.Room,
 /// The bit mask of the places with floor and walls.
@@ -24,14 +23,14 @@ entrance: ?p.Point = null,
 exit: ?p.Point = null,
 
 /// Uses arena to create a self instance and trying to generate a dungeon with passed seed.
-pub fn generateDungeon(arena: *std.heap.ArenaAllocator, cellural_automata: CelluralAutomata, seed: u64) !?d.Dungeon {
+pub fn generateDungeon(arena: *std.heap.ArenaAllocator, cellural_automata: d.CelluralAutomata, seed: u64) !?d.Dungeon {
     const alloc = arena.allocator();
     const self = try alloc.create(Self);
     self.* = try init(alloc, cellural_automata);
     return try self.dungeon(seed);
 }
 
-pub fn init(alloc: std.mem.Allocator, cellural_automata: CelluralAutomata) !Self {
+pub fn init(alloc: std.mem.Allocator, cellural_automata: d.CelluralAutomata) !Self {
     return .{
         .alloc = alloc,
         .cellural_automata = cellural_automata,
@@ -48,10 +47,11 @@ pub fn dungeon(self: *Self, seed: u64) !?d.Dungeon {
     defer tmp_arena.deinit();
     const tmp_alloc = tmp_arena.allocator();
 
-    const prototype_map = try self.cellural_automata.generate(rows, cols, &tmp_arena, rand);
+    const prototype_map = try self.cellural_automata.generate(rows, cols, &tmp_arena, seed);
     const tuple = try biggestOpenArea(tmp_alloc, prototype_map);
     log.debug("Generated cave with max open area {d}. Expected > {d}", .{ tuple[0], min_area });
     if (tuple[0] > min_area) {
+        log.debug("The cave is successfully generate with seed {d}", .{seed});
         var stack: std.ArrayListUnmanaged(p.Point) = .empty;
         defer stack.deinit(tmp_alloc);
 
@@ -161,5 +161,36 @@ pub fn randomEmptyPlace(self: *const Self, rand: std.Random) p.Point {
         const row = self.room.region.top_left.row + rand.uintLessThan(u8, self.room.region.rows - 2) + 1;
         const col = self.room.region.top_left.col + rand.uintLessThan(u8, self.room.region.cols - 2) + 1;
         if (!self.cells.isSet(row, col)) return .{ .row = row, .col = col };
+    }
+}
+
+test "For same seed should return same dungeon" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    var buf_expected: [4096]u8 = undefined;
+    var buf_actual: [4096]u8 = undefined;
+
+    const seed, var previous = try generateAndWriteDungeon(&arena, &buf_expected, null);
+
+    for (0..10) |_| {
+        const used_seed, const current = try generateAndWriteDungeon(&arena, &buf_actual, seed);
+
+        try std.testing.expectEqual(seed, used_seed);
+        try std.testing.expectEqualStrings(previous, current);
+
+        previous = current;
+    }
+}
+
+fn generateAndWriteDungeon(arena: *std.heap.ArenaAllocator, buf: []u8, seed: ?u64) !struct { u64, []const u8 } {
+    var rnd = std.Random.DefaultPrng.init(100500);
+    var bfw = std.io.fixedBufferStream(buf);
+    while (true) {
+        const s: u64 = seed orelse rnd.next();
+        if (try Self.generateDungeon(arena, .{}, s)) |dunge| {
+            const len = try dunge.write(bfw.writer());
+            return .{ dunge.seed, buf[0..len] };
+        }
     }
 }

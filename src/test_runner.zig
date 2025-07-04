@@ -1,6 +1,13 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
+pub const std_options: std.Options = .{
+    .log_level = .info,
+    .log_scope_levels = &[_]std.log.ScopeLevel{
+        .{ .scope = .default, .level = .debug },
+    },
+};
+
 const TestFn = std.builtin.TestFn;
 
 // TODO: add doc about how to use it, and how to filter tests

@@ -133,21 +133,23 @@ pub fn dumpToLog(self: Dungeon) void {
     var buf: [(g.DUNGEON_COLS + 1) * g.DUNGEON_ROWS]u8 = undefined;
     const real_size: usize = @as(usize, @intCast(self.rows)) * (self.cols + 1);
     var writer = std.io.fixedBufferStream(&buf);
-    self.write(writer.writer().any()) catch unreachable;
+    _ = self.write(writer.writer().any()) catch unreachable;
     log.debug("Dungeon:\n{s}", .{buf[0..real_size]});
 }
 
 pub fn write(
     self: Dungeon,
-    writer: std.io.AnyWriter,
-) !void {
+    writer: anytype,
+) !usize {
     var itr = self.cellsInRegion(.{ .top_left = .{ .row = 1, .col = 1 }, .rows = self.rows, .cols = self.cols });
     var row: usize = 1;
     var col: usize = 1;
+    var len: usize = 0;
     while (itr.next()) |cell| {
         if (col > self.cols) {
             col = 1;
             try writer.writeByte('\n');
+            len += 1;
         }
         const symbol: u8 = switch (cell) {
             .nothing => ' ',
@@ -156,7 +158,9 @@ pub fn write(
             else => '#',
         };
         try writer.writeByte(symbol);
+        len += 1;
         row += 1;
         col += 1;
     }
+    return len;
 }

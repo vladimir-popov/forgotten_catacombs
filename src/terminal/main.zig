@@ -26,7 +26,7 @@ pub const std_options: std.Options = .{
         // .{ .scope = .levels, .level = .debug },
         .{ .scope = .level, .level = .debug },
         // .{ .scope = .cmd, .level = .debug },
-        // .{ .scope = .level_map, .level = .debug },
+        .{ .scope = .cave, .level = .debug },
         // .{ .scope = .events, .level = .debug },
         // .{ .scope = .action_system, .level = .debug },
     },

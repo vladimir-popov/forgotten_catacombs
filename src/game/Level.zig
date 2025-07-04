@@ -22,6 +22,9 @@ pub const Cell = union(enum) {
 
 arena: std.heap.ArenaAllocator,
 session: *g.GameSession,
+/// The list of the entities belong to this level.
+/// Used to cleanup global registry on moving from the level.
+entities: std.ArrayListUnmanaged(g.Entity),
 /// The depth of the current level. The session_seed + depth is unique seed for the level.
 depth: u8 = undefined,
 dungeon: d.Dungeon = undefined,
@@ -39,13 +42,16 @@ fn init(self: *Self, session: *g.GameSession) void {
     self.* = .{
         .arena = std.heap.ArenaAllocator.init(session.arena.allocator()),
         .session = session,
+        .entities = .empty,
     };
 }
 
 fn setupDungeon(self: *Self, depth: u8, dungeon: d.Dungeon) !void {
+    log.debug("Setup the dungeon {s} on depth {d}", .{ @tagName(dungeon.type), depth });
     const alloc = self.arena.allocator();
     self.depth = depth;
     self.dungeon = dungeon;
+    self.entities.clearRetainingCapacity();
     self.visibility_strategy = switch (dungeon.type) {
         .first_location => g.visibility.showTheCurrentPlacement,
         .cave => g.visibility.showInRadiusOfSourceOfLight,
@@ -77,6 +83,8 @@ pub fn firstLevel(self: *Self, session: *g.GameSession) !void {
     self.init(session);
     errdefer self.deinit();
 
+    const alloc = self.arena.allocator();
+
     try self.setupDungeon(0, try d.FirstLocation.generateDungeon(&self.arena));
 
     // Add wharf
@@ -86,6 +94,7 @@ pub fn firstLevel(self: *Self, session: *g.GameSession) !void {
         .sprite = .{ .codepoint = cp.ladder_up },
         .position = .{ .place = self.dungeon.entrance },
     });
+    try self.entities.append(alloc, entity);
 
     // Add the ladder leads to the bottom dungeons:
     entity = self.session.entities.newEntity();
@@ -100,9 +109,11 @@ pub fn firstLevel(self: *Self, session: *g.GameSession) !void {
         .sprite = .{ .codepoint = cp.ladder_down },
         .position = .{ .place = self.dungeon.exit },
     });
+    try self.entities.append(alloc, entity);
 
     // Place the player on the level
     log.debug("The player entity id is {d}", .{self.session.player.id});
+    try self.entities.append(alloc, self.session.player);
     try self.session.entities.set(self.session.player, c.Position{ .place = self.dungeon.entrance });
 
     // Add the trader
@@ -112,6 +123,7 @@ pub fn firstLevel(self: *Self, session: *g.GameSession) !void {
         .sprite = .{ .codepoint = cp.human },
         .description = .{ .preset = .traider },
     });
+    try self.entities.append(alloc, entity);
 
     // Add the scientist
     entity = try self.session.entities.addNewEntity(.{
@@ -120,15 +132,18 @@ pub fn firstLevel(self: *Self, session: *g.GameSession) !void {
         .sprite = .{ .codepoint = cp.human },
         .description = .{ .preset = .scientist },
     });
+    try self.entities.append(alloc, entity);
 
     // Add the teleport
     entity = try self.session.entities.addNewEntity(g.entities.teleport(d.FirstLocation.teleport_place));
+    try self.entities.append(alloc, entity);
 
     // Add doors
     var doors = self.dungeon.doorways.?.iterator();
     while (doors.next()) |entry| {
         entry.value_ptr.door_id = try self.session.entities.addNewEntity(g.entities.ClosedDoor);
         try self.session.entities.set(entry.value_ptr.door_id, c.Position{ .place = entry.key_ptr.* });
+        try self.entities.append(alloc, entry.value_ptr.door_id);
         log.debug(
             "For the doorway on {any} added closed door with id {d}",
             .{ entry.key_ptr.*, entry.value_ptr.door_id.id },
@@ -145,6 +160,7 @@ pub fn tryGenerateNew(self: *Self, depth: u8, from_ladder: c.Ladder, seed: u64) 
         "Generate level {s} on depth {d} from ladder {any}",
         .{ @tagName(from_ladder.direction), depth, from_ladder },
     );
+    const alloc = self.arena.allocator();
 
     const dungeon: d.Dungeon = (try self.generateDungeon(depth, seed)) orelse return false;
 
@@ -182,6 +198,7 @@ pub fn tryGenerateNew(self: *Self, depth: u8, from_ladder: c.Ladder, seed: u64) 
         while (doors.next()) |entry| {
             entry.value_ptr.door_id = try self.session.entities.addNewEntity(g.entities.ClosedDoor);
             try self.session.entities.set(entry.value_ptr.door_id, c.Position{ .place = entry.key_ptr.* });
+            try self.entities.append(alloc, entry.value_ptr.door_id);
             log.debug(
                 "For the doorway on {any} added closed door with id {d}",
                 .{ entry.key_ptr.*, entry.value_ptr.door_id.id },
@@ -223,6 +240,15 @@ pub fn forgetObject(self: *Self, place: p.Point) !void {
     _ = try self.remembered_objects.remove(place);
 }
 
+pub fn removeEntity(self: *Self, entity: g.Entity) !void {
+    for (0..self.entities.items.len) |idx| {
+        if (entity.eql(self.entities.items[idx])) {
+            _ = self.entities.swapRemove(idx);
+            return;
+        }
+    }
+}
+
 /// Adds an item to the list of entities on this level, and put it at the place.
 /// Three possible scenario can happened here:
 ///   - If no one other item on the place, then the item will be dropped as is:
@@ -247,6 +273,7 @@ pub fn addEntityAtPlace(self: *Self, item: g.Entity, place: p.Point) !?g.Entity 
                 } else {
                     // or create a new pile and add the item to the pile
                     const pile_id = try self.session.entities.addNewEntityAllocate(g.entities.pile);
+                    try self.entities.append(self.arena.allocator(), pile_id);
                     try self.session.entities.set(pile_id, c.Position{ .place = place });
                     const pile = self.session.entities.getUnsafe(pile_id, c.Pile);
                     log.debug("Created a pile {any} at {any}", .{ pile_id, place });
@@ -265,6 +292,7 @@ pub fn addEntityAtPlace(self: *Self, item: g.Entity, place: p.Point) !?g.Entity 
     }
     log.debug("Adding item {any} to the empty place {any}", .{ item, place });
     try self.session.entities.set(item, c.Position{ .place = place });
+    try self.entities.append(self.arena.allocator(), item);
     return null;
 }
 
@@ -397,12 +425,14 @@ fn updatePlacement(self: *Self, player_moved_from: p.Point, player_moved_to: p.P
 fn addLadder(self: *g.Level, ladder: c.Ladder, place: p.Point) !void {
     try self.session.entities.setComponentsToEntity(ladder.id, g.entities.ladder(ladder));
     try self.session.entities.set(ladder.id, c.Position{ .place = place });
+    try self.entities.append(self.arena.allocator(), ladder.id);
 }
 
 fn addEnemy(self: *g.Level, rand: std.Random, enemy: c.Components) !void {
     if (self.randomEmptyPlace(rand)) |place| {
         const id = try self.session.entities.addNewEntity(enemy);
         try self.session.entities.set(id, c.Position{ .place = place });
+        try self.entities.append(self.arena.allocator(), id);
         const state: c.EnemyState = if (rand.uintLessThan(u8, 5) == 0) .sleeping else .walking;
         try self.session.entities.set(id, state);
     }
@@ -412,6 +442,7 @@ const JsonTag = enum {
     depth,
     dungeon_seed,
     entity,
+    entities,
     place,
     remembered_objects,
     visited_places,
@@ -465,6 +496,19 @@ pub fn load(self: *Self, session: *g.GameSession, reader: g.Runtime.FileReader, 
     // Read other fields and set them to the already initialized level
     loop: while (true) {
         switch (next_tag) {
+            .entities => {
+                assertEql(try json.next(), .object_begin);
+                while (try json.peekNextTokenType() != .object_end) {
+                    const entity = g.Entity.parse((try json.next()).string).?;
+                    var value = try std.json.Value.jsonParse(alloc, &json, .{ .max_value_len = 1024 });
+                    defer value.object.deinit();
+                    const parsed_components = try std.json.parseFromValue(c.Components, alloc, value, .{});
+                    defer parsed_components.deinit();
+                    try self.entities.append(alloc, entity);
+                    try self.session.entities.copyComponentsToEntity(entity, parsed_components.value);
+                }
+                std.debug.assert(try json.next() == .object_end);
+            },
             .visited_places => {
                 assertEql(try json.next(), .array_begin);
                 for (0..self.visited_places.len) |i| {
@@ -520,6 +564,14 @@ pub fn save(self: *Self, writer: g.Runtime.FileWriter, progress: Percent) !Perce
     try jws.write(self.depth);
     try JsonTag.dungeon_seed.writeAsField(&jws);
     try jws.write(self.dungeon.seed);
+    try JsonTag.entities.writeAsField(&jws);
+    try jws.beginObject();
+    for (self.entities.items) |entity| {
+        var buf: [5]u8 = undefined;
+        try jws.objectField(try std.fmt.bufPrint(&buf, "{d}", .{entity.id}));
+        try jws.write(try self.session.entities.entityToStruct(entity));
+    }
+    try jws.endObject();
     try JsonTag.visited_places.writeAsField(&jws);
     try jws.beginArray();
     for (self.visited_places) |visited_row| {

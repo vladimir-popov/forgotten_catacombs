@@ -289,7 +289,8 @@ pub fn parse(arena: *std.heap.ArenaAllocator, str: []const u8) !Self {
     if (!@import("builtin").is_test) {
         @compileError("The function `parse` is for test purpose only");
     }
-    var catacomb = try Self.init(arena);
+    var catacomb: Self = undefined;
+    try catacomb.init(arena.allocator(), .{});
     try catacomb.floor.parse('.', str);
     try catacomb.walls.parse('#', str);
     return catacomb;
@@ -321,6 +322,8 @@ inline fn addEmptyPassage(self: *Self) !*Passage {
     return passage;
 }
 
+/// Finds a place for a door on the borders of the region r1 and region 2, and create a passage
+/// between. Return a region included both passed regions and created passage.
 pub fn createAndAddPassageBetweenRegions(
     self: *Self,
     rand: std.Random,
@@ -331,10 +334,14 @@ pub fn createAndAddPassageBetweenRegions(
     defer _ = stack_arena.deinit();
 
     const direction: p.Direction = if (r1.top_left.row == r2.top_left.row) .right else .down;
-    const doorPlace1 = try self.findPlaceForDoorInRegionRnd(&stack_arena, rand, r1, direction) orelse
+    const doorPlace1 = try self.findPlaceForDoorInRegionRnd(&stack_arena, rand, r1, direction) orelse {
+        log.err("A place for door was not found in {any} in {s} direction", .{ r1, @tagName(direction) });
         return Error.NoSpaceForDoor;
-    const doorPlace2 = try self.findPlaceForDoorInRegionRnd(&stack_arena, rand, r2, direction.opposite()) orelse
+    };
+    const doorPlace2 = try self.findPlaceForDoorInRegionRnd(&stack_arena, rand, r2, direction.opposite()) orelse {
+        log.err("A place for door was not found in {any} in {s} direction", .{ r2, @tagName(direction.opposite()) });
         return Error.NoSpaceForDoor;
+    };
 
     const passage = try self.addEmptyPassage();
 
@@ -759,8 +766,6 @@ test "find a random place for the door on the bottom side" {
 
 test "create passage between two rooms" {
     // given:
-    const Rows = 4;
-    const Cols = 12;
     const str =
         \\ ####   ####
         \\ #..#   #..#
@@ -771,20 +776,43 @@ test "create passage between two rooms" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     var dung = try Self.parse(&arena, str);
-    _ = try dung.addRoom(.{ .top_left = .{ .row = 1, .col = 1 }, .rows = Rows, .cols = 4 });
-    _ = try dung.addRoom(.{ .top_left = .{ .row = 1, .col = 7 }, .rows = Rows, .cols = 4 });
+    const room1 = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 4, .cols = 4 };
+    const room2 = p.Region{ .top_left = .{ .row = 1, .col = 7 }, .rows = 4, .cols = 4 };
+    _ = try dung.generateAndAddRoom(room1);
+    _ = try dung.generateAndAddRoom(room2);
 
-    const expected_region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = Rows, .cols = Cols };
-    // regions with rooms:
-    const r1 = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = Rows, .cols = 6 };
-    const r2 = p.Region{ .top_left = .{ .row = 1, .col = 7 }, .rows = Rows, .cols = Cols - 6 };
+    const expected_region = room1.unionWith(room2);
 
     // when:
-    const region = try dung.createAndAddPassageBetweenRegions(std.crypto.random, r1, r2);
+    const region = try dung.createAndAddPassageBetweenRegions(std.crypto.random, room1, room2);
 
     // then:
     try std.testing.expectEqualDeep(expected_region, region);
-    const passage: Passage = dung.placements.items[2].passage;
+    const passage = dung.placements.items[2].passage;
     errdefer std.debug.print("Passage: {any}\n", .{passage.turns.items});
     try std.testing.expect(passage.turns.items.len >= 2);
+}
+
+test "For same seed should return same dungeon" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    var buf_expected: [10000]u8 = undefined;
+    var buf_actual: [10000]u8 = undefined;
+
+    const seed = 100500;
+    var previous = try generateAndWriteDungeon(&arena, &buf_expected, seed);
+
+    for (0..10) |_| {
+        const current = try generateAndWriteDungeon(&arena, &buf_actual, seed);
+        try std.testing.expectEqualStrings(previous, current);
+        previous = current;
+    }
+}
+
+fn generateAndWriteDungeon(arena: *std.heap.ArenaAllocator, buf: []u8, seed: u64) ![]const u8 {
+    var bfw = std.io.fixedBufferStream(buf);
+    const dunge = try Self.generateDungeon(arena, .{}, seed);
+    const len = try dunge.write(bfw.writer());
+    return buf[0..len];
 }

@@ -141,9 +141,10 @@ fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
 }
 
 pub fn playerMovedToLevel(self: *GameSession) !void {
+    self.max_depth = @max(self.max_depth, self.level.depth);
+    self.viewport.centeredAround(self.level.playerPosition().place);
     try self.play(null);
     try self.mode.play.updateQuickActions(null);
-    self.viewport.centeredAround(self.level.playerPosition().place);
     const event = g.events.Event{
         .entity_moved = .{
             .entity = self.player,
@@ -235,6 +236,7 @@ pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_spe
             } else {
                 try inventory.items.add(item);
                 try self.entities.remove(item, c.Position);
+                try self.level.removeEntity(item);
             }
         },
         .move_to_level => |ladder| {

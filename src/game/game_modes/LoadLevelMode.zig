@@ -138,6 +138,7 @@ fn beginSaving(session: *g.GameSession) !Process {
 
 fn beginGenerating(self: *Self) !Process {
     log.debug("Start generating level on depth {d}", .{self.new_depth});
+    try self.removeEntitiesFromLevel();
     return .{ .generating = .{ .prng = std.Random.DefaultPrng.init(self.session.seed + self.new_depth) } };
 }
 
@@ -145,7 +146,17 @@ fn beginLoading(self: *Self) !Process {
     var buf: [50]u8 = undefined;
     const file_path = try pathToLevelFile(&buf, self.new_depth);
     log.debug("Start loading level on depth {d} from {s}", .{ self.new_depth, file_path });
+    try self.removeEntitiesFromLevel();
     return .{ .loading = .{ .reader = try self.session.runtime.fileReader(file_path) } };
+}
+
+/// Removes all entities belong to the level from the registry.
+/// It should be done before init a new level and deinit previous one.
+fn removeEntitiesFromLevel(self: Self) !void {
+    for (self.session.level.entities.items) |entity| {
+        if (!entity.eql(self.session.player))
+            try self.session.entities.removeEntity(entity);
+    }
 }
 
 fn pathToLevelFile(buf: []u8, depth: u8) ![]const u8 {

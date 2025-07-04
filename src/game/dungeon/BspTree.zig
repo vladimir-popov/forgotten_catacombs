@@ -129,7 +129,7 @@ fn GenericNode(comptime V: type) type {
         pub fn root(
             arena: *std.heap.ArenaAllocator,
             value: V,
-        ) !*GenericNode(V) {
+        ) !*NodeV {
             const node = try arena.allocator().create(NodeV);
             node.* = .{ .value = value };
             return node;
@@ -185,26 +185,29 @@ fn GenericNode(comptime V: type) type {
             }
         }
 
-        pub fn add(self: *NodeV, arena: *std.heap.ArenaAllocator, value: V) !void {
-            if (self.lessThan(self.value, value)) {
+        pub fn add(
+            self: *NodeV,
+            arena: *std.heap.ArenaAllocator,
+            value: V,
+            lessThan: *const fn (x: V, y: V) bool,
+        ) !void {
+            if (lessThan(self.value, value)) {
                 if (self.right) |right| {
-                    try right.add(arena, value);
+                    try right.add(arena, value, lessThan);
                 } else {
                     self.right = try arena.allocator().create(NodeV);
                     self.right.?.* = NodeV{
                         .parent = self,
-                        .lessThan = self.lessThan,
                         .value = value,
                     };
                 }
             } else {
                 if (self.left) |left| {
-                    try left.add(arena, value);
+                    try left.add(arena, value, lessThan);
                 } else {
                     self.left = try arena.allocator().create(NodeV);
                     self.left.?.* = NodeV{
                         .parent = self,
-                        .lessThan = self.lessThan,
                         .value = value,
                     };
                 }
@@ -292,16 +295,16 @@ fn GenericNode(comptime V: type) type {
 test "build tree" {
     // given:
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer _ = arena.reset(.free_all);
+    defer arena.deinit();
     var rand = std.Random.DefaultPrng.init(0);
-    const opts: MinRegionSettings = .{ .min_rows = 2, .min_cols = 2 };
+    const opts: MinRegionSettings = .{ .min_rows = 2, .min_cols = 2, .square_ratio = 0.4 };
 
     // when:
     const root = try build(&arena, rand.random(), 9, 7, opts);
 
     // then:
     var validate = ValidateNodes{ .opts = opts };
-    try root.traverse(arena.allocator(), validate.bspNodeHandler());
+    try root.traverse(&arena, validate.bspNodeHandler());
 }
 
 /// Utility for test
@@ -371,16 +374,15 @@ const ValidateNodes = struct {
 test "split/fold" {
     // given:
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer _ = arena.reset(.free_all);
-    const alloc = arena.allocator();
+    defer arena.deinit();
 
     const divider = GenericNode(u8).SplitHandler{ .ptr = undefined, .split = divide };
     const summator = GenericNode(u8).FoldHandler{ .ptr = undefined, .combine = sum };
-    var tree = try GenericNode(u8).root(&arena, 8, compareU8);
+    var tree = try GenericNode(u8).root(&arena, 8);
 
     // when:
     try tree.split(&arena, divider);
-    const result = try tree.foldModify(alloc, summator);
+    const result = try tree.foldModify(&arena, summator);
 
     // then:
     try std.testing.expectEqual(8, result);
@@ -411,12 +413,12 @@ test "add/traverse" {
     //          3
     //      1       5
     //        2   4   6
-    var tree = try GenericNode(u8).root(&arena, 3, compareU8);
-    try tree.add(&arena, 1);
-    try tree.add(&arena, 2);
-    try tree.add(&arena, 5);
-    try tree.add(&arena, 4);
-    try tree.add(&arena, 6);
+    var tree = try GenericNode(u8).root(&arena, 3);
+    try tree.add(&arena, 1, compareU8);
+    try tree.add(&arena, 2, compareU8);
+    try tree.add(&arena, 5, compareU8);
+    try tree.add(&arena, 4, compareU8);
+    try tree.add(&arena, 6, compareU8);
 
     const expected_values = [_]u8{ 1, 2, 3, 4, 5, 6 };
 
@@ -428,7 +430,7 @@ test "add/traverse" {
     };
 
     // when:
-    try tree.traverse(arena.allocator(), validation.handler());
+    try tree.traverse(&arena, validation.handler());
 
     // then:
     std.mem.sort(u8, &actual_values, {}, lessThanU8);
@@ -450,6 +452,6 @@ fn divide(_: *anyopaque, node: *GenericNode(u8)) anyerror!?struct { u8, u8 } {
     return if (half > 0) .{ half, half } else null;
 }
 
-fn sum(_: *anyopaque, x: *u8, y: *u8) anyerror!u8 {
-    return x.* + y.*;
+fn sum(_: *anyopaque, x: u8, y: u8) anyerror!u8 {
+    return x + y;
 }

@@ -26,8 +26,11 @@ pub fn generate(
     comptime rows: u8,
     comptime cols: u8,
     arena: *std.heap.ArenaAllocator,
-    rand: std.Random,
+    seed: u64,
 ) !*u.BitMap(rows, cols) {
+    var prng = std.Random.DefaultPrng.init(seed);
+    const rand = prng.random();
+
     var generations = [_]*u.BitMap(rows, cols){
         try arena.allocator().create(u.BitMap(rows, cols)),
         try arena.allocator().create(u.BitMap(rows, cols)),
@@ -42,7 +45,7 @@ pub fn generate(
                 generations[i].set0(r0, c0);
                 continue;
             }
-            if (rand.intRangeLessThan(u8, 0, 100) < self.init_walls_percent) {
+            if (rand.uintLessThan(u8, 100) < self.init_walls_percent) {
                 generations[i].set0(r0, c0);
             }
         }
@@ -107,5 +110,22 @@ fn write(
             try writer.writeByte(if (bitmap.isSet(@intCast(r), @intCast(c))) '#' else ' ');
         }
         try writer.writeByte('\n');
+    }
+}
+
+test "For same seed should return same result" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    const seed = 100500;
+    var ca: CelluralAutomata = .{};
+
+    var previous = try ca.generate(10, 10, &arena, seed);
+    for (0..10) |_| {
+        const current = try ca.generate(10, 10, &arena, seed);
+
+        try std.testing.expectEqualDeep(previous, current);
+
+        previous = current;
     }
 }
