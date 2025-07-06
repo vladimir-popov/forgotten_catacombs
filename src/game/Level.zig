@@ -514,13 +514,8 @@ pub fn load(
             .entities => {
                 assertEql(try json.next(), .object_begin);
                 while (try json.peekNextTokenType() != .object_end) {
-                    const entity = g.Entity.parse((try json.next()).string).?;
-                    var value = try std.json.Value.jsonParse(alloc, &json, .{ .max_value_len = 1024 });
-                    defer value.object.deinit();
-                    const parsed_components = try std.json.parseFromValue(c.Components, alloc, value, .{});
-                    defer parsed_components.deinit();
+                    const entity = try self.session.loadEntity(alloc, &json);
                     try self.entities.append(alloc, entity);
-                    try self.session.entities.copyComponentsToEntity(entity, parsed_components.value);
                 }
                 std.debug.assert(try json.next() == .object_end);
             },
@@ -583,9 +578,7 @@ pub fn save(self: *Self, writer: g.Runtime.FileWriter, progress: Percent) !Perce
     try JsonTag.entities.writeAsField(&jws);
     try jws.beginObject();
     for (self.entities.items) |entity| {
-        var buf: [5]u8 = undefined;
-        try jws.objectField(try std.fmt.bufPrint(&buf, "{d}", .{entity.id}));
-        try jws.write(try self.session.entities.entityToStruct(entity));
+        try self.session.saveEntity(entity, &jws);
     }
     try jws.endObject();
     try JsonTag.visited_places.writeAsField(&jws);
