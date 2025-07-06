@@ -24,6 +24,7 @@ arena: std.heap.ArenaAllocator,
 session: *g.GameSession,
 /// The list of the entities belong to this level.
 /// Used to cleanup global registry on moving from the level.
+/// The player doesn't belong to any particular level and should not be presented here.
 entities: std.ArrayListUnmanaged(g.Entity),
 /// The depth of the current level. The session_seed + depth is unique seed for the level.
 depth: u8 = undefined,
@@ -111,11 +112,6 @@ pub fn firstLevel(self: *Self, session: *g.GameSession) !void {
     });
     try self.entities.append(alloc, entity);
 
-    // Place the player on the level
-    log.debug("The player entity id is {d}", .{self.session.player.id});
-    try self.entities.append(alloc, self.session.player);
-    try self.session.entities.set(self.session.player, c.Position{ .place = self.dungeon.entrance });
-
     // Add the trader
     entity = try self.session.entities.addNewEntity(.{
         .z_order = .{ .order = .obstacle },
@@ -149,7 +145,7 @@ pub fn firstLevel(self: *Self, session: *g.GameSession) !void {
             .{ entry.key_ptr.*, entry.value_ptr.door_id.id },
         );
     }
-    self.player_placement = self.dungeon.placementWith(self.playerPosition().place).?;
+    try self.completeInitialization(.down);
 }
 
 /// Tries to generate a new level with passed seed. In successful case the level
@@ -176,8 +172,6 @@ pub fn tryGenerateNew(self: *Self, depth: u8, from_ladder: c.Ladder, seed: u64) 
     };
     // Add ladder by which the player has come to this level
     try self.addLadder(from_ladder.inverted(), init_place);
-    // Generate player on the ladder
-    try self.session.entities.set(self.session.player, c.Position{ .place = init_place });
 
     // Add ladder to the next level
     try self.addLadder(.{
@@ -205,10 +199,25 @@ pub fn tryGenerateNew(self: *Self, depth: u8, from_ladder: c.Ladder, seed: u64) 
             );
         }
     }
+    try self.completeInitialization(from_ladder.direction);
+    return true;
+}
 
+/// Sets up a position for player and remembers the placement with player.
+/// This method should be invoked right after setup of a dungeon.
+fn completeInitialization(self: *Self, direction: c.Ladder.Direction) !void {
+    const init_place = switch (direction) {
+        .down => self.dungeon.entrance,
+        .up => self.dungeon.exit,
+    };
+    // Generate player on the ladder
+    try self.session.entities.set(self.session.player, c.Position{ .place = init_place });
     self.player_placement = self.dungeon.placementWith(self.playerPosition().place).?;
 
-    return true;
+    log.debug(
+        "The level completed. Depth {d}; seed {d}; type {d}",
+        .{ self.depth, self.dungeon.seed, @tagName(self.dungeon.type) },
+    );
 }
 
 fn generateDungeon(self: *Self, depth: u8, seed: u64) !?d.Dungeon {
@@ -463,7 +472,13 @@ const JsonTag = enum {
 };
 
 /// Reads json from the reader, deserializes and initializes the level.
-pub fn load(self: *Self, session: *g.GameSession, reader: g.Runtime.FileReader, progress: Percent) !Percent {
+pub fn load(
+    self: *Self,
+    session: *g.GameSession,
+    reader: g.Runtime.FileReader,
+    direction: c.Ladder.Direction,
+    progress: Percent,
+) !Percent {
     _ = progress;
 
     self.init(session);
@@ -548,7 +563,8 @@ pub fn load(self: *Self, session: *g.GameSession, reader: g.Runtime.FileReader, 
         }
     }
     assertEql(try json.next(), .end_of_document);
-    self.player_placement = self.dungeon.placementWith(self.playerPosition().place).?;
+
+    try self.completeInitialization(direction);
     return 100;
 }
 

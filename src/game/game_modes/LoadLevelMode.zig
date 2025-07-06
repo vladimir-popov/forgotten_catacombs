@@ -116,7 +116,7 @@ pub fn tick(self: *Self) !void {
         },
         .loading => |*process| {
             process.progress =
-                try self.session.level.load(self.session, process.reader, process.progress);
+                try self.session.level.load(self.session, process.reader, self.from_ladder.direction, process.progress);
         },
     }
 }
