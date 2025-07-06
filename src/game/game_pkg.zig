@@ -27,6 +27,7 @@ pub const Level = @import("Level.zig");
 pub const MovePoints = @import("actions.zig").MovePoints;
 pub const Render = @import("Render.zig");
 pub const Runtime = @import("Runtime.zig");
+pub const Storage = @import("Storage.zig");
 pub const TextAlign = Runtime.TextAlign;
 pub const Viewport = @import("Viewport.zig");
 

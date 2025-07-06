@@ -11,8 +11,6 @@ const u = g.utils;
 
 const log = std.log.scoped(.level);
 
-const Percent = u8;
-
 const Self = @This();
 
 pub const Cell = union(enum) {
@@ -39,7 +37,12 @@ player_placement: d.Placement = undefined,
 /// Dijkstra Map of direction to the player. Used to find a path to the player.
 dijkstra_map: u.DijkstraMap = undefined,
 
-fn init(self: *Self, session: *g.GameSession) void {
+/// Starts initialization of the level. Prepares an arena for all other fields.
+/// The full initialization should include:
+/// - preinit
+/// - setupDungeon
+/// - completeInitialization
+pub fn preinit(self: *Self, session: *g.GameSession) void {
     self.* = .{
         .arena = std.heap.ArenaAllocator.init(session.arena.allocator()),
         .session = session,
@@ -47,7 +50,7 @@ fn init(self: *Self, session: *g.GameSession) void {
     };
 }
 
-fn setupDungeon(self: *Self, depth: u8, dungeon: d.Dungeon) !void {
+pub fn setupDungeon(self: *Self, depth: u8, dungeon: d.Dungeon) !void {
     log.debug("Setup the dungeon {s} on depth {d}", .{ @tagName(dungeon.type), depth });
     const alloc = self.arena.allocator();
     self.depth = depth;
@@ -73,6 +76,23 @@ fn setupDungeon(self: *Self, depth: u8, dungeon: d.Dungeon) !void {
     }
 }
 
+/// Sets up a position for player and remembers the placement with player.
+/// This method should be invoked right after setup of a dungeon.
+pub fn completeInitialization(self: *Self, direction: c.Ladder.Direction) !void {
+    const init_place = switch (direction) {
+        .down => self.dungeon.entrance,
+        .up => self.dungeon.exit,
+    };
+    // Generate player on the ladder
+    try self.session.entities.set(self.session.player, c.Position{ .place = init_place });
+    self.player_placement = self.dungeon.placementWith(self.playerPosition().place).?;
+
+    log.debug(
+        "The level completed. Depth {d}; seed {d}; type {d}",
+        .{ self.depth, self.dungeon.seed, @tagName(self.dungeon.type) },
+    );
+}
+
 fn deinit(self: *Self) void {
     self.arena.deinit();
 }
@@ -81,7 +101,7 @@ fn deinit(self: *Self) void {
 pub fn firstLevel(self: *Self, session: *g.GameSession) !void {
     log.debug("Start creating the first level.", .{});
 
-    self.init(session);
+    self.preinit(session);
     errdefer self.deinit();
 
     const alloc = self.arena.allocator();
@@ -148,9 +168,9 @@ pub fn firstLevel(self: *Self, session: *g.GameSession) !void {
     try self.completeInitialization(.down);
 }
 
-/// Tries to generate a new level with passed seed. In successful case the level
-/// will be reinitialized and true returned. Otherwise the level will be not changed
-/// and false returned.
+/// Tries to generate a new level with passed seed. The level should be at least preinited.
+/// In successful case the level will be reinitialized and true returned. Otherwise the level
+/// will be not changed and false returned.
 pub fn tryGenerateNew(self: *Self, depth: u8, from_ladder: c.Ladder, seed: u64) !bool {
     log.debug(
         "Generate level {s} on depth {d} from ladder {any}",
@@ -203,24 +223,7 @@ pub fn tryGenerateNew(self: *Self, depth: u8, from_ladder: c.Ladder, seed: u64) 
     return true;
 }
 
-/// Sets up a position for player and remembers the placement with player.
-/// This method should be invoked right after setup of a dungeon.
-fn completeInitialization(self: *Self, direction: c.Ladder.Direction) !void {
-    const init_place = switch (direction) {
-        .down => self.dungeon.entrance,
-        .up => self.dungeon.exit,
-    };
-    // Generate player on the ladder
-    try self.session.entities.set(self.session.player, c.Position{ .place = init_place });
-    self.player_placement = self.dungeon.placementWith(self.playerPosition().place).?;
-
-    log.debug(
-        "The level completed. Depth {d}; seed {d}; type {d}",
-        .{ self.depth, self.dungeon.seed, @tagName(self.dungeon.type) },
-    );
-}
-
-fn generateDungeon(self: *Self, depth: u8, seed: u64) !?d.Dungeon {
+pub fn generateDungeon(self: *Self, depth: u8, seed: u64) !?d.Dungeon {
     return if (depth == 0)
         try d.FirstLocation.generateDungeon(&self.arena)
     else if (depth < 3)
@@ -444,177 +447,5 @@ fn addEnemy(self: *g.Level, rand: std.Random, enemy: c.Components) !void {
         try self.entities.append(self.arena.allocator(), id);
         const state: c.EnemyState = if (rand.uintLessThan(u8, 5) == 0) .sleeping else .walking;
         try self.session.entities.set(id, state);
-    }
-}
-
-const JsonTag = enum {
-    depth,
-    dungeon_seed,
-    entity,
-    entities,
-    place,
-    remembered_objects,
-    visited_places,
-
-    pub fn writeAsField(self: JsonTag, jws: anytype) !void {
-        try jws.objectField(@tagName(self));
-    }
-
-    pub fn readFromField(json: anytype) !JsonTag {
-        const next = try json.next();
-        if (next == .string) {
-            return std.meta.stringToEnum(JsonTag, next.string) orelse error.WrongTag;
-        } else {
-            log.err("Expected a string with tag, but had {any}", .{next});
-            return error.WrongTag;
-        }
-    }
-};
-
-/// Reads json from the reader, deserializes and initializes the level.
-pub fn load(
-    self: *Self,
-    session: *g.GameSession,
-    reader: g.Runtime.FileReader,
-    direction: c.Ladder.Direction,
-    progress: Percent,
-) !Percent {
-    _ = progress;
-
-    self.init(session);
-    const alloc = self.arena.allocator();
-
-    var json = std.json.reader(self.arena.allocator(), reader.reader());
-    defer json.deinit();
-
-    assertEql(try json.next(), .object_begin);
-
-    // Read the depth and dungeon seed to initialize the level.
-    // They have to be the first two fields in the current json object
-    var depth: ?u8 = null;
-    var dungeon_seed: ?u64 = null;
-    var next_tag: JsonTag = undefined;
-    while (true) {
-        next_tag = try JsonTag.readFromField(&json);
-        switch (next_tag) {
-            .depth => depth = try std.fmt.parseInt(u8, (try json.next()).number, 10),
-            .dungeon_seed => dungeon_seed = try std.fmt.parseInt(u64, (try json.next()).number, 10),
-            else => break,
-        }
-    }
-    const dungeon = (try self.generateDungeon(depth.?, dungeon_seed.?)) orelse {
-        log.err("A dungeon was not generate from the saved seed {d}", .{dungeon_seed.?});
-        return error.BrokenSeed;
-    };
-    try self.setupDungeon(depth.?, dungeon);
-
-    // Read other fields and set them to the already initialized level
-    loop: while (true) {
-        switch (next_tag) {
-            .entities => {
-                assertEql(try json.next(), .object_begin);
-                while (try json.peekNextTokenType() != .object_end) {
-                    const entity = try self.session.loadEntity(alloc, &json);
-                    try self.entities.append(alloc, entity);
-                }
-                std.debug.assert(try json.next() == .object_end);
-            },
-            .visited_places => {
-                assertEql(try json.next(), .array_begin);
-                for (0..self.visited_places.len) |i| {
-                    var value = try std.json.Value.jsonParse(alloc, &json, .{ .max_value_len = 1024 });
-                    defer value.array.deinit();
-                    for (value.array.items) |idx| {
-                        self.visited_places[i].set(@intCast(idx.integer));
-                    }
-                }
-                assertEql(try json.next(), .array_end);
-            },
-            .remembered_objects => {
-                assertEql(try json.next(), .array_begin);
-                while (try json.peekNextTokenType() != .array_end) {
-                    var value = try std.json.Value.jsonParse(alloc, &json, .{ .max_value_len = 1024 });
-                    defer value.object.deinit();
-                    const entity = g.Entity{ .id = @intCast(value.object.get("entity").?.integer) };
-                    const place = value.object.get("place").?;
-                    try self.remembered_objects.put(alloc, try p.Point.jsonParseFromValue(alloc, place, .{}), entity);
-                }
-                assertEql(try json.next(), .array_end);
-            },
-            else => break :loop,
-        }
-        switch (try json.peekNextTokenType()) {
-            .string => {
-                next_tag = try JsonTag.readFromField(&json);
-            },
-            .object_end => {
-                _ = try json.next();
-                break :loop;
-            },
-            else => |unexpected| {
-                log.err("Unexpected token `{any}`", .{unexpected});
-                return error.UnexpectedToken;
-            },
-        }
-    }
-    assertEql(try json.next(), .end_of_document);
-
-    try self.completeInitialization(direction);
-    return 100;
-}
-
-pub fn save(self: *Self, writer: g.Runtime.FileWriter, progress: Percent) !Percent {
-    _ = progress;
-
-    const alloc = self.arena.allocator();
-    var jws = std.json.writeStreamArbitraryDepth(alloc, writer.writer(), .{ .emit_null_optional_fields = false });
-    defer jws.deinit();
-
-    try jws.beginObject();
-    try JsonTag.depth.writeAsField(&jws);
-    try jws.write(self.depth);
-    try JsonTag.dungeon_seed.writeAsField(&jws);
-    try jws.write(self.dungeon.seed);
-    try JsonTag.entities.writeAsField(&jws);
-    try jws.beginObject();
-    for (self.entities.items) |entity| {
-        try self.session.saveEntity(entity, &jws);
-    }
-    try jws.endObject();
-    try JsonTag.visited_places.writeAsField(&jws);
-    try jws.beginArray();
-    for (self.visited_places) |visited_row| {
-        try jws.beginArray();
-        var itr = visited_row.iterator(.{});
-        while (itr.next()) |idx| {
-            try jws.write(idx);
-        }
-        try jws.endArray();
-    }
-    try jws.endArray();
-
-    try JsonTag.remembered_objects.writeAsField(&jws);
-    var kvs = self.remembered_objects.iterator();
-    try jws.beginArray();
-    while (kvs.next()) |kv| {
-        try jws.beginObject();
-        try JsonTag.place.writeAsField(&jws);
-        try jws.write(kv.key_ptr.*);
-        try JsonTag.entity.writeAsField(&jws);
-        try jws.write(kv.value_ptr.id);
-        try jws.endObject();
-    }
-    try jws.endArray();
-    try jws.endObject();
-
-    return 100;
-}
-
-fn assertEql(actual: anytype, expected: anytype) void {
-    switch (@import("builtin").mode) {
-        .Debug, .ReleaseSafe => if (expected != actual) {
-            std.debug.panic("Expected {any}, but was {any}", .{ expected, actual });
-        },
-        else => {},
     }
 }

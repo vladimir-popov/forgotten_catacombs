@@ -97,8 +97,9 @@ pub fn tick(self: *Self) !void {
 
     switch (self.process) {
         .saving => |*process| {
+            const alloc = self.session.level.arena.allocator();
             process.progress =
-                try self.session.level.save(process.writer, process.progress);
+                try self.session.storage.saveLevel(alloc, self.session.level, process.writer, process.progress);
             if (process.progress == 100) {
                 process.writer.deinit();
                 self.process = if (self.is_new_level)
@@ -116,7 +117,12 @@ pub fn tick(self: *Self) !void {
         },
         .loading => |*process| {
             process.progress =
-                try self.session.level.load(self.session, process.reader, self.from_ladder.direction, process.progress);
+                try self.session.storage.loadLevel(
+                    &self.session.level,
+                    process.reader,
+                    self.from_ladder.direction,
+                    process.progress,
+                );
         },
     }
 }

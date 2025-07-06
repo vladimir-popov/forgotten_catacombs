@@ -43,6 +43,7 @@ seed: u64,
 prng: std.Random.DefaultPrng,
 ai: g.AI,
 runtime: g.Runtime,
+storage: g.Storage,
 /// Buffered render to draw the game
 render: g.Render,
 /// Visible area
@@ -73,6 +74,7 @@ pub fn init(
         .prng = std.Random.DefaultPrng.init(seed),
         .ai = g.AI{ .session = self, .rand = self.prng.random() },
         .runtime = runtime,
+        .storage = .{ .session = self },
         .render = render,
         .viewport = g.Viewport.init(render.scene_rows, render.scene_cols),
         .entities = try g.EntitiesManager.init(self.arena.allocator()),
@@ -349,22 +351,4 @@ fn doHit(
         }
     }
     return actor_speed;
-}
-
-/// Writes an entity as a pair `"id" : { components }`
-pub fn saveEntity(self: *const g.GameSession, entity: g.Entity, jws: anytype) !void {
-    var buf: [5]u8 = undefined;
-    try jws.objectField(try std.fmt.bufPrint(&buf, "{d}", .{entity.id}));
-    try jws.write(try self.entities.entityToStruct(entity));
-}
-
-/// Reads a pair `"<number>" : <json object>` as entity id and its components.
-pub fn loadEntity(self: *g.GameSession, alloc: std.mem.Allocator, json: anytype) !g.Entity {
-    const entity = g.Entity.parse((try json.next()).string).?;
-    var value = try std.json.Value.jsonParse(alloc, json, .{ .max_value_len = 1024 });
-    defer value.object.deinit();
-    const parsed_components = try std.json.parseFromValue(c.Components, alloc, value, .{});
-    defer parsed_components.deinit();
-    try self.entities.copyComponentsToEntity(entity, parsed_components.value);
-    return entity;
 }
