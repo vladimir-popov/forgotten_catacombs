@@ -204,8 +204,8 @@ const inventory_line_fmt = std.fmt.comptimePrint(
 );
 
 fn formatInventoryLine(self: *InventoryMode, line: *w.TextArea.Line, item: g.Entity) ![]const u8 {
-    const sprite = self.session.entities.getUnsafe(item, c.Sprite);
-    const name = if (self.session.entities.get(item, c.Description)) |desc|
+    const sprite = self.session.registry.getUnsafe(item, c.Sprite);
+    const name = if (self.session.registry.get(item, c.Description)) |desc|
         desc.name()
     else
         "???";
@@ -244,12 +244,12 @@ fn useSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
 
     if (item.eql(self.equipment.weapon)) {
         self.equipment.weapon = null;
-    } else if (self.session.entities.get(item, c.Weapon)) |_| {
+    } else if (self.session.registry.get(item, c.Weapon)) |_| {
         self.equipment.weapon = item;
     }
     if (item.eql(self.equipment.light)) {
         self.equipment.light = null;
-    } else if (self.session.entities.get(item, c.SourceOfLight)) |_| {
+    } else if (self.session.registry.get(item, c.SourceOfLight)) |_| {
         self.equipment.light = item;
     }
     try self.updateInventoryTab(tab);
@@ -294,7 +294,7 @@ fn addDropTab(self: *InventoryMode, drop: g.Entity) !void {
 fn updateDropTab(self: *InventoryMode, tab: *Tab, drop: g.Entity) !void {
     const selected_line = tab.window.selected_line orelse 0;
     tab.window.clearRetainingCapacity();
-    if (self.session.entities.get(drop, c.Pile)) |pile| {
+    if (self.session.registry.get(drop, c.Pile)) |pile| {
         var itr = pile.items.iterator();
         while (itr.next()) |item_ptr| {
             try self.addDropOption(tab, item_ptr.*);
@@ -312,8 +312,8 @@ fn updateDropTab(self: *InventoryMode, tab: *Tab, drop: g.Entity) !void {
 
 fn addDropOption(self: *InventoryMode, tab: *Tab, item: g.Entity) !void {
     var buffer: w.TextArea.Line = undefined;
-    const sprite = self.session.entities.getUnsafe(item, c.Sprite);
-    const name = if (self.session.entities.get(item, c.Description)) |desc|
+    const sprite = self.session.registry.getUnsafe(item, c.Sprite);
+    const name = if (self.session.registry.get(item, c.Description)) |desc|
         desc.name()
     else
         "???";
@@ -327,7 +327,7 @@ fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     log.debug("Show info about item {d}", .{item.id});
     self.description_window = try w.DescriptionWindow.init(
         self.alloc,
-        self.session.entities,
+        self.session.registry,
         item,
         self.session.runtime.isDevMode(),
     );
@@ -340,11 +340,11 @@ fn takeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self = tab.parent;
     try self.inventory.items.add(item);
     const entity = self.drop orelse @panic("Attempt to take an item when dropped item is not defined");
-    if (self.session.entities.get(entity, c.Pile)) |pile| {
+    if (self.session.registry.get(entity, c.Pile)) |pile| {
         _ = pile.items.remove(item);
         // Remove the pile only if it is became empty
         if (pile.items.size() == 0) {
-            try self.session.entities.removeEntity(entity);
+            try self.session.registry.removeEntity(entity);
             self.tabs_count = 1;
             self.active_tab_idx = 0;
             self.drop = null;

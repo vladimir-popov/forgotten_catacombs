@@ -7,7 +7,7 @@ const ComponentsMap = @import("ComponentsMap.zig").ComponentsMap;
 const log = std.log.scoped(.ecs);
 
 /// The manager of the entities and components.
-pub fn EntitiesManager(comptime ComponentsStruct: type) type {
+pub fn Registry(comptime ComponentsStruct: type) type {
     return struct {
         const Self = @This();
 
@@ -345,7 +345,7 @@ test "Add/Get/Remove component" {
         foo: ?TestComponent,
     };
 
-    var manager = try EntitiesManager(TestComponents).init(std.testing.allocator);
+    var manager = try Registry(TestComponents).init(std.testing.allocator);
     defer manager.deinit();
 
     // should return the component, which was added before
@@ -384,7 +384,7 @@ test "deinit entity on update" {
     const Components = struct { cmp: ?Cmp };
 
     defer std.testing.expectEqual(true, deinited_2) catch unreachable;
-    var manager = try EntitiesManager(Components).init(std.testing.allocator);
+    var manager = try Registry(Components).init(std.testing.allocator);
     defer manager.deinit();
 
     const entity = manager.newEntity();
@@ -405,7 +405,7 @@ test "get entity as a struct" {
 
     const TestComponents = struct { foo: ?Foo, bar: ?Bar };
 
-    var manager = try EntitiesManager(TestComponents).init(std.testing.allocator);
+    var manager = try Registry(TestComponents).init(std.testing.allocator);
     defer manager.deinit();
 
     const entity = manager.newEntity();
@@ -426,7 +426,7 @@ test "set all components as a struct to the entity" {
 
     const TestComponents = struct { foo: ?Foo = null, bar: ?Bar = null };
 
-    var manager = try EntitiesManager(TestComponents).init(std.testing.allocator);
+    var manager = try Registry(TestComponents).init(std.testing.allocator);
     defer manager.deinit();
 
     const entity = try manager.addNewEntity(.{ .foo = .{ .value = 42 } });

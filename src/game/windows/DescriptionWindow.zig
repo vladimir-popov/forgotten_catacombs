@@ -19,13 +19,13 @@ right_button_label: []const u8 = "Close",
 
 pub fn init(
     alloc: std.mem.Allocator,
-    entities: g.EntitiesManager,
+    registry: g.Registry,
     entity: g.Entity,
     dev_mode: bool,
 ) !DescriptionWindow {
     var title: []const u8 = "";
     var text_area = w.TextArea.init(.modal);
-    if (entities.get(entity, c.Description)) |description| {
+    if (registry.get(entity, c.Description)) |description| {
         title = description.name();
         for (description.description()) |str| {
             const line = try text_area.addEmptyLine(alloc, false);
@@ -39,28 +39,28 @@ pub fn init(
     if (dev_mode) {
         var line = try text_area.addEmptyLine(alloc, false);
         _ = try std.fmt.bufPrint(line[1..], "Id: {d}", .{entity.id});
-        if (entities.get(entity, c.Position)) |position| {
+        if (registry.get(entity, c.Position)) |position| {
             line = try text_area.addEmptyLine(alloc, false);
             _ = try std.fmt.bufPrint(line[1..], "Position: {any}", .{position.place});
         }
     }
-    if (entities.get(entity, c.EnemyState)) |state| {
+    if (registry.get(entity, c.EnemyState)) |state| {
         const line = try text_area.addEmptyLine(alloc, false);
         _ = try std.fmt.bufPrint(line[1..], "State: is {s}", .{@tagName(state.*)});
     }
-    if (entities.get(entity, c.Health)) |health| {
+    if (registry.get(entity, c.Health)) |health| {
         const line = try text_area.addEmptyLine(alloc, false);
         _ = try std.fmt.bufPrint(line[1..], "Health: {d}/{d}", .{ health.current, health.max });
     }
-    if (entities.get(entity, c.Speed)) |speed| {
+    if (registry.get(entity, c.Speed)) |speed| {
         const line = try text_area.addEmptyLine(alloc, false);
         _ = try std.fmt.bufPrint(line[1..], "Speed: {d}", .{speed.move_points});
     }
-    if (entities.get(entity, c.Weapon)) |weapon| {
+    if (registry.get(entity, c.Weapon)) |weapon| {
         const line = try text_area.addEmptyLine(alloc, false);
         _ = try std.fmt.bufPrint(line[1..], "Damage: {d}-{d}", .{ weapon.min_damage, weapon.max_damage });
     }
-    if (entities.get(entity, c.SourceOfLight)) |light| {
+    if (registry.get(entity, c.SourceOfLight)) |light| {
         const line = try text_area.addEmptyLine(alloc, false);
         _ = try std.fmt.bufPrint(line[1..], "Radius of light: {d}", .{light.radius});
     }

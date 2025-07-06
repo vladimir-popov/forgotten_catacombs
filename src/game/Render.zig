@@ -168,7 +168,7 @@ fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order
 }
 /// Draw sprites inside the screen
 pub fn drawSpritesToBuffer(self: Render, viewport: g.Viewport, level: *const g.Level, entity_in_focus: ?g.Entity) !void {
-    var itr = level.session.entities.query3(cm.Position, cm.Sprite, cm.ZOrder);
+    var itr = level.registry.query3(cm.Position, cm.Sprite, cm.ZOrder);
     while (itr.next()) |tuple| {
         const entity, const position, const sprite, const zorder = tuple;
         if (!viewport.region.containsPoint(position.place)) continue;
@@ -258,7 +258,7 @@ pub fn redrawFromSceneBuffer(self: Render) !void {
 /// Removes the animation if the last frame was drawn.
 pub fn drawAnimationsFrames(self: Render, viewport: g.Viewport, level: *g.Level, entity_in_focus: ?g.Entity) !void {
     const now: c_uint = self.runtime.currentMillis();
-    var itr = level.session.entities.query2(cm.Position, cm.Animation);
+    var itr = level.registry.query2(cm.Position, cm.Animation);
     while (itr.next()) |components| {
         const entity, const position, const animation = components;
         if (animation.frame(now)) |frame| {
@@ -277,7 +277,7 @@ pub fn drawAnimationsFrames(self: Render, viewport: g.Viewport, level: *g.Level,
                 );
             }
         } else {
-            try level.session.entities.remove(entity, cm.Animation);
+            try level.registry.remove(entity, cm.Animation);
         }
     }
 }

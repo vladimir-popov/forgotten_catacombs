@@ -161,7 +161,7 @@ fn beginLoading(self: *Self) !Process {
 fn removeEntitiesFromLevel(self: Self) !void {
     for (self.session.level.entities.items) |entity| {
         if (!entity.eql(self.session.player))
-            try self.session.entities.removeEntity(entity);
+            try self.session.registry.removeEntity(entity);
     }
 }
 

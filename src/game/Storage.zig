@@ -47,7 +47,6 @@ pub fn loadLevel(
 ) !Percent {
     _ = progress;
 
-    level.preinit(self.session);
     const alloc = level.arena.allocator();
 
     var json = std.json.reader(level.arena.allocator(), reader.reader());
@@ -185,7 +184,7 @@ pub fn saveLevel(
 fn saveEntity(self: Self, entity: g.Entity, jws: anytype) !void {
     var buf: [5]u8 = undefined;
     try jws.objectField(try std.fmt.bufPrint(&buf, "{d}", .{entity.id}));
-    try jws.write(try self.session.entities.entityToStruct(entity));
+    try jws.write(try self.session.registry.entityToStruct(entity));
 }
 
 /// Reads a pair `"<number>" : <json object>` as entity id and its components.
@@ -195,7 +194,7 @@ fn loadEntity(self: *Self, alloc: std.mem.Allocator, json: anytype) !g.Entity {
     defer value.object.deinit();
     const parsed_components = try std.json.parseFromValue(c.Components, alloc, value, .{});
     defer parsed_components.deinit();
-    try self.session.entities.copyComponentsToEntity(entity, parsed_components.value);
+    try self.session.registry.copyComponentsToEntity(entity, parsed_components.value);
     return entity;
 }
 

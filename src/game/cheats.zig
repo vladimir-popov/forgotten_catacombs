@@ -120,7 +120,7 @@ pub const Cheat = union(enum) {
     pub fn toAction(self: Cheat, session: *g.GameSession) ?g.Action {
         switch (self) {
             .move_player_to_ladder_up => {
-                var itr = session.entities.query2(c.Ladder, c.Position);
+                var itr = session.registry.query2(c.Ladder, c.Position);
                 while (itr.next()) |tuple| {
                     if (tuple[1].direction == .up) {
                         return movePlayerToPoint(tuple[2].place);
@@ -128,7 +128,7 @@ pub const Cheat = union(enum) {
                 }
             },
             .move_player_to_ladder_down => {
-                var itr = session.entities.query2(c.Ladder, c.Position);
+                var itr = session.registry.query2(c.Ladder, c.Position);
                 while (itr.next()) |tuple| {
                     if (tuple[1].direction == .down) {
                         return movePlayerToPoint(tuple[2].place);
