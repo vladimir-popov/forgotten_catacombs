@@ -274,6 +274,17 @@ pub const Region = struct {
         self.top_left.col = if (target_center.col > (self.cols / 2)) target_center.col - (self.cols / 2) else 1;
     }
 
+    pub fn centralizedAround(self: Region, target_center: Point) Region {
+        return .{
+            .top_left = .{
+                .row = if (target_center.row > (self.rows / 2)) target_center.row - (self.rows / 2) else 1,
+                .col = if (target_center.col > (self.cols / 2)) target_center.col - (self.cols / 2) else 1,
+            },
+            .rows = self.rows,
+            .cols = self.cols,
+        };
+    }
+
     /// Splits vertically the region in two if it possible. The first one contains the top
     /// left corner and `cols` columns. The second has the other part.
     /// If splitting is impossible, returns null.

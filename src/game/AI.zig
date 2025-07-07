@@ -84,7 +84,7 @@ inline fn actionForAggressiveEnemy(
             };
     }
     const level = &self.session.level;
-    if (level.dijkstra_map.vectors.get(entity_place)) |vector| {
+    if (level.dijkstra_map.get(entity_place)) |vector| {
         log.debug(
             "Entity {any} moves to the player from {any} in direction {s}",
             .{ entity, entity_place, @tagName(vector.direction) },
@@ -97,7 +97,7 @@ inline fn actionForAggressiveEnemy(
 }
 
 fn isPlayerIsInSight(self: AI, entity_place: p.Point) bool {
-    return if (self.session.level.dijkstra_map.vectors.get(entity_place)) |vector|
+    return if (self.session.level.dijkstra_map.get(entity_place)) |vector|
         vector.distance > 0
     else
         false;

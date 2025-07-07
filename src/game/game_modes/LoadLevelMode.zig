@@ -33,7 +33,7 @@ const GeneratingLevel = struct {
         self.attempt = max_attempts;
     }
 
-    fn incrementProgres(self: *GeneratingLevel) !void {
+    fn incrementProgress(self: *GeneratingLevel) !void {
         self.attempt += 1;
         if (self.attempt > max_attempts) {
             log.err("Generating level has been failed after {d} attempts", .{self.attempt - 1});
@@ -102,6 +102,8 @@ pub fn tick(self: *Self) !void {
                 try self.session.storage.saveLevel(alloc, self.session.level, process.writer, process.progress);
             if (process.progress == 100) {
                 process.writer.deinit();
+                try self.removeEntitiesOfTheLevel();
+                self.session.level.deinit();
                 self.process = if (self.is_new_level)
                     try self.beginGenerating()
                 else
@@ -110,10 +112,20 @@ pub fn tick(self: *Self) !void {
         },
         .generating => |*process| {
             const seed = process.prng.next();
-            if (try self.session.level.tryGenerateNew(self.new_depth, self.from_ladder, seed))
-                process.complete()
-            else
-                try process.incrementProgres();
+            const maybe_level = try g.Level.tryGenerateNew(
+                self.session.arena.allocator(),
+                &self.session.registry,
+                self.session.player,
+                self.new_depth,
+                self.from_ladder,
+                seed,
+            );
+            if (maybe_level) |level| {
+                self.session.level = level;
+                process.complete();
+            } else {
+                try process.incrementProgress();
+            }
         },
         .loading => |*process| {
             process.progress =
@@ -139,26 +151,44 @@ fn beginSaving(session: *g.GameSession) !Process {
     var buf: [50]u8 = undefined;
     const file_path = try pathToLevelFile(&buf, session.level.depth);
     log.debug("Start saving level on depth {d} to {s}", .{ session.level.depth, file_path });
-    return .{ .saving = .{ .writer = try session.runtime.fileWriter(file_path) } };
+
+    const file_writer = try session.runtime.fileWriter(file_path);
+    errdefer file_writer.deinit();
+
+    const writer = file_writer.writer();
+    try writer.writeInt(u64, session.level.dungeon.seed, .big);
+    return .{ .saving = .{ .writer = file_writer } };
 }
 
 fn beginGenerating(self: *Self) !Process {
-    log.debug("Start generating level on depth {d}", .{self.new_depth});
-    try self.removeEntitiesFromLevel();
+    log.debug("Start generating a new level on depth {d}", .{self.new_depth});
     return .{ .generating = .{ .prng = std.Random.DefaultPrng.init(self.session.seed + self.new_depth) } };
 }
 
 fn beginLoading(self: *Self) !Process {
     var buf: [50]u8 = undefined;
     const file_path = try pathToLevelFile(&buf, self.new_depth);
-    log.debug("Start loading level on depth {d} from {s}", .{ self.new_depth, file_path });
-    try self.removeEntitiesFromLevel();
-    return .{ .loading = .{ .reader = try self.session.runtime.fileReader(file_path) } };
+
+    log.debug("Start loading a level on depth {d} from {s}", .{ self.new_depth, file_path });
+
+    const file_reader = try self.session.runtime.fileReader(file_path);
+    errdefer file_reader.deinit();
+
+    const reader = file_reader.reader();
+    const seed = try reader.readInt(u64, .big);
+    self.session.level = try g.Level.initEmpty(
+        self.session.arena.allocator(),
+        &self.session.registry,
+        self.session.player,
+        self.new_depth,
+        seed,
+    );
+    return .{ .loading = .{ .reader = file_reader } };
 }
 
 /// Removes all entities belong to the level from the registry.
 /// It should be done before init a new level and deinit previous one.
-fn removeEntitiesFromLevel(self: Self) !void {
+fn removeEntitiesOfTheLevel(self: Self) !void {
     for (self.session.level.entities.items) |entity| {
         if (!entity.eql(self.session.player))
             try self.session.registry.removeEntity(entity);

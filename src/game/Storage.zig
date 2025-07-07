@@ -10,8 +10,6 @@ const log = std.log.scoped(.storage);
 const Percent = u8;
 
 const JsonTag = enum {
-    depth,
-    dungeon_seed,
     entity,
     entities,
     place,
@@ -54,26 +52,7 @@ pub fn loadLevel(
 
     assertEql(try json.next(), .object_begin);
 
-    // Read the depth and dungeon seed to initialize the level.
-    // They have to be the first two fields in the current json object
-    var depth: ?u8 = null;
-    var dungeon_seed: ?u64 = null;
-    var next_tag: JsonTag = undefined;
-    while (true) {
-        next_tag = try JsonTag.readFromField(&json);
-        switch (next_tag) {
-            .depth => depth = try std.fmt.parseInt(u8, (try json.next()).number, 10),
-            .dungeon_seed => dungeon_seed = try std.fmt.parseInt(u64, (try json.next()).number, 10),
-            else => break,
-        }
-    }
-    const dungeon = (try level.generateDungeon(depth.?, dungeon_seed.?)) orelse {
-        log.err("A dungeon was not generate from the saved seed {d}", .{dungeon_seed.?});
-        return error.BrokenSeed;
-    };
-    try level.setupDungeon(depth.?, dungeon);
-
-    // Read other fields and set them to the already initialized level
+    var next_tag: JsonTag = try JsonTag.readFromField(&json);
     loop: while (true) {
         switch (next_tag) {
             .entities => {
@@ -141,10 +120,6 @@ pub fn saveLevel(
     defer jws.deinit();
 
     try jws.beginObject();
-    try JsonTag.depth.writeAsField(&jws);
-    try jws.write(level.depth);
-    try JsonTag.dungeon_seed.writeAsField(&jws);
-    try jws.write(level.dungeon.seed);
     try JsonTag.entities.writeAsField(&jws);
     try jws.beginObject();
     for (level.entities.items) |entity| {

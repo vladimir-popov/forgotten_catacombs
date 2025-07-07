@@ -5,8 +5,8 @@ const p = g.primitives;
 
 const DijkstraMap = @This();
 
-const Vector = struct { direction: p.Direction, distance: u8 };
-const VectorsMap = std.AutoHashMapUnmanaged(p.Point, Vector);
+pub const Vector = struct { direction: p.Direction, distance: u8 };
+pub const VectorsMap = std.AutoHashMapUnmanaged(p.Point, Vector);
 
 pub const Obstacles = struct {
     context: *const anyopaque,
@@ -17,69 +17,59 @@ pub const Obstacles = struct {
     }
 };
 
-alloc: std.mem.Allocator,
-region: p.Region,
-/// The Dijkstra map that provides an optimal direction to the player, and counts of moves
+/// Returns the Dijkstra map that provides an optimal direction to the player, and counts of moves
 /// needed to achieve the player in that direction.
 /// The weight == 0 means that the place is unreachable and has some obstacle.
-vectors: VectorsMap,
-obstacles: Obstacles,
-
-pub fn init(alloc: std.mem.Allocator, region: p.Region, obstacles: Obstacles) DijkstraMap {
-    return .{ .alloc = alloc, .vectors = .empty, .region = region, .obstacles = obstacles };
-}
-
-pub fn deinit(self: *DijkstraMap) void {
-    self.vectors.deinit(self.alloc);
-}
-
-pub fn calculate(self: *DijkstraMap, target: p.Point) !void {
+pub fn calculate(
+    alloc: std.mem.Allocator,
+    map: *VectorsMap,
+    region: p.Region,
+    obstacles: Obstacles,
+    target: p.Point,
+) !void {
     var openned: std.ArrayListUnmanaged(struct { p.Point, u8 }) = .empty;
-    defer openned.deinit(self.alloc);
+    defer openned.deinit(alloc);
 
-    self.vectors.clearRetainingCapacity();
+    map.clearRetainingCapacity();
 
-    try openned.append(self.alloc, .{ target, 0 });
+    try openned.append(alloc, .{ target, 0 });
     while (openned.pop()) |tuple| {
         const weight: u8 = tuple[1];
         for (&[_]p.Direction{ .left, .up, .right, .down }) |direction| {
             const neighbor = tuple[0].movedTo(direction);
-            if (!self.region.containsPoint(neighbor) or neighbor.eql(target) or self.obstacles.isObstacle(neighbor))
+            if (!region.containsPoint(neighbor) or neighbor.eql(target) or obstacles.isObstacle(neighbor))
                 continue;
 
-            const gop = try self.vectors.getOrPut(self.alloc, neighbor);
+            const gop = try map.getOrPut(alloc, neighbor);
             if (!gop.found_existing or gop.value_ptr.distance > weight + 1) {
                 gop.value_ptr.* = .{ .direction = direction.opposite(), .distance = weight + 1 };
-                try openned.append(self.alloc, .{ neighbor, weight + 1 });
+                try openned.append(alloc, .{ neighbor, weight + 1 });
             }
         }
     }
 }
 
-pub fn dumpToLog(self: DijkstraMap) void {
+pub fn dumpToLog(map: VectorsMap, region: p.Region) void {
     var buf: [2048]u8 = [_]u8{0} ** 2048;
     var writer = std.io.fixedBufferStream(&buf);
-    self.write(writer.writer().any()) catch unreachable;
-    std.log.debug("Dijkstra Map ({any}):\n{s}", .{ self.region, std.mem.sliceTo(&buf, 0) });
+    DijkstraMap.write(map, writer.writer().any(), region) catch unreachable;
+    std.log.debug("Dijkstra Map ({any}):\n{s}", .{ region, std.mem.sliceTo(&buf, 0) });
 }
 
-fn write(
-    self: DijkstraMap,
-    writer: std.io.AnyWriter,
-) !void {
+fn write(map: VectorsMap, writer: std.io.AnyWriter, region: p.Region) !void {
     try writer.print("   |", .{});
-    for (0..self.region.cols) |col_idx| {
+    for (0..region.cols) |col_idx| {
         try writer.print("{d:3}|", .{col_idx + 1});
     }
     try writer.writeByte('\n');
-    for (0..self.region.rows) |row_idx| {
+    for (0..region.rows) |row_idx| {
         try writer.print("{d:3}|", .{row_idx + 1});
-        for (0..self.region.cols) |col_idx| {
+        for (0..region.cols) |col_idx| {
             const place = p.Point{
-                .row = @intCast(row_idx + self.region.top_left.row),
-                .col = @intCast(col_idx + self.region.top_left.col),
+                .row = @intCast(row_idx + region.top_left.row),
+                .col = @intCast(col_idx + region.top_left.col),
             };
-            if (self.vectors.get(place)) |vector| {
+            if (map.get(place)) |vector| {
                 const char = directionToArrow(vector.direction);
                 try writer.print("{c}{d:2}|", .{ char, vector.distance });
             } else {
@@ -110,14 +100,14 @@ test "vectors for the middle of the empty region 5x5" {
         .context = undefined,
         .isObstacleFn = clojure.noObstacles,
     };
-    var field = DijkstraMap.init(std.testing.allocator, region, obstacles);
-    defer field.deinit();
 
-    try field.calculate(.{ .row = 3, .col = 3 });
+    var map: VectorsMap = .empty;
+    defer map.deinit(std.testing.allocator);
+    try DijkstraMap.calculate(std.testing.allocator, &map, region, obstacles, .{ .row = 3, .col = 3 });
 
     var buf: [512]u8 = [1]u8{0} ** 512;
     var fbs = std.io.fixedBufferStream(&buf);
-    try field.write(fbs.writer().any());
+    try DijkstraMap.write(map, fbs.writer().any(), region);
     const expected =
         \\   |  1|  2|  3|  4|  5|
         \\  1|> 4|> 3|v 2|v 3|v 4|
@@ -148,14 +138,13 @@ test "vectors for the region with obstacles" {
         .context = undefined,
         .isObstacleFn = clojure.isObstacle,
     };
-    var field = DijkstraMap.init(std.testing.allocator, region, obstacles);
-    defer field.deinit();
-
-    try field.calculate(.{ .row = 3, .col = 3 });
+    var map: VectorsMap = .empty;
+    defer map.deinit(std.testing.allocator);
+    try DijkstraMap.calculate(std.testing.allocator, &map, region, obstacles, .{ .row = 3, .col = 3 });
 
     var buf: [512]u8 = [1]u8{0} ** 512;
     var fbs = std.io.fixedBufferStream(&buf);
-    try field.write(fbs.writer().any());
+    try DijkstraMap.write(map, fbs.writer().any(), region);
     const expected =
         \\   |  1|  2|  3|  4|  5|
         \\  1|v 8|? 0|v 2|v 3|v 4|

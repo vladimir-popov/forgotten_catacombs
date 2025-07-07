@@ -80,11 +80,10 @@ pub fn init(
         .registry = try g.Registry.init(self.arena.allocator()),
         .player = try self.registry.addNewEntityAllocate(g.entities.player),
         .events = g.events.EventBus.init(&self.arena),
-        .level = g.Level.preinit(self.arena.allocator(), &self.registry, self.player),
+        .level = try g.Level.initFirstLevel(self.arena.allocator(), &self.registry, self.player),
         .max_depth = 0,
         .mode = .{ .play = undefined },
     };
-    try self.level.initFirstLevel();
     try self.equipPlayer();
     self.viewport.centeredAround(self.level.playerPosition().place);
     self.viewport.region.top_left.moveNTimes(.up, 3);

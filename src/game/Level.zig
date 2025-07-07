@@ -18,7 +18,9 @@ pub const Cell = union(enum) {
     entities: [3]?g.Entity,
 };
 
-arena: std.heap.ArenaAllocator,
+pub const DijkstraMapRegion = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 12, .cols = 25 };
+
+arena: *std.heap.ArenaAllocator,
 registry: *g.Registry,
 player: g.Entity,
 /// The list of the entities belong to this level.
@@ -36,76 +38,75 @@ remembered_objects: std.AutoHashMapUnmanaged(p.Point, g.Entity) = .empty,
 /// The placement where the player right now. It's used for optimization.
 player_placement: d.Placement = undefined,
 /// Dijkstra Map of direction to the player. Used to find a path to the player.
-dijkstra_map: u.DijkstraMap = undefined,
+dijkstra_map: u.DijkstraMap.VectorsMap,
 
-/// Starts initialization of the level. Prepares an arena for all other fields.
-/// The full initialization should include:
-/// - preinit
-/// - setupDungeon
-/// - completeInitialization
-pub fn preinit(alloc: std.mem.Allocator, registry: *g.Registry, player: g.Entity) Self {
-    return .{
-        .arena = std.heap.ArenaAllocator.init(alloc),
+fn init(
+    arena: *std.heap.ArenaAllocator,
+    registry: *g.Registry,
+    depth: u8,
+    dungeon: d.Dungeon,
+    player: g.Entity,
+) !Self {
+    log.debug("Init a level on depth {d} with a dungeon {s}.", .{ depth, @tagName(dungeon.type) });
+    const visibility_strategy: *const fn (level: *const g.Level, place: p.Point) g.Render.Visibility =
+        switch (dungeon.type) {
+            .first_location => g.visibility.showTheCurrentPlacement,
+            .cave => g.visibility.showInRadiusOfSourceOfLight,
+            .catacomb => if (depth < 3)
+                g.visibility.showTheCurrentPlacement
+            else
+                g.visibility.showTheCurrentPlacementInLight,
+        };
+    var self = Self{
+        .arena = arena,
+        .depth = depth,
         .registry = registry,
         .player = player,
+        .dungeon = dungeon,
         .entities = .empty,
+        .visibility_strategy = visibility_strategy,
+        .visited_places = try arena.allocator().alloc(std.DynamicBitSetUnmanaged, dungeon.rows),
+        .remembered_objects = .empty,
+        .dijkstra_map = .empty,
     };
-}
-
-pub fn setupDungeon(self: *Self, depth: u8, dungeon: d.Dungeon) !void {
-    log.debug("Setup the dungeon {s} on depth {d}", .{ @tagName(dungeon.type), depth });
-    const alloc = self.arena.allocator();
-    self.depth = depth;
-    self.dungeon = dungeon;
-    self.entities.clearRetainingCapacity();
-    self.visibility_strategy = switch (dungeon.type) {
-        .first_location => g.visibility.showTheCurrentPlacement,
-        .cave => g.visibility.showInRadiusOfSourceOfLight,
-        .catacomb => if (self.depth < 3)
-            g.visibility.showTheCurrentPlacement
-        else
-            g.visibility.showTheCurrentPlacementInLight,
-    };
-    self.visited_places = try self.arena.allocator().alloc(std.DynamicBitSetUnmanaged, dungeon.rows);
-    self.remembered_objects = std.AutoHashMapUnmanaged(p.Point, g.Entity){};
-    self.dijkstra_map = u.DijkstraMap.init(
-        self.arena.allocator(),
-        .{ .top_left = .{ .row = 1, .col = 1 }, .rows = 12, .cols = 25 },
-        self.obstacles(),
-    );
+    const alloc = arena.allocator();
     for (0..self.dungeon.rows) |r0| {
         self.visited_places[r0] = try std.DynamicBitSetUnmanaged.initEmpty(alloc, self.dungeon.cols);
     }
+    return self;
 }
 
-/// Sets up a position for player and remembers the placement with player.
-/// This method should be invoked right after setup of a dungeon.
-pub fn completeInitialization(self: *Self, direction: c.Ladder.Direction) !void {
-    const init_place = switch (direction) {
-        .down => self.dungeon.entrance,
-        .up => self.dungeon.exit,
-    };
-    // Generate player on the ladder
-    try self.registry.set(self.player, c.Position{ .place = init_place });
-    self.player_placement = self.dungeon.placementWith(self.playerPosition().place).?;
-
-    log.debug(
-        "The level completed. Depth {d}; seed {d}; type {d}",
-        .{ self.depth, self.dungeon.seed, @tagName(self.dungeon.type) },
-    );
-}
-
-fn deinit(self: *Self) void {
+pub fn deinit(self: *Self) void {
+    const alloc = self.arena.child_allocator;
     self.arena.deinit();
+    alloc.destroy(self.arena);
 }
 
-/// Complete initialization of a preinited level as the first level of the game.
-pub fn initFirstLevel(self: *Self) !void {
+pub fn initEmpty(
+    alloc: std.mem.Allocator,
+    registry: *g.Registry,
+    player: g.Entity,
+    depth: u8,
+    seed: u64,
+) !Self {
+    const arena = try alloc.create(std.heap.ArenaAllocator);
+    arena.* = std.heap.ArenaAllocator.init(alloc);
+    const dungeon = try generateDungeon(arena, depth, seed) orelse {
+        log.err("A dungeon was not generate from the saved seed {d}", .{seed});
+        return error.BrokenSeed;
+    };
+    return try init(arena, registry, depth, dungeon, player);
+}
+
+pub fn initFirstLevel(
+    alloc: std.mem.Allocator,
+    registry: *g.Registry,
+    player: g.Entity,
+) !Self {
     log.debug("Start creating the first level.", .{});
 
-    const alloc = self.arena.allocator();
-
-    try self.setupDungeon(0, try d.FirstLocation.generateDungeon(&self.arena));
+    var self = try initEmpty(alloc, registry, player, 0, 0);
+    const arena_alloc = self.arena.allocator();
 
     // Add wharf
     var entity = try self.registry.addNewEntity(.{
@@ -114,7 +115,7 @@ pub fn initFirstLevel(self: *Self) !void {
         .sprite = .{ .codepoint = cp.ladder_up },
         .position = .{ .place = self.dungeon.entrance },
     });
-    try self.entities.append(alloc, entity);
+    try self.entities.append(arena_alloc, entity);
 
     // Add the ladder leads to the bottom dungeons:
     entity = self.registry.newEntity();
@@ -129,7 +130,7 @@ pub fn initFirstLevel(self: *Self) !void {
         .sprite = .{ .codepoint = cp.ladder_down },
         .position = .{ .place = self.dungeon.exit },
     });
-    try self.entities.append(alloc, entity);
+    try self.entities.append(arena_alloc, entity);
 
     // Add the trader
     entity = try self.registry.addNewEntity(.{
@@ -138,7 +139,7 @@ pub fn initFirstLevel(self: *Self) !void {
         .sprite = .{ .codepoint = cp.human },
         .description = .{ .preset = .traider },
     });
-    try self.entities.append(alloc, entity);
+    try self.entities.append(arena_alloc, entity);
 
     // Add the scientist
     entity = try self.registry.addNewEntity(.{
@@ -147,39 +148,54 @@ pub fn initFirstLevel(self: *Self) !void {
         .sprite = .{ .codepoint = cp.human },
         .description = .{ .preset = .scientist },
     });
-    try self.entities.append(alloc, entity);
+    try self.entities.append(arena_alloc, entity);
 
     // Add the teleport
     entity = try self.registry.addNewEntity(g.entities.teleport(d.FirstLocation.teleport_place));
-    try self.entities.append(alloc, entity);
+    try self.entities.append(arena_alloc, entity);
 
     // Add doors
     var doors = self.dungeon.doorways.?.iterator();
     while (doors.next()) |entry| {
         entry.value_ptr.door_id = try self.registry.addNewEntity(g.entities.ClosedDoor);
         try self.registry.set(entry.value_ptr.door_id, c.Position{ .place = entry.key_ptr.* });
-        try self.entities.append(alloc, entry.value_ptr.door_id);
+        try self.entities.append(arena_alloc, entry.value_ptr.door_id);
         log.debug(
             "For the doorway on {any} added closed door with id {d}",
             .{ entry.key_ptr.*, entry.value_ptr.door_id.id },
         );
     }
     try self.completeInitialization(.down);
+    return self;
 }
 
 /// Tries to generate a new level with passed seed. The level should be at least preinited.
 /// In successful case the level will be reinitialized and true returned. Otherwise the level
 /// will be not changed and false returned.
-pub fn tryGenerateNew(self: *Self, depth: u8, from_ladder: c.Ladder, seed: u64) !bool {
+pub fn tryGenerateNew(
+    alloc: std.mem.Allocator,
+    registry: *g.Registry,
+    player: g.Entity,
+    depth: u8,
+    from_ladder: c.Ladder,
+    seed: u64,
+) !?Self {
     log.debug(
-        "Generate level {s} on depth {d} from ladder {any}",
+        "Generate a level {s} on depth {d} from ladder {any}",
         .{ @tagName(from_ladder.direction), depth, from_ladder },
     );
-    const alloc = self.arena.allocator();
+    const arena = try alloc.create(std.heap.ArenaAllocator);
+    arena.* = std.heap.ArenaAllocator.init(alloc);
 
-    const dungeon: d.Dungeon = (try self.generateDungeon(depth, seed)) orelse return false;
+    const dungeon: d.Dungeon = (try generateDungeon(arena, depth, seed)) orelse {
+        alloc.destroy(arena);
+        return null;
+    };
+    log.debug("On depth {d} a dungeon {s} has been generated", .{ depth, @tagName(dungeon.type) });
 
-    try self.setupDungeon(depth, dungeon);
+    const arena_alloc = arena.allocator();
+
+    var self = try init(arena, registry, depth, dungeon, player);
 
     const init_place = switch (from_ladder.direction) {
         .down => self.dungeon.entrance,
@@ -212,7 +228,7 @@ pub fn tryGenerateNew(self: *Self, depth: u8, from_ladder: c.Ladder, seed: u64) 
         while (doors.next()) |entry| {
             entry.value_ptr.door_id = try self.registry.addNewEntity(g.entities.ClosedDoor);
             try self.registry.set(entry.value_ptr.door_id, c.Position{ .place = entry.key_ptr.* });
-            try self.entities.append(alloc, entry.value_ptr.door_id);
+            try self.entities.append(arena_alloc, entry.value_ptr.door_id);
             log.debug(
                 "For the doorway on {any} added closed door with id {d}",
                 .{ entry.key_ptr.*, entry.value_ptr.door_id.id },
@@ -220,16 +236,32 @@ pub fn tryGenerateNew(self: *Self, depth: u8, from_ladder: c.Ladder, seed: u64) 
         }
     }
     try self.completeInitialization(from_ladder.direction);
-    return true;
+    return self;
 }
 
-pub fn generateDungeon(self: *Self, depth: u8, seed: u64) !?d.Dungeon {
+/// Sets up a position for a player and remembers the placement with the player.
+pub fn completeInitialization(self: *Self, direction: c.Ladder.Direction) !void {
+    const init_place = switch (direction) {
+        .down => self.dungeon.entrance,
+        .up => self.dungeon.exit,
+    };
+    // Generate player on the ladder
+    try self.registry.set(self.player, c.Position{ .place = init_place });
+    self.player_placement = self.dungeon.placementWith(self.playerPosition().place).?;
+
+    log.debug(
+        "The level is completed. Depth {d}; seed {d}; type {s}",
+        .{ self.depth, self.dungeon.seed, @tagName(self.dungeon.type) },
+    );
+}
+
+fn generateDungeon(arena: *std.heap.ArenaAllocator, depth: u8, seed: u64) !?d.Dungeon {
     return if (depth == 0)
-        try d.FirstLocation.generateDungeon(&self.arena)
+        try d.FirstLocation.generateDungeon(arena)
     else if (depth < 3)
-        try d.Cave.generateDungeon(&self.arena, .{}, seed)
+        try d.Cave.generateDungeon(arena, .{}, seed)
     else
-        try d.Catacomb.generateDungeon(&self.arena, .{}, seed);
+        try d.Catacomb.generateDungeon(arena, .{}, seed);
 }
 
 pub fn isVisited(self: Self, place: p.Point) bool {
@@ -411,8 +443,13 @@ pub fn onPlayerMoved(self: *Self, player_moved: g.events.EntityMoved) !void {
     std.debug.assert(player_moved.is_player);
     self.updatePlacement(player_moved.moved_from, player_moved.targetPlace());
     const player_place = self.playerPosition().place;
-    self.dijkstra_map.region.centralizeAround(player_place);
-    try self.dijkstra_map.calculate(player_place);
+    try u.DijkstraMap.calculate(
+        self.arena.allocator(),
+        &self.dijkstra_map,
+        DijkstraMapRegion.centralizedAround(player_place),
+        self.obstacles(),
+        player_place,
+    );
 }
 
 fn updatePlacement(self: *Self, player_moved_from: p.Point, player_moved_to: p.Point) void {
