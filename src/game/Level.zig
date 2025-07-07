@@ -40,6 +40,25 @@ player_placement: d.Placement = undefined,
 /// Dijkstra Map of direction to the player. Used to find a path to the player.
 dijkstra_map: u.DijkstraMap.VectorsMap,
 
+/// Creates an instance of the level with dungeon generated with passed seed.
+///
+/// See also `initFirstLevel`, `tryGenerateNew`, `completeInitialization`.
+pub fn initEmpty(
+    alloc: std.mem.Allocator,
+    registry: *g.Registry,
+    player: g.Entity,
+    depth: u8,
+    seed: u64,
+) !Self {
+    const arena = try alloc.create(std.heap.ArenaAllocator);
+    arena.* = std.heap.ArenaAllocator.init(alloc);
+    const dungeon = try generateDungeon(arena, depth, seed) orelse {
+        log.err("A dungeon was not generate from the saved seed {d}", .{seed});
+        return error.BrokenSeed;
+    };
+    return try init(arena, registry, depth, dungeon, player);
+}
+
 fn init(
     arena: *std.heap.ArenaAllocator,
     registry: *g.Registry,
@@ -80,22 +99,6 @@ pub fn deinit(self: *Self) void {
     const alloc = self.arena.child_allocator;
     self.arena.deinit();
     alloc.destroy(self.arena);
-}
-
-pub fn initEmpty(
-    alloc: std.mem.Allocator,
-    registry: *g.Registry,
-    player: g.Entity,
-    depth: u8,
-    seed: u64,
-) !Self {
-    const arena = try alloc.create(std.heap.ArenaAllocator);
-    arena.* = std.heap.ArenaAllocator.init(alloc);
-    const dungeon = try generateDungeon(arena, depth, seed) orelse {
-        log.err("A dungeon was not generate from the saved seed {d}", .{seed});
-        return error.BrokenSeed;
-    };
-    return try init(arena, registry, depth, dungeon, player);
 }
 
 pub fn initFirstLevel(
@@ -316,7 +319,7 @@ pub fn addEntityAtPlace(self: *Self, item: g.Entity, place: p.Point) !?g.Entity 
                     return entity;
                 } else {
                     // or create a new pile and add the item to the pile
-                    const pile_id = try self.registry.addNewEntityAllocate(g.entities.pile);
+                    const pile_id = try self.registry.addNewEntity(try g.entities.pile(self.registry.alloc));
                     try self.entities.append(self.arena.allocator(), pile_id);
                     try self.registry.set(pile_id, c.Position{ .place = place });
                     const pile = self.registry.getUnsafe(pile_id, c.Pile);

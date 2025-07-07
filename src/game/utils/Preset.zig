@@ -32,8 +32,9 @@ pub fn Preset(comptime S: type) type {
     const stringMap = std.StaticStringMap(*const T).initComptime(&kvs);
 
     return struct {
-        pub const Keys = StructFields(S);
+        pub const Keys = std.meta.FieldEnum(S);
 
+        /// Returns default value for the field appropriate to the passed `key`.
         pub fn get(key: Keys) *const T {
             return stringMap.get(@tagName(key)).?;
         }
@@ -44,21 +45,6 @@ fn typeOfTheFirstField(comptime S: type) type {
     const type_info = @typeInfo(S);
     const struct_fields = type_info.@"struct".fields;
     return struct_fields[0].type;
-}
-
-fn StructFields(comptime S: type) type {
-    const type_info = @typeInfo(S);
-    const struct_fields = type_info.@"struct".fields;
-    var values: [struct_fields.len]Type.EnumField = undefined;
-    for (struct_fields, 0..) |field, i| {
-        values[i] = .{ .name = field.name, .value = i };
-    }
-    return @Type(.{ .@"enum" = .{
-        .fields = &values,
-        .decls = &[_]std.builtin.Type.Declaration{},
-        .tag_type = u8,
-        .is_exhaustive = true,
-    } });
 }
 
 test Preset {

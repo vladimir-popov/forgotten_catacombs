@@ -21,7 +21,7 @@ pub const Obstacles = struct {
 /// needed to achieve the player in that direction.
 /// The weight == 0 means that the place is unreachable and has some obstacle.
 pub fn calculate(
-    alloc: std.mem.Allocator,
+    alloc: std.mem.Allocator, // FIXME: avoid using allocator here
     map: *VectorsMap,
     region: p.Region,
     obstacles: Obstacles,

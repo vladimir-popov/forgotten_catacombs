@@ -7,10 +7,10 @@ pub const dungeon = @import("dungeon/dungeon_pkg.zig");
 pub const ecs = @import("ecs/ecs_pkg.zig");
 pub const entities = @import("entities.zig");
 pub const events = @import("events.zig");
-pub const dto = @import("dto.zig");
+pub const persistance = @import("persistance.zig");
 pub const primitives = @import("primitives.zig");
-pub const visibility = @import("visibility_strategies.zig");
 pub const utils = @import("utils/utils_pkg.zig");
+pub const visibility = @import("visibility_strategies.zig");
 pub const windows = @import("windows/windows_pkg.zig");
 
 pub const Action = @import("actions.zig").Action;
@@ -27,7 +27,6 @@ pub const MovePoints = @import("actions.zig").MovePoints;
 pub const Registry = ecs.Registry(components.Components);
 pub const Render = @import("Render.zig");
 pub const Runtime = @import("Runtime.zig");
-pub const Storage = @import("Storage.zig");
 pub const TextAlign = Runtime.TextAlign;
 pub const Viewport = @import("Viewport.zig");
 
