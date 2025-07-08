@@ -216,8 +216,8 @@ pub const Reader = struct {
     }
 
     fn readValue(self: *Reader, comptime T: type) !T {
-        const value = try std.json.Value.jsonParse(self.arena.allocator(), self.reader, .{});
-        try std.json.parseFromValueLeaky(T, self.arena.allocator(), value);
+        const value = try std.json.Value.jsonParse(self.arena.allocator(), &self.reader, .{});
+        return try std.json.parseFromValueLeaky(T, self.arena.allocator(), value, .{});
     }
     // =====================================
 
@@ -231,12 +231,12 @@ pub const Reader = struct {
         const alloc = level.arena.allocator();
         try self.beginCollection();
         while (try self.isCollectionEnd()) {
-            level.entities.append(alloc, try self.readEntity(level.registry));
+            try level.entities.append(alloc, try self.readEntity(level.registry));
         }
         try self.endCollection();
     }
 
-    pub fn readVisitedPlaces(self: *Reader, level: *g.Level) ![]std.DynamicBitSetUnmanaged {
+    pub fn readVisitedPlaces(self: *Reader, level: *g.Level) !void {
         assertEql(try self.readStringKey(), "visited_places");
         try self.beginCollection();
         for (0..level.dungeon.rows) |i| {
@@ -254,15 +254,15 @@ pub const Reader = struct {
         const alloc = level.arena.allocator();
         while (!try self.isCollectionEnd()) {
             try self.beginObject();
-            const entity = g.Entity{ .id = try self.readNumericKey(g.Entity.IdType).? };
+            const entity = g.Entity{ .id = try self.readNumericKey(g.Entity.IdType) };
             const place = try self.readValue(p.Point);
-            level.remembered_objects.put(alloc, place, entity);
+            try level.remembered_objects.put(alloc, place, entity);
             try self.endObject();
         }
         try self.endCollection();
     }
 
-    fn readEntity(self: *Reader, registry: *g.Registry) !g.Entity {
+    fn readEntity(self: *Reader, registry: *g.Registry) anyerror!g.Entity {
         try self.beginObject();
         const entity = g.Entity{ .id = try self.readNumericKey(g.Entity.IdType) };
         try self.readComponents(entity, registry);
@@ -272,25 +272,27 @@ pub const Reader = struct {
 
     fn readComponents(self: *Reader, entity: g.Entity, registry: *g.Registry) !void {
         try self.beginObject();
-        while (!try self.isObjectEnd()) {
-            const key = (try self.readStringKey());
-            const typeTag: g.Registry.TypeTag = std.meta.stringToEnum(g.Registry.TypeTag, key).?;
-            const C = @FieldType(c.Components, @tagName(typeTag));
-            try self.readComponent(C, entity, registry);
+        inline for (std.meta.fields(c.Components)) |field| {
+            if (try self.isObjectEnd()) break;
+            const key = try self.readStringKey();
+            if (std.mem.eql(u8, key, field.name)) {
+                const C = @typeInfo(field.type).optional.child;
+                try self.readComponent(C, entity, registry);
+            }
         }
         try self.endObject();
     }
 
     fn readComponent(self: *Reader, comptime C: type, entity: g.Entity, registry: *g.Registry) !void {
         const component: C = if (C == c.Inventory or C == c.Pile)
-            C{ .items = self.readEntitiesSet(registry) }
+            C{ .items = try self.readEntitiesSet(registry) }
         else if (isDto(C))
             try self.readValue(C)
         else {
             log.err("Unsupported deserialization for {any}. It should be DTO.", .{@typeName(C)});
             return error.UnsupportedType;
         };
-        try registry.set(entity, C, component);
+        try registry.set(entity, component);
     }
 
     fn readEntitiesSet(self: *Reader, registry: *g.Registry) !u.EntitiesSet {
