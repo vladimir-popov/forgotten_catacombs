@@ -1,3 +1,6 @@
+//! The persistence layer currently implemented with Json format.
+//! Note, that this implementation is order sensitive. It means that fields of every persisted
+//! structure must follow the same order on reading in which they were written.
 const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
@@ -7,325 +10,454 @@ const u = g.utils;
 
 const log = std.log.scoped(.persistance);
 
-pub const Writer = struct {
-    registry: *const g.Registry,
-    writer: std.json.WriteStream(g.Runtime.FileWriter.Writer, .checked_to_arbitrary_depth),
+pub fn Writer(comptime Underlying: type) type {
+    return struct {
+        const Self = @This();
 
-    pub fn init(alloc: std.mem.Allocator, registry: *const g.Registry, file_writer: g.Runtime.FileWriter) Writer {
-        return .{
-            .registry = registry,
-            .writer = std.json.writeStreamArbitraryDepth(
-                alloc,
-                file_writer.writer(),
-                .{ .emit_null_optional_fields = false },
-            ),
-        };
-    }
+        pub const Error = anyerror;
 
-    pub fn deinit(self: *Writer) void {
-        self.writer.deinit();
-    }
+        // used to get components of entities inside containers such as pile or inventory
+        registry: *const g.Registry,
+        writer: std.json.WriteStream(Underlying, .{ .checked_to_fixed_depth = 256 }),
 
-    // ==== The interface of any writer  =====
-
-    pub fn beginObject(self: *Writer) !void {
-        try self.writer.beginObject();
-    }
-
-    pub fn endObject(self: *Writer) !void {
-        try self.writer.endObject();
-    }
-
-    pub fn beginCollection(self: *Writer) !void {
-        try self.writer.beginArray();
-    }
-
-    pub fn endCollection(self: *Writer) !void {
-        try self.writer.endArray();
-    }
-
-    fn writeStringKey(self: *Writer, name: []const u8) !void {
-        try self.writer.objectField(name);
-    }
-
-    fn writeNumericKey(self: *Writer, key: anytype) !void {
-        const type_info = @typeInfo(@TypeOf(key));
-        var buf: [@divExact(type_info.int.bits, 8)]u8 = undefined;
-        switch (type_info) {
-            .int => try self.writeStringKey(try std.fmt.bufPrint(&buf, "{d}", .{key})),
-            else => {
-                log.err("Unsupported type for key {any}", .{@typeName(type_info)});
-                return error.UnsupportedType;
-            },
+        pub fn init(registry: *const g.Registry, writer: Underlying) Self {
+            return .{
+                .registry = registry,
+                .writer = std.json.writeStream(
+                    writer,
+                    .{ .emit_null_optional_fields = false },
+                ),
+            };
         }
-    }
 
-    fn writeValue(self: *Writer, value: anytype) !void {
-        try self.writer.write(value);
-    }
-    // =====================================
-
-    pub fn writeSeed(self: *Writer, seed: u64) !void {
-        try self.writeStringKey("seed");
-        try self.writeValue(seed);
-    }
-
-    pub fn writeLevelEntities(self: *Writer, entities: []g.Entity) !void {
-        try self.writeStringKey("entities");
-        try self.beginCollection();
-        for (entities) |entity| {
-            try self.writeEntity(entity);
+        pub fn deinit(self: *Self) void {
+            self.writer.deinit();
         }
-        try self.endCollection();
-    }
 
-    pub fn writeVisitedPlaces(self: *Writer, places: []std.DynamicBitSetUnmanaged) !void {
-        try self.writeStringKey("visited_places");
-        try self.beginCollection();
-        for (places) |row| {
-            var itr = row.iterator(.{});
+        pub fn beginObject(self: *Self) Error!void {
+            try self.writer.beginObject();
+        }
+
+        pub fn endObject(self: *Self) Error!void {
+            try self.writer.endObject();
+        }
+
+        pub fn writeSeed(self: *Self, seed: u64) Error!void {
+            try self.writeStringKey("seed");
+            try self.writeValue(seed);
+        }
+
+        pub fn writeLevelEntities(self: *Self, entities: []g.Entity) Error!void {
+            try self.writeStringKey("entities");
             try self.beginCollection();
-            while (itr.next()) |idx| {
-                try self.writeValue(idx);
+            for (entities) |entity| {
+                try self.writeEntity(entity);
             }
             try self.endCollection();
         }
-        try self.endCollection();
-    }
 
-    pub fn writeRememberedObjects(self: *Writer, objects: std.AutoHashMapUnmanaged(p.Point, g.Entity)) !void {
-        try self.writeStringKey("remembered_objects");
-        var itr = objects.iterator();
-        try self.beginCollection();
-        while (itr.next()) |kv| {
-            try self.beginObject();
-            try self.writeNumericKey(kv.value_ptr.id);
-            try self.writeValue(kv.key_ptr.*);
-            try self.endObject();
-        }
-        try self.endCollection();
-    }
-
-    fn writeEntity(self: *Writer, entity: g.Entity) !void {
-        try self.beginObject();
-        try self.writeNumericKey(entity.id);
-        try self.writeComponents(try self.registry.entityToStruct(entity));
-        try self.endObject();
-    }
-
-    fn writeComponents(self: *Writer, components: c.Components) !void {
-        try self.beginObject();
-        inline for (std.meta.fields(c.Components)) |field| {
-            try self.writeStringKey(field.name);
-            try self.write(@field(components, field.name));
-        }
-        try self.endObject();
-    }
-
-    fn writeEntitiesSet(self: *Writer, items: u.EntitiesSet) !void {
-        try self.beginCollection();
-        var itr = items.iterator();
-        while (itr.next()) |entity| {
-            try self.writeEntity(entity);
-        }
-        try self.endCollection();
-    }
-
-    fn write(self: *Writer, value: anytype) !void {
-        const t = @TypeOf(value);
-        if (t == g.Entity) {
-            try self.writeEntity(@as(g.Entity, value));
-        } else if (t == c.Components) {
-            try self.writeComponents(@as(c.Components, value));
-        } else if (t == c.Inventory or t == c.Pile) {
-            try self.writeEntitiesSet(value.items);
-        } else if (isDto(t)) {
-            try self.writeValue(value);
-        } else {
-            log.err("Unsupported serialization for {any}. It should be DTO.", .{@typeName(@TypeOf(value))});
-            return error.UnsupportedType;
-        }
-    }
-};
-
-pub const Reader = struct {
-    /// This area is used to allocate every parsed value, and is used to manage memory consumption.
-    /// It can be freed after any reading. This is why all read data have to be copied somewhere
-    /// with more stable allocator.
-    arena: *std.heap.ArenaAllocator,
-    reader: std.json.Reader(4096, g.Runtime.FileReader.Reader),
-    registry: *g.Registry,
-
-    pub fn init(alloc: std.mem.Allocator, registry: *g.Registry, file_reader: g.Runtime.FileReader) !Reader {
-        const arena = try alloc.create(std.heap.ArenaAllocator);
-        arena.* = std.heap.ArenaAllocator.init(alloc);
-        return .{
-            .arena = arena,
-            .reader = std.json.reader(arena.allocator(), file_reader.reader()),
-            .registry = registry,
-        };
-    }
-
-    pub fn deinit(self: *Reader) void {
-        self.reader.deinit();
-        const alloc = self.arena.child_allocator;
-        self.arena.deinit();
-        alloc.destroy(self.arena);
-    }
-
-    pub fn resetBuffer(self: *Reader) void {
-        self.arena.reset(.retain_capacity);
-    }
-
-    // ==== The interface of any reader  =====
-
-    pub fn beginObject(self: *Reader) !void {
-        assertEql(try self.reader.next(), .object_begin);
-    }
-
-    pub fn endObject(self: *Reader) !void {
-        assertEql(try self.reader.next(), .object_end);
-    }
-
-    pub fn isObjectEnd(self: *Reader) !bool {
-        return try self.reader.peekNextTokenType() == .object_end;
-    }
-
-    pub fn beginCollection(self: *Reader) !void {
-        assertEql(try self.reader.next(), .array_begin);
-    }
-
-    pub fn endCollection(self: *Reader) !void {
-        assertEql(try self.reader.next(), .array_end);
-    }
-
-    pub fn isCollectionEnd(self: *Reader) !bool {
-        return try self.reader.peekNextTokenType() == .array_end;
-    }
-
-    fn readStringKey(self: *Reader) ![]const u8 {
-        return (try self.reader.nextAlloc(self.arena.allocator(), .alloc_if_needed)).string;
-    }
-
-    fn readNumericKey(self: *Reader, comptime N: type) !N {
-        return try std.fmt.parseInt(N, try self.readStringKey(), 10);
-    }
-
-    fn readNumber(self: *Reader, comptime T: type) !T {
-        return try std.fmt.parseInt(T, (try self.reader.next()).number, 10);
-    }
-
-    fn readValue(self: *Reader, comptime T: type) !T {
-        const value = try std.json.Value.jsonParse(self.arena.allocator(), &self.reader, .{});
-        return try std.json.parseFromValueLeaky(T, self.arena.allocator(), value, .{});
-    }
-    // =====================================
-
-    pub fn readSeed(self: *Reader) !u64 {
-        assertEql(try self.readStringKey(), "seed");
-        return try self.readNumber(u64);
-    }
-
-    pub fn readLevelEntities(self: *Reader, level: *g.Level) !void {
-        assertEql(try self.readStringKey(), "entities");
-        const alloc = level.arena.allocator();
-        try self.beginCollection();
-        while (try self.isCollectionEnd()) {
-            try level.entities.append(alloc, try self.readEntity(level.registry));
-        }
-        try self.endCollection();
-    }
-
-    pub fn readVisitedPlaces(self: *Reader, level: *g.Level) !void {
-        assertEql(try self.readStringKey(), "visited_places");
-        try self.beginCollection();
-        for (0..level.dungeon.rows) |i| {
+        pub fn writeVisitedPlaces(self: *Self, places: []std.DynamicBitSetUnmanaged) Error!void {
+            try self.writeStringKey("visited_places");
             try self.beginCollection();
-            while (try self.isCollectionEnd())
-                level.visited_places[i].set(try self.readNumber(usize));
+            for (places) |row| {
+                var itr = row.iterator(.{});
+                try self.beginCollection();
+                while (itr.next()) |idx| {
+                    try self.writeValue(idx);
+                }
+                try self.endCollection();
+            }
             try self.endCollection();
         }
-        try self.endCollection();
-    }
 
-    pub fn readRememberedObjects(self: *Reader, level: *g.Level) !void {
-        assertEql(try self.readStringKey(), "remembered_objects");
-        try self.beginCollection();
-        const alloc = level.arena.allocator();
-        while (!try self.isCollectionEnd()) {
+        pub fn writeRememberedObjects(self: *Self, objects: std.AutoHashMapUnmanaged(p.Point, g.Entity)) Error!void {
+            try self.writeStringKey("remembered_objects");
+            var itr = objects.iterator();
+            try self.beginCollection();
+            while (itr.next()) |kv| {
+                try self.beginObject();
+                try self.writeNumericKey(kv.value_ptr.id);
+                try self.writeValue(kv.key_ptr.*);
+                try self.endObject();
+            }
+            try self.endCollection();
+        }
+
+        fn writeEntity(self: *Self, entity: g.Entity) Error!void {
+            try self.beginObject();
+            try self.writeNumericKey(entity.id);
+            try self.write(try self.registry.entityToStruct(entity));
+            try self.endObject();
+        }
+
+        fn writeEntitiesSet(self: *Self, items: u.EntitiesSet) Error!void {
+            try self.beginCollection();
+            var itr = items.iterator();
+            while (itr.next()) |entity| {
+                try self.writeEntity(entity.*);
+            }
+            try self.endCollection();
+        }
+
+        fn write(self: *Self, value: anytype) Error!void {
+            const T = @TypeOf(value);
+            if (T == u.EntitiesSet) {
+                try self.writeEntitiesSet(@as(u.EntitiesSet, value));
+                return;
+            }
+            switch (@typeInfo(T)) {
+                .bool, .int, .float, .comptime_int, .comptime_float, .@"enum", .enum_literal => {
+                    try self.writeValue(value);
+                },
+                .optional => if (value == null) {
+                    log.err("null is not supported value.", .{});
+                    return error.UnsupportedType;
+                } else try self.write(value.?),
+                .array => |arr| {
+                    try self.beginCollection();
+                    for (0..arr.len) |i| {
+                        try self.write(value[i]);
+                    }
+                    try self.endCollection();
+                },
+                .pointer => |ptr| if (ptr.size == .slice) { // a single pointer is not supported
+                    try self.beginCollection();
+                    for (value) |v| {
+                        try self.write(v);
+                    }
+                    try self.endCollection();
+                },
+                .@"struct" => |s| {
+                    try self.beginObject();
+                    inline for (s.fields) |field| {
+                        const f_value = @field(value, field.name);
+                        if (@typeInfo(field.type) != .optional or f_value != null) {
+                            try self.writeStringKey(field.name);
+                            self.write(f_value) catch |err| {
+                                log.err("Error on writing {s}.{s}: {any}", .{ @typeName(T), field.name, err });
+                                return err;
+                            };
+                        }
+                    }
+                    try self.endObject();
+                },
+                .@"union" => |un| {
+                    // not tagged unions are not supported
+                    if (un.tag_type) |tt| {
+                        try self.beginObject();
+                        inline for (un.fields) |u_field| {
+                            if (value == @field(tt, u_field.name)) {
+                                try self.writeStringKey(u_field.name);
+                                if (u_field.type == void) {
+                                    // void value is {}
+                                    try self.beginObject();
+                                    try self.endObject();
+                                } else {
+                                    try self.write(@field(value, u_field.name));
+                                }
+                                break;
+                            }
+                        }
+                        try self.endObject();
+                    }
+                },
+                else => {
+                    log.err("Unsupported type for serialization: {s}.", .{@typeName(T)});
+                    return error.UnsupportedType;
+                },
+            }
+        }
+
+        fn beginCollection(self: *Self) Error!void {
+            try self.writer.beginArray();
+        }
+
+        fn endCollection(self: *Self) Error!void {
+            try self.writer.endArray();
+        }
+
+        fn writeStringKey(self: *Self, name: []const u8) Error!void {
+            try self.writer.objectField(name);
+        }
+
+        fn writeNumericKey(self: *Self, key: anytype) Error!void {
+            const type_info = @typeInfo(@TypeOf(key));
+            var buf: [@divExact(type_info.int.bits, 8)]u8 = undefined;
+            switch (type_info) {
+                .int => try self.writeStringKey(try std.fmt.bufPrint(&buf, "{d}", .{key})),
+                else => {
+                    log.err("Unsupported type for key {any}", .{@typeName(type_info)});
+                    return error.UnsupportedType;
+                },
+            }
+        }
+
+        fn writeValue(self: *Self, value: anytype) Error!void {
+            try self.writer.write(value);
+        }
+    };
+}
+
+pub fn Reader(comptime Underlying: type) type {
+    return struct {
+        const Self = @This();
+        pub const Error = anyerror;
+
+        registry: *g.Registry,
+        reader: std.json.Reader(4096, Underlying),
+        // a buffer for object keys. helps to avoid allocations
+        string_buffer: [128]u8 = undefined,
+
+        pub fn init(registry: *g.Registry, reader: Underlying) Self {
+            return .{
+                .registry = registry,
+                .reader = std.json.reader(registry.allocator(), reader),
+            };
+        }
+
+        pub fn deinit(self: *Self) void {
+            self.reader.deinit();
+        }
+
+        pub fn beginObject(self: *Self) Error!void {
+            assertEql(try self.reader.next(), .object_begin);
+        }
+
+        pub fn endObject(self: *Self) Error!void {
+            assertEql(try self.reader.next(), .object_end);
+        }
+
+        pub fn readSeed(self: *Self) Error!u64 {
+            assertEql(try self.readStringKey(), "seed");
+            return try self.readNumber(u64);
+        }
+
+        pub fn readLevelEntities(self: *Self, level: *g.Level) Error!void {
+            assertEql(try self.readStringKey(), "entities");
+            const alloc = level.arena.allocator();
+            try self.beginCollection();
+            while (!try self.isCollectionEnd()) {
+                try level.entities.append(alloc, try self.readEntity());
+            }
+            try self.endCollection();
+        }
+
+        pub fn readVisitedPlaces(self: *Self, level: *g.Level) Error!void {
+            assertEql(try self.readStringKey(), "visited_places");
+            try self.beginCollection();
+            for (0..level.dungeon.rows) |i| {
+                try self.beginCollection();
+                while (!try self.isCollectionEnd())
+                    level.visited_places[i].set(try self.readNumber(usize));
+                try self.endCollection();
+            }
+            try self.endCollection();
+        }
+
+        pub fn readRememberedObjects(self: *Self, level: *g.Level) Error!void {
+            assertEql(try self.readStringKey(), "remembered_objects");
+            try self.beginCollection();
+            const alloc = level.arena.allocator();
+            while (!try self.isCollectionEnd()) {
+                try self.beginObject();
+                const entity = g.Entity{ .id = try self.readNumericKey(g.Entity.IdType) };
+                const place = try self.readValue(p.Point);
+                try level.remembered_objects.put(alloc, place, entity);
+                try self.endObject();
+            }
+            try self.endCollection();
+        }
+
+        fn readEntity(self: *Self) anyerror!g.Entity {
             try self.beginObject();
             const entity = g.Entity{ .id = try self.readNumericKey(g.Entity.IdType) };
-            const place = try self.readValue(p.Point);
-            try level.remembered_objects.put(alloc, place, entity);
+            try self.registry.setComponentsToEntity(entity, try self.read(c.Components));
             try self.endObject();
+            return entity;
         }
-        try self.endCollection();
-    }
 
-    fn readEntity(self: *Reader, registry: *g.Registry) anyerror!g.Entity {
-        try self.beginObject();
-        const entity = g.Entity{ .id = try self.readNumericKey(g.Entity.IdType) };
-        try self.readComponents(entity, registry);
-        try self.endObject();
-        return entity;
-    }
-
-    fn readComponents(self: *Reader, entity: g.Entity, registry: *g.Registry) !void {
-        try self.beginObject();
-        inline for (std.meta.fields(c.Components)) |field| {
-            if (try self.isObjectEnd()) break;
-            const key = try self.readStringKey();
-            if (std.mem.eql(u8, key, field.name)) {
-                const C = @typeInfo(field.type).optional.child;
-                try self.readComponent(C, entity, registry);
+        fn readEntitiesSet(self: *Self) Error!u.EntitiesSet {
+            const set = try u.EntitiesSet.init(self.registry.allocator());
+            try self.beginCollection();
+            while (!try self.isCollectionEnd()) {
+                try set.add(try self.readEntity());
             }
+            try self.endCollection();
+            return set;
         }
-        try self.endObject();
-    }
 
-    fn readComponent(self: *Reader, comptime C: type, entity: g.Entity, registry: *g.Registry) !void {
-        const component: C = if (C == c.Inventory or C == c.Pile)
-            C{ .items = try self.readEntitiesSet(registry) }
-        else if (isDto(C))
-            try self.readValue(C)
-        else {
-            log.err("Unsupported deserialization for {any}. It should be DTO.", .{@typeName(C)});
+        // registry is used in case of EntitiesSet, to store the components during deserialization.
+        fn read(self: *Self, comptime T: type) Error!T {
+            if (T == u.EntitiesSet) {
+                return @as(T, try self.readEntitiesSet());
+            }
+            switch (@typeInfo(T)) {
+                .void => {
+                    try self.beginObject();
+                    try self.endObject();
+                    return {};
+                },
+                .bool, .int, .comptime_int, .float, .comptime_float, .@"enum", .enum_literal => {
+                    return try self.readValue(T);
+                },
+                .optional => |op| {
+                    return try self.read(op.child);
+                },
+                .array => |arr| {
+                    var buf: [arr.len]arr.child = undefined;
+                    try self.beginCollection();
+                    for (0..arr.len) |i| {
+                        buf[i] = try self.read(arr.child);
+                    }
+                    try self.endCollection();
+                    return buf;
+                },
+                .pointer => |ptr| if (ptr.size == .slice) {
+                    const buf: std.ArrayListUnmanaged(ptr.child) = .empty;
+                    errdefer buf.deinit(self.registry.alloc);
+
+                    try self.beginCollection();
+                    while (!try self.isCollectionEnd()) {
+                        const item = buf.addOne(self.registry.alloc);
+                        item.* = try self.read(ptr.child);
+                    }
+                    try self.endCollection();
+                    return buf.toOwnedSlice();
+                },
+                .@"struct" => |s| {
+                    try self.beginObject();
+                    var result: T = undefined;
+                    var prev_key: ?[]const u8 = null;
+                    inline for (s.fields) |field| {
+                        if (try self.isObjectEnd()) break;
+
+                        const key = prev_key orelse blk: {
+                            prev_key = try self.readStringKey();
+                            break :blk prev_key.?;
+                        };
+                        if (std.mem.eql(u8, key, field.name)) {
+                            @field(&result, field.name) = try self.read(field.type);
+                            prev_key = null;
+                        } else if (@typeInfo(field.type) == .optional) {
+                            @field(&result, field.name) = null;
+                        } else {
+                            log.err(
+                                "Error on reading {s}. Expected a key for the field {s}, but was read {s}",
+                                .{ @typeName(T), field.name, key },
+                            );
+                            return error.WrongInput;
+                        }
+                    }
+                    try self.endObject();
+                    return result;
+                },
+                .@"union" => |un| {
+                    try self.beginObject();
+                    const key = try self.readStringKey();
+                    inline for (un.fields) |u_field| {
+                        if (std.mem.eql(u8, u_field.name, key)) {
+                            return @unionInit(T, u_field.name, try self.read(u_field.type));
+                        }
+                    }
+                    try self.endObject();
+                },
+                else => {},
+            }
+            log.err("Unsupported type for desrialization {s}", .{@typeName(T)});
             return error.UnsupportedType;
-        };
-        try registry.set(entity, component);
-    }
-
-    fn readEntitiesSet(self: *Reader, registry: *g.Registry) !u.EntitiesSet {
-        var set = u.EntitiesSet.empty(registry.alloc);
-        try self.beginCollection();
-        while (!try self.isCollectionEnd()) {
-            try set.add(try self.readEntity(registry));
         }
-        try self.endCollection();
-        return set;
-    }
-};
 
-fn isDto(t: type) bool {
-    switch (@typeInfo(t)) {
-        .null, .bool, .int, .float, .comptime_int, .comptime_float, .@"enum", .enum_literal => return true,
-        .optional => |op| return isDto(op.child),
-        .array => |arr| return isDto(arr.child),
-        .@"struct" => |s| {
-            inline for (s.fields) |field| {
-                if (!isDto(field.type)) return false;
+        fn readSymbols(self: *Self) Error![]const u8 {
+            var buffer = &self.string_buffer;
+            var capacity: usize = 0;
+            while (true) {
+                switch (try self.reader.next()) {
+                    // Accumulate partial values.
+                    .partial_number, .partial_string => |slice| {
+                        std.mem.copyForwards(u8, buffer[capacity..], slice);
+                        capacity += slice.len;
+                    },
+                    .partial_string_escaped_1 => |buf| {
+                        std.mem.copyForwards(u8, buffer[capacity..], buf[0..]);
+                        capacity += buf.len;
+                    },
+                    .partial_string_escaped_2 => |buf| {
+                        std.mem.copyForwards(u8, buffer[capacity..], buf[0..]);
+                        capacity += buf.len;
+                    },
+                    .partial_string_escaped_3 => |buf| {
+                        std.mem.copyForwards(u8, buffer[capacity..], buf[0..]);
+                        capacity += buf.len;
+                    },
+                    .partial_string_escaped_4 => |buf| {
+                        std.mem.copyForwards(u8, buffer[capacity..], buf[0..]);
+                        capacity += buf.len;
+                    },
+                    .number, .string => |slice| if (capacity == 0) {
+                        return slice;
+                    } else {
+                        std.mem.copyForwards(u8, buffer[capacity..], slice);
+                        capacity += slice.len;
+                        return buffer[0..capacity];
+                    },
+                    else => {
+                        return error.WrongInput;
+                    },
+                }
             }
-            return true;
-        },
-        .@"union" => |un| {
-            if (un.tag_type == null) return false;
-            for (un.fields) |field| {
-                if (!isDto(field.type)) return false;
+        }
+
+        fn isObjectEnd(self: *Self) Error!bool {
+            return try self.reader.peekNextTokenType() == .object_end;
+        }
+
+        fn beginCollection(self: *Self) Error!void {
+            assertEql(try self.reader.next(), .array_begin);
+        }
+
+        fn endCollection(self: *Self) Error!void {
+            assertEql(try self.reader.next(), .array_end);
+        }
+
+        fn isCollectionEnd(self: *Self) Error!bool {
+            return try self.reader.peekNextTokenType() == .array_end;
+        }
+
+        fn readStringKey(self: *Self) Error![]const u8 {
+            return try self.readSymbols();
+        }
+
+        fn readNumericKey(self: *Self, comptime N: type) Error!N {
+            return try std.fmt.parseInt(N, try self.readStringKey(), 10);
+        }
+
+        fn readNumber(self: *Self, comptime T: type) Error!T {
+            return try std.fmt.parseInt(T, try self.readSymbols(), 10);
+        }
+
+        fn readValue(self: *Self, comptime T: type) Error!T {
+            const next = try self.reader.next();
+            switch (@typeInfo(T)) {
+                .bool => return if (next == .true) true else if (next == .false) false else {
+                    log.err("Wrong input. Expected bool, but was {any}", .{next});
+                    return error.WrongInput;
+                },
+                .int, .comptime_int => {
+                    return try std.fmt.parseInt(T, next.number, 10);
+                },
+                .float, .comptime_float => {
+                    return try std.fmt.parseFloat(T, next.number);
+                },
+                .@"enum", .enum_literal => {
+                    return std.meta.stringToEnum(T, next.string) orelse {
+                        log.err("Wrong value {s} for the enum {s}", .{ next.string, @typeName(T) });
+                        return error.WrongInput;
+                    };
+                },
+                else => return error.WrongInput,
             }
-            return true;
-        },
-        else => return false,
-    }
+        }
+    };
 }
 
 fn assertEql(actual: anytype, expected: anytype) void {
@@ -337,5 +469,81 @@ fn assertEql(actual: anytype, expected: anytype) void {
                 std.debug.panic("Expected {s}, but was {s}", .{ expected, actual }),
         },
         else => {},
+    }
+}
+
+test "All components should be serializable" {
+    var original_registry = try g.Registry.init(std.testing.allocator);
+    errdefer original_registry.deinit();
+
+    var inventory = try c.Inventory.empty(std.testing.allocator);
+    try inventory.items.add(.{ .id = 7 });
+    defer inventory.deinit();
+
+    var pile = try c.Pile.empty(std.testing.allocator);
+    try pile.items.add(.{ .id = 9 });
+    defer pile.deinit();
+
+    // Random components to check serialization:
+    const expected = c.Components{
+        .animation = c.Animation{ .preset = .hit },
+        .description = c.Description{ .preset = .player },
+        .door = c.Door{ .state = .opened },
+        .equipment = c.Equipment{ .weapon = null, .light = .{ .id = 12 } },
+        .health = c.Health{ .current = 42, .max = 100 },
+        .initiative = c.Initiative{ .move_points = 5 },
+        .inventory = inventory,
+        .ladder = c.Ladder{ .id = .{ .id = 2 }, .direction = .down, .target_ladder = .{ .id = 3 } },
+        .pile = pile,
+        .position = c.Position{ .place = p.Point.init(12, 42) },
+        .source_of_light = c.SourceOfLight{ .radius = 4 },
+        .speed = c.Speed{ .move_points = 12 },
+        .sprite = c.Sprite{ .codepoint = g.codepoints.human },
+        .state = .walking,
+        .weapon = c.Weapon{ .min_damage = 3, .max_damage = 32 },
+        .z_order = c.ZOrder{ .order = .obstacle },
+    };
+
+    var buffer: [1024]u8 = @splat(0);
+    var buffer_writer = std.io.fixedBufferStream(&buffer);
+    const underlying_writer = buffer_writer.writer();
+    var writer = Writer(@TypeOf(underlying_writer)).init(&original_registry, underlying_writer);
+
+    // when:
+    try writer.write(expected);
+    original_registry.deinit();
+
+    std.debug.print("{s}\n", .{buffer});
+
+    // then:
+    var actual_registry = try g.Registry.init(std.testing.allocator);
+    defer actual_registry.deinit();
+
+    var buffer_reader = std.io.fixedBufferStream(&buffer);
+    const underlying_reader = buffer_reader.reader();
+    var reader = Reader(@TypeOf(underlying_reader)).init(&actual_registry, underlying_reader);
+
+    const actual = try reader.read(c.Components);
+
+    try expectEql(expected, actual);
+}
+
+fn expectEql(expected: anytype, actual: anytype) !void {
+    try std.testing.expectEqual(@TypeOf(expected), @TypeOf(actual));
+
+    switch (@typeInfo(@TypeOf(expected))) {
+        .pointer => try expectEql(expected.*, actual.*),
+        .optional => if (expected == null)
+            try std.testing.expectEqual(null, actual)
+        else
+            try expectEql(expected.?, actual.?),
+        .@"struct" => |s| inline for (s.fields) |field| {
+            if (@hasDecl(@TypeOf(expected), "eql")) {
+                try std.testing.expect(expected.eql(actual));
+            } else {
+                try expectEql(@field(expected, field.name), @field(actual, field.name));
+            }
+        },
+        else => try std.testing.expectEqual(expected, actual),
     }
 }

@@ -76,7 +76,7 @@ pub fn init(
         .render = render,
         .viewport = g.Viewport.init(render.scene_rows, render.scene_cols),
         .registry = try g.Registry.init(self.arena.allocator()),
-        .player = try self.registry.addNewEntity(try g.entities.player(self.registry.alloc)),
+        .player = try self.registry.addNewEntity(try g.entities.player(self.registry.allocator())),
         .events = g.events.EventBus.init(&self.arena),
         .level = try g.Level.initFirstLevel(self.arena.allocator(), &self.registry, self.player),
         .max_depth = 0,

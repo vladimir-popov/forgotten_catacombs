@@ -8,14 +8,17 @@ const UnderlyingMap = std.AutoHashMapUnmanaged(g.Entity, void);
 pub const Iterator = UnderlyingMap.KeyIterator;
 
 alloc: std.mem.Allocator,
-underlying_map: UnderlyingMap = .empty,
+underlying_map: *UnderlyingMap,
 
-pub fn empty(alloc: std.mem.Allocator) Self {
-    return .{ .alloc = alloc, .underlying_map = .empty };
+pub fn init(alloc: std.mem.Allocator) !Self {
+    const self: Self = .{ .alloc = alloc, .underlying_map = try alloc.create(UnderlyingMap) };
+    self.underlying_map.* = .empty;
+    return self;
 }
 
 pub fn deinit(self: *Self) void {
     self.underlying_map.deinit(self.alloc);
+    self.alloc.destroy(self.underlying_map);
 }
 
 pub fn clone(self: Self, alloc: std.mem.Allocator) !Self {
@@ -30,35 +33,12 @@ pub fn iterator(self: Self) Iterator {
     return self.underlying_map.keyIterator();
 }
 
-pub fn add(self: *Self, item: g.Entity) !void {
+pub fn add(self: Self, item: g.Entity) !void {
     try self.underlying_map.put(self.alloc, item, {});
 }
 
-pub fn remove(self: *Self, item: g.Entity) bool {
+pub fn remove(self: Self, item: g.Entity) bool {
     return self.underlying_map.remove(item);
-}
-
-pub fn jsonStringify(self: *const Self, jws: anytype) !void {
-    try jws.beginArray();
-    var itr = self.underlying_map.keyIterator();
-    while (itr.next()) |entity| {
-        try jws.write(entity.id);
-    }
-    try jws.endArray();
-}
-
-pub fn jsonParse(alloc: std.mem.Allocator, source: anytype, opts: std.json.ParseOptions) !Self {
-    const value = try std.json.Value.jsonParse(alloc, source, opts);
-    defer value.array.deinit();
-    return try jsonParseFromValue(alloc, value, opts);
-}
-
-pub fn jsonParseFromValue(alloc: std.mem.Allocator, value: std.json.Value, _: std.json.ParseOptions) !Self {
-    var result: Self = .{ .alloc = alloc, .underlying_map = .empty };
-    for (value.array.items) |v| {
-        try result.underlying_map.put(alloc, .{ .id = @intCast(v.integer) }, {});
-    }
-    return result;
 }
 
 pub fn eql(self: Self, other: Self) bool {

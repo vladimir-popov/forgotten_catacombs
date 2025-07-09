@@ -2,30 +2,42 @@
 //! loading from file.
 const std = @import("std");
 const g = @import("../game_pkg.zig");
+const c = g.components;
 
 const log = std.log.scoped(.load_level_mode);
 
 const Percent = u8;
 
+const Reader = g.persistance.Reader(g.Runtime.FileReader.Reader);
+const Writer = g.persistance.Writer(g.Runtime.FileWriter.Writer);
+
 const SavingLevel = struct {
-    writer: g.persistance.Writer,
+    file_writer: g.Runtime.FileWriter,
+    writer: Writer,
     progress: Percent = 0,
 
     pub fn init(session: *g.GameSession, file_path: []const u8) !SavingLevel {
+        const file_writer = try session.runtime.fileWriter(file_path);
+        errdefer file_writer.deinit();
         // FIXME var ????
         var self = SavingLevel{
-            .writer = g.persistance.Writer.init(
-                session.arena.allocator(),
+            .file_writer = file_writer,
+            .writer = Writer.init(
                 &session.registry,
-                try session.runtime.fileWriter(file_path),
+                file_writer.writer(),
             ),
         };
-        errdefer self.writer.deinit();
 
         try self.writer.beginObject();
         try self.writer.writeSeed(session.level.dungeon.seed);
 
         return self;
+    }
+
+    pub fn deinit(self: *SavingLevel) void {
+        self.writer.deinit();
+        log.debug("Closing save file", .{});
+        self.file_writer.deinit();
     }
 
     pub fn doSave(self: *SavingLevel, level: g.Level) !void {
@@ -34,6 +46,7 @@ const SavingLevel = struct {
         try self.writer.writeRememberedObjects(level.remembered_objects);
         try self.writer.endObject();
         self.progress = 100;
+        log.debug("Saving is completed", .{});
     }
 
     pub fn isCompleted(self: SavingLevel) bool {
@@ -42,18 +55,24 @@ const SavingLevel = struct {
 };
 
 const LoadingLevel = struct {
-    reader: g.persistance.Reader,
+    file_reader: g.Runtime.FileReader,
+    reader: Reader,
     progress: Percent = 0,
 
-    pub fn init(session: *g.GameSession, new_depth: u8, file_path: []const u8) !LoadingLevel {
+    pub fn init(
+        session: *g.GameSession,
+        new_depth: u8,
+        file_path: []const u8,
+    ) !LoadingLevel {
+        const file_reader = try session.runtime.fileReader(file_path);
+        errdefer file_reader.deinit();
         var self = LoadingLevel{
-            .reader = try g.persistance.Reader.init(
-                session.arena.allocator(),
+            .file_reader = file_reader,
+            .reader = Reader.init(
                 &session.registry,
-                try session.runtime.fileReader(file_path),
+                file_reader.reader(),
             ),
         };
-        errdefer self.reader.deinit();
 
         try self.reader.beginObject();
         const seed = try self.reader.readSeed();
@@ -68,15 +87,22 @@ const LoadingLevel = struct {
         return self;
     }
 
+    pub fn deinit(self: *LoadingLevel) void {
+        self.reader.deinit();
+        log.debug("Closing loaded file", .{});
+        self.file_reader.deinit();
+    }
+
     pub fn doLoad(self: *LoadingLevel, level: *g.Level) !void {
         try self.reader.readLevelEntities(level);
         try self.reader.readVisitedPlaces(level);
         try self.reader.readRememberedObjects(level);
         try self.reader.endObject();
         self.progress = 100;
+        log.debug("Loading is completed", .{});
     }
 
-    pub fn isCompleted(self: SavingLevel) bool {
+    pub fn isCompleted(self: LoadingLevel) bool {
         return self.progress == 100;
     }
 };
@@ -88,13 +114,45 @@ const GeneratingLevel = struct {
     /// PRNG based on the global game session's seed and level's depth
     prng: std.Random.DefaultPrng,
     attempt: u8 = 0,
+    session: *g.GameSession,
+    new_depth: u8,
+    from_ladder: c.Ladder,
+
+    pub fn init(session: *g.GameSession, new_depth: u8, from_ladder: c.Ladder) GeneratingLevel {
+        return .{
+            .prng = std.Random.DefaultPrng.init(session.seed + new_depth),
+            .session = session,
+            .new_depth = new_depth,
+            .from_ladder = from_ladder,
+        };
+    }
+
+    pub fn doGenerate(
+        self: *GeneratingLevel,
+    ) !void {
+        const seed = self.prng.next();
+        const maybe_level = try g.Level.tryGenerateNew(
+            self.session.arena.allocator(),
+            &self.session.registry,
+            self.session.player,
+            self.new_depth,
+            self.from_ladder,
+            seed,
+        );
+        if (maybe_level) |level| {
+            self.session.level = level;
+            self.attempt = max_attempts;
+        } else {
+            try self.incrementProgress();
+        }
+    }
 
     fn progress(self: GeneratingLevel) Percent {
         return self.attempt * 10;
     }
 
-    fn complete(self: *GeneratingLevel) void {
-        self.attempt = max_attempts;
+    fn isCompleted(self: GeneratingLevel) bool {
+        return self.attempt == max_attempts;
     }
 
     fn incrementProgress(self: *GeneratingLevel) !void {
@@ -116,11 +174,11 @@ const Self = @This();
 
 session: *g.GameSession,
 new_depth: u8,
-from_ladder: g.components.Ladder,
+from_ladder: c.Ladder,
 is_new_level: bool,
 process: Process,
 
-pub fn loadOrGenerateLevel(session: *g.GameSession, from_ladder: g.components.Ladder) !Self {
+pub fn loadOrGenerateLevel(session: *g.GameSession, from_ladder: c.Ladder) !Self {
     const new_depth = switch (from_ladder.direction) {
         .up => session.level.depth - 1,
         .down => session.level.depth + 1,
@@ -144,8 +202,8 @@ pub fn loadOrGenerateLevel(session: *g.GameSession, from_ladder: g.components.La
 
 pub fn deinit(self: *Self) void {
     switch (self.process) {
-        .saving => self.process.saving.writer.deinit(),
-        .loading => self.process.loading.reader.deinit(),
+        .saving => self.process.saving.deinit(),
+        .loading => self.process.loading.deinit(),
         else => {},
     }
     log.debug("Level {d} is ready.", .{self.new_depth});
@@ -155,6 +213,7 @@ pub fn tick(self: *Self) !void {
     try self.drawLoadingScreen();
 
     if (self.isCompleted()) {
+        // self.deinit will happen inside this function:
         try self.session.playerMovedToLevel();
         return;
     }
@@ -163,9 +222,9 @@ pub fn tick(self: *Self) !void {
         .saving => |*process| {
             try process.doSave(self.session.level);
             if (process.isCompleted()) {
-                process.writer.deinit();
                 try self.removeEntitiesOfTheLevel();
-                self.session.level.deinit();
+                _ = self.session.level.arena.deinit();
+                process.deinit();
                 self.process = if (self.is_new_level)
                     try self.beginGenerating()
                 else
@@ -174,23 +233,12 @@ pub fn tick(self: *Self) !void {
         },
         .loading => |*process| {
             try process.doLoad(&self.session.level);
+            if (process.isCompleted()) {
+                try self.session.level.completeInitialization(self.from_ladder.direction);
+            }
         },
         .generating => |*process| {
-            const seed = process.prng.next();
-            const maybe_level = try g.Level.tryGenerateNew(
-                self.session.arena.allocator(),
-                &self.session.registry,
-                self.session.player,
-                self.new_depth,
-                self.from_ladder,
-                seed,
-            );
-            if (maybe_level) |level| {
-                self.session.level = level;
-                process.complete();
-            } else {
-                try process.incrementProgress();
-            }
+            try process.doGenerate();
         },
     }
 }
@@ -198,8 +246,8 @@ pub fn tick(self: *Self) !void {
 fn isCompleted(self: Self) bool {
     return switch (self.process) {
         .saving => false,
-        .loading => self.process.loading.progress == 100,
-        .generating => self.process.generating.progress() == 100,
+        .loading => self.process.loading.isCompleted(),
+        .generating => self.process.generating.isCompleted(),
     };
 }
 
@@ -212,7 +260,7 @@ fn beginSaving(session: *g.GameSession) !Process {
 
 fn beginGenerating(self: *Self) !Process {
     log.debug("Start generating a new level on depth {d}", .{self.new_depth});
-    return .{ .generating = .{ .prng = std.Random.DefaultPrng.init(self.session.seed + self.new_depth) } };
+    return .{ .generating = GeneratingLevel.init(self.session, self.new_depth, self.from_ladder) };
 }
 
 fn beginLoading(self: *Self) !Process {

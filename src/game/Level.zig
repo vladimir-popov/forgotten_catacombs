@@ -319,7 +319,7 @@ pub fn addEntityAtPlace(self: *Self, item: g.Entity, place: p.Point) !?g.Entity 
                     return entity;
                 } else {
                     // or create a new pile and add the item to the pile
-                    const pile_id = try self.registry.addNewEntity(try g.entities.pile(self.registry.alloc));
+                    const pile_id = try self.registry.addNewEntity(try g.entities.pile(self.registry.allocator()));
                     try self.entities.append(self.arena.allocator(), pile_id);
                     try self.registry.set(pile_id, c.Position{ .place = place });
                     const pile = self.registry.getUnsafe(pile_id, c.Pile);

@@ -2,7 +2,6 @@ const std = @import("std");
 const Type = std.builtin.Type;
 const Entity = @import("Entity.zig");
 const ArraySet = @import("ArraySet.zig").ArraySet;
-const ComponentsMap = @import("ComponentsMap.zig").ComponentsMap;
 
 const log = std.log.scoped(.ecs);
 
@@ -11,41 +10,48 @@ pub fn Registry(comptime ComponentsStruct: type) type {
     return struct {
         const Self = @This();
 
+        pub const ComponentsMap = @import("ComponentsMap.zig").ComponentsMap(ComponentsStruct);
         pub const TypeTag = std.meta.FieldEnum(ComponentsStruct);
 
-        alloc: std.mem.Allocator,
-        components_map: ComponentsMap(ComponentsStruct),
+        arena: std.heap.ArenaAllocator,
+        // segmentation fault happens if use it as a structure 
+        components_map: *ComponentsMap,
         /// An id for a next new entity
         next_entity: Entity,
 
         /// Initializes every field of the inner components map.
         /// The allocator is used for allocate inner storages.
         pub fn init(alloc: std.mem.Allocator) !Self {
-            var self: Self = .{
-                .alloc = alloc,
-                .next_entity = .{ .id = 1 },
-                .components_map = undefined,
-            };
+            // const arena = try alloc.create(std.heap.ArenaAllocator);
+            var arena = std.heap.ArenaAllocator.init(alloc);
+            var cm = try arena.allocator().create(ComponentsMap);
 
-            const ArraySets = @typeInfo(ComponentsMap(ComponentsStruct)).@"struct".fields;
+            const ArraySets = @typeInfo(ComponentsMap).@"struct".fields;
             inline for (ArraySets) |array_set| {
-                @field(self.components_map, array_set.name) = array_set.type.init(alloc);
+                @field(cm, array_set.name) = array_set.type.empty;
             }
-
-            return self;
+            return .{
+                .arena = arena,
+                .next_entity = .{ .id = 1 },
+                .components_map = cm,
+            };
         }
 
         /// Cleans up all inner storages.
         pub fn deinit(self: *Self) void {
-            inline for (@typeInfo(ComponentsMap(ComponentsStruct)).@"struct".fields) |field| {
-                @field(self.components_map, field.name).deinit();
-            }
+            // const alloc = self.arena.child_allocator;
+            self.arena.deinit();
+            // alloc.destroy(self.arena);
+        }
+
+        pub fn allocator(self: *Self) std.mem.Allocator {
+            return self.arena.allocator();
         }
 
         /// Adds the component of the type `C` to the entity, or replace existed.
         pub fn set(self: *Self, entity: Entity, component: anytype) !void {
             const C = @TypeOf(component);
-            try @field(self.components_map, @typeName(C)).setToEntity(entity, component);
+            try @field(self.components_map, @typeName(C)).setToEntity(self.allocator(), entity, component);
         }
 
         /// Sets all defined fields from the `ComponentsStruct` to the entity as the components.
@@ -209,7 +215,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
 
         /// Removes the component of the type `C` from the entity if it was added before, or does nothing.
         pub fn remove(self: *Self, entity: Entity, comptime C: type) !void {
-            try @field(self.components_map, @typeName(C)).removeFromEntity(entity);
+            try @field(self.components_map, @typeName(C)).removeFromEntity(self.allocator(), entity);
         }
 
         /// Removes all components of the type `C` from all entities.
@@ -219,8 +225,8 @@ pub fn Registry(comptime ComponentsStruct: type) type {
 
         /// Removes all components from all stores which belong to the entity.
         pub fn removeEntity(self: *Self, entity: Entity) !void {
-            inline for (@typeInfo(ComponentsMap(ComponentsStruct)).@"struct".fields) |field| {
-                try @field(self.components_map, field.name).removeFromEntity(entity);
+            inline for (@typeInfo(ComponentsMap).@"struct".fields) |field| {
+                try @field(self.components_map, field.name).removeFromEntity(self.allocator(), entity);
             }
         }
 
@@ -305,18 +311,17 @@ test "deinit entity on update" {
     };
     const Components = struct { cmp: ?Cmp };
 
-    defer std.testing.expectEqual(true, deinited_2) catch unreachable;
-    var manager = try Registry(Components).init(std.testing.allocator);
-    defer manager.deinit();
+    var registry = try Registry(Components).init(std.testing.allocator);
+    defer registry.deinit();
 
-    const entity = manager.newEntity();
-    try manager.set(entity, Cmp{ .value = 1, .deinited = &deinited_1 });
+    const entity = registry.newEntity();
+    try registry.set(entity, Cmp{ .value = 1, .deinited = &deinited_1 });
 
     // when:
-    try manager.set(entity, Cmp{ .value = 2, .deinited = &deinited_2 });
+    try registry.set(entity, Cmp{ .value = 2, .deinited = &deinited_2 });
 
     // then:
-    try std.testing.expectEqual(2, manager.getUnsafe(entity, Cmp).value);
+    try std.testing.expectEqual(2, registry.getUnsafe(entity, Cmp).value);
     try std.testing.expectEqual(true, deinited_1);
 }
 
@@ -327,14 +332,14 @@ test "get entity as a struct" {
 
     const TestComponents = struct { foo: ?Foo, bar: ?Bar };
 
-    var manager = try Registry(TestComponents).init(std.testing.allocator);
-    defer manager.deinit();
+    var registry = try Registry(TestComponents).init(std.testing.allocator);
+    defer registry.deinit();
 
-    const entity = manager.newEntity();
-    try manager.set(entity, Bar{ .value = true });
+    const entity = registry.newEntity();
+    try registry.set(entity, Bar{ .value = true });
 
     // when:
-    const structure = try manager.entityToStruct(entity);
+    const structure = try registry.entityToStruct(entity);
 
     // then:
     try std.testing.expectEqual(null, structure.foo);
@@ -348,14 +353,14 @@ test "set all components as a struct to the entity" {
 
     const TestComponents = struct { foo: ?Foo = null, bar: ?Bar = null };
 
-    var manager = try Registry(TestComponents).init(std.testing.allocator);
-    defer manager.deinit();
+    var registry = try Registry(TestComponents).init(std.testing.allocator);
+    defer registry.deinit();
 
-    const entity = try manager.addNewEntity(.{ .foo = .{ .value = 42 } });
+    const entity = try registry.addNewEntity(.{ .foo = .{ .value = 42 } });
 
     // when:
-    const foo = manager.get(entity, Foo);
-    const bar = manager.get(entity, Bar);
+    const foo = registry.get(entity, Foo);
+    const bar = registry.get(entity, Bar);
 
     // then:
     try std.testing.expectEqualDeep(Foo{ .value = 42 }, foo.?.*);

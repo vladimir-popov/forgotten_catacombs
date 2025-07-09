@@ -12,7 +12,7 @@ pub fn player(alloc: std.mem.Allocator) !c.Components {
         .health = .{ .max = 30, .current = 30 },
         .speed = .{ .move_points = 10 },
         .equipment = .nothing,
-        .inventory = c.Inventory.empty(alloc),
+        .inventory = try c.Inventory.empty(alloc),
     };
 }
 
@@ -86,6 +86,6 @@ pub fn pile(alloc: std.mem.Allocator) !c.Components {
         .z_order = .{ .order = .item },
         .sprite = .{ .codepoint = cp.pile },
         .description = .{ .preset = .pile },
-        .pile = c.Pile.empty(alloc),
+        .pile = try c.Pile.empty(alloc),
     };
 }

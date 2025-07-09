@@ -104,16 +104,12 @@ pub const Pile = struct {
 
     items: u.EntitiesSet,
 
-    pub fn empty(alloc: std.mem.Allocator) Pile {
-        return .{ .items = .{ .alloc = alloc } };
+    pub fn empty(alloc: std.mem.Allocator) !Pile {
+        return .{ .items = try u.EntitiesSet.init(alloc) };
     }
 
     pub fn deinit(self: *Pile) void {
         self.items.deinit();
-    }
-
-    pub fn clone(self: Pile, alloc: std.mem.Allocator) !Pile {
-        return .{ .items = try self.items.clone(alloc) };
     }
 };
 
@@ -122,22 +118,18 @@ pub const Inventory = struct {
 
     items: u.EntitiesSet,
 
-    pub fn empty(alloc: std.mem.Allocator) Inventory {
-        return .{ .items = .{ .alloc = alloc } };
+    pub fn empty(alloc: std.mem.Allocator) !Inventory {
+        return .{ .items = try u.EntitiesSet.init(alloc) };
     }
 
     pub fn deinit(self: *Inventory) void {
         self.items.deinit();
     }
-
-    pub fn clone(self: Inventory, alloc: std.mem.Allocator) !Inventory {
-        return .{ .items = try self.items.clone(alloc) };
-    }
 };
 
 pub const Equipment = struct {
-    weapon: ?g.Entity = null,
-    light: ?g.Entity = null,
+    weapon: ?g.Entity,
+    light: ?g.Entity,
 
     pub const nothing: Equipment = .{ .weapon = null, .light = null };
 };
@@ -188,58 +180,3 @@ pub const Components = struct {
     weapon: ?Weapon = null,
     z_order: ?ZOrder,
 };
-
-test "Components should be serializable" {
-    var inventory = Inventory.empty(std.testing.allocator);
-    try inventory.items.add(.{ .id = 7 });
-    defer inventory.deinit();
-
-    var pile = Pile.empty(std.testing.allocator);
-    try pile.items.add(.{ .id = 9 });
-    defer pile.deinit();
-
-    // Random components to check serialization:
-    const prototype = Components{
-        .animation = Animation{ .preset = .hit },
-        .description = Description{ .preset = .player },
-        .door = Door{ .state = .opened },
-        .equipment = Equipment{ .weapon = .{ .id = 1 }, .light = .{ .id = 12 } },
-        .health = Health{ .current = 42, .max = 100 },
-        .initiative = Initiative{ .move_points = 5 },
-        .inventory = inventory,
-        .ladder = Ladder{ .id = .{ .id = 2 }, .direction = .down, .target_ladder = .{ .id = 3 } },
-        .pile = pile,
-        .position = Position{ .place = p.Point.init(12, 42) },
-        .source_of_light = SourceOfLight{ .radius = 4 },
-        .speed = Speed{ .move_points = 12 },
-        .sprite = Sprite{ .codepoint = g.codepoints.human },
-        .state = .walking,
-        .weapon = Weapon{ .min_damage = 3, .max_damage = 32 },
-        .z_order = ZOrder{ .order = .obstacle },
-    };
-
-    const buffer: []u8 = try std.json.stringifyAlloc(std.testing.allocator, prototype, .{});
-    defer std.testing.allocator.free(buffer);
-
-    const parsed = try std.json.parseFromSlice(Components, std.testing.allocator, buffer, .{});
-    defer parsed.deinit();
-
-    try expectEql(prototype, parsed.value);
-}
-
-fn expectEql(expected: anytype, actual: anytype) !void {
-    try std.testing.expectEqual(@TypeOf(expected), @TypeOf(actual));
-
-    switch (@typeInfo(@TypeOf(expected))) {
-        .pointer => try expectEql(expected.*, actual.*),
-        .optional => try expectEql(expected.?, actual.?),
-        .@"struct" => |s| inline for (s.fields) |field| {
-            if (@hasDecl(@TypeOf(expected), "eql")) {
-                try std.testing.expect(expected.eql(actual));
-            } else {
-                try expectEql(@field(expected, field.name), @field(actual, field.name));
-            }
-        },
-        else => try std.testing.expectEqual(expected, actual),
-    }
-}

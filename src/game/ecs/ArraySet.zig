@@ -13,41 +13,37 @@ pub fn ArraySet(comptime C: anytype) type {
     return struct {
         const Self = @This();
 
-        alloc: std.mem.Allocator,
         components: std.ArrayListUnmanaged(C),
         entity_index: std.AutoHashMapUnmanaged(Entity, usize),
         index_entity: std.AutoHashMapUnmanaged(usize, Entity),
 
-        /// Creates instances of the inner storages.
-        pub fn init(alloc: std.mem.Allocator) Self {
-            return .{
-                .alloc = alloc,
-                .components = .empty,
-                .entity_index = .empty,
-                .index_entity = .empty,
-            };
-        }
+        /// An instance of this ArraySet with empty inner storages.
+        pub const empty = Self{
+            .components = .empty,
+            .entity_index = .empty,
+            .index_entity = .empty,
+        };
 
         /// Deinits the inner storages and components.
-        pub fn deinit(self: *Self) void {
+        pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
             self.deinitComponents();
-            self.components.deinit(self.alloc);
-            self.entity_index.deinit(self.alloc);
-            self.index_entity.deinit(self.alloc);
+            self.components.deinit(alloc);
+            self.entity_index.deinit(alloc);
+            self.index_entity.deinit(alloc);
         }
 
-        pub fn clearRetainingCapacity(self: *Self) void {
-            self.deinitComponents();
+        pub fn clearRetainingCapacity(self: *Self, alloc: std.mem.Allocator) void {
+            self.deinitComponents(alloc);
             self.components.clearRetainingCapacity();
             self.entity_index.clearRetainingCapacity();
             self.index_entity.clearRetainingCapacity();
         }
 
-        pub fn clear(self: *Self) void {
-            self.deinitComponents();
-            self.components.clearAndFree(self.alloc);
-            self.entity_index.clearAndFree(self.alloc);
-            self.index_entity.clearAndFree(self.alloc);
+        pub fn clear(self: *Self, alloc: std.mem.Allocator) void {
+            self.deinitComponents(alloc);
+            self.components.clearAndFree(alloc);
+            self.entity_index.clearAndFree(alloc);
+            self.index_entity.clearAndFree(alloc);
         }
 
         pub const Iterator = struct {
@@ -79,20 +75,20 @@ pub fn ArraySet(comptime C: anytype) type {
         }
 
         /// Adds the component of the type `C` for the entity, or replaces existed.
-        pub fn setToEntity(self: *Self, entity: Entity, component: C) !void {
+        pub fn setToEntity(self: *Self, alloc: std.mem.Allocator, entity: Entity, component: C) !void {
             if (self.entity_index.get(entity)) |idx| {
                 self.deinitComponent(idx);
                 self.components.items[idx] = component;
             } else {
-                try self.entity_index.put(self.alloc, entity, self.components.items.len);
-                try self.index_entity.put(self.alloc, self.components.items.len, entity);
-                try self.components.append(self.alloc, component);
+                try self.entity_index.put(alloc, entity, self.components.items.len);
+                try self.index_entity.put(alloc, self.components.items.len, entity);
+                try self.components.append(alloc, component);
             }
         }
 
         /// Deletes the components of the entity from the all inner stores
         /// if they was added before, or does nothing.
-        pub fn removeFromEntity(self: *Self, entity: Entity) !void {
+        pub fn removeFromEntity(self: *Self, alloc: std.mem.Allocator, entity: Entity) !void {
             if (self.entity_index.get(entity)) |idx| {
                 _ = self.index_entity.remove(idx);
                 _ = self.entity_index.remove(entity);
@@ -105,8 +101,8 @@ pub fn ArraySet(comptime C: anytype) type {
                     const last_entity = self.index_entity.get(last_idx).?;
                     self.components.items[idx] = self.components.items[self.components.items.len - 1];
                     self.components.items.len -= 1;
-                    try self.entity_index.put(self.alloc, last_entity, idx);
-                    try self.index_entity.put(self.alloc, idx, last_entity);
+                    try self.entity_index.put(alloc, last_entity, idx);
+                    try self.index_entity.put(alloc, idx, last_entity);
                 }
             }
         }
