@@ -60,13 +60,6 @@ pub const Point = struct {
         try writer.print("Point(r:{d}, c:{d})", .{ self.row, self.col });
     }
 
-    pub fn jsonParseFromValue(_: std.mem.Allocator, source: std.json.Value, _: std.json.ParseOptions) !Point {
-        return .{
-            .row = @intCast(source.object.get("row").?.integer),
-            .col = @intCast(source.object.get("col").?.integer),
-        };
-    }
-
     pub inline fn move(self: *Point, direction: Direction) void {
         switch (direction) {
             .up => {

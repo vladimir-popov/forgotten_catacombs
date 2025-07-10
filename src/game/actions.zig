@@ -42,6 +42,8 @@ pub const Action = union(enum) {
     chill: g.Entity,
     /// Change the state of the entity to hunt
     get_angry: g.Entity,
+    //
+    open_inventory,
 
     pub fn toString(action: Action) []const u8 {
         return switch (action) {
@@ -54,7 +56,16 @@ pub const Action = union(enum) {
                 .down => "Go down",
             },
             .pickup => "Pickup",
+            .open_inventory => "Inventory",
             else => "???",
         };
+    }
+
+    pub fn eql(self: Action, maybe_other: ?Action) bool {
+        if (maybe_other) |other| {
+            return std.meta.eql(self, other);
+        } else {
+            return false;
+        }
     }
 };

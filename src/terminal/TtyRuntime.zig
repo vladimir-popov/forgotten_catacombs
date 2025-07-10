@@ -11,7 +11,7 @@ pub const DisplayBuffer = @import("DisplayBuffer.zig").DisplayBuffer;
 
 var window_size: tty.Display.RowsCols = undefined;
 var act: std.posix.Sigaction = undefined;
-/// true if game should be rendered in the center of the terminal window:
+/// true if the game should be rendered in the center of the terminal window:
 var should_render_in_center: bool = true;
 var rows_pad: u8 = 1;
 var cols_pad: u8 = 1;
@@ -66,6 +66,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             draw_border: bool,
             render_in_center: bool,
             is_dev_mode: bool,
+            use_mouse: bool,
         ) !Self {
             const instance = Self{
                 .alloc = alloc,
@@ -77,7 +78,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                 .is_dev_mode = is_dev_mode,
                 .saves_dir = try std.fs.cwd().makeOpenPath("save", .{}),
             };
-            try enableGameMode(is_dev_mode);
+            try enableGameMode(use_mouse);
             should_render_in_center = render_in_center;
             return instance;
         }

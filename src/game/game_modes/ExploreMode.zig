@@ -53,7 +53,7 @@ pub fn tick(self: *ExploreMode) anyerror!void {
                     try entities_window.close(self.arena.allocator(), self.session.render);
                     self.entities_window = null;
                 },
-                .chose_btn => try entities_window.hide(self.session.render),
+                .choose_btn => try entities_window.hide(self.session.render),
                 else => {},
             }
         } else {

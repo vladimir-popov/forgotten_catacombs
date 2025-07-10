@@ -461,15 +461,13 @@ pub fn Reader(comptime Underlying: type) type {
 }
 
 fn assertEql(actual: anytype, expected: anytype) void {
-    switch (@import("builtin").mode) {
-        .Debug, .ReleaseSafe => switch (@typeInfo(@TypeOf(expected))) {
+    if (u.isDebug())
+        switch (@typeInfo(@TypeOf(expected))) {
             .enum_literal => if (actual != expected)
                 std.debug.panic("Expected {any}, but was {any}", .{ expected, actual }),
             else => if (!std.mem.eql(u8, actual, expected))
                 std.debug.panic("Expected {s}, but was {s}", .{ expected, actual }),
-        },
-        else => {},
-    }
+        };
 }
 
 test "All components should be serializable" {

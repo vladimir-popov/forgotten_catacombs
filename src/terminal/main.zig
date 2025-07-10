@@ -16,17 +16,17 @@ pub const std_options: std.Options = .{
         // .{ .scope = .windows, .level = .debug },
         // .{ .scope = .tty_runtime, .level = .debug },
         // .{ .scope = .visibility, .level = .debug },
-        .{ .scope = .ai, .level = .debug },
+        // .{ .scope = .ai, .level = .debug },
         // .{ .scope = .game, .level = .debug },
-        .{ .scope = .game_session, .level = .debug },
-        // .{ .scope = .play_mode, .level = .debug },
-        .{ .scope = .load_level_mode, .level = .debug },
+        // .{ .scope = .game_session, .level = .debug },
+        .{ .scope = .play_mode, .level = .debug },
+        // .{ .scope = .load_level_mode, .level = .debug },
         .{ .scope = .inventory_mode, .level = .debug },
         // .{ .scope = .looking_around_mode, .level = .debug },
         // .{ .scope = .levels, .level = .debug },
-        .{ .scope = .level, .level = .debug },
+        // .{ .scope = .level, .level = .debug },
         // .{ .scope = .cmd, .level = .debug },
-        .{ .scope = .cave, .level = .debug },
+        // .{ .scope = .cave, .level = .debug },
         // .{ .scope = .events, .level = .debug },
         // .{ .scope = .action_system, .level = .debug },
     },
@@ -53,9 +53,10 @@ pub fn main() !void {
     const alloc = gpa.allocator();
 
     const use_cheats = Args.flag("devmode");
+    const use_mouse = Args.flag("use-mouse");
 
     var runtime = try TtyRuntime.TtyRuntime(g.DISPLAY_ROWS + 2, g.DISPLAY_COLS + 2)
-        .init(alloc, true, true, use_cheats);
+        .init(alloc, true, true, use_cheats, use_mouse);
     defer runtime.deinit();
     if (use_cheats) {
         log.warn("The Developer is in the room!", .{});

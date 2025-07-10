@@ -9,14 +9,20 @@ const log = std.log.scoped(.play_mode);
 
 const PlayMode = @This();
 
-const QuickAction = struct { target: g.Entity, action: g.Action };
+const QuickAction = struct {
+    target: g.Entity,
+    action: g.Action,
+    pub fn format(self: QuickAction, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        try writer.print("QuickAction: {s}; target {d}", .{ @tagName(self.action), self.target.id });
+    }
+};
 
 arena: std.heap.ArenaAllocator,
 session: *g.GameSession,
 // The actions which can be applied to the entity in focus
 quick_actions: std.ArrayListUnmanaged(QuickAction),
 // The index of the quick action for the target entity
-target_idx: usize = 0,
+selected_action_idx: usize = 0,
 is_player_turn: bool = true,
 quick_actions_window: ?w.OptionsWindow(void) = null,
 
@@ -32,7 +38,7 @@ pub fn init(
         .session = session,
         .quick_actions = std.ArrayListUnmanaged(QuickAction){},
     };
-    try self.updateQuickActions(target_entity);
+    try self.updateQuickActions(target_entity, null);
     try self.draw();
     try self.session.render.drawHorizontalLine(
         '═',
@@ -61,8 +67,8 @@ pub fn tick(self: *PlayMode) !void {
             const mp = try self.session.doAction(self.session.player, action, speed.move_points);
             if (mp > 0) {
                 log.debug("Spent {d} move points", .{mp});
-                log.debug("Update quick actions after action {any}", .{action});
-                try self.updateQuickActions(self.target());
+                log.debug("Update quick actions after action '{s}'", .{@tagName(action)});
+                try self.updateQuickActions(self.target(), self.quickAction());
                 var itr = self.session.registry.query(c.Initiative);
                 while (itr.next()) |initiative| {
                     initiative[1].move_points += mp;
@@ -87,12 +93,18 @@ pub fn tick(self: *PlayMode) !void {
 fn handleInput(self: *PlayMode) !?g.Action {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (self.quick_actions_window) |*window| {
-            if (btn.game_button == .b) {
-                try window.close(self.arena.allocator(), self.session.render);
-                self.quick_actions_window = null;
-            } else {
-                _ = try window.handleButton(btn);
-                try window.draw(self.session.render);
+            switch (try window.handleButton(btn)) {
+                .choose_btn => {
+                    try window.close(self.arena.allocator(), self.session.render);
+                    self.quick_actions_window = null;
+                    return self.quickAction();
+                },
+                .close_btn => {
+                    try window.close(self.arena.allocator(), self.session.render);
+                    self.quick_actions_window = null;
+                },
+                .select_btn => try window.draw(self.session.render),
+                else => {},
             }
         } else {
             switch (btn.game_button) {
@@ -100,7 +112,7 @@ fn handleInput(self: *PlayMode) !?g.Action {
                     .released => return self.quickAction(),
                     .hold => if (self.quick_actions.items.len > 0) {
                         self.quick_actions_window =
-                            try self.windowWithQuickActions(self.quick_actions.items, self.target_idx);
+                            try self.windowWithQuickActions(self.quick_actions.items, self.selected_action_idx);
                         try self.quick_actions_window.?.draw(self.session.render);
                         return null;
                     },
@@ -157,7 +169,7 @@ fn drawInfoBar(self: *const PlayMode) !void {
     try self.session.render.drawLeftButton("Explore");
     const qa = self.quickAction();
     const action_label = qa.toString();
-    try self.session.render.drawRightButton(action_label, self.quick_actions.items.len > 1);
+    try self.session.render.drawRightButton(action_label, self.quick_actions.items.len > 2);
 
     // Draw the name or health of the target entity
     if (self.target()) |entity| {
@@ -175,34 +187,41 @@ fn drawInfoBar(self: *const PlayMode) !void {
 }
 
 fn target(self: PlayMode) ?g.Entity {
-    return if (self.quick_actions.items.len == 0 or self.target_idx > self.quick_actions.items.len - 1)
+    return if (self.quick_actions.items.len == 0 or self.selected_action_idx > self.quick_actions.items.len - 1)
         null
-    else if (self.quick_actions.items[self.target_idx].action == .wait)
+    else if (self.quick_actions.items[self.selected_action_idx].action == .wait)
         null
     else
-        self.quick_actions.items[self.target_idx].target;
+        self.quick_actions.items[self.selected_action_idx].target;
 }
 
 fn quickAction(self: PlayMode) g.Action {
-    return self.quick_actions.items[self.target_idx].action;
+    return self.quick_actions.items[self.selected_action_idx].action;
 }
 
-pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity) anyerror!void {
+pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity, prev_action: ?g.Action) anyerror!void {
     defer {
         log.debug(
-            "After update {d} quick actions: {any}",
-            .{ self.quick_actions.items.len, self.quick_actions.items },
+            "{d} quick actions after update:\n{any}The selected action is {any}\nThe previous was {any}",
+            .{
+                self.quick_actions.items.len,
+                g.utils.toStringWithListOf(self.quick_actions.items),
+                self.quickAction(),
+                prev_action,
+            },
         );
     }
 
     self.quick_actions.clearRetainingCapacity();
-    self.target_idx = 0;
+    self.selected_action_idx = 0;
+    const alloc = self.arena.allocator();
 
     if (target_entity) |tg| {
         if (tg.id != self.session.player.id) {
             // check if quick action is available for target
             if (self.calculateQuickActionForTarget(tg)) |qa| {
-                try self.quick_actions.append(self.arena.allocator(), .{ .target = tg, .action = qa });
+                self.selected_action_idx = self.quick_actions.items.len;
+                try self.quick_actions.append(alloc, .{ .target = tg, .action = qa });
             }
         }
     }
@@ -220,14 +239,20 @@ pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity) anyerror!vo
             );
             if (self.calculateQuickActionForTarget(entity)) |qa| {
                 log.debug("Calculated action is {any}", .{qa});
-                try self.quick_actions.append(self.arena.allocator(), .{ .target = entity, .action = qa });
+                if (qa.eql(prev_action)) {
+                    self.selected_action_idx = self.quick_actions.items.len;
+                }
+                try self.quick_actions.append(alloc, .{ .target = entity, .action = qa });
             } else {
                 log.debug("No quick action for entity {any}", .{entity});
             }
         }
     }
-    // player should always be able to wait
-    try self.quick_actions.append(self.arena.allocator(), .{ .target = self.session.player, .action = .wait });
+    // player should always be able to
+    // wait
+    try self.quick_actions.append(alloc, .{ .target = self.session.player, .action = .wait });
+    // manage its inventory
+    try self.quick_actions.append(alloc, .{ .target = self.session.player, .action = .open_inventory });
 }
 
 fn calculateQuickActionForTarget(
@@ -281,12 +306,13 @@ fn windowWithQuickActions(
     for (variants, 0..) |qa, idx| {
         try window.addOption(self.arena.allocator(), qa.action.toString(), {}, chooseEntity, null);
         if (idx == selected)
-            window.selected_line = idx;
+            try window.selectLine(idx);
     }
     return window;
 }
 
 fn chooseEntity(ptr: *anyopaque, line_idx: usize, _: void) anyerror!void {
     const self: *PlayMode = @ptrCast(@alignCast(ptr));
-    self.target_idx = line_idx;
+    self.selected_action_idx = line_idx;
+    log.debug("Choosen option {d}: {s}", .{ line_idx, @tagName(self.quickAction()) });
 }

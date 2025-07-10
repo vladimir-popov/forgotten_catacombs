@@ -143,7 +143,7 @@ pub fn playerMovedToLevel(self: *GameSession) !void {
     self.max_depth = @max(self.max_depth, self.level.depth);
     self.viewport.centeredAround(self.level.playerPosition().place);
     try self.play(null);
-    try self.mode.play.updateQuickActions(null);
+    try self.mode.play.updateQuickActions(null, null);
     const event = g.events.Event{
         .entity_moved = .{
             .entity = self.player,
@@ -199,7 +199,7 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
         },
         .player_hit => {
             log.debug("Update target after player hit", .{});
-            try self.mode.play.updateQuickActions(event.player_hit.target);
+            try self.mode.play.updateQuickActions(event.player_hit.target, null);
         },
         .entity_moved => |entity_moved| if (entity_moved.entity.id == self.player.id) {
             try self.level.onPlayerMoved(entity_moved);
@@ -214,6 +214,10 @@ pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_spe
     }
     switch (action) {
         .do_nothing => return 0,
+        .open_inventory => {
+            try self.manageInventory();
+            return 0;
+        },
         .move => |move| {
             if (self.registry.get(actor, c.Position)) |position|
                 return doMove(self, actor, position, move.target, actor_speed);

@@ -122,7 +122,7 @@ pub fn tick(self: *InventoryMode) !void {
             }
         } else if (self.actions_window) |*window| {
             switch (try window.handleButton(btn)) {
-                .close_btn, .chose_btn => {
+                .close_btn, .choose_btn => {
                     std.log.debug("Close actions window", .{});
                     try window.close(self.alloc, self.session.render);
                     self.actions_window = null;

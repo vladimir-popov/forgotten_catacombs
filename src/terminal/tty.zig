@@ -367,10 +367,12 @@ pub const KeyboardAndMouse = struct {
 
     pub inline fn enableMouseEvents() !void {
         try write(Text.MOUSE_TRACK_ON);
+        log.info("Mouse enabled", .{});
     }
 
     pub inline fn disableMouseEvents() !void {
         try write(Text.MOUSE_TRACK_OFF);
+        log.info("Mouse disabled", .{});
     }
 };
 

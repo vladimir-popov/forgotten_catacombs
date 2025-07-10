@@ -1,5 +1,8 @@
 //! This is a window with a list of options.
-//! It binds a context and handle function to every line in the window.
+//! You may add options with items and right button handlers. An appropriate handler will be invoked
+//! on `handleButton` method invocation. The index of the current line and appropriate item
+//! will be passed to the handler, and one of the possible outcome will be returned from the
+//! `handleButton`.
 //! ╔════════════════════════════════════════╗
 //! ║                                        ║
 //! ║                                        ║
@@ -24,7 +27,16 @@ const log = std.log.scoped(.windows);
 
 pub fn OptionWindow(comptime Item: type) type {
     return struct {
-        pub const HandleResult = enum { close_btn, select_btn, ignored, chose_btn };
+        pub const HandleResult = enum {
+            /// A button to close the window was pressed.
+            close_btn,
+            /// Up or down button was pressed.
+            select_btn,
+            /// Unhandled button (left or right) was pressed.
+            ignored,
+            /// A button to choose the current option was pressed.
+            choose_btn,
+        };
 
         const Self = @This();
 
@@ -50,7 +62,7 @@ pub fn OptionWindow(comptime Item: type) type {
         left_button_label: []const u8,
         right_button_label: []const u8,
         // if the window is above scene, the buffer should be drawn to hide the window,
-        // or fill the region with spaces
+        // or fill the region with spaces otherwise
         above_scene: bool = true,
 
         pub fn init(
@@ -143,7 +155,7 @@ pub fn OptionWindow(comptime Item: type) type {
                     } else {
                         try option.onReleaseButtonFn(self.handler, idx, option.item);
                     }
-                    return .chose_btn;
+                    return .choose_btn;
                 },
                 .b => return .close_btn,
                 else => return .ignored,
