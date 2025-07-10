@@ -4,8 +4,8 @@ const g = @import("game");
 
 const log = std.log.scoped(.last_button);
 
-const HOLD_DELAY_MS = 700;
-const REPEATE_DELAY_MS = 100;
+const HOLD_DELAY_MS = 400;
+const REPEATE_DELAY_MS = 200;
 
 const State = enum { pressed, released };
 

@@ -204,14 +204,14 @@ pub fn Reader(comptime Underlying: type) type {
         pub const Error = anyerror;
 
         registry: *g.Registry,
-        reader: std.json.Reader(4096, Underlying),
+        reader: std.json.Reader(256, Underlying),
         // a buffer for object keys. helps to avoid allocations
         string_buffer: [128]u8 = undefined,
 
         pub fn init(registry: *g.Registry, reader: Underlying) Self {
             return .{
                 .registry = registry,
-                .reader = std.json.reader(registry.allocator(), reader),
+                .reader = std.json.Reader(256, Underlying).init(registry.allocator(), reader),
             };
         }
 
