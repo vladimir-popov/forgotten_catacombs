@@ -14,7 +14,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
         pub const TypeTag = std.meta.FieldEnum(ComponentsStruct);
 
         arena: std.heap.ArenaAllocator,
-        // segmentation fault happens if use it as a structure 
+        // segmentation fault happens if use it as a structure
         components_map: *ComponentsMap,
         /// An id for a next new entity
         next_entity: Entity,

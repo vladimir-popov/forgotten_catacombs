@@ -1,34 +1,38 @@
 //! ```
 //!                             The main window with two tabs:
-//! ╔════════════════════════════════════════╗   ╔════════════════════════════════════════╗
-//! ║░░░Inventory░░░░░░░░░    Drop           ║   ║   Inventory         ░░░░Drop░░░░░░░░░░░║
-//! ║────────────────────────────────────────║   ║────────────────────────────────────────║
-//! ║ [ T-short [2]                      [x] ║   ║ \ Magic sword (3:12)                   ║
-//! ║░/░Torch░░<3>░░░░░░░░░░░░░░░░░░░░░░░[░]░║   ║░,░Apple░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░║
-//! ║ , Apple                                ║ > ║                                        ║
-//! ║ ! Health portion                       ║ < ║                                        ║
-//! ║ \ Club (4:5)                       [ ] ║   ║                                        ║
-//! ║                                        ║   ║                                        ║
-//! ║                                        ║   ║                                        ║
-//! ║────────────────────────────────────────║   ║────────────────────────────────────────║
-//! ║                         Close   Choose ║   ║                         Close   Choose ║
-//! ╚════════════════════════════════════════╝   ╚════════════════════════════════════════╝
-//!
+//! ╔════════════════════════════════════════╗     ╔════════════════════════════════════════╗                                                     
+//! ║ ╔═════════════════╗═══════════════════╗║     ║╔══════════════════╔══════════════════╗ ║
+//! ║ ║    Inventory    ║        Drop       ║║     ║║    Inventory     ║       Drop       ║ ║                                                     
+//! ║╔╝                 ╚═══════════════════║║     ║║══════════════════╝                  ╚╗║                                                     
+//! ║║░\░Club░░░░░░░░░░░░░░░░░░░░░░░░░[x]░░░║║     ║║ / Torch                              ║║                                                     
+//! ║║   Apple                        [x]   ║║     ║║                                      ║║                                                     
+//! ║║                                      ║║     ║║                                      ║║                                                     
+//! ║║                                      ║║     ║║                                      ║║                                                     
+//! ║║                                      ║║     ║║                                      ║║                                                     
+//! ║║                                      ║║     ║║                                      ║║                                                     
+//! ║║                                      ║║     ║║                                      ║║                                                     
+//! ║╚══════════════════════════════════════╝║     ║╚══════════════════════════════════════╝║                                                     
+//! ║════════════════════════════════════════║     ║════════════════════════════════════════║                                                     
+//! ║                     Close       Choose ║     ║                     Close       Choose ║                                                     
+//! ╚════════════════════════════════════════╝     ╚════════════════════════════════════════╝                                                     
+//! 
 //!                                      Modal windows:
-//! ╔════════════════════════════════════════╗   ╔════════════════════════════════════════╗
-//! ║░░░Inventory░░░░░░░░░    Pile           ║   ║░░░Inventory░░░░░░░░░    Pile           ║
-//! ║────────────────────────────────────────║   ║────────────────────────────────────────║
-//! ║                                        ║   ║ ┌──────────────Torch <3>─────────────┐ ║
-//! ║ ┌────────────────────────────────────┐ ║   ║ │ Bla...                             │ ║
-//! ║ │░░░░░░░░░░░░░░░Use░░░░░░░░░░░░░░░░░░│ ║   ║ │        bla...                      │ ║
-//! ║ │               Info                 │ ║   ║ │               bla...               │ ║
-//! ║ │               Drop                 │ ║   ║ │                      description   │ ║
-//! ║ └────────────────────────────────────┘ ║   ║ │                                    │ ║
-//! ║                                        ║   ║ │ Radius of light: 3                 │ ║
-//! ║                                        ║   ║ └────────────────────────────────────┘ ║
-//! ║────────────────────────────────────────║   ║────────────────────────────────────────║
-//! ║                          Cancel Choose ║   ║                                  Close ║
-//! ╚════════════════════════════════════════╝   ╚════════════════════════════════════════╝
+//! ╔════════════════════════════════════════╗     ╔════════════════════════════════════════╗                                                        
+//! ║ ╔══════════════════╗══════════════════╗║     ║ ╔══════════════════╗══════════════════╗║
+//! ║ ║    Inventory     ║        Drop      ║║     ║ ║    Inventory     ║       Drop       ║║                                          
+//! ║╔╝                  ╚══════════════════║║     ║╔╝                  ╚══════════════════║║                                          
+//! ║║ ┌───────────────────────────────────┐║║     ║║                                      ║║                                          
+//! ║║ │Use                                │║║     ║║ ┌────────────────Club───────────────┐║║                                          
+//! ║║ │Drop                               │║║     ║║ │ Id: 12                            │║║                                          
+//! ║║ │Describe                           │║║     ║║ │ Damage: 2-5                       │║║                                          
+//! ║║ └───────────────────────────────────┘║║     ║║ └───────────────────────────────────┘║║                                          
+//! ║║                                      ║║     ║║                                      ║║                                          
+//! ║║                                      ║║     ║║                                      ║║                                          
+//! ║╚══════════════════════════════════════╝║     ║╚══════════════════════════════════════╝║                                          
+//! ║════════════════════════════════════════║     ║════════════════════════════════════════║                                          
+//! ║                     Cancel       Use   ║     ║                                 Close  ║                                          
+//! ╚════════════════════════════════════════╝     ╚════════════════════════════════════════╝                                          
+
 //! ```
 const std = @import("std");
 const g = @import("../game_pkg.zig");
@@ -49,11 +53,15 @@ const Tab = struct {
 const InventoryOptions = enum { Use, Drop, Describe };
 const PileOptions = enum { Take, Describe };
 
-const draw_tab_options = blk: {
+const bordered_region = w.DrawOptions.full_screen.region;
+const tab_content_options = blk: {
     var prototype = w.DrawOptions.full_screen;
-    // reserve one line for the title separator
-    prototype.region.top_left.row += 1;
-    prototype.region.rows -= 1;
+    // reserve one line for the title separator and one line for upper border
+    prototype.region.top_left.row += 2;
+    prototype.region.rows -= 3;
+    // reserve two columns for border
+    prototype.region.top_left.col += 1;
+    prototype.region.cols -= 2;
     break :blk prototype;
 };
 
@@ -89,7 +97,7 @@ pub fn init(
     self.tabs_count = 1;
     tab.* = .{
         .title = "Inventory",
-        .window = w.OptionsWindow(g.Entity).init(tab, draw_tab_options, "Close", "Choose"),
+        .window = w.OptionsWindow(g.Entity).init(tab, tab_content_options, "Close", "Choose"),
         .parent = self,
     };
     try self.updateInventoryTab(tab);
@@ -160,19 +168,48 @@ fn draw(self: *InventoryMode) !void {
     } else {
         log.debug("Draw tab window {d}", .{self.active_tab_idx});
         try self.tabs[self.active_tab_idx].window.draw(self.session.render);
-        try self.session.render.drawHorizontalLine('═', p.Point.init(2, 1), g.DISPLAY_COLS);
-        const tab_title_width: u8 = @intCast(g.DISPLAY_COLS / self.tabs_count);
+        const tab_title_width: u8 = @intCast((bordered_region.cols - 2) / self.tabs_count);
+        try self.session.render.drawDoubledBorder(bordered_region);
+        try self.session.render.drawHorizontalLine(
+            '═',
+            bordered_region.top_left.movedToNTimes(.down, 2).movedTo(.right),
+            bordered_region.cols - 2,
+        );
         for (self.tabs[0..self.tabs_count], 0..) |tab, idx| {
-            const mode: g.DrawingMode = if (self.active_tab_idx == idx) .inverted else .normal;
-            const cursor = p.Point.init(1, @intCast(1 + idx * tab_title_width));
+            const cursor = bordered_region.top_left
+                .movedTo(.down)
+                .movedToNTimes(.right, @intCast(1 + idx * tab_title_width));
             try self.session.render.drawTextWithAlign(
                 tab_title_width,
                 tab.title,
                 cursor,
-                mode,
+                .normal,
                 .center,
             );
         }
+        // Draw a border around the active tab
+        const cursor = bordered_region.top_left
+            .movedTo(.down)
+            .movedToNTimes(.right, @intCast(self.active_tab_idx * tab_title_width));
+        const cursor_above = cursor.movedTo(.up);
+        const underline_cursor = cursor.movedTo(.down);
+        try self.session.render.drawSymbol('╔', cursor_above, .normal);
+        try self.session.render.drawSymbol('╗', cursor_above.movedToNTimes(.right, tab_title_width + 1), .normal);
+
+        try self.session.render.drawSymbol('║', cursor, .normal);
+        try self.session.render.drawSymbol('║', cursor.movedToNTimes(.right, tab_title_width + 1), .normal);
+
+        try self.session.render.drawHorizontalLine(' ', underline_cursor, tab_title_width + 1);
+        try self.session.render.drawSymbol(
+            if (self.active_tab_idx > 0) '╝' else '║',
+            underline_cursor,
+            .normal,
+        );
+        try self.session.render.drawSymbol(
+            if (self.active_tab_idx < self.tabs_count - 1) '╚' else '║',
+            underline_cursor.movedToNTimes(.right, tab_title_width + 1),
+            .normal,
+        );
     }
 }
 
@@ -200,7 +237,7 @@ fn updateInventoryTab(self: *InventoryMode, tab: *Tab) !void {
 
 const inventory_line_fmt = std.fmt.comptimePrint(
     "{{u}} {{s:<{d}}}{{s}}",
-    .{draw_tab_options.maxLineSymbols() - 5}, // "{u} ".len == 2 + "[ ]".len == 3
+    .{tab_content_options.maxLineSymbols() - 5}, // "{u} ".len == 2 + "[ ]".len == 3
 );
 
 fn formatInventoryLine(self: *InventoryMode, line: *w.TextArea.Line, item: g.Entity) ![]const u8 {
@@ -285,7 +322,7 @@ fn addDropTab(self: *InventoryMode, drop: g.Entity) !void {
     const tab = &self.tabs[1];
     tab.* = .{
         .title = "Drop",
-        .window = w.OptionsWindow(g.Entity).init(tab, draw_tab_options, "Close", "Choose"),
+        .window = w.OptionsWindow(g.Entity).init(tab, tab_content_options, "Close", "Choose"),
         .parent = self,
     };
     try self.updateDropTab(tab, drop);

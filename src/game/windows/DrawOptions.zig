@@ -21,7 +21,7 @@ pub const modal = DrawOptions{
 pub const full_screen = DrawOptions{
     .border = null,
     .is_adaptive = false,
-    .region = p.Region.init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS),
+    .region = p.Region.init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS), // -2 rows for infoBar
 };
 
 /// The maximum symbols in a row (few symbols can be reserved for border and/or scroll)

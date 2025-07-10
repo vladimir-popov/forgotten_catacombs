@@ -185,7 +185,7 @@ pub fn drawSpritesToBuffer(self: Render, viewport: g.Viewport, level: *const g.L
     }
 }
 
-pub fn drawSpriteToBuffer(
+fn drawSpriteToBuffer(
     self: Render,
     viewport: g.Viewport,
     codepoint: g.Codepoint,
@@ -254,6 +254,11 @@ pub fn redrawFromSceneBuffer(self: Render) !void {
     try self.redrawRegionFromSceneBuffer(self.scene_buffer.region());
 }
 
+/// Draws a single symbol directly to display
+pub fn drawSymbol(self: Render, symbol: u21, position_on_display: p.Point, mode: g.DrawingMode) !void {
+    try self.runtime.drawSprite(symbol, position_on_display, mode);
+}
+
 /// Draws a single frame from every animation.
 /// Removes the animation if the last frame was drawn.
 pub fn drawAnimationsFrames(self: Render, viewport: g.Viewport, level: *g.Level, entity_in_focus: ?g.Entity) !void {
@@ -295,6 +300,21 @@ pub fn drawBorder(self: Render, region: p.Region) !void {
     try self.runtime.drawSprite('└', region.bottomLeft(), .normal);
     try self.runtime.drawSprite('┐', region.topRight(), .normal);
     try self.runtime.drawSprite('┘', region.bottomRight(), .normal);
+}
+
+pub fn drawDoubledBorder(self: Render, region: p.Region) !void {
+    var itr = region.cells();
+    while (itr.next()) |point| {
+        if (point.row == region.top_left.row or point.row == region.bottomRightRow()) {
+            try self.runtime.drawSprite('═', point, .normal);
+        } else if (point.col == region.top_left.col or point.col == region.bottomRightCol()) {
+            try self.runtime.drawSprite('║', point, .normal);
+        }
+    }
+    try self.runtime.drawSprite('╔', region.top_left, .normal);
+    try self.runtime.drawSprite('╚', region.bottomLeft(), .normal);
+    try self.runtime.drawSprite('╗', region.topRight(), .normal);
+    try self.runtime.drawSprite('╝', region.bottomRight(), .normal);
 }
 
 pub fn drawHorizontalLine(self: Render, codepoint: u21, left_point: p.Point, length: u8) !void {
