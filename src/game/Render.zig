@@ -22,7 +22,6 @@
 //!   ║═══════════════════════════════════════║---
 //!   ║ Rat:|||||||||||||||    Info    Attack ║     | <- the InfoBar is not buffered
 //!   ╚═══════════════════════════════════════╝-------
-//!   | Zone 0              | Zone 1 | Zone 2 |
 //!   |        Info         |Button B|Button A|
 //!
 const std = @import("std");
@@ -350,37 +349,59 @@ pub fn drawEnemyHealth(self: Render, codepoint: g.Codepoint, health: *const cm.H
         buf[len + i] = '|';
     }
     len += free_length;
-    try self.drawZone(0, buf[0..len], .normal);
+    try self.drawInfo(buf[0..len]);
 }
 
-/// Draws the label for the B button
-pub inline fn drawLeftButton(self: Render, text: []const u8) !void {
-    try self.drawZone(1, text, .inverted);
+pub fn drawInfo(self: Render, text: []const u8) !void {
+    const pos = p.Point{ .row = g.DISPLAY_ROWS, .col = 1 };
+    try self.drawTextWithAlign(INFO_ZONE_LENGTH, text, pos, .normal, .center);
 }
 
-pub inline fn hideLeftButton(self: Render) !void {
-    try self.cleanZone(1);
-}
-
-/// Draws the label for the A button
-pub inline fn drawRightButton(self: Render, text: []const u8, has_alternatives: bool) !void {
-    try self.drawZone(2, text, .inverted);
-    if (has_alternatives) {
-        const pos = p.Point{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS };
-        try self.runtime.drawSprite(cp.variants, pos, .inverted);
+pub fn cleanInfo(self: Render) !void {
+    var pos = p.Point{ .row = g.DISPLAY_ROWS, .col = 1 };
+    for (0..INFO_ZONE_LENGTH) |_| {
+        try self.drawSymbol(' ', pos, .normal);
+        pos.move(.right);
     }
 }
 
-pub inline fn hideRightButton(self: Render) !void {
-    try self.cleanZone(2);
+/// Draws the label for the B button
+pub inline fn drawLeftButton(self: Render, text: []const u8, has_alternatives: bool) !void {
+    var pos = p.Point{ .row = g.DISPLAY_ROWS, .col = INFO_ZONE_LENGTH + 1 };
+    try self.runtime.drawSprite(
+        if (has_alternatives) cp.variants else ' ',
+        pos,
+        .inverted,
+    );
+    pos.move(.right);
+    try self.drawTextWithAlign(BUTTON_ZONE_LENGTH, text, pos, .inverted, .center);
 }
 
-pub inline fn drawInfo(self: Render, text: []const u8) !void {
-    try self.drawZone(0, text, .normal);
+pub fn hideLeftButton(self: Render) !void {
+    var pos = p.Point{ .row = g.DISPLAY_ROWS, .col = INFO_ZONE_LENGTH + 1 };
+    for (0..BUTTON_ZONE_LENGTH + 1) |_| {
+        try self.drawSymbol(' ', pos, .normal);
+        pos.move(.right);
+    }
 }
 
-pub inline fn cleanInfo(self: Render) !void {
-    try self.cleanZone(0);
+/// Draws the label for the A button
+pub fn drawRightButton(self: Render, text: []const u8, has_alternatives: bool) !void {
+    const pos = p.Point{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS - BUTTON_ZONE_LENGTH };
+    try self.drawTextWithAlign(BUTTON_ZONE_LENGTH, text, pos, .inverted, .center);
+    try self.runtime.drawSprite(
+        if (has_alternatives) cp.variants else ' ',
+        .{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS },
+        .inverted,
+    );
+}
+
+pub fn hideRightButton(self: Render) !void {
+    var pos = p.Point{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS - BUTTON_ZONE_LENGTH };
+    for (0..BUTTON_ZONE_LENGTH) |_| {
+        try self.drawSymbol(' ', pos, .normal);
+        pos.move(.right);
+    }
 }
 
 /// Sets the line of spaces as a board on the passed side. Inverts the draw mode
@@ -428,36 +449,6 @@ pub fn setBorderWithArrow(
                 );
             }
         },
-    }
-}
-
-inline fn drawZone(
-    self: Render,
-    comptime zone: u2,
-    text: []const u8,
-    mode: g.DrawingMode,
-) !void {
-    const zone_len = if (zone == 0) INFO_ZONE_LENGTH - 2 else BUTTON_ZONE_LENGTH;
-    const pos = switch (zone) {
-        0 => p.Point{ .row = g.DISPLAY_ROWS, .col = 1 },
-        1 => p.Point{ .row = g.DISPLAY_ROWS, .col = INFO_ZONE_LENGTH + 1 },
-        2 => p.Point{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS - BUTTON_ZONE_LENGTH + 1 },
-        else => unreachable,
-    };
-    try self.drawTextWithAlign(zone_len, text, pos, mode, .center);
-}
-
-fn cleanZone(self: Render, comptime zone: u8) !void {
-    const zone_len = if (zone == 0) INFO_ZONE_LENGTH else BUTTON_ZONE_LENGTH;
-    var pos = switch (zone) {
-        0 => p.Point{ .row = g.DISPLAY_ROWS, .col = 1 },
-        1 => p.Point{ .row = g.DISPLAY_ROWS, .col = INFO_ZONE_LENGTH + 1 },
-        2 => p.Point{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS - BUTTON_ZONE_LENGTH + 1 },
-        else => unreachable,
-    };
-    for (0..zone_len) |_| {
-        try self.runtime.drawText(" ", pos, .normal);
-        pos.move(.right);
     }
 }
 

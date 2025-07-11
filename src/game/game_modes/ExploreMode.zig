@@ -87,7 +87,7 @@ fn draw(self: *const ExploreMode) !void {
         try window.draw(self.session.render);
     } else {
         try self.session.render.drawScene(self.session, self.entity_in_focus);
-        try self.session.render.drawLeftButton("Continue");
+        try self.session.render.drawLeftButton("Continue", false);
         try self.session.render.drawRightButton("Describe", self.countOfEntitiesInFocus() > 1);
         // Draw the name or health of the entity in focus
         var buf: [g.DISPLAY_COLS]u8 = undefined;

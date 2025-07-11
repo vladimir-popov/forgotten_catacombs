@@ -117,10 +117,17 @@ fn handleInput(self: *PlayMode) !?g.Action {
                         return null;
                     },
                 },
-                .b => if (btn.state == .released) {
-                    try self.session.lookAround();
-                    // we have to handle changing the state right after this function
-                    return null;
+                .b => switch (btn.state) {
+                    .released => {
+                        try self.session.lookAround();
+                        // we have to handle changing the state right after this function
+                        return null;
+                    },
+                    .hold => {
+                        try self.session.explore();
+                        // we have to handle changing the state right after this function
+                        return null;
+                    },
                 },
                 .left, .right, .up, .down => {
                     return g.Action{
@@ -166,10 +173,10 @@ fn drawInfoBar(self: *const PlayMode) !void {
     if (self.session.registry.get(self.session.player, c.Health)) |health| {
         try self.session.render.drawPlayerHp(health);
     }
-    try self.session.render.drawLeftButton("Explore");
+    try self.session.render.drawLeftButton("Explore", true);
     const qa = self.quickAction();
     const action_label = qa.toString();
-    try self.session.render.drawRightButton(action_label, self.quick_actions.items.len > 2);
+    try self.session.render.drawRightButton(action_label, self.quick_actions.items.len > 1);
 
     // Draw the name or health of the target entity
     if (self.target()) |entity| {

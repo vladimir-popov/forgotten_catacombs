@@ -169,7 +169,7 @@ pub fn OptionWindow(comptime Item: type) type {
                 .{ self.options.items.len, self.selected_line },
             );
             try self.text_area.draw(render);
-            try render.drawLeftButton(self.left_button_label);
+            try render.drawLeftButton(self.left_button_label, false);
             if (self.selected_line) |idx| {
                 const option = self.options.items[idx];
                 try render.drawRightButton(self.right_button_label, option.onHoldButtonFn != null);
