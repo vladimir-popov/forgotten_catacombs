@@ -12,41 +12,34 @@ const Reader = g.persistance.Reader(g.Runtime.FileReader.Reader);
 const Writer = g.persistance.Writer(g.Runtime.FileWriter.Writer);
 
 const SavingLevel = struct {
+    session: *g.GameSession,
     file_writer: g.Runtime.FileWriter,
-    writer: Writer,
+    writer: ?Writer = null,
     progress: Percent = 0,
 
     pub fn init(session: *g.GameSession, file_path: []const u8) !SavingLevel {
-        const file_writer = try session.runtime.fileWriter(file_path);
-        errdefer file_writer.deinit();
-        // FIXME var ????
-        var self = SavingLevel{
-            .file_writer = file_writer,
-            .writer = Writer.init(
-                &session.registry,
-                file_writer.writer(),
-            ),
-        };
-
-        try self.writer.beginObject();
-        try self.writer.writeSeed(session.level.dungeon.seed);
-
-        return self;
+        return .{ .session = session, .file_writer = try session.runtime.fileWriter(file_path) };
     }
 
     pub fn deinit(self: *SavingLevel) void {
-        self.writer.deinit();
+        if (self.writer) |*writer| writer.deinit();
         log.debug("Closing save file", .{});
         self.file_writer.deinit();
     }
 
-    pub fn doSave(self: *SavingLevel, level: g.Level) !void {
-        try self.writer.writeLevelEntities(level.entities.items);
-        try self.writer.writeVisitedPlaces(level.visited_places);
-        try self.writer.writeRememberedObjects(level.remembered_objects);
-        try self.writer.endObject();
-        self.progress = 100;
-        log.debug("Saving is completed", .{});
+    pub fn doSave(self: *SavingLevel) !void {
+        if (self.writer) |*writer| {
+            try writer.writeLevelEntities(self.session.level.entities.items);
+            try writer.writeVisitedPlaces(self.session.level.visited_places);
+            try writer.writeRememberedObjects(self.session.level.remembered_objects);
+            try writer.endObject();
+            self.progress = 100;
+            log.debug("Saving is completed", .{});
+        } else {
+            self.writer = Writer.init(&self.session.registry, self.file_writer.writer());
+            try self.writer.?.beginObject();
+            try self.writer.?.writeSeed(self.session.level.dungeon.seed);
+        }
     }
 
     pub fn isCompleted(self: SavingLevel) bool {
@@ -55,51 +48,46 @@ const SavingLevel = struct {
 };
 
 const LoadingLevel = struct {
+    session: *g.GameSession,
+    new_depth: u8,
     file_reader: g.Runtime.FileReader,
-    reader: Reader,
+    reader: ?Reader = null,
     progress: Percent = 0,
 
-    pub fn init(
-        session: *g.GameSession,
-        new_depth: u8,
-        file_path: []const u8,
-    ) !LoadingLevel {
-        const file_reader = try session.runtime.fileReader(file_path);
-        errdefer file_reader.deinit();
-        var self = LoadingLevel{
-            .file_reader = file_reader,
-            .reader = Reader.init(
-                &session.registry,
-                file_reader.reader(),
-            ),
+    pub fn init(session: *g.GameSession, new_depth: u8, file_path: []const u8) !LoadingLevel {
+        return .{
+            .session = session,
+            .new_depth = new_depth,
+            .file_reader = try session.runtime.fileReader(file_path),
         };
-
-        try self.reader.beginObject();
-        const seed = try self.reader.readSeed();
-        session.level = try g.Level.initEmpty(
-            session.arena.allocator(),
-            &session.registry,
-            session.player,
-            new_depth,
-            seed,
-        );
-
-        return self;
     }
 
     pub fn deinit(self: *LoadingLevel) void {
-        self.reader.deinit();
+        if (self.reader) |*reader| reader.deinit();
         log.debug("Closing loaded file", .{});
         self.file_reader.deinit();
     }
 
-    pub fn doLoad(self: *LoadingLevel, level: *g.Level) !void {
-        try self.reader.readLevelEntities(level);
-        try self.reader.readVisitedPlaces(level);
-        try self.reader.readRememberedObjects(level);
-        try self.reader.endObject();
-        self.progress = 100;
-        log.debug("Loading is completed", .{});
+    pub fn doLoad(self: *LoadingLevel) !void {
+        if (self.reader) |*reader| {
+            try reader.readLevelEntities(&self.session.level);
+            try reader.readVisitedPlaces(&self.session.level);
+            try reader.readRememberedObjects(&self.session.level);
+            try reader.endObject();
+            self.progress = 100;
+            log.debug("Loading is completed", .{});
+        } else {
+            self.reader = Reader.init(&self.session.registry, self.file_reader.reader());
+            try self.reader.?.beginObject();
+            const seed = try self.reader.?.readSeed();
+            self.session.level = try g.Level.initEmpty(
+                self.session.arena.allocator(),
+                &self.session.registry,
+                self.session.player,
+                self.new_depth,
+                seed,
+            );
+        }
     }
 
     pub fn isCompleted(self: LoadingLevel) bool {
@@ -220,7 +208,7 @@ pub fn tick(self: *Self) !void {
 
     switch (self.process) {
         .saving => |*process| {
-            try process.doSave(self.session.level);
+            try process.doSave();
             if (process.isCompleted()) {
                 try self.removeEntitiesOfTheLevel();
                 _ = self.session.level.arena.deinit();
@@ -232,7 +220,7 @@ pub fn tick(self: *Self) !void {
             }
         },
         .loading => |*process| {
-            try process.doLoad(&self.session.level);
+            try process.doLoad();
             if (process.isCompleted()) {
                 try self.session.level.completeInitialization(self.from_ladder.direction);
             }

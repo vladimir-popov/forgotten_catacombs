@@ -204,14 +204,14 @@ pub fn Reader(comptime Underlying: type) type {
         pub const Error = anyerror;
 
         registry: *g.Registry,
-        reader: std.json.Reader(256, Underlying),
+        reader: std.json.Reader(512, Underlying),
         // a buffer for object keys. helps to avoid allocations
         string_buffer: [128]u8 = undefined,
 
         pub fn init(registry: *g.Registry, reader: Underlying) Self {
             return .{
                 .registry = registry,
-                .reader = std.json.Reader(256, Underlying).init(registry.allocator(), reader),
+                .reader = std.json.Reader(512, Underlying).init(registry.allocator(), reader),
             };
         }
 
@@ -367,46 +367,6 @@ pub fn Reader(comptime Underlying: type) type {
             return error.UnsupportedType;
         }
 
-        fn readSymbols(self: *Self) Error![]const u8 {
-            var buffer = &self.string_buffer;
-            var capacity: usize = 0;
-            while (true) {
-                switch (try self.reader.next()) {
-                    // Accumulate partial values.
-                    .partial_number, .partial_string => |slice| {
-                        std.mem.copyForwards(u8, buffer[capacity..], slice);
-                        capacity += slice.len;
-                    },
-                    .partial_string_escaped_1 => |buf| {
-                        std.mem.copyForwards(u8, buffer[capacity..], buf[0..]);
-                        capacity += buf.len;
-                    },
-                    .partial_string_escaped_2 => |buf| {
-                        std.mem.copyForwards(u8, buffer[capacity..], buf[0..]);
-                        capacity += buf.len;
-                    },
-                    .partial_string_escaped_3 => |buf| {
-                        std.mem.copyForwards(u8, buffer[capacity..], buf[0..]);
-                        capacity += buf.len;
-                    },
-                    .partial_string_escaped_4 => |buf| {
-                        std.mem.copyForwards(u8, buffer[capacity..], buf[0..]);
-                        capacity += buf.len;
-                    },
-                    .number, .string => |slice| if (capacity == 0) {
-                        return slice;
-                    } else {
-                        std.mem.copyForwards(u8, buffer[capacity..], slice);
-                        capacity += slice.len;
-                        return buffer[0..capacity];
-                    },
-                    else => {
-                        return error.WrongInput;
-                    },
-                }
-            }
-        }
-
         fn isObjectEnd(self: *Self) Error!bool {
             return try self.reader.peekNextTokenType() == .object_end;
         }
@@ -436,25 +396,67 @@ pub fn Reader(comptime Underlying: type) type {
         }
 
         fn readValue(self: *Self, comptime T: type) Error!T {
-            const next = try self.reader.next();
             switch (@typeInfo(T)) {
-                .bool => return if (next == .true) true else if (next == .false) false else {
-                    log.err("Wrong input. Expected bool, but was {any}", .{next});
-                    return error.WrongInput;
+                .bool => {
+                    const next = try self.reader.next();
+                    return if (next == .true) true else if (next == .false) false else {
+                        log.err("Wrong input. Expected bool, but was {any}", .{next});
+                        return error.WrongInput;
+                    };
                 },
                 .int, .comptime_int => {
-                    return try std.fmt.parseInt(T, next.number, 10);
+                    return try std.fmt.parseInt(T, try self.readSymbols(), 10);
                 },
                 .float, .comptime_float => {
-                    return try std.fmt.parseFloat(T, next.number);
+                    return try std.fmt.parseFloat(T, try self.readSymbols());
                 },
                 .@"enum", .enum_literal => {
-                    return std.meta.stringToEnum(T, next.string) orelse {
-                        log.err("Wrong value {s} for the enum {s}", .{ next.string, @typeName(T) });
+                    const str = try self.readSymbols();
+                    return std.meta.stringToEnum(T, str) orelse {
+                        log.err("Wrong value {s} for the enum {s}", .{ str, @typeName(T) });
                         return error.WrongInput;
                     };
                 },
                 else => return error.WrongInput,
+            }
+        }
+
+        fn readSymbols(self: *Self) Error![]const u8 {
+            var capacity: usize = 0;
+            while (true) {
+                switch (try self.reader.next()) {
+                    // Accumulate partial values.
+                    .partial_number, .partial_string => |slice| {
+                        @memmove(self.string_buffer[capacity .. capacity + slice.len], slice);
+                        capacity += slice.len;
+                    },
+                    .partial_string_escaped_1 => |buf| {
+                        @memmove(self.string_buffer[capacity .. capacity + buf.len], buf[0..]);
+                        capacity += buf.len;
+                    },
+                    .partial_string_escaped_2 => |buf| {
+                        @memmove(self.string_buffer[capacity .. capacity + buf.len], buf[0..]);
+                        capacity += buf.len;
+                    },
+                    .partial_string_escaped_3 => |buf| {
+                        @memmove(self.string_buffer[capacity .. capacity + buf.len], buf[0..]);
+                        capacity += buf.len;
+                    },
+                    .partial_string_escaped_4 => |buf| {
+                        @memmove(self.string_buffer[capacity .. capacity + buf.len], buf[0..]);
+                        capacity += buf.len;
+                    },
+                    .number, .string => |slice| if (capacity == 0) {
+                        return slice;
+                    } else {
+                        @memmove(self.string_buffer[capacity .. capacity + slice.len], slice);
+                        capacity += slice.len;
+                        return self.string_buffer[0..capacity];
+                    },
+                    else => {
+                        return error.WrongInput;
+                    },
+                }
             }
         }
     };
