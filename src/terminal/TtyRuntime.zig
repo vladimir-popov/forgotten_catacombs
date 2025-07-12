@@ -105,8 +105,8 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                     .drawText = drawText,
                     .openFile = openFile,
                     .closeFile = closeFile,
-                    .readFile = readFile,
-                    .writeFile = writeFile,
+                    .readFromFile = readFromFile,
+                    .writeToFile = writeToFile,
                 },
             };
         }
@@ -282,12 +282,12 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             self.alloc.destroy(file);
         }
 
-        fn readFile(_: *anyopaque, file_ptr: *anyopaque, buffer: []u8) anyerror!usize {
+        fn readFromFile(_: *anyopaque, file_ptr: *anyopaque, buffer: []u8) anyerror!usize {
             const file: *std.fs.File = @ptrCast(@alignCast(file_ptr));
             return try file.read(buffer);
         }
 
-        fn writeFile(_: *anyopaque, file_ptr: *anyopaque, bytes: []const u8) anyerror!usize {
+        fn writeToFile(_: *anyopaque, file_ptr: *anyopaque, bytes: []const u8) anyerror!usize {
             const file: *std.fs.File = @ptrCast(@alignCast(file_ptr));
             return try file.write(bytes);
         }

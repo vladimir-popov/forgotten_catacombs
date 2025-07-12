@@ -75,8 +75,8 @@ pub fn runtime(self: *PlaydateRuntime) g.Runtime {
             .drawText = drawText,
             .openFile = openFile,
             .closeFile = closeFile,
-            .readFile = readFile,
-            .writeFile = writeFile,
+            .readFromFile = readFromFile,
+            .writeToFile = writeToFile,
         },
     };
 }
@@ -225,7 +225,7 @@ fn closeFile(ptr: *anyopaque, file: *anyopaque) void {
         std.debug.panic("Error on closing file {any}: {s}", .{ file, self.playdate.file.geterr() });
 }
 
-fn readFile(ptr: *anyopaque, file: *anyopaque, buffer: []u8) anyerror!usize {
+fn readFromFile(ptr: *anyopaque, file: *anyopaque, buffer: []u8) anyerror!usize {
     const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
     const sdfile: ?*api.SDFile = @ptrCast(@alignCast(file));
     const result = self.playdate.file.read(sdfile, buffer.ptr, @intCast(buffer.len));
@@ -234,7 +234,7 @@ fn readFile(ptr: *anyopaque, file: *anyopaque, buffer: []u8) anyerror!usize {
     return @intCast(result);
 }
 
-fn writeFile(ptr: *anyopaque, file: *anyopaque, bytes: []const u8) anyerror!usize {
+fn writeToFile(ptr: *anyopaque, file: *anyopaque, bytes: []const u8) anyerror!usize {
     const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
     const sdfile: ?*api.SDFile = @ptrCast(@alignCast(file));
     const result = self.playdate.file.write(sdfile, bytes.ptr, @intCast(bytes.len));

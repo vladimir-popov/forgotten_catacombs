@@ -40,8 +40,8 @@ const VTable = struct {
     popCheat: *const fn (context: *anyopaque) ?g.Cheat,
     openFile: *const fn (context: *anyopaque, file_path: []const u8, mode: FileMode) anyerror!File,
     closeFile: *const fn (context: *anyopaque, file: File) void,
-    readFile: *const fn (context: *anyopaque, file: File, buffer: []u8) anyerror!usize,
-    writeFile: *const fn (context: *anyopaque, file: File, bytes: []const u8) anyerror!usize,
+    readFromFile: *const fn (context: *anyopaque, file: File, buffer: []u8) anyerror!usize,
+    writeToFile: *const fn (context: *anyopaque, file: File, bytes: []const u8) anyerror!usize,
 };
 
 context: *anyopaque,
@@ -98,12 +98,12 @@ pub inline fn closeFile(self: Runtime, file: File) void {
     self.vtable.closeFile(self.context, file);
 }
 
-pub inline fn readFile(self: Runtime, file: File, buffer: []u8) anyerror!usize {
-    return try self.vtable.readFile(self.context, file, buffer);
+pub inline fn readFromFile(self: Runtime, file: File, buffer: []u8) anyerror!usize {
+    return try self.vtable.readFromFile(self.context, file, buffer);
 }
 
-pub inline fn writeFile(self: Runtime, file: File, bytes: []const u8) anyerror!usize {
-    return try self.vtable.writeFile(self.context, file, bytes);
+pub inline fn writeToFile(self: Runtime, file: File, bytes: []const u8) anyerror!usize {
+    return try self.vtable.writeToFile(self.context, file, bytes);
 }
 
 pub const FileReader = struct {
@@ -114,7 +114,7 @@ pub const FileReader = struct {
     file: File,
 
     pub fn read(self: FileReader, buffer: []u8) Error!usize {
-        return try self.runtime.readFile(self.file, buffer);
+        return try self.runtime.readFromFile(self.file, buffer);
     }
 
     pub fn deinit(self: FileReader) void {
@@ -142,7 +142,7 @@ pub const FileWriter = struct {
     }
 
     pub fn write(self: FileWriter, bytes: []const u8) Error!usize {
-        return try self.runtime.writeFile(self.file, bytes);
+        return try self.runtime.writeToFile(self.file, bytes);
     }
 
     pub fn writeAll(self: FileWriter, bytes: []const u8) Error!void {
