@@ -57,60 +57,77 @@ pub fn deinit(self: *Self) void {
 }
 
 pub fn tick(self: *Self) !void {
-    try self.drawLoadingScreen();
-
-    if (self.isCompleted()) {
-        // self.deinit will happen inside this function:
-        try self.session.playerMovedToLevel();
-        return;
-    }
+    try self.draw();
 
     switch (self.process) {
         .saving => |*saving| {
-            if (saving.writer) |*writer| {
-                try writer.writeLevelEntities(self.session.level.entities.items);
-                try writer.writeVisitedPlaces(self.session.level.visited_places);
-                try writer.writeRememberedObjects(self.session.level.remembered_objects);
-                try writer.endObject();
-                saving.progress = 100;
-                log.debug("Saving is completed", .{});
-            } else {
-                saving.writer = Writer.init(&self.session.registry, saving.file_writer.writer());
-                try saving.writer.?.beginObject();
-                try saving.writer.?.writeSeed(self.session.level.dungeon.seed);
-            }
-            if (saving.progress == 100) {
-                try self.removeEntitiesOfTheLevel();
-                _ = self.session.level.arena.deinit();
-                saving.deinit();
-                self.process = if (self.is_new_level)
-                    try self.beginGenerating()
-                else
-                    try self.beginLoading();
+            switch (saving.progress) {
+                .inited => {
+                    saving.writer = Writer.init(&self.session.registry, saving.file_writer.writer());
+                    try saving.writer.beginObject();
+                    try saving.writer.writeSeed(self.session.level.dungeon.seed);
+                    saving.progress = .seed_saved;
+                },
+                .seed_saved => {
+                    try saving.writer.writeLevelEntities(self.session.level.entities.items);
+                    saving.progress = .entities_saved;
+                },
+                .entities_saved => {
+                    try saving.writer.writeVisitedPlaces(self.session.level.visited_places);
+                    saving.progress = .visited_places_saved;
+                },
+                .visited_places_saved => {
+                    try saving.writer.writeRememberedObjects(self.session.level.remembered_objects);
+                    saving.progress = .remembered_objects_saved;
+                },
+                .remembered_objects_saved => {
+                    try saving.writer.endObject();
+                    try self.removeEntitiesOfTheLevel();
+                    _ = self.session.level.arena.deinit();
+                    saving.deinit();
+                    log.debug("Saving is completed", .{});
+                    self.process = if (self.is_new_level)
+                        try self.beginGenerating()
+                    else
+                        try self.beginLoading();
+                },
             }
         },
         .loading => |*loading| {
-            if (loading.reader) |*reader| {
-                try reader.readLevelEntities(&self.session.level);
-                try reader.readVisitedPlaces(&self.session.level);
-                try reader.readRememberedObjects(&self.session.level);
-                try reader.endObject();
-                loading.progress = 100;
-                log.debug("Loading is completed", .{});
-            } else {
-                loading.reader = Reader.init(&self.session.registry, loading.file_reader.reader());
-                try loading.reader.?.beginObject();
-                const seed = try loading.reader.?.readSeed();
-                self.session.level = try g.Level.initEmpty(
-                    self.session.arena.allocator(),
-                    &self.session.registry,
-                    self.session.player,
-                    self.new_depth,
-                    seed,
-                );
-            }
-            if (loading.progress == 100) {
-                try self.session.level.completeInitialization(self.from_ladder.direction);
+            switch (loading.progress) {
+                .inited => {
+                    loading.reader = Reader.init(&self.session.registry, loading.file_reader.reader());
+                    try loading.reader.beginObject();
+                    const seed = try loading.reader.readSeed();
+                    self.session.level = try g.Level.initEmpty(
+                        self.session.arena.allocator(),
+                        &self.session.registry,
+                        self.session.player,
+                        self.new_depth,
+                        seed,
+                    );
+                    loading.progress = .level_inited;
+                },
+                .level_inited => {
+                    try loading.reader.readLevelEntities(&self.session.level);
+                    loading.progress = .entities_loaded;
+                },
+                .entities_loaded => {
+                    try loading.reader.readVisitedPlaces(&self.session.level);
+                    loading.progress = .visited_places_loaded;
+                },
+                .visited_places_loaded => {
+                    try loading.reader.readRememberedObjects(&self.session.level);
+                    loading.progress = .remembered_objects_loaded;
+                },
+                .remembered_objects_loaded => {
+                    try loading.reader.endObject();
+                    try self.session.level.completeInitialization(self.from_ladder.direction);
+                    log.debug("Loading is completed", .{});
+                    // self.deinit will happen inside this function:
+                    try self.session.playerMovedToLevel();
+                    return;
+                },
             }
         },
         .generating => |*generating| {
@@ -125,20 +142,15 @@ pub fn tick(self: *Self) !void {
             );
             if (maybe_level) |level| {
                 self.session.level = level;
-                generating.attempt = GeneratingLevel.max_attempts;
+                log.debug("Generating is completed", .{});
+                // self.deinit will happen inside this function:
+                try self.session.playerMovedToLevel();
+                return;
             } else {
                 try generating.incrementProgress();
             }
         },
     }
-}
-
-fn isCompleted(self: Self) bool {
-    return switch (self.process) {
-        .saving => false,
-        .loading => self.process.loading.progress == 100,
-        .generating => self.process.generating.attempt == GeneratingLevel.max_attempts,
-    };
 }
 
 fn beginSaving(session: *g.GameSession) !Process {
@@ -150,7 +162,7 @@ fn beginSaving(session: *g.GameSession) !Process {
 
 fn beginGenerating(self: *Self) !Process {
     const seed = self.session.seed + self.new_depth;
-    log.debug("Start generating a new level on depth {d} with seed {d}", .{self.new_depth, seed});
+    log.debug("Start generating a new level on depth {d} with seed {d}", .{ self.new_depth, seed });
     return .{ .generating = .{ .prng = std.Random.DefaultPrng.init(seed) } };
 }
 
@@ -174,29 +186,91 @@ fn pathToLevelFile(buf: []u8, depth: u8) ![]const u8 {
     return try std.fmt.bufPrint(buf, "level_{d}.json", .{depth});
 }
 
-fn drawLoadingScreen(self: Self) !void {
-    _ = self;
+fn draw(self: Self) !void {
+    switch (self.process) {
+        .saving => |saving| {
+            if (saving.progress == .inited) {
+                try self.session.render.clearDisplay();
+                try self.drawScereenFromScratch("Saving");
+            } else try self.drawProgress(@intFromEnum(saving.progress));
+        },
+        .loading => |loading| {
+            if (loading.progress == .inited)
+                try self.drawScereenFromScratch("Loading")
+            else
+                try self.drawProgress(@intFromEnum(loading.progress));
+        },
+        .generating => |generating| {
+            if (generating.attempt == 0)
+                try self.drawScereenFromScratch("Generating")
+            else
+                try self.drawProgress(generating.progress());
+        },
+    }
+    // var tmp: usize = 0;
+    // for (0..100000000) |i| {
+    //     tmp += i;
+    // }
+}
+
+fn drawScereenFromScratch(self: Self, label: []const u8) !void {
+    const vertical_middle = g.DISPLAY_ROWS / 2;
+    try self.session.render.drawTextWithAlign(
+        g.DISPLAY_COLS,
+        label,
+        .{ .row = vertical_middle - 1, .col = 1 },
+        .normal,
+        .center,
+    );
+    try self.drawProgress(0);
+}
+
+fn drawProgress(self: Self, percent: u8) !void {
+    var buf: [4]u8 = undefined;
+    const vertical_middle = g.DISPLAY_ROWS / 2;
+    try self.session.render.drawTextWithAlign(
+        g.DISPLAY_COLS,
+        try std.fmt.bufPrint(&buf, "{d:3}%", .{percent}),
+        .{ .row = vertical_middle, .col = 1 },
+        .normal,
+        .center,
+    );
 }
 
 const SavingLevel = struct {
+    const Progress = enum(u8) {
+        inited = 0,
+        seed_saved = 10,
+        entities_saved = 50,
+        visited_places_saved = 70,
+        remembered_objects_saved = 90,
+    };
     file_writer: g.Runtime.FileWriter,
-    writer: ?Writer = null,
-    progress: Percent = 0,
+    progress: Progress = .inited,
+    writer: Writer = undefined,
 
-    pub fn deinit(self: *SavingLevel) void {
-        if (self.writer) |*writer| writer.deinit();
+    fn deinit(self: *SavingLevel) void {
+        if (self.progress != .inited) self.writer.deinit();
         log.debug("Closing save file", .{});
         self.file_writer.deinit();
     }
 };
 
 const LoadingLevel = struct {
+    const Progress = enum(u8) {
+        inited = 0,
+        level_inited = 10,
+        entities_loaded = 50,
+        visited_places_loaded = 70,
+        remembered_objects_loaded = 90,
+    };
+
     file_reader: g.Runtime.FileReader,
-    reader: ?Reader = null,
-    progress: Percent = 0,
+    progress: Progress = .inited,
+    reader: Reader = undefined,
 
     pub fn deinit(self: *LoadingLevel) void {
-        if (self.reader) |*reader| reader.deinit();
+        if (self.progress != .inited) self.reader.deinit();
         log.debug("Closing loaded file", .{});
         self.file_reader.deinit();
     }
