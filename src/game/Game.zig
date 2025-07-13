@@ -1,11 +1,53 @@
 const std = @import("std");
 const g = @import("game_pkg.zig");
+const p = g.primitives;
+const w = g.windows;
 
 const log = std.log.scoped(.game);
 
-const Game = @This();
+const Self = @This();
 
-pub const State = enum { welcome, game_over, game };
+const vertical_middle = g.DISPLAY_ROWS / 2;
+const horizontal_middle = g.DISPLAY_COLS / 2;
+
+const WelcomeScreen = struct {
+    const MenuOption = enum { Continue, NewGame, Manual };
+
+    menu: w.TextArea,
+    selected_option: usize = 0,
+
+    fn menuOption(self: WelcomeScreen) MenuOption {
+        return if (self.menu.lines.items.len == 2)
+            @enumFromInt(self.selected_option + 1)
+        else
+            @enumFromInt(self.selected_option);
+    }
+
+    fn selectPreviousLine(self: *@This()) void {
+        self.menu.unhighlightLine(self.selected_option);
+        if (self.selected_option > 0)
+            self.selected_option -= 1
+        else
+            self.selected_option = self.menu.lines.items.len - 1;
+        self.menu.highlightLine(self.selected_option);
+    }
+
+    fn selectNextLine(self: *@This()) void {
+        self.menu.unhighlightLine(self.selected_option);
+        if (self.selected_option < self.menu.lines.items.len - 1)
+            self.selected_option += 1
+        else
+            self.selected_option = 0;
+        self.menu.highlightLine(self.selected_option);
+    }
+};
+
+pub const State = union(enum) {
+    welcome: WelcomeScreen,
+    game_over,
+    /// The current game session
+    game_session: g.GameSession,
+};
 
 /// The general purpose allocator
 gpa: std.mem.Allocator,
@@ -18,33 +60,49 @@ render: g.Render,
 seed: u64,
 /// The current state of the game
 state: State,
-/// The current game session
-game_session: g.GameSession,
 
-pub fn init(self: *Game, gpa: std.mem.Allocator, runtime: g.Runtime, seed: u64) !void {
+pub fn init(self: *Self, gpa: std.mem.Allocator, runtime: g.Runtime, seed: u64) !void {
     self.* = .{
         .gpa = gpa,
         .runtime = runtime,
         .render = undefined,
         .seed = seed,
-        .state = .welcome,
-        .game_session = undefined,
+        .state = undefined,
     };
     try self.render.init(gpa, runtime, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS);
     try self.welcome();
 }
 
-pub fn deinit(self: *Game) void {
+pub fn deinit(self: *Self) void {
     self.render.deinit();
-    if (self.state == .game)
-        self.game_session.deinit();
+    switch (self.state) {
+        .welcome => self.state.welcome.menu.deinit(self.gpa),
+        .game_session => self.state.game_session.deinit(),
+        .game_over => {},
+    }
 }
 
-pub fn tick(self: *Game) !void {
+pub fn tick(self: *Self) !void {
     switch (self.state) {
         .welcome => if (try self.runtime.readPushedButtons()) |btn| {
             switch (btn.game_button) {
-                .a => if (btn.state == .released) try self.newGame(),
+                .a => if (btn.state == .released) {
+                    switch (self.state.welcome.menuOption()) {
+                        .NewGame => {
+                            self.state.welcome.menu.deinit(self.gpa);
+                            try self.newGame();
+                        },
+                        else => {},
+                    }
+                },
+                .up => {
+                    self.state.welcome.selectPreviousLine();
+                    try self.state.welcome.menu.draw(self.render);
+                },
+                .down => {
+                    self.state.welcome.selectNextLine();
+                    try self.state.welcome.menu.draw(self.render);
+                },
                 else => {},
             }
         },
@@ -54,8 +112,8 @@ pub fn tick(self: *Game) !void {
                 else => {},
             }
         },
-        .game => {
-            self.game_session.tick() catch |err| switch (err) {
+        .game_session => |*session| {
+            session.tick() catch |err| switch (err) {
                 error.GameOver => try self.gameOver(),
                 else => return err,
             };
@@ -63,52 +121,87 @@ pub fn tick(self: *Game) !void {
     }
 }
 
-inline fn welcome(self: *Game) !void {
-    self.state = .welcome;
+fn welcome(self: *Self) !void {
+    self.state = .{ .welcome = .{ .menu = w.TextArea.init(.{
+        .region = p.Region.init(vertical_middle + 1, horizontal_middle - 6, 5, 12),
+    }) } };
+
     self.runtime.removeAllMenuItems();
+
+    if (try self.isSessionExists())
+        try self.state.welcome.menu.addLine(self.gpa, " Continue ", true);
+    try self.state.welcome.menu.addLine(self.gpa, " New game ", !try self.isSessionExists());
+    try self.state.welcome.menu.addLine(self.gpa, "  Manual  ", false);
+
     try self.render.clearDisplay();
-    try self.render.drawWelcomeScreen();
+    try self.drawWelcomeScreen();
 }
 
-inline fn newGame(self: *Game) !void {
-    std.debug.assert(self.state != .game);
-    _ = self.runtime.addMenuItem("Inventory", self, inventoryMenu);
-    _ = self.runtime.addMenuItem("Explore lvl", self, exploreMenu);
+fn newGame(self: *Self) !void {
+    std.debug.assert(self.state != .game_session);
     _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
-    try self.game_session.init(
+    self.state = .{ .game_session = undefined };
+    try self.state.game_session.init(
         self.gpa,
         self.seed,
         self.runtime,
         self.render,
     );
-    self.state = .game;
 }
 
-fn gameOver(self: *Game) !void {
-    std.debug.assert(self.state == .game);
-    self.game_session.deinit();
+fn gameOver(self: *Self) !void {
+    std.debug.assert(self.state == .game_session);
+    self.state.game_session.deinit();
     self.state = .game_over;
-    try self.render.drawGameOverScreen();
+    try self.drawGameOverScreen();
 }
 
 fn goToMainMenu(ptr: ?*anyopaque) callconv(.C) void {
     if (ptr == null) return;
-    const self: *Game = @ptrCast(@alignCast(ptr.?));
-    std.debug.assert(self.state == .game);
-    self.game_session.deinit();
+    const self: *Self = @ptrCast(@alignCast(ptr.?));
+    std.debug.assert(self.state == .game_session);
+    self.state.game_session.deinit();
     self.welcome() catch @panic("Error when the Game went to the '.welcome' state");
 }
 
-fn inventoryMenu(ptr: ?*anyopaque) callconv(.C) void {
-    if (ptr == null) return;
-    const self: *Game = @ptrCast(@alignCast(ptr.?));
-    std.debug.assert(self.state == .game);
-    self.game_session.manageInventory() catch @panic("Error on switching to the Inventory mode");
+fn isSessionExists(self: Self) !bool {
+    _ = self;
+    return false;
 }
 
-fn exploreMenu(ptr: ?*anyopaque) callconv(.C) void {
-    if (ptr == null) return;
-    const self: *Game = @ptrCast(@alignCast(ptr.?));
-    std.debug.assert(self.state == .game);
-    self.game_session.explore() catch @panic("Error on switching to the Explore mode");
+fn drawWelcomeScreen(self: Self) !void {
+    try self.runtime.clearDisplay();
+    try self.render.drawTextWithAlign(
+        g.DISPLAY_COLS,
+        "Welcome ",
+        .{ .row = vertical_middle - 3, .col = 1 },
+        .normal,
+        .center,
+    );
+    try self.render.drawTextWithAlign(
+        g.DISPLAY_COLS,
+        "to ",
+        .{ .row = vertical_middle - 2, .col = 1 },
+        .normal,
+        .center,
+    );
+    try self.render.drawTextWithAlign(
+        g.DISPLAY_COLS,
+        "Forgotten catacombs",
+        .{ .row = vertical_middle - 1, .col = 1 },
+        .normal,
+        .center,
+    );
+    try self.state.welcome.menu.draw(self.render);
+}
+
+fn drawGameOverScreen(self: Self) !void {
+    try self.render.clearDisplay();
+    try self.render.drawTextWithAlign(
+        g.DISPLAY_COLS,
+        "You are dead",
+        .{ .row = g.DISPLAY_ROWS / 2, .col = 1 },
+        .normal,
+        .center,
+    );
 }

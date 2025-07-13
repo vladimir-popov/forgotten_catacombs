@@ -41,13 +41,13 @@ pub fn OptionWindow(comptime Item: type) type {
         const Self = @This();
 
         pub const OnReleaseButton = *const fn (
-            handler: *anyopaque,
+            owner: *anyopaque,
             line_idx: usize,
             item: Item,
         ) anyerror!void;
 
         pub const OnHoldButton = *const fn (
-            handler: *anyopaque,
+            owner: *anyopaque,
             line_idx: usize,
             item: Item,
         ) anyerror!void;
@@ -57,7 +57,8 @@ pub fn OptionWindow(comptime Item: type) type {
         text_area: w.TextArea,
         /// The absolute index of the selected line (includes the lines out of scroll)
         selected_line: ?usize,
-        handler: *anyopaque,
+        // The owner is always passed to button handlers
+        owner: *anyopaque,
         options: std.ArrayListUnmanaged(Option),
         left_button_label: []const u8,
         right_button_label: []const u8,
@@ -66,14 +67,14 @@ pub fn OptionWindow(comptime Item: type) type {
         above_scene: bool = true,
 
         pub fn init(
-            handler: *anyopaque,
-            draw_opts: w.DrawOptions,
+            owner: *anyopaque,
+            text_area_opts: w.TextArea.Options,
             left_button_label: []const u8,
             right_button_label: []const u8,
         ) Self {
             return .{
-                .handler = handler,
-                .text_area = w.TextArea.init(draw_opts),
+                .owner = owner,
+                .text_area = w.TextArea.init(text_area_opts),
                 .options = .empty,
                 .selected_line = null,
                 .left_button_label = left_button_label,
@@ -151,9 +152,9 @@ pub fn OptionWindow(comptime Item: type) type {
                 .a => if (self.selected_line) |idx| {
                     const option = self.options.items[idx];
                     if (btn.state == .hold and option.onHoldButtonFn != null) {
-                        try option.onHoldButtonFn.?(self.handler, idx, option.item);
+                        try option.onHoldButtonFn.?(self.owner, idx, option.item);
                     } else {
-                        try option.onReleaseButtonFn(self.handler, idx, option.item);
+                        try option.onReleaseButtonFn(self.owner, idx, option.item);
                     }
                     return .choose_btn;
                 },

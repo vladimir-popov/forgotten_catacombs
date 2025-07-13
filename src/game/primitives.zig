@@ -135,12 +135,14 @@ pub const Point = struct {
 /// and count of rows and columns.
 ///
 /// Example of the region 4x6:
+/// ```
 ///   c:1
 /// r:1 *----*
 ///     |    |
 ///     |    |
 ///     *____* r:4
 ///        c:6
+/// ```
 pub const Region = struct {
     /// Top left corner. Index of rows and cols begins from 1.
     top_left: Point,

@@ -31,17 +31,60 @@ pub const Line = [COLS]u8;
 /// Set of indexes of visible lines, which should be drawn inverted
 pub const HighlightedLines = std.bit_set.IntegerBitSet(g.DISPLAY_ROWS);
 
+pub const Options = struct {
+    /// If true, then the `region` options should be interpret as a maximal, but not as an actually occupied region
+    is_adaptive: bool = true,
+    /// Actual or maximal occupied region (depends on `is_adaptive` option). This region includes a
+    /// space for borders.
+    region: p.Region,
+    /// The mode to draw the border. If it's not specified then the border should not be drawn (but a
+    /// place should be reserved).
+    border: ?g.DrawingMode = null,
+
+    pub const modal = Options{
+        .border = .normal,
+        .is_adaptive = true,
+        .region = p.Region.init(1, 2, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS - 2),
+    };
+
+    pub const full_screen = Options{
+        .border = null,
+        .is_adaptive = false,
+        .region = p.Region.init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS), // -2 rows for infoBar
+    };
+
+    /// The maximum symbols in a row (few symbols can be reserved for border and/or scroll)
+    pub fn maxLineSymbols(self: Options) u8 {
+        // -2 for padding; -2 for borders; -1 for scroll.
+        return self.region.cols - 5;
+    }
+
+    /// Returns the region that should be occupied (including border) according to the options and actual count of lines.
+    pub fn actualRegion(self: Options, actual_rows: u8) p.Region {
+        // Count of rows that should be drawn (including border)
+        const rows: u8 = if (self.is_adaptive) actual_rows + 2 else self.region.rows; // 2 for border
+        return .{
+            .top_left = if (rows < self.region.rows)
+                self.region.top_left.movedToNTimes(.down, (self.region.rows - rows) / 2)
+            else
+                self.region.top_left,
+            .rows = @min(rows, self.region.rows),
+            .cols = self.region.cols,
+        };
+    }
+};
+
 const TextArea = @This();
 
-draw_options: w.DrawOptions,
+options: Options,
 /// The scrollable content of the window
 lines: std.ArrayListUnmanaged(Line) = .empty,
 /// How many scrolled lines should be skipped
 scroll: usize = 0,
 highlighted_lines: HighlightedLines = .{ .mask = 0 },
 
-pub fn init(draw_opts: w.DrawOptions) TextArea {
-    return .{ .draw_options = draw_opts };
+pub fn init(draw_opts: Options) TextArea {
+    return .{ .options = draw_opts };
 }
 
 pub fn deinit(self: *TextArea, alloc: std.mem.Allocator) void {
@@ -49,13 +92,13 @@ pub fn deinit(self: *TextArea, alloc: std.mem.Allocator) void {
 }
 
 pub inline fn isScrolled(self: TextArea) bool {
-    return self.lines.items.len > self.draw_options.region.rows - 2;
+    return self.lines.items.len > self.options.region.rows - 2;
 }
 
 /// Returns slice of the visible lines only.
 pub fn visibleLines(self: TextArea) [][COLS]u8 {
     return if (self.isScrolled())
-        self.lines.items[self.scroll .. self.scroll + self.draw_options.region.rows - 2]
+        self.lines.items[self.scroll .. self.scroll + self.options.region.rows - 2]
     else
         self.lines.items;
 }
@@ -89,7 +132,7 @@ pub fn unhighlightLine(self: *TextArea, absolute_line_idx: usize) void {
 
 /// Returns the region occupied by this area including borders.
 pub fn region(self: *const TextArea) p.Region {
-    return self.draw_options.actualRegion(@intCast(self.visibleLines().len));
+    return self.options.actualRegion(@intCast(self.visibleLines().len));
 }
 
 /// Uses the render to draw the text area directly to the screen.
@@ -98,12 +141,12 @@ pub fn draw(self: *const TextArea, render: g.Render) !void {
     var itr = reg.cells();
     while (itr.next()) |point| {
         if (point.row == reg.top_left.row or point.row == reg.bottomRightRow()) {
-            if (self.draw_options.border) |mode|
+            if (self.options.border) |mode|
                 try render.runtime.drawSprite('─', point, mode)
             else
                 try render.runtime.drawSprite(' ', point, .normal);
         } else if (point.col == reg.top_left.col or point.col == reg.bottomRightCol()) {
-            if (self.draw_options.border) |mode|
+            if (self.options.border) |mode|
                 try render.runtime.drawSprite('│', point, mode)
             else
                 try render.runtime.drawSprite(' ', point, .normal);
@@ -122,7 +165,7 @@ pub fn draw(self: *const TextArea, render: g.Render) !void {
     //
     // Draw the corners
     //
-    if (self.draw_options.border) |mode| {
+    if (self.options.border) |mode| {
         try render.runtime.drawSprite('┌', reg.top_left, mode);
         try render.runtime.drawSprite('└', reg.bottomLeft(), mode);
         try render.runtime.drawSprite('┐', reg.topRight(), mode);

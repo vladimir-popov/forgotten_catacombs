@@ -53,9 +53,9 @@ const Tab = struct {
 const InventoryOptions = enum { Use, Drop, Describe };
 const PileOptions = enum { Take, Describe };
 
-const bordered_region = w.DrawOptions.full_screen.region;
+const bordered_region = w.TextArea.Options.full_screen.region;
 const tab_content_options = blk: {
-    var prototype = w.DrawOptions.full_screen;
+    var prototype = w.TextArea.Options.full_screen;
     // reserve one line for the title separator and one line for upper border
     prototype.region.top_left.row += 2;
     prototype.region.rows -= 3;

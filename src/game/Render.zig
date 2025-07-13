@@ -71,44 +71,6 @@ pub fn deinit(self: *Render) void {
     self.arena.deinit();
 }
 
-pub fn drawWelcomeScreen(self: Render) !void {
-    try self.runtime.clearDisplay();
-    const vertical_middle = g.DISPLAY_ROWS / 2;
-    try self.drawTextWithAlign(
-        g.DISPLAY_COLS,
-        "Welcome",
-        .{ .row = vertical_middle - 1, .col = 1 },
-        .normal,
-        .center,
-    );
-    try self.drawTextWithAlign(
-        g.DISPLAY_COLS,
-        "to",
-        .{ .row = vertical_middle, .col = 1 },
-        .normal,
-        .center,
-    );
-    try self.drawTextWithAlign(
-        g.DISPLAY_COLS,
-        "Forgotten catacombs",
-        .{ .row = vertical_middle + 1, .col = 1 },
-        .normal,
-        .center,
-    );
-}
-
-pub fn drawGameOverScreen(self: Render) !void {
-    try self.runtime.clearDisplay();
-    self.scene_buffer.reset();
-    try self.drawTextWithAlign(
-        g.DISPLAY_COLS,
-        "You are dead",
-        .{ .row = g.DISPLAY_ROWS / 2, .col = 1 },
-        .normal,
-        .center,
-    );
-}
-
 /// Draws the dungeon, sprites and animations on the screen.
 pub fn drawScene(self: Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
     const level = &session.level;
