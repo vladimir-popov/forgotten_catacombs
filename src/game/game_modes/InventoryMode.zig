@@ -224,7 +224,7 @@ fn updateInventoryTab(self: *InventoryMode, tab: *Tab) !void {
             try self.formatInventoryLine(&buffer, item_ptr.*),
             item_ptr.*,
             useDropDescribe,
-            null,
+            describeSelectedItem,
         );
     }
     if (tab.window.options.items.len > 0) {
@@ -355,7 +355,7 @@ fn addDropOption(self: *InventoryMode, tab: *Tab, item: g.Entity) !void {
     else
         "???";
     const label = try std.fmt.bufPrint(&buffer, "{u} {s}", .{ sprite.codepoint, name });
-    try tab.window.addOption(self.alloc, label, item, takeFromPileOrDescribe, null);
+    try tab.window.addOption(self.alloc, label, item, takeFromPileOrDescribe, describeSelectedItem);
 }
 
 fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
