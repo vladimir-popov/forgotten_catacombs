@@ -18,6 +18,7 @@ const log = std.log.scoped(.game_session);
 const GameSession = @This();
 
 pub const Mode = union(enum) {
+    initialization,
     play: PlayMode,
     inventory: InventoryMode,
     explore: ExploreMode,
@@ -26,6 +27,7 @@ pub const Mode = union(enum) {
 
     inline fn deinit(self: *Mode) void {
         switch (self.*) {
+            .initialization => {},
             .play => self.play.deinit(),
             .inventory => self.inventory.deinit(),
             .explore => self.explore.deinit(),
@@ -59,35 +61,69 @@ max_depth: u8,
 /// The current mode of the game
 mode: Mode,
 
-pub fn init(
+/// The GameSession should be initialized in few steps:
+///  - `preInit` sets up external dependencies, initializes inner containers and the viewport.
+///  - the seed should be set up;
+///  - the player should be added to the session;
+///  - the max depth should be set up;
+///  - the level should be completely initialized;
+///  - `completeInitialization` subscribes the viewport and the game session itself on events;
+///    move the viewport to the player; changes the inner state to the `play` mode.
+pub fn preInit(
+    self: *GameSession,
+    gpa: std.mem.Allocator,
+    runtime: g.Runtime,
+    render: g.Render,
+) !void {
+    self.* = .{
+        .arena = std.heap.ArenaAllocator.init(gpa),
+        .runtime = runtime,
+        .render = render,
+        .viewport = g.Viewport.init(render.scene_rows, render.scene_cols),
+        .registry = try g.Registry.init(self.arena.allocator()),
+        .events = g.events.EventBus.init(&self.arena),
+        .seed = 0,
+        .prng = std.Random.DefaultPrng.init(0),
+        .ai = g.AI{ .session = self, .rand = self.prng.random() },
+        .player = undefined,
+        .level = undefined,
+        .max_depth = undefined,
+        .mode = .initialization,
+    };
+}
+
+/// This method is idempotent. It does the following:
+///  - subscribes event handlers;
+///  - puts the viewport around the player;
+///  - switches the game session to the `play` mode.
+pub fn completeInitialization(self: *GameSession) !void {
+    if (self.mode == .initialization) {
+        try self.events.subscribe(self.viewport.subscriber());
+        try self.events.subscribe(self.subscriber());
+        self.viewport.centeredAround(self.level.playerPosition().place);
+        self.mode = .{ .play = undefined };
+        try self.mode.play.init(self.arena.allocator(), self, null);
+    }
+}
+
+/// Completely initializes an undefined GameSession.
+pub fn initNew(
     self: *GameSession,
     gpa: std.mem.Allocator,
     seed: u64,
     runtime: g.Runtime,
     render: g.Render,
 ) !void {
-    log.debug("Begin the new game session with seed {d}", .{seed});
-    self.* = .{
-        .arena = std.heap.ArenaAllocator.init(gpa),
-        .seed = seed,
-        .prng = std.Random.DefaultPrng.init(seed),
-        .ai = g.AI{ .session = self, .rand = self.prng.random() },
-        .runtime = runtime,
-        .render = render,
-        .viewport = g.Viewport.init(render.scene_rows, render.scene_cols),
-        .registry = try g.Registry.init(self.arena.allocator()),
-        .player = try self.registry.addNewEntity(try g.entities.player(self.registry.allocator())),
-        .events = g.events.EventBus.init(&self.arena),
-        .level = try g.Level.initFirstLevel(self.arena.allocator(), &self.registry, self.player),
-        .max_depth = 0,
-        .mode = .{ .play = undefined },
-    };
+    log.debug("Begin a new game session with seed {d}", .{seed});
+    try self.preInit(gpa, runtime, render);
+    self.prng.seed(seed);
+    self.player = try self.registry.addNewEntity(try g.entities.player(self.registry.allocator()));
     try self.equipPlayer();
-    self.viewport.centeredAround(self.level.playerPosition().place);
+    self.max_depth = 0;
+    self.level = try g.Level.initFirstLevel(self.arena.allocator(), &self.registry, self.player);
+    try self.completeInitialization();
+    // hack  for the first level only
     self.viewport.region.top_left.moveNTimes(.up, 3);
-    try self.events.subscribe(self.viewport.subscriber());
-    try self.events.subscribe(self.subscriber());
-    try self.mode.play.init(self.arena.allocator(), self, null);
 }
 
 pub fn deinit(self: *GameSession) void {
@@ -182,6 +218,7 @@ pub inline fn tick(self: *GameSession) !void {
         .explore => try self.mode.explore.tick(),
         .explore_level => try self.mode.explore_level.tick(),
         .load_level => try self.mode.load_level.tick(),
+        .initialization => undefined,
     }
     try self.events.notifySubscribers();
 }

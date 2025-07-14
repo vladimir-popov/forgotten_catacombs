@@ -44,9 +44,11 @@ const WelcomeScreen = struct {
 
 pub const State = union(enum) {
     welcome: WelcomeScreen,
-    game_over,
+    // saving_session,
+    // loading_session,
     /// The current game session
     game_session: g.GameSession,
+    game_over,
 };
 
 /// The general purpose allocator
@@ -141,7 +143,7 @@ fn newGame(self: *Self) !void {
     std.debug.assert(self.state != .game_session);
     _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
     self.state = .{ .game_session = undefined };
-    try self.state.game_session.init(
+    try self.state.game_session.initNew(
         self.gpa,
         self.seed,
         self.runtime,

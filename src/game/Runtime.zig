@@ -98,14 +98,6 @@ pub inline fn closeFile(self: Runtime, file: File) void {
     self.vtable.closeFile(self.context, file);
 }
 
-pub inline fn readFromFile(self: Runtime, file: File, buffer: []u8) anyerror!usize {
-    return try self.vtable.readFromFile(self.context, file, buffer);
-}
-
-pub inline fn writeToFile(self: Runtime, file: File, bytes: []const u8) anyerror!usize {
-    return try self.vtable.writeToFile(self.context, file, bytes);
-}
-
 pub const FileReader = struct {
     pub const Error = anyerror;
     pub const Reader = std.io.Reader(FileReader, Error, read);
@@ -114,7 +106,7 @@ pub const FileReader = struct {
     file: File,
 
     pub fn read(self: FileReader, buffer: []u8) Error!usize {
-        return try self.runtime.readFromFile(self.file, buffer);
+        return try self.runtime.vtable.readFromFile(self.runtime.context, self.file, buffer);
     }
 
     pub fn deinit(self: FileReader) void {
@@ -137,12 +129,13 @@ pub const FileWriter = struct {
     runtime: Runtime,
     file: File,
 
+    // TODO: rename to `close`
     pub fn deinit(self: FileWriter) void {
         self.runtime.closeFile(self.file);
     }
 
     pub fn write(self: FileWriter, bytes: []const u8) Error!usize {
-        return try self.runtime.writeToFile(self.file, bytes);
+        return try self.runtime.vtable.writeToFile(self.runtime.context, self.file, bytes);
     }
 
     pub fn writeAll(self: FileWriter, bytes: []const u8) Error!void {

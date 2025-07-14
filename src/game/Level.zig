@@ -242,14 +242,16 @@ pub fn tryGenerateNew(
     return self;
 }
 
-/// Sets up a position for a player and remembers the placement with the player.
-pub fn completeInitialization(self: *Self, direction: c.Ladder.Direction) !void {
-    const init_place = switch (direction) {
-        .down => self.dungeon.entrance,
-        .up => self.dungeon.exit,
-    };
-    // Generate player on the ladder
-    try self.registry.set(self.player, c.Position{ .place = init_place });
+/// Sets up a position for a player if the direction is provided, and remembers the placement with the player.
+pub fn completeInitialization(self: *Self, moving_direction: ?c.Ladder.Direction) !void {
+    if (moving_direction) |direction| {
+        const init_place = switch (direction) {
+            .down => self.dungeon.entrance,
+            .up => self.dungeon.exit,
+        };
+        // Move the player to the ladder
+        try self.registry.set(self.player, c.Position{ .place = init_place });
+    }
     self.player_placement = self.dungeon.placementWith(self.playerPosition().place).?;
 
     log.debug(
