@@ -109,7 +109,7 @@ pub const FileReader = struct {
         return try self.runtime.vtable.readFromFile(self.runtime.context, self.file, buffer);
     }
 
-    pub fn deinit(self: FileReader) void {
+    pub fn close(self: FileReader) void {
         self.runtime.closeFile(self.file);
     }
 
@@ -129,8 +129,7 @@ pub const FileWriter = struct {
     runtime: Runtime,
     file: File,
 
-    // TODO: rename to `close`
-    pub fn deinit(self: FileWriter) void {
+    pub fn close(self: FileWriter) void {
         self.runtime.closeFile(self.file);
     }
 

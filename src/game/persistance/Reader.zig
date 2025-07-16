@@ -29,30 +29,30 @@ pub fn Reader(comptime Underlying: type) type {
         }
 
         pub fn beginObject(self: *Self) Error!void {
-            assertEql(try self.reader.next(), .object_begin);
+            try assertEql(self.reader.next(), .object_begin);
         }
 
         pub fn endObject(self: *Self) Error!void {
-            assertEql(try self.reader.next(), .object_end);
+            try assertEql(self.reader.next(), .object_end);
         }
 
         pub fn readSeed(self: *Self) Error!u64 {
-            assertEql(try self.readStringKey(), "seed");
+            try assertEql(self.readStringKey(), "seed");
             return try self.readNumber(u64);
         }
 
         pub fn readDepth(self: *Self) Error!u8 {
-            assertEql(try self.readStringKey(), "depth");
+            try assertEql(self.readStringKey(), "depth");
             return try self.readNumber(u8);
         }
 
         pub fn readMaxDepth(self: *Self) Error!u8 {
-            assertEql(try self.readStringKey(), "max_depth");
+            try assertEql(self.readStringKey(), "max_depth");
             return try self.readNumber(u8);
         }
 
         pub fn readLevelEntities(self: *Self, level: *g.Level) Error!void {
-            assertEql(try self.readStringKey(), "entities");
+            try assertEql(self.readStringKey(), "entities");
             const alloc = level.arena.allocator();
             try self.beginCollection();
             while (!try self.isCollectionEnd()) {
@@ -62,7 +62,7 @@ pub fn Reader(comptime Underlying: type) type {
         }
 
         pub fn readVisitedPlaces(self: *Self, level: *g.Level) Error!void {
-            assertEql(try self.readStringKey(), "visited_places");
+            try assertEql(self.readStringKey(), "visited_places");
             try self.beginCollection();
             for (0..level.dungeon.rows) |i| {
                 try self.beginCollection();
@@ -74,7 +74,7 @@ pub fn Reader(comptime Underlying: type) type {
         }
 
         pub fn readRememberedObjects(self: *Self, level: *g.Level) Error!void {
-            assertEql(try self.readStringKey(), "remembered_objects");
+            try assertEql(self.readStringKey(), "remembered_objects");
             try self.beginCollection();
             const alloc = level.arena.allocator();
             while (!try self.isCollectionEnd()) {
@@ -88,14 +88,18 @@ pub fn Reader(comptime Underlying: type) type {
         }
 
         pub fn readPlayer(self: *Self) anyerror!g.Entity {
-            assertEql(try self.readStringKey(), "player");
+            try assertEql(self.readStringKey(), "player");
             return try self.readEntity();
         }
 
         fn readEntity(self: *Self) anyerror!g.Entity {
             try self.beginObject();
             const entity = g.Entity{ .id = try self.readNumericKey(g.Entity.IdType) };
-            try self.registry.setComponentsToEntity(entity, try self.read(c.Components));
+            const components = self.read(c.Components) catch |err| {
+                log.err("Error on reading components of the entity {d}", .{entity.id});
+                return err;
+            };
+            try self.registry.setComponentsToEntity(entity, components);
             try self.endObject();
             return entity;
         }
@@ -111,7 +115,7 @@ pub fn Reader(comptime Underlying: type) type {
         }
 
         // registry is used in case of EntitiesSet, to store the components during deserialization.
-        fn read(self: *Self, comptime T: type) Error!T {
+        pub fn read(self: *Self, comptime T: type) Error!T {
             if (T == u.EntitiesSet) {
                 return @as(T, try self.readEntitiesSet());
             }
@@ -151,23 +155,23 @@ pub fn Reader(comptime Underlying: type) type {
                 .@"struct" => |s| {
                     try self.beginObject();
                     var result: T = undefined;
-                    var prev_key: ?[]const u8 = null;
+                    var key: ?[]const u8 = null;
                     inline for (s.fields) |field| {
-                        if (try self.isObjectEnd()) break;
-
-                        const key = prev_key orelse blk: {
-                            prev_key = try self.readStringKey();
-                            break :blk prev_key.?;
-                        };
-                        if (std.mem.eql(u8, key, field.name)) {
-                            @field(&result, field.name) = try self.read(field.type);
-                            prev_key = null;
+                        if (key == null) {
+                            key = try self.readStringKey();
+                        }
+                        if (std.mem.eql(u8, field.name, key.?)) {
+                            @field(&result, field.name) = self.read(field.type) catch |err| {
+                                log.err("Error on reading value of the field {s}", .{field.name});
+                                return err;
+                            };
+                            key = null;
                         } else if (@typeInfo(field.type) == .optional) {
                             @field(&result, field.name) = null;
                         } else {
                             log.err(
                                 "Error on reading {s}. Expected a key for the field {s}, but was read {s}",
-                                .{ @typeName(T), field.name, key },
+                                .{ @typeName(T), field.name, key.? },
                             );
                             return error.WrongInput;
                         }
@@ -196,11 +200,11 @@ pub fn Reader(comptime Underlying: type) type {
         }
 
         fn beginCollection(self: *Self) Error!void {
-            assertEql(try self.reader.next(), .array_begin);
+            try assertEql(self.reader.next(), .array_begin);
         }
 
         fn endCollection(self: *Self) Error!void {
-            assertEql(try self.reader.next(), .array_end);
+            try assertEql(self.reader.next(), .array_end);
         }
 
         fn isCollectionEnd(self: *Self) Error!bool {
@@ -286,12 +290,21 @@ pub fn Reader(comptime Underlying: type) type {
     };
 }
 
-fn assertEql(actual: anytype, expected: anytype) void {
-    if (u.isDebug())
-        switch (@typeInfo(@TypeOf(expected))) {
-            .enum_literal => if (actual != expected)
-                std.debug.panic("Expected {any}, but was {any}", .{ expected, actual }),
-            else => if (!std.mem.eql(u8, actual, expected))
-                std.debug.panic("Expected {s}, but was {s}", .{ expected, actual }),
+fn assertEql(actual: anytype, expected: anytype) !void {
+    if (u.isDebug()) {
+        const act = switch (@typeInfo(@TypeOf(actual))) {
+            .error_set, .error_union => try actual,
+            else => actual,
         };
+        switch (@typeInfo(@TypeOf(expected))) {
+            .enum_literal => if (act != expected) {
+                log.err("Expected {any}, but was {any}", .{ expected, act });
+                return error.WrongInput;
+            },
+            else => if (!std.mem.eql(u8, act, expected)) {
+                log.err("Expected {s}, but was {s}", .{ expected, act });
+                return error.WrongInput;
+            },
+        }
+    }
 }

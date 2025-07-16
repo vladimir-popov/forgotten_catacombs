@@ -85,16 +85,18 @@ pub fn tick(self: *Self) !void {
                 self.process = if (self.is_new_level)
                     .{ .generating = .{ .prng = std.Random.DefaultPrng.init(self.session.seed + self.new_depth) } }
                 else
-                    .{ .loading = ps.Loading.loadLevel(self.session, self.new_depth) };
+                    .{ .loading = ps.Loading.loadLevel(self.session, self.new_depth, self.from_ladder.direction) };
             }
             errdefer self.process.saving.deinit();
         },
         .loading => {
-            if (!try self.process.loading.tick()) {
+            const is_continue = self.process.loading.tick() catch |err| {
+                log.err("Error on loading level on depth {d}", .{self.new_depth});
+                return err;
+            };
+            if (!is_continue) {
                 self.process.loading.deinit();
                 self.process = .done;
-                // self.deinit will happen inside this function:
-                try self.session.playerMovedToLevel();
             }
             errdefer self.process.loading.deinit();
         },

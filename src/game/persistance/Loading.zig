@@ -26,20 +26,28 @@ progress: Progress,
 state: union(enum) { reading: Reader, file_closed } = .file_closed,
 file: g.Runtime.FileReader = undefined,
 level_depth: u8 = undefined,
+/// Helps to choose a ladder on which the player should appear on the loaded level.
+/// null means that player's position will be loaded together with game session.
+moving_direction: ?c.Ladder.Direction,
 
 pub fn loadSession(session: *g.GameSession) Self {
-    return .{ .session = session, .progress = .session_preinited };
+    return .{ .session = session, .progress = .session_preinited, .moving_direction = null };
 }
 
-pub fn loadLevel(session: *g.GameSession, depth: u8) Self {
-    return .{ .session = session, .progress = .session_loaded, .level_depth = depth };
+pub fn loadLevel(session: *g.GameSession, depth: u8, moving_direction: c.Ladder.Direction) Self {
+    return .{
+        .session = session,
+        .progress = .session_loaded,
+        .level_depth = depth,
+        .moving_direction = moving_direction,
+    };
 }
 
 pub fn deinit(self: *Self) void {
     switch (self.state) {
         .reading => |*reading| {
             reading.deinit();
-            self.file.deinit();
+            self.file.close();
         },
         .file_closed => {},
     }
@@ -60,7 +68,7 @@ pub fn tick(self: *Self) !bool {
             self.session.player = try self.state.reading.readPlayer();
             try self.state.reading.endObject();
             self.state.reading.deinit();
-            self.file.deinit();
+            self.file.close();
             self.state = .file_closed;
             self.progress = .session_loaded;
         },
@@ -94,8 +102,11 @@ pub fn tick(self: *Self) !bool {
         },
         .remembered_objects_loaded => {
             try self.state.reading.endObject();
-            try self.session.level.completeInitialization(null);
+            try self.session.level.completeInitialization(self.moving_direction);
             try self.session.completeInitialization();
+            // the game sessions is switched to the `play` mde here,
+            // and self.deinit will be invoked inside this function:
+            try self.session.playerMovedToLevel();
             self.progress = .completed;
         },
         .completed => unreachable,

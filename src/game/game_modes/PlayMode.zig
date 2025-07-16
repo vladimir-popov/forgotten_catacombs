@@ -53,8 +53,8 @@ pub fn deinit(self: PlayMode) void {
 
 pub fn tick(self: *PlayMode) !void {
     try self.draw();
-    if (self.session.registry.getAll(c.Animation).len > 0)
-        return;
+    // if (self.session.registry.getAll(c.Animation).len > 0)
+    //     return;
 
     if (self.is_player_turn) {
         const maybe_action = try self.handleInput();

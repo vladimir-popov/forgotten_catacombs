@@ -109,7 +109,7 @@ pub fn Writer(comptime Underlying: type) type {
             try self.endCollection();
         }
 
-        fn write(self: *Self, value: anytype) Error!void {
+        pub fn write(self: *Self, value: anytype) Error!void {
             const T = @TypeOf(value);
             if (T == u.EntitiesSet) {
                 try self.writeEntitiesSet(@as(u.EntitiesSet, value));

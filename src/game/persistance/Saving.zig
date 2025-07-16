@@ -34,7 +34,7 @@ pub fn deinit(self: *Self) void {
     switch (self.state) {
         .writing => |*writer| {
             writer.deinit();
-            self.file.deinit();
+            self.file.close();
         },
         .file_closed => {},
     }
@@ -55,7 +55,7 @@ pub fn tick(self: *Self) !bool {
             try self.state.writing.writePlayer(self.session.player);
             try self.state.writing.endObject();
             self.state.writing.deinit();
-            self.file.deinit();
+            self.file.close();
             self.state = .file_closed;
             self.progress = .session_saved;
         },
@@ -89,7 +89,7 @@ pub fn tick(self: *Self) !bool {
             }
             _ = self.session.level.arena.deinit();
             self.state.writing.deinit();
-            self.file.deinit();
+            self.file.close();
             self.state = .file_closed;
             self.progress = .completed;
         },
