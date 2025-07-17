@@ -11,7 +11,7 @@ const PlayMode = @import("game_modes/PlayMode.zig");
 const InventoryMode = @import("game_modes/InventoryMode.zig");
 const ExploreMode = @import("game_modes/ExploreMode.zig");
 const ExploreLevelMode = @import("game_modes/ExploreLevelMode.zig");
-const LoadLevelMode = @import("game_modes/LoadLevelMode.zig");
+const SaveLoadMode = @import("game_modes/SaveLoadMode.zig");
 
 const log = std.log.scoped(.game_session);
 
@@ -23,7 +23,7 @@ pub const Mode = union(enum) {
     inventory: InventoryMode,
     explore: ExploreMode,
     explore_level: ExploreLevelMode,
-    load_level: LoadLevelMode,
+    save_load: SaveLoadMode,
 
     inline fn deinit(self: *Mode) void {
         switch (self.*) {
@@ -32,7 +32,7 @@ pub const Mode = union(enum) {
             .inventory => self.inventory.deinit(),
             .explore => self.explore.deinit(),
             .explore_level => {},
-            .load_level => self.load_level.deinit(),
+            .save_load => self.save_load.deinit(),
         }
     }
 };
@@ -83,13 +83,14 @@ pub fn preInit(
         .registry = try g.Registry.init(self.arena.allocator()),
         .events = g.events.EventBus.init(&self.arena),
         .seed = 0,
+        .max_depth = 0,
         .prng = std.Random.DefaultPrng.init(0),
         .ai = g.AI{ .session = self, .rand = self.prng.random() },
         .player = undefined,
         .level = undefined,
-        .max_depth = undefined,
         .mode = .initialization,
     };
+    log.debug("The game session is preinited", .{});
 }
 
 /// This method is idempotent. It does the following:
@@ -103,6 +104,7 @@ pub fn completeInitialization(self: *GameSession) !void {
         self.viewport.centeredAround(self.level.playerPosition().place);
         self.mode = .{ .play = undefined };
         try self.mode.play.init(self.arena.allocator(), self, null);
+        log.debug("The game session is completely initialized. Seed {d}; Max depth {d}", .{ self.seed, self.max_depth });
     }
 }
 
@@ -120,7 +122,8 @@ pub fn initNew(
     self.player = try self.registry.addNewEntity(try g.entities.player(self.registry.allocator()));
     try self.equipPlayer();
     self.max_depth = 0;
-    self.level = try g.Level.initFirstLevel(self.arena.allocator(), &self.registry, self.player);
+    self.level = g.Level.preInit(self.arena.allocator(), &self.registry);
+    try self.level.initAsFirstLevel(self.player);
     try self.completeInitialization();
     // hack  for the first level only
     self.viewport.region.top_left.moveNTimes(.up, 3);
@@ -142,7 +145,15 @@ fn equipPlayer(self: *GameSession) !void {
     try invent.items.add(light);
 }
 
-// TODO: Load session from file
+pub fn load(self: *GameSession) !void {
+    self.mode.deinit();
+    self.mode = .{ .save_load = SaveLoadMode.loadSession(self) };
+}
+
+pub fn save(self: *GameSession) !void {
+    self.mode.deinit();
+    self.mode = .{ .save_load = SaveLoadMode.saveSession(self) };
+}
 
 pub fn play(self: *GameSession, entity_in_focus: ?g.Entity) !void {
     self.mode.deinit();
@@ -172,7 +183,7 @@ pub fn lookAround(self: *GameSession) !void {
 }
 
 fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
-    try self.events.sendEvent(.{ .changing_level = .{ .by_ladder = by_ladder } });
+    try self.events.sendEvent(.{ .level_changed = .{ .by_ladder = by_ladder } });
 }
 
 pub fn playerMovedToLevel(self: *GameSession) !void {
@@ -217,7 +228,7 @@ pub inline fn tick(self: *GameSession) !void {
         .inventory => try self.mode.inventory.tick(),
         .explore => try self.mode.explore.tick(),
         .explore_level => try self.mode.explore_level.tick(),
-        .load_level => try self.mode.load_level.tick(),
+        .save_load => try self.mode.save_load.tick(),
         .initialization => undefined,
     }
     try self.events.notifySubscribers();
@@ -230,9 +241,9 @@ pub fn subscriber(self: *GameSession) g.events.Subscriber {
 fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
     const self: *GameSession = @ptrCast(@alignCast(ptr));
     switch (event) {
-        .changing_level => |lvl| {
+        .level_changed => |lvl| {
             self.mode.deinit();
-            self.mode = .{ .load_level = try LoadLevelMode.loadOrGenerateLevel(self, lvl.by_ladder) };
+            self.mode = .{ .save_load = try SaveLoadMode.loadOrGenerateLevel(self, lvl.by_ladder) };
         },
         .player_hit => {
             log.debug("Update target after player hit", .{});

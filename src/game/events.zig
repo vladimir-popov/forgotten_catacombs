@@ -29,7 +29,7 @@ pub const PlayerHit = struct { target: g.Entity };
 pub const Event = union(enum) {
     const Tag = @typeInfo(Event).@"union".tag_type.?;
 
-    changing_level: ChangingLevel,
+    level_changed: ChangingLevel,
     entity_moved: EntityMoved,
     player_hit: PlayerHit,
 

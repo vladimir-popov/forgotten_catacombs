@@ -44,8 +44,6 @@ const WelcomeScreen = struct {
 
 pub const State = union(enum) {
     welcome: WelcomeScreen,
-    // saving_session,
-    // loading_session,
     /// The current game session
     game_session: g.GameSession,
     game_over,
@@ -94,6 +92,10 @@ pub fn tick(self: *Self) !void {
                             self.state.welcome.menu.deinit(self.gpa);
                             try self.newGame();
                         },
+                        .Continue => {
+                            self.state.welcome.menu.deinit(self.gpa);
+                            try self.continueGame();
+                        },
                         else => {},
                     }
                 },
@@ -141,6 +143,7 @@ fn welcome(self: *Self) !void {
 
 fn newGame(self: *Self) !void {
     std.debug.assert(self.state != .game_session);
+    try self.deleteSessionIfExists();
     _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
     self.state = .{ .game_session = undefined };
     try self.state.game_session.initNew(
@@ -151,9 +154,21 @@ fn newGame(self: *Self) !void {
     );
 }
 
+fn continueGame(self: *Self) !void {
+    _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
+    self.state = .{ .game_session = undefined };
+    try self.state.game_session.preInit(
+        self.gpa,
+        self.runtime,
+        self.render,
+    );
+    try self.state.game_session.load();
+}
+
 fn gameOver(self: *Self) !void {
     std.debug.assert(self.state == .game_session);
     self.state.game_session.deinit();
+    try self.deleteSessionIfExists();
     self.state = .game_over;
     try self.drawGameOverScreen();
 }
@@ -162,13 +177,20 @@ fn goToMainMenu(ptr: ?*anyopaque) callconv(.C) void {
     if (ptr == null) return;
     const self: *Self = @ptrCast(@alignCast(ptr.?));
     std.debug.assert(self.state == .game_session);
+    self.state.game_session.save() catch |err| std.debug.panic("Error on saving: {any}", .{err});
     self.state.game_session.deinit();
-    self.welcome() catch @panic("Error when the Game went to the '.welcome' state");
+    self.welcome() catch |err| std.debug.panic("Error when the Game went to the '.welcome' state: {any}", .{err});
 }
 
+/// Checks that save file for a session exists.
 fn isSessionExists(self: Self) !bool {
     _ = self;
     return false;
+}
+
+/// Remove the save file with a game session if exists.
+fn deleteSessionIfExists(self: Self) !void {
+    _ = self;
 }
 
 fn drawWelcomeScreen(self: Self) !void {

@@ -20,9 +20,9 @@ pub const Cell = union(enum) {
 
 pub const DijkstraMapRegion = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 12, .cols = 25 };
 
-arena: *std.heap.ArenaAllocator,
+arena: std.heap.ArenaAllocator,
 registry: *g.Registry,
-player: g.Entity,
+player: g.Entity = undefined,
 /// The list of the entities belong to this level.
 /// Used to cleanup global registry on moving from the level.
 /// The player doesn't belong to any particular level and should not be presented here.
@@ -34,81 +34,95 @@ visibility_strategy: *const fn (level: *const g.Level, place: p.Point) g.Render.
 /// Already visited places in the dungeon.
 visited_places: []std.DynamicBitSetUnmanaged = undefined,
 /// All static objects (doors, ladders, items) met previously.
-remembered_objects: std.AutoHashMapUnmanaged(p.Point, g.Entity) = .empty,
+remembered_objects: std.AutoHashMapUnmanaged(p.Point, g.Entity),
 /// The placement where the player right now. It's used for optimization.
 player_placement: d.Placement = undefined,
 /// Dijkstra Map of direction to the player. Used to find a path to the player.
 dijkstra_map: u.DijkstraMap.VectorsMap,
 
-/// Creates an instance of the level with dungeon generated with passed seed.
-///
-/// See also `initFirstLevel`, `tryGenerateNew`, `completeInitialization`.
-pub fn initEmpty(
+/// Initializes an arena to store everything inside the level.
+pub fn preInit(
     alloc: std.mem.Allocator,
     registry: *g.Registry,
-    player: g.Entity,
-    depth: u8,
-    seed: u64,
-) !Self {
-    const arena = try alloc.create(std.heap.ArenaAllocator);
-    arena.* = std.heap.ArenaAllocator.init(alloc);
-    const dungeon = try generateDungeon(arena, depth, seed) orelse {
-        log.err("A dungeon was not generate from the saved seed {d}", .{seed});
-        return error.BrokenSeed;
-    };
-    return try init(arena, registry, depth, dungeon, player);
-}
-
-fn init(
-    arena: *std.heap.ArenaAllocator,
-    registry: *g.Registry,
-    depth: u8,
-    dungeon: d.Dungeon,
-    player: g.Entity,
-) !Self {
-    log.debug("Init a level on depth {d} with a dungeon {s}.", .{ depth, @tagName(dungeon.type) });
-    const visibility_strategy: *const fn (level: *const g.Level, place: p.Point) g.Render.Visibility =
-        switch (dungeon.type) {
-            .first_location => g.visibility.showTheCurrentPlacement,
-            .cave => g.visibility.showInRadiusOfSourceOfLight,
-            .catacomb => if (depth < 3)
-                g.visibility.showTheCurrentPlacement
-            else
-                g.visibility.showTheCurrentPlacementInLight,
-        };
-    var self = Self{
-        .arena = arena,
-        .depth = depth,
+) Self {
+    return .{
+        .arena = std.heap.ArenaAllocator.init(alloc),
         .registry = registry,
-        .player = player,
-        .dungeon = dungeon,
         .entities = .empty,
-        .visibility_strategy = visibility_strategy,
-        .visited_places = try arena.allocator().alloc(std.DynamicBitSetUnmanaged, dungeon.rows),
         .remembered_objects = .empty,
         .dijkstra_map = .empty,
     };
-    const alloc = arena.allocator();
-    for (0..self.dungeon.rows) |r0| {
-        self.visited_places[r0] = try std.DynamicBitSetUnmanaged.initEmpty(alloc, self.dungeon.cols);
-    }
-    return self;
 }
 
 pub fn deinit(self: *Self) void {
-    const alloc = self.arena.child_allocator;
+    log.debug("Deinit level on depth {d}", .{self.depth});
     self.arena.deinit();
-    alloc.destroy(self.arena);
 }
 
-pub fn initFirstLevel(
-    alloc: std.mem.Allocator,
-    registry: *g.Registry,
+pub fn reset(self: *Self) void {
+    log.debug("Reset level on depth {d}", .{self.depth});
+    std.debug.assert(self.arena.reset(.retain_capacity));
+    self.entities = .empty;
+    self.remembered_objects = .empty;
+    self.dijkstra_map = .empty;
+}
+
+/// Generates with the passed seed and sets up a dungeon to the preinited level.
+/// This is the first step in loading a level.
+pub fn initWithEmptyDungeon(
+    self: *Self,
     player: g.Entity,
-) !Self {
+    depth: u8,
+    seed: u64,
+) !void {
+    const dungeon = try generateDungeon(&self.arena, depth, seed) orelse {
+        log.err("A dungeon was not generate from the saved seed {d}", .{seed});
+        return error.BrokenSeed;
+    };
+    try self.setupDungeon(depth, dungeon, player);
+}
+
+/// Sets up the dungeon to the level, and initializes the inner state according to the dungeon.
+/// The level should be preinitialized before run this method.
+fn setupDungeon(
+    self: *Self,
+    depth: u8,
+    dungeon: d.Dungeon,
+    player: g.Entity,
+) !void {
+    log.debug(
+        "Setting up the dungeon with type {s} to the level on depth {d}. Player id is {d}",
+        .{ @tagName(dungeon.type), depth, player.id },
+    );
+
+    const alloc = self.arena.allocator();
+
+    self.depth = depth;
+    self.player = player;
+    self.dungeon = dungeon;
+    self.visibility_strategy = switch (dungeon.type) {
+        .first_location => g.visibility.showTheCurrentPlacement,
+        .cave => g.visibility.showInRadiusOfSourceOfLight,
+        .catacomb => if (depth < 3)
+            g.visibility.showTheCurrentPlacement
+        else
+            g.visibility.showTheCurrentPlacementInLight,
+    };
+    self.visited_places = try alloc.alloc(std.DynamicBitSetUnmanaged, dungeon.rows);
+
+    for (0..self.dungeon.rows) |r0| {
+        self.visited_places[r0] = try std.DynamicBitSetUnmanaged.initEmpty(alloc, self.dungeon.cols);
+    }
+}
+
+/// Completely initializes a preinited level as the first location in the game.
+pub fn initAsFirstLevel(
+    self: *Self,
+    player: g.Entity,
+) !void {
     log.debug("Start creating the first level.", .{});
 
-    var self = try initEmpty(alloc, registry, player, 0, 0);
+    try self.initWithEmptyDungeon(player, 0, 0);
     const arena_alloc = self.arena.allocator();
 
     // Add wharf
@@ -169,36 +183,28 @@ pub fn initFirstLevel(
         );
     }
     try self.completeInitialization(.down);
-    return self;
 }
 
-/// Tries to generate a new level with passed seed. The level should be at least preinited.
-/// In successful case the level will be reinitialized and true returned. Otherwise the level
-/// will be not changed and false returned.
+/// Tries to generate a new level with passed seed.
+/// The level should be preinited before run this method.
+/// In successful case the level becomes completely initialized and true is returned.
+/// Otherwise the inner arena is cleaned up and false is returned.
 pub fn tryGenerateNew(
-    alloc: std.mem.Allocator,
-    registry: *g.Registry,
+    self: *Self,
     player: g.Entity,
     depth: u8,
     from_ladder: c.Ladder,
     seed: u64,
-) !?Self {
-    log.debug(
-        "Generate a level {s} on depth {d} from ladder {any}",
-        .{ @tagName(from_ladder.direction), depth, from_ladder },
-    );
-    const arena = try alloc.create(std.heap.ArenaAllocator);
-    arena.* = std.heap.ArenaAllocator.init(alloc);
-
-    const dungeon: d.Dungeon = (try generateDungeon(arena, depth, seed)) orelse {
-        alloc.destroy(arena);
-        return null;
+) !bool {
+    const dungeon: d.Dungeon = (try generateDungeon(&self.arena, depth, seed)) orelse {
+        self.reset();
+        return false;
     };
-    log.debug("On depth {d} a dungeon {s} has been generated", .{ depth, @tagName(dungeon.type) });
+    log.debug("A {s} has been generated on depth {d}.", .{ @tagName(dungeon.type), depth });
 
-    const arena_alloc = arena.allocator();
+    const arena_alloc = self.arena.allocator();
 
-    var self = try init(arena, registry, depth, dungeon, player);
+    try self.setupDungeon(depth, dungeon, player);
 
     const init_place = switch (from_ladder.direction) {
         .down => self.dungeon.entrance,
@@ -239,10 +245,11 @@ pub fn tryGenerateNew(
         }
     }
     try self.completeInitialization(from_ladder.direction);
-    return self;
+    return true;
 }
 
-/// Sets up a position for a player if the direction is provided, and remembers the placement with the player.
+/// Sets up a position for the player if the direction is provided, and remembers the placement with the player.
+/// This is the final step of the initialization process.
 pub fn completeInitialization(self: *Self, moving_direction: ?c.Ladder.Direction) !void {
     if (moving_direction) |direction| {
         const init_place = switch (direction) {

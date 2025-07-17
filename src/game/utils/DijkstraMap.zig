@@ -30,7 +30,8 @@ pub fn calculate(
     var openned: std.ArrayListUnmanaged(struct { p.Point, u8 }) = .empty;
     defer openned.deinit(alloc);
 
-    map.clearRetainingCapacity();
+    if (map.size > 0)
+        map.clearRetainingCapacity();
 
     try openned.append(alloc, .{ target, 0 });
     while (openned.pop()) |tuple| {
