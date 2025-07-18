@@ -23,7 +23,7 @@ pub const std_options: std.Options = .{
         // .{ .scope = .load_level_mode, .level = .debug },
         // .{ .scope = .inventory_mode, .level = .debug },
         // .{ .scope = .looking_around_mode, .level = .debug },
-        .{ .scope = .load_level_mode, .level = .debug },
+        .{ .scope = .save_load_mode, .level = .debug },
         .{ .scope = .level, .level = .debug },
         // .{ .scope = .cmd, .level = .debug },
         // .{ .scope = .cave, .level = .debug },
@@ -70,7 +70,5 @@ pub fn main() !void {
     try game.init(alloc, runtime.runtime(), seed);
     defer game.deinit();
 
-    runtime.run(game) catch |e| {
-        std.debug.panic("Fatal error {any}", .{e});
-    };
+    try runtime.run(game);
 }

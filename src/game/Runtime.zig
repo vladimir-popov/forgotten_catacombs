@@ -38,7 +38,7 @@ const VTable = struct {
     currentMillis: *const fn (context: *anyopaque) c_uint,
     isDevMode: *const fn (context: *anyopaque) bool,
     popCheat: *const fn (context: *anyopaque) ?g.Cheat,
-    // --------- FS operations --------- 
+    // --------- FS operations ---------
     // All paths should be relative to a directory with save files
     openFile: *const fn (context: *anyopaque, file_path: []const u8, mode: FileMode) anyerror!File,
     closeFile: *const fn (context: *anyopaque, file: File) void,
@@ -46,7 +46,7 @@ const VTable = struct {
     writeToFile: *const fn (context: *anyopaque, file: File, bytes: []const u8) anyerror!usize,
     isFileExists: *const fn (context: *anyopaque, path: []const u8) anyerror!bool,
     deleteFileIfExists: *const fn (context: *anyopaque, path: []const u8) anyerror!void,
-    //  ---------------------------------- 
+    //  ----------------------------------
 };
 
 context: *anyopaque,
@@ -102,11 +102,11 @@ pub inline fn openFile(self: Runtime, file_path: []const u8, mode: FileMode) any
 pub inline fn closeFile(self: Runtime, file: File) void {
     self.vtable.closeFile(self.context, file);
 }
-    
+
 pub fn isFileExists(self: Runtime, path: []const u8) anyerror!bool {
     return try self.vtable.isFileExists(self.context, path);
 }
- 
+
 pub fn deleteFileIfExists(self: Runtime, path: []const u8) anyerror!void {
     try self.vtable.deleteFileIfExists(self.context, path);
 }

@@ -59,6 +59,8 @@ pub fn deinit(self: *Self) void {
     self.arena.deinit();
 }
 
+/// Resets the inner arena, and sets up all containers to the empty state.
+/// Sets up the level to the preinited state.
 pub fn reset(self: *Self) void {
     log.debug("Reset level on depth {d}", .{self.depth});
     std.debug.assert(self.arena.reset(.retain_capacity));
@@ -256,14 +258,14 @@ pub fn completeInitialization(self: *Self, moving_direction: ?c.Ladder.Direction
             .down => self.dungeon.entrance,
             .up => self.dungeon.exit,
         };
-        // Move the player to the ladder
+        log.debug("Move the player to the ladder in direction {s}.", .{@tagName(direction)});
         try self.registry.set(self.player, c.Position{ .place = init_place });
     }
     self.player_placement = self.dungeon.placementWith(self.playerPosition().place).?;
 
     log.debug(
-        "The level is completed. Depth {d}; seed {d}; type {s}",
-        .{ self.depth, self.dungeon.seed, @tagName(self.dungeon.type) },
+        "The level is completed. Depth {d}; seed {d}; type {s}; player position {any}",
+        .{ self.depth, self.dungeon.seed, @tagName(self.dungeon.type), self.playerPosition().place },
     );
 }
 

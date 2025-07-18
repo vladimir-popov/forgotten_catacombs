@@ -2,8 +2,6 @@ const std = @import("std");
 const fmt = std.fmt;
 const c = std.c;
 
-const log = std.log.scoped(.tty);
-
 pub var original_termios: c.termios = undefined;
 
 /// Functions and constants for format text and produce special sequences.
@@ -266,7 +264,6 @@ pub const KeyboardAndMouse = struct {
         len: usize,
 
         pub fn button(self: @This()) Button {
-            log.debug("Button: '{any}'", .{self});
             if (self.len == 1) {
                 switch (self.bytes[0]) {
                     ControlButton.ESC.code() => return Button{ .control = .ESC },
@@ -367,12 +364,10 @@ pub const KeyboardAndMouse = struct {
 
     pub inline fn enableMouseEvents() !void {
         try write(Text.MOUSE_TRACK_ON);
-        log.info("Mouse enabled", .{});
     }
 
     pub inline fn disableMouseEvents() !void {
         try write(Text.MOUSE_TRACK_OFF);
-        log.info("Mouse disabled", .{});
     }
 };
 

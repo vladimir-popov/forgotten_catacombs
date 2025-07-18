@@ -70,7 +70,7 @@ pub fn init(self: *Self, gpa: std.mem.Allocator, runtime: g.Runtime, seed: u64) 
         .state = undefined,
     };
     try self.render.init(gpa, runtime, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS);
-    try welcome(self);
+    try self.welcome();
 }
 
 pub fn deinit(self: *Self) void {
@@ -112,34 +112,42 @@ pub fn tick(self: *Self) !void {
         },
         .game_over => if (try self.runtime.readPushedButtons()) |btn| {
             switch (btn.game_button) {
-                .a => if (btn.state == .released) try welcome(self),
+                .a => if (btn.state == .released) try self.welcome(),
                 else => {},
             }
         },
         .game_session => |*session| {
             session.tick() catch |err| switch (err) {
-                error.GameOver => try self.gameOver(),
+                error.GameOver => {
+                    self.state.game_session.deinit();
+                    try self.deleteSessionFileIfExists();
+                    self.state = .game_over;
+                    try self.drawGameOverScreen();
+                },
+                error.GoToMainMenu => {
+                    self.state.game_session.deinit();
+                    try self.welcome();
+                },
                 else => return err,
             };
         },
     }
 }
 
-fn welcome(ptr: *anyopaque) !void {
-    const self: *Self = @ptrCast(@alignCast(ptr));
-    if (self.state == .game_session)
-        self.state.game_session.deinit();
-
+/// Changes the current state to the `welcome`,
+/// removes all items from the global menu, and draws the Welcome screen.
+pub fn welcome(self: *Self) !void {
+    log.debug("Welcome screen. The game state is {s}", .{@tagName(self.state)});
     self.state = .{ .welcome = .{ .menu = w.TextArea.init(.{
         .region = p.Region.init(vertical_middle + 1, horizontal_middle - 6, 5, 12),
     }) } };
 
     self.runtime.removeAllMenuItems();
 
-    if (try self.isSessionExists())
+    if (try self.isSessionFileExists())
         try self.state.welcome.menu.addLine(self.gpa, " Continue ", true);
-    try self.state.welcome.menu.addLine(self.gpa, " New game ", !try self.isSessionExists());
-    try self.state.welcome.menu.addLine(self.gpa, "  Manual  ", false);
+    try self.state.welcome.menu.addLine(self.gpa, " New game ", !try self.isSessionFileExists());
+    try self.state.welcome.menu.addLine(self.gpa, "  About   ", false);
 
     try self.render.clearDisplay();
     try self.drawWelcomeScreen();
@@ -147,7 +155,7 @@ fn welcome(ptr: *anyopaque) !void {
 
 fn newGame(self: *Self) !void {
     std.debug.assert(self.state != .game_session);
-    try self.deleteSessionIfExists();
+    try self.deleteSessionFileIfExists();
     _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
     self.state = .{ .game_session = undefined };
     try self.state.game_session.initNew(
@@ -169,28 +177,20 @@ fn continueGame(self: *Self) !void {
     try self.state.game_session.load();
 }
 
-fn gameOver(self: *Self) !void {
-    std.debug.assert(self.state == .game_session);
-    self.state.game_session.deinit();
-    try self.deleteSessionIfExists();
-    self.state = .game_over;
-    try self.drawGameOverScreen();
-}
-
 fn goToMainMenu(ptr: ?*anyopaque) callconv(.C) void {
     if (ptr == null) return;
     const self: *Self = @ptrCast(@alignCast(ptr.?));
     std.debug.assert(self.state == .game_session);
-    self.state.game_session.save(.{ .context = self, .handle = welcome });
+    self.state.game_session.save();
 }
 
 /// Checks that save file for a session exists.
-fn isSessionExists(self: Self) !bool {
+fn isSessionFileExists(self: Self) !bool {
     return self.runtime.isFileExists(g.persistance.PATH_TO_SESSION_FILE);
 }
 
 /// Remove the save file with a game session if exists.
-fn deleteSessionIfExists(self: Self) !void {
+fn deleteSessionFileIfExists(self: Self) !void {
     try self.runtime.deleteFileIfExists(g.persistance.PATH_TO_SESSION_FILE);
 }
 

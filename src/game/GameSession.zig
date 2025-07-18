@@ -18,7 +18,6 @@ const log = std.log.scoped(.game_session);
 const GameSession = @This();
 
 pub const Mode = union(enum) {
-    initialization,
     play: PlayMode,
     inventory: InventoryMode,
     explore: ExploreMode,
@@ -27,12 +26,11 @@ pub const Mode = union(enum) {
 
     inline fn deinit(self: *Mode) void {
         switch (self.*) {
-            .initialization => {},
             .play => self.play.deinit(),
             .inventory => self.inventory.deinit(),
             .explore => self.explore.deinit(),
-            .explore_level => {},
             .save_load => self.save_load.deinit(),
+            .explore_level => {},
         }
     }
 };
@@ -88,7 +86,7 @@ pub fn preInit(
         .ai = g.AI{ .session = self, .rand = self.prng.random() },
         .player = undefined,
         .level = undefined,
-        .mode = .initialization,
+        .mode = undefined,
     };
     log.debug("The game session is preinited", .{});
 }
@@ -98,14 +96,10 @@ pub fn preInit(
 ///  - puts the viewport around the player;
 ///  - switches the game session to the `play` mode.
 pub fn completeInitialization(self: *GameSession) !void {
-    if (self.mode == .initialization) {
-        try self.events.subscribe(self.viewport.subscriber());
-        try self.events.subscribe(self.subscriber());
-        self.viewport.centeredAround(self.level.playerPosition().place);
-        self.mode = .{ .play = undefined };
-        try self.mode.play.init(self.arena.allocator(), self, null);
-        log.debug("The game session is completely initialized. Seed {d}; Max depth {d}", .{ self.seed, self.max_depth });
-    }
+    try self.events.subscribe(self.viewport.subscriber());
+    try self.events.subscribe(self.subscriber());
+    self.viewport.centeredAround(self.level.playerPosition().place);
+    log.debug("The game session is completely initialized. Seed {d}; Max depth {d}", .{ self.seed, self.max_depth });
 }
 
 /// Completely initializes an undefined GameSession.
@@ -118,19 +112,32 @@ pub fn initNew(
 ) !void {
     log.debug("Begin a new game session with seed {d}", .{seed});
     try self.preInit(gpa, runtime, render);
-    self.prng.seed(seed);
+    self.setSeed(seed);
     self.player = try self.registry.addNewEntity(try g.entities.player(self.registry.allocator()));
     try self.equipPlayer();
     self.max_depth = 0;
     self.level = g.Level.preInit(self.arena.allocator(), &self.registry);
     try self.level.initAsFirstLevel(self.player);
     try self.completeInitialization();
+
+    self.mode = .{ .play = undefined };
+    try self.mode.play.init(self.arena.allocator(), self, null);
     // hack  for the first level only
     self.viewport.region.top_left.moveNTimes(.up, 3);
 }
 
 pub fn deinit(self: *GameSession) void {
+    // to be sure that all files are closed
+    self.mode.deinit();
+    // free memory
     self.arena.deinit();
+    self.* = undefined;
+    log.debug("The game session is deinited", .{});
+}
+
+pub fn setSeed(self: *GameSession, seed: u64) void {
+    self.seed = seed;
+    self.prng.seed(seed);
 }
 
 /// Creates the initial equipment of the player
@@ -146,13 +153,15 @@ fn equipPlayer(self: *GameSession) !void {
 }
 
 pub fn load(self: *GameSession) !void {
-    self.mode.deinit();
+    log.debug("Start loading a game session", .{});
     self.mode = .{ .save_load = SaveLoadMode.loadSession(self) };
 }
 
-pub fn save(self: *GameSession, callback: SaveLoadMode.Callback) void {
+/// Runs the process of saving the current game session,
+/// that should be finished with GoToMainMenu error on `tick()`
+pub fn save(self: *GameSession) void {
     self.mode.deinit();
-    self.mode = .{ .save_load = SaveLoadMode.saveSession(self, callback) };
+    self.mode = .{ .save_load = SaveLoadMode.saveSession(self) };
 }
 
 pub fn play(self: *GameSession, entity_in_focus: ?g.Entity) !void {
@@ -229,7 +238,6 @@ pub inline fn tick(self: *GameSession) !void {
         .explore => try self.mode.explore.tick(),
         .explore_level => try self.mode.explore_level.tick(),
         .save_load => try self.mode.save_load.tick(),
-        .initialization => undefined,
     }
     try self.events.notifySubscribers();
 }

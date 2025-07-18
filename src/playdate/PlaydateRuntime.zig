@@ -9,7 +9,7 @@ const LastButton = @import("LastButton.zig");
 
 const log = std.log.scoped(.playdate_runtime);
 
-const PlaydateRuntime = @This();
+const Self = @This();
 
 // This is a global var because the
 // serialMessageCallback doesn't receive custom data
@@ -24,7 +24,7 @@ bitmap_table: *api.LCDBitmapTable,
 last_button: *LastButton,
 is_dev_mode: bool = false,
 
-pub fn init(playdate: *api.PlaydateAPI) !PlaydateRuntime {
+pub fn init(playdate: *api.PlaydateAPI) !Self {
     const err: ?*[*c]const u8 = null;
 
     const bitmap_table: *api.LCDBitmapTable = playdate.graphics.loadBitmapTable("sprites", err) orelse {
@@ -55,12 +55,12 @@ pub fn init(playdate: *api.PlaydateAPI) !PlaydateRuntime {
     };
 }
 
-pub fn deinit(self: *PlaydateRuntime) void {
+pub fn deinit(self: *Self) void {
     self.playdate.realloc(0, self.bitmap_table);
     self.playdate.realloc(0, self.last_button);
 }
 
-pub fn runtime(self: *PlaydateRuntime) g.Runtime {
+pub fn runtime(self: *Self) g.Runtime {
     return .{
         .context = self,
         .vtable = &.{
@@ -77,6 +77,8 @@ pub fn runtime(self: *PlaydateRuntime) g.Runtime {
             .closeFile = closeFile,
             .readFromFile = readFromFile,
             .writeToFile = writeToFile,
+            .isFileExists = isFileExists,
+            .deleteFileIfExists = deleteFileIfExists,
         },
     };
 }
@@ -84,12 +86,12 @@ pub fn runtime(self: *PlaydateRuntime) g.Runtime {
 // ======== Private methods: ==============
 
 fn isDevMode(ptr: *anyopaque) bool {
-    const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
+    const self: *Self = @ptrCast(@alignCast(ptr));
     return self.is_dev_mode;
 }
 
 fn currentMillis(ptr: *anyopaque) c_uint {
-    const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
+    const self: *Self = @ptrCast(@alignCast(ptr));
     return self.playdate.system.getCurrentTimeMilliseconds();
 }
 
@@ -99,17 +101,17 @@ fn addMenuItem(
     game_object: *anyopaque,
     callback: g.Runtime.MenuItemCallback,
 ) ?*anyopaque {
-    const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
+    const self: *Self = @ptrCast(@alignCast(ptr));
     return self.playdate.system.addMenuItem(title.ptr, callback, game_object).?;
 }
 
 fn removeAllMenuItems(ptr: *anyopaque) void {
-    const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
+    const self: *Self = @ptrCast(@alignCast(ptr));
     self.playdate.system.removeAllMenuItems();
 }
 
 fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
-    const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
+    const self: *Self = @ptrCast(@alignCast(ptr));
 
     if (self.playdate.system.isCrankDocked() == 0) {
         const change = self.playdate.system.getCrankChange();
@@ -126,12 +128,12 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
 }
 
 fn clearDisplay(ptr: *anyopaque) anyerror!void {
-    var self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
+    var self: *Self = @ptrCast(@alignCast(ptr));
     self.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
 }
 
 fn drawSprite(ptr: *anyopaque, codepoint: g.Codepoint, position_on_display: p.Point, mode: g.DrawingMode) !void {
-    var self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
+    var self: *Self = @ptrCast(@alignCast(ptr));
     const x = @as(c_int, position_on_display.col - 1) * g.SPRITE_WIDTH;
     const y = @as(c_int, position_on_display.row - 1) * g.SPRITE_HEIGHT;
     if (mode == .inverted)
@@ -150,7 +152,7 @@ fn drawText(ptr: *anyopaque, text: []const u8, position_on_display: p.Point, mod
     }
 }
 
-fn getBitmap(self: PlaydateRuntime, codepoint: g.Codepoint) *api.LCDBitmap {
+fn getBitmap(self: Self, codepoint: g.Codepoint) *api.LCDBitmap {
     const idx = getCodepointIdx(codepoint);
     return self.playdate.graphics.getTableBitmap(self.bitmap_table, idx) orelse {
         std.debug.panic("Wrong index {d} for codepoint {d}", .{ idx, codepoint });
@@ -200,7 +202,7 @@ fn serialMessageCallback(data: [*c]const u8) callconv(.C) void {
 }
 
 fn openFile(ptr: *anyopaque, file_path: []const u8, mode: g.Runtime.FileMode) anyerror!*anyopaque {
-    const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
+    const self: *Self = @ptrCast(@alignCast(ptr));
     const file_options: c_int = switch (mode) {
         .read => api.FILE_READ_DATA,
         .write => api.FILE_WRITE,
@@ -209,36 +211,78 @@ fn openFile(ptr: *anyopaque, file_path: []const u8, mode: g.Runtime.FileMode) an
     const full_path = try std.fmt.bufPrint(&buf, "{s}/{s}", .{ save_dir, file_path });
     buf[full_path.len] = 0;
     return self.playdate.file.open(full_path.ptr, file_options) orelse {
-        std.debug.panic(
+        log.err(
             "Error on opening file {s} in mode {s}: {s}",
             .{ full_path, @tagName(mode), self.playdate.file.geterr() },
         );
+        return error.IOError;
     };
 }
 
 fn closeFile(ptr: *anyopaque, file: *anyopaque) void {
-    const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
+    const self: *Self = @ptrCast(@alignCast(ptr));
     const sdfile: ?*api.SDFile = @ptrCast(@alignCast(file));
-    if (self.playdate.file.flush(sdfile) < 0)
+    if (self.playdate.file.flush(sdfile) < 0) {
         std.debug.panic("Error on flushing file {any}: {s}", .{ file, self.playdate.file.geterr() });
-    if (self.playdate.file.close(sdfile) < 0)
+    }
+    if (self.playdate.file.close(sdfile) < 0) {
         std.debug.panic("Error on closing file {any}: {s}", .{ file, self.playdate.file.geterr() });
+    }
 }
 
 fn readFromFile(ptr: *anyopaque, file: *anyopaque, buffer: []u8) anyerror!usize {
-    const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
+    const self: *Self = @ptrCast(@alignCast(ptr));
     const sdfile: ?*api.SDFile = @ptrCast(@alignCast(file));
     const result = self.playdate.file.read(sdfile, buffer.ptr, @intCast(buffer.len));
-    if (result < 0)
-        std.debug.panic("Error on reading the file {any}: {s}", .{ file, self.playdate.file.geterr() });
+    if (result < 0) {
+        log.err("Error on reading the file {any}: {s}", .{ file, self.playdate.file.geterr() });
+        return error.IOError;
+    }
     return @intCast(result);
 }
 
 fn writeToFile(ptr: *anyopaque, file: *anyopaque, bytes: []const u8) anyerror!usize {
-    const self: *PlaydateRuntime = @ptrCast(@alignCast(ptr));
+    const self: *Self = @ptrCast(@alignCast(ptr));
     const sdfile: ?*api.SDFile = @ptrCast(@alignCast(file));
     const result = self.playdate.file.write(sdfile, bytes.ptr, @intCast(bytes.len));
-    if (result < 0)
-        std.debug.panic("Error on writing to the file {any}: {s}", .{ file, self.playdate.file.geterr() });
+    if (result < 0) {
+        log.err("Error on writing to the file {any}: {s}", .{ file, self.playdate.file.geterr() });
+        return error.IOError;
+    }
     return @intCast(result);
+}
+
+fn isFileExists(ptr: *anyopaque, file_path: []const u8) anyerror!bool {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    var result = ExpectedFile{ .file_name = file_path };
+    if (self.playdate.file.listfiles(save_dir, validateFile, &result, 0) < 0) {
+        log.err("Error on listing files inside {s}: {s}", .{ save_dir, self.playdate.file.geterr() });
+        return error.IOError;
+    }
+
+    return result.is_found;
+}
+
+const ExpectedFile = struct {
+    file_name: []const u8,
+    is_found: bool = false,
+};
+
+fn validateFile(file_name: [*c]const u8, userdata: ?*anyopaque) callconv(.C) void {
+    const expected_file: *ExpectedFile = @ptrCast(@alignCast(userdata));
+    const actual_file = std.mem.sliceTo(file_name, 0);
+    expected_file.is_found = std.mem.eql(u8, expected_file.file_name, actual_file);
+}
+
+fn deleteFileIfExists(ptr: *anyopaque, file_path: []const u8) !void {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    if (!try isFileExists(ptr, file_path)) return;
+
+    var buf: [50]u8 = undefined;
+    const full_path = try std.fmt.bufPrint(&buf, "{s}/{s}", .{ save_dir, file_path });
+    buf[full_path.len] = 0;
+    if (self.playdate.file.unlink(full_path.ptr, 0) < 0) {
+        log.err("Error on deleting file {s}: {s}", .{ file_path, self.playdate.file.geterr() });
+        return error.IOError;
+    }
 }

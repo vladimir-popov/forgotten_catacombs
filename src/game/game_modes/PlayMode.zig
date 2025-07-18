@@ -36,10 +36,9 @@ pub fn init(
     self.* = .{
         .arena = std.heap.ArenaAllocator.init(alloc),
         .session = session,
-        .quick_actions = std.ArrayListUnmanaged(QuickAction){},
+        .quick_actions = .empty,
     };
     try self.updateQuickActions(target_entity, null);
-    try self.draw();
     try self.session.render.drawHorizontalLine(
         '═',
         .{ .row = self.session.viewport.region.rows + 1, .col = 1 },
