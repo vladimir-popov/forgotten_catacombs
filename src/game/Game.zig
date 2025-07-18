@@ -139,7 +139,7 @@ pub fn tick(self: *Self) !void {
 pub fn welcome(self: *Self) !void {
     log.debug("Welcome screen. The game state is {s}", .{@tagName(self.state)});
     self.state = .{ .welcome = .{ .menu = w.TextArea.init(.{
-        .region = p.Region.init(vertical_middle + 1, horizontal_middle - 6, 5, 12),
+        .region = p.Region.init(vertical_middle + 2, horizontal_middle - 6, 5, 12),
     }) } };
 
     self.runtime.removeAllMenuItems();

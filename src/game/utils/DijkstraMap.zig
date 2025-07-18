@@ -17,9 +17,10 @@ pub const Obstacles = struct {
     }
 };
 
-/// Returns the Dijkstra map that provides an optimal direction to the player, and counts of moves
+/// Calculates the Dijkstra map that provides an optimal direction to the player and counts of moves
 /// needed to achieve the player in that direction.
 /// The weight == 0 means that the place is unreachable and has some obstacle.
+/// The map will contains all points from the passed region.
 pub fn calculate(
     alloc: std.mem.Allocator, // FIXME: avoid using allocator here
     map: *VectorsMap,
@@ -57,6 +58,9 @@ pub fn dumpToLog(map: VectorsMap, region: p.Region) void {
     std.log.debug("Dijkstra Map ({any}):\n{s}", .{ region, std.mem.sliceTo(&buf, 0) });
 }
 
+/// Iterates over all points inside the passed region and writes a content for them
+/// from the map of vectors. The passed region may differ from the region used to fill the map of
+/// vectors. If the map doesn't contain some point, same result as for unreachable place will be written.
 fn write(map: VectorsMap, writer: std.io.AnyWriter, region: p.Region) !void {
     try writer.print("   |", .{});
     for (0..region.cols) |col_idx| {

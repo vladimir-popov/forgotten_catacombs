@@ -53,6 +53,13 @@ pub fn Writer(comptime Underlying: type) type {
             try self.writeValue(seed);
         }
 
+        /// Writes the value for a next generated entity.
+        /// It used to recovery entities registry.
+        pub fn writeNextEntityId(self: *Self, next_entity: g.Entity) Error!void {
+            try self.writeStringKey("next_entity");
+            try self.writeValue(next_entity.id);
+        }
+
         pub fn writeDepth(self: *Self, depth: u8) Error!void {
             try self.writeStringKey("depth");
             try self.writeValue(depth);
@@ -253,6 +260,11 @@ pub fn Reader(comptime Underlying: type) type {
             return try self.readNumber(u64);
         }
 
+        pub fn readNextEntityId(self: *Self) Error!g.Entity {
+            try assertEql(self.readStringKey(), "next_entity");
+            return .{ .id = try self.readNumber(g.Entity.IdType) };
+        }
+
         pub fn readDepth(self: *Self) Error!u8 {
             try assertEql(self.readStringKey(), "depth");
             return try self.readNumber(u8);
@@ -369,10 +381,10 @@ pub fn Reader(comptime Underlying: type) type {
                     var result: T = undefined;
                     var key: ?[]const u8 = null;
                     inline for (s.fields) |field| {
-                        if (key == null) {
+                        if (key == null and !try self.isObjectEnd()) {
                             key = try self.readStringKey();
                         }
-                        if (std.mem.eql(u8, field.name, key.?)) {
+                        if (key != null and std.mem.eql(u8, field.name, key.?)) {
                             @field(&result, field.name) = self.read(field.type) catch |err| {
                                 log.err("Error on reading value of the field {s}", .{field.name});
                                 return err;
@@ -493,7 +505,8 @@ pub fn Reader(comptime Underlying: type) type {
                         capacity += slice.len;
                         return self.string_buffer[0..capacity];
                     },
-                    else => {
+                    else => |unexpected| {
+                        log.err("Unexpected input during reading symbols: {any}", .{unexpected});
                         return error.WrongInput;
                     },
                 }
@@ -503,21 +516,21 @@ pub fn Reader(comptime Underlying: type) type {
 }
 
 fn assertEql(actual: anytype, expected: anytype) !void {
-    if (u.isDebug()) {
-        const act = switch (@typeInfo(@TypeOf(actual))) {
-            .error_set, .error_union => try actual,
-            else => actual,
-        };
-        switch (@typeInfo(@TypeOf(expected))) {
-            .enum_literal => if (act != expected) {
-                log.err("Expected {any}, but was {any}", .{ expected, act });
-                return error.WrongInput;
-            },
-            else => if (!std.mem.eql(u8, act, expected)) {
-                log.err("Expected {s}, but was {s}", .{ expected, act });
-                return error.WrongInput;
-            },
-        }
+    if (comptime !u.isDebug()) return;
+
+    const act = switch (@typeInfo(@TypeOf(actual))) {
+        .error_set, .error_union => try actual,
+        else => actual,
+    };
+    switch (@typeInfo(@TypeOf(expected))) {
+        .enum_literal => if (act != expected) {
+            log.err("Expected {any}, but was {any}", .{ expected, act });
+            return error.WrongInput;
+        },
+        else => if (!std.mem.eql(u8, act, expected)) {
+            log.err("Expected {s}, but was {s}", .{ expected, act });
+            return error.WrongInput;
+        },
     }
 }
 

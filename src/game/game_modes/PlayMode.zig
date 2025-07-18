@@ -140,11 +140,11 @@ fn handleInput(self: *PlayMode) !?g.Action {
         }
     }
     if (self.session.runtime.popCheat()) |cheat| {
-        log.debug("Cheat {any}", .{cheat});
+        log.debug("Run cheat {any}", .{cheat});
         switch (cheat) {
             .dump_vector_field => g.utils.DijkstraMap.dumpToLog(
                 self.session.level.dijkstra_map,
-                g.Level.DijkstraMapRegion,
+                self.session.viewport.region,
             ),
             .turn_light_on => g.visibility.turn_light_on = true,
             .turn_light_off => g.visibility.turn_light_on = false,

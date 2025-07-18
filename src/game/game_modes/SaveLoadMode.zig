@@ -89,7 +89,6 @@ pub fn tick(self: *Self) !void {
         .saving => |*saving| {
             const is_continue = saving.tick() catch |err| {
                 log.err("Error on saving a level on depth {d}", .{saving.session.level.depth});
-                saving.deinit();
                 return err;
             };
             if (!is_continue) {
@@ -122,11 +121,10 @@ pub fn tick(self: *Self) !void {
         .loading => |*loading| {
             const is_continue = loading.tick() catch |err| {
                 log.err("Error on loading level on depth {d}", .{loading.level_depth});
-                loading.deinit();
                 return err;
             };
             if (!is_continue) {
-                // the deinit will be invoked for the whole SaveLoadMode here:
+                // the einit will be invoked for the whole SaveLoadMode here:
                 try loading.session.playerMovedToLevel();
             }
         },
@@ -134,7 +132,7 @@ pub fn tick(self: *Self) !void {
             try generating.draw();
             const seed = generating.prng.next();
             log.debug(
-                "Start {d} attempt to generate a level {s} on depth {d} from ladder {any}. Seed is {d}",
+                "Start {d} attempt of generating a level {s} on depth {d} from the ladder {any}. Seed is {d}",
                 .{
                     generating.attempt,
                     @tagName(generating.from_ladder.direction),
@@ -167,7 +165,7 @@ const Generating = struct {
     prng: std.Random.DefaultPrng,
     depth: u8,
     from_ladder: c.Ladder,
-    attempt: u8 = 0,
+    attempt: u8 = 1,
 
     fn progress(self: Generating) Percent {
         return self.attempt * 10;
@@ -185,7 +183,7 @@ const Generating = struct {
         //        |
         // Generat|ing XXX%
         //        |
-        if (self.attempt == 0) {
+        if (self.attempt == 1) {
             try self.session.render.drawTextWithAlign(
                 10,
                 "Generating",
@@ -251,7 +249,6 @@ const Loading = struct {
         }
     }
 
-    // deinit should be called in case of any errors here
     pub fn tick(self: *Loading) !bool {
         log.debug("Continue loading: {s}", .{@tagName(self.progress)});
         try self.draw();
@@ -267,6 +264,7 @@ const Loading = struct {
 
                 try self.state.reading.beginObject();
                 self.session.setSeed(try self.state.reading.readSeed());
+                self.session.registry.next_entity = try self.state.reading.readNextEntityId();
                 self.level_depth = try self.state.reading.readDepth();
                 self.session.max_depth = try self.state.reading.readMaxDepth();
                 self.session.player = try self.state.reading.readPlayer();
@@ -324,7 +322,7 @@ const Loading = struct {
         //       |
         // Loadin|g XXX%
         //       |
-        if (self.progress == .session_preinited) {
+        if (self.progress == .session_preinited or self.progress == .session_loaded) {
             try self.session.render.clearDisplay();
             try self.session.render.drawTextWithAlign(
                 7,
@@ -381,7 +379,6 @@ const Saving = struct {
         }
     }
 
-    // deinit should be called in case of any errors here
     pub fn tick(self: *Saving) !bool {
         log.debug("Continue saving: {s}", .{@tagName(self.progress)});
         try self.draw();
@@ -391,6 +388,7 @@ const Saving = struct {
                 self.state = .{ .writing = Writer.init(&self.session.registry, self.file.writer()) };
                 try self.state.writing.beginObject();
                 try self.state.writing.writeSeed(self.session.seed);
+                try self.state.writing.writeNextEntityId(self.session.registry.next_entity);
                 try self.state.writing.writeDepth(self.session.level.depth);
                 try self.state.writing.writeMaxDepth(self.session.max_depth);
                 try self.state.writing.writePlayer(self.session.player);

@@ -233,15 +233,21 @@ pub fn Registry(comptime ComponentsStruct: type) type {
         /// Takes all components for the entity and set them to the appropriate
         /// fields of the `ComponentsStruct`.
         pub fn entityToStruct(self: Self, entity: Entity) !ComponentsStruct {
+            var has_at_least_one_component: bool = false;
             var structure: ComponentsStruct = undefined;
             inline for (@typeInfo(ComponentsStruct).@"struct".fields) |field| {
                 const field_type = @typeInfo(field.type);
                 const type_name = @typeName(field_type.optional.child);
-                if (@field(self.components_map, type_name).getForEntity(entity)) |cmp_ptr|
-                    @field(structure, field.name) = cmp_ptr.*
-                else
+                if (@field(self.components_map, type_name).getForEntity(entity)) |cmp_ptr| {
+                    @field(structure, field.name) = cmp_ptr.*;
+                    has_at_least_one_component = true;
+                } else {
                     @field(structure, field.name) = null;
+                }
             }
+            if (!has_at_least_one_component)
+                log.warn("Entity {d} doesn't have any component", .{entity.id});
+
             return structure;
         }
     };

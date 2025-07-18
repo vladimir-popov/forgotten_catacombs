@@ -368,49 +368,32 @@ pub fn hideRightButton(self: Render) !void {
 
 /// Sets the line of spaces as a board on the passed side. Inverts the draw mode
 /// for few symbols in the middle.
-pub fn setBorderWithArrow(
-    self: Render,
-    viewport: g.Viewport,
-    side: p.Direction,
-) void {
-    const arrow: g.Codepoint = switch (side) {
-        .up => '^',
-        .down => 'v',
-        .left => '<',
-        .right => '>',
-    };
+pub fn setBorderWithArrow(self: Render, viewport: g.Viewport, side: p.Direction) void {
     switch (side) {
-        .left, .right => {
-            for (1..self.scene_rows + 1) |r| {
-                const is_middle = r == 1 + self.scene_rows / 2;
-                const codepoint: g.Codepoint = if (is_middle) arrow else filler;
-                var point: p.Point = .{ .row = @intCast(r), .col = if (side == .left) 1 else self.scene_cols };
-                point.row = @intCast(r);
-                self.scene_buffer.setSymbol(
-                    point,
-                    codepoint,
-                    if (is_middle) .inverted else .normal,
-                    std.math.maxInt(SceneBuffer.ZOrder),
-                );
-            }
-        },
-        .up, .down => {
-            var point: p.Point = .{
-                .row = if (side == .up) 1 else self.scene_rows,
-                .col = 1,
-            };
-            for (1..self.scene_cols + 1) |cl| {
-                const is_middle = (cl == viewport.region.cols / 2);
-                const codepoint = if (is_middle) arrow else filler;
-                point.col = @intCast(cl);
-                self.scene_buffer.setSymbol(
-                    point,
-                    codepoint,
-                    if (is_middle) .inverted else .normal,
-                    std.math.maxInt(SceneBuffer.ZOrder),
-                );
-            }
-        },
+        .left => self.scene_buffer.setSymbol(
+            p.Point.init(1 + self.scene_rows / 2, 1),
+            '<',
+            .inverted,
+            std.math.maxInt(SceneBuffer.ZOrder),
+        ),
+        .right => self.scene_buffer.setSymbol(
+            p.Point.init(1 + self.scene_rows / 2, self.scene_cols),
+            '>',
+            .inverted,
+            std.math.maxInt(SceneBuffer.ZOrder),
+        ),
+        .up => self.scene_buffer.setSymbol(
+            p.Point.init(1, viewport.region.cols / 2),
+            '^',
+            .inverted,
+            std.math.maxInt(SceneBuffer.ZOrder),
+        ),
+        .down => self.scene_buffer.setSymbol(
+            p.Point.init(self.scene_rows, viewport.region.cols / 2),
+            'v',
+            .inverted,
+            std.math.maxInt(SceneBuffer.ZOrder),
+        ),
     }
 }
 

@@ -83,6 +83,13 @@ pub const Ladder = struct {
             .target_ladder = self.id,
         };
     }
+
+    pub fn format(self: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        try writer.print(
+            "Ladder(id: {d}; direction: {s}; target: {d})",
+            .{ self.id.id, @tagName(self.direction), self.target_ladder.id },
+        );
+    }
 };
 
 pub const Health = struct {

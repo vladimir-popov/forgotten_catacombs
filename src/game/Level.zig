@@ -93,7 +93,7 @@ fn setupDungeon(
     player: g.Entity,
 ) !void {
     log.debug(
-        "Setting up the dungeon with type {s} to the level on depth {d}. Player id is {d}",
+        "Setting up a dungeon with type {s} to the level on depth {d}. Player id is {d}",
         .{ @tagName(dungeon.type), depth, player.id },
     );
 
@@ -264,8 +264,8 @@ pub fn completeInitialization(self: *Self, moving_direction: ?c.Ladder.Direction
     self.player_placement = self.dungeon.placementWith(self.playerPosition().place).?;
 
     log.debug(
-        "The level is completed. Depth {d}; seed {d}; type {s}; player position {any}",
-        .{ self.depth, self.dungeon.seed, @tagName(self.dungeon.type), self.playerPosition().place },
+        "The level is completed. Depth {d}; seed {d}; type {s}; player {d}, its position {any}",
+        .{ self.depth, self.dungeon.seed, @tagName(self.dungeon.type), self.player.id, self.playerPosition().place },
     );
 }
 
@@ -298,6 +298,7 @@ pub fn forgetObject(self: *Self, place: p.Point) !void {
     _ = try self.remembered_objects.remove(place);
 }
 
+/// Removes if exists the entity from inner index, or do nothing.
 pub fn removeEntity(self: *Self, entity: g.Entity) !void {
     for (0..self.entities.items.len) |idx| {
         if (entity.eql(self.entities.items[idx])) {

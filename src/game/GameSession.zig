@@ -402,6 +402,7 @@ fn doHit(
         const is_player = enemy.eql(self.player);
         log.debug("The {s} {d} died", .{ if (is_player) "player" else "enemy", enemy.id });
         try self.registry.removeEntity(enemy);
+        try self.level.removeEntity(enemy);
         if (is_player) {
             log.info("Player is dead. Game over.", .{});
             return error.GameOver;
