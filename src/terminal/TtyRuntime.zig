@@ -107,6 +107,8 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                     .closeFile = closeFile,
                     .readFromFile = readFromFile,
                     .writeToFile = writeToFile,
+                    .isFileExists = isFileExists,
+                    .deleteFileIfExists = deleteFileIfExists,
                 },
             };
         }
@@ -290,6 +292,26 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
         fn writeToFile(_: *anyopaque, file_ptr: *anyopaque, bytes: []const u8) anyerror!usize {
             const file: *std.fs.File = @ptrCast(@alignCast(file_ptr));
             return try file.write(bytes);
+        }
+
+        fn isFileExists(ptr: *anyopaque, file_path: []const u8) !bool {
+            const self: *Self = @ptrCast(@alignCast(ptr));
+            if (self.saves_dir.access(file_path, .{})) |_| {
+                return true;
+            } else |err| switch (err) {
+                error.FileNotFound => return false,
+                else => return err,
+            }
+        }
+
+        fn deleteFileIfExists(ptr: *anyopaque, file_path: []const u8) !void {
+            const self: *Self = @ptrCast(@alignCast(ptr));
+            self.saves_dir.deleteFile(file_path) catch |err| {
+                switch (err) {
+                    error.FileNotFound => {},
+                    else => return err,
+                }
+            };
         }
     };
 }

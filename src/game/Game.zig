@@ -70,7 +70,7 @@ pub fn init(self: *Self, gpa: std.mem.Allocator, runtime: g.Runtime, seed: u64) 
         .state = undefined,
     };
     try self.render.init(gpa, runtime, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS);
-    try self.welcome();
+    try welcome(self);
 }
 
 pub fn deinit(self: *Self) void {
@@ -112,7 +112,7 @@ pub fn tick(self: *Self) !void {
         },
         .game_over => if (try self.runtime.readPushedButtons()) |btn| {
             switch (btn.game_button) {
-                .a => if (btn.state == .released) try self.welcome(),
+                .a => if (btn.state == .released) try welcome(self),
                 else => {},
             }
         },
@@ -125,7 +125,11 @@ pub fn tick(self: *Self) !void {
     }
 }
 
-fn welcome(self: *Self) !void {
+fn welcome(ptr: *anyopaque) !void {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    if (self.state == .game_session)
+        self.state.game_session.deinit();
+
     self.state = .{ .welcome = .{ .menu = w.TextArea.init(.{
         .region = p.Region.init(vertical_middle + 1, horizontal_middle - 6, 5, 12),
     }) } };
@@ -177,20 +181,17 @@ fn goToMainMenu(ptr: ?*anyopaque) callconv(.C) void {
     if (ptr == null) return;
     const self: *Self = @ptrCast(@alignCast(ptr.?));
     std.debug.assert(self.state == .game_session);
-    self.state.game_session.save() catch |err| std.debug.panic("Error on saving: {any}", .{err});
-    self.state.game_session.deinit();
-    self.welcome() catch |err| std.debug.panic("Error when the Game went to the '.welcome' state: {any}", .{err});
+    self.state.game_session.save(.{ .context = self, .handle = welcome });
 }
 
 /// Checks that save file for a session exists.
 fn isSessionExists(self: Self) !bool {
-    _ = self;
-    return false;
+    return self.runtime.isFileExists(g.persistance.PATH_TO_SESSION_FILE);
 }
 
 /// Remove the save file with a game session if exists.
 fn deleteSessionIfExists(self: Self) !void {
-    _ = self;
+    try self.runtime.deleteFileIfExists(g.persistance.PATH_TO_SESSION_FILE);
 }
 
 fn drawWelcomeScreen(self: Self) !void {

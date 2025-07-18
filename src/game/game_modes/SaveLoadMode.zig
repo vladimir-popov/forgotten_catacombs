@@ -31,6 +31,8 @@ const log = std.log.scoped(.load_level_mode);
 
 const Percent = u8;
 
+pub const Callback = struct { context: *anyopaque, handle: *const fn (context: *anyopaque) anyerror!void };
+
 const Process = union(enum) {
     saving: Saving,
     loading: Loading,
@@ -44,17 +46,18 @@ process: Process,
 next: union(enum) {
     load_level: struct { depth: u8, direction: c.Ladder.Direction },
     generate_level: struct { prng: std.Random.DefaultPrng, depth: u8, from_ladder: c.Ladder },
-    done,
+    callback: Callback,
+    nothing,
 },
 
 // the session should be preinited
 pub fn loadSession(session: *g.GameSession) Self {
-    return .{ .process = .{ .loading = Loading.loadSession(session) }, .next = .done };
+    return .{ .process = .{ .loading = Loading.loadSession(session) }, .next = .nothing };
 }
 
 // the session should be preinited
-pub fn saveSession(session: *g.GameSession) Self {
-    return .{ .process = .{ .saving = Saving.saveSession(session) }, .next = .done };
+pub fn saveSession(session: *g.GameSession, callback: Callback) Self {
+    return .{ .process = .{ .saving = Saving.saveSession(session) }, .next = .{ .callback = callback } };
 }
 
 pub fn loadOrGenerateLevel(session: *g.GameSession, from_ladder: c.Ladder) !Self {
@@ -102,8 +105,8 @@ pub fn tick(self: *Self) !void {
             if (!is_continue) {
                 const session = self.process.saving.session;
                 saving.deinit();
-                self.process = switch (self.next) {
-                    .generate_level => |generate| .{
+                switch (self.next) {
+                    .generate_level => |generate| self.process = .{
                         .generating = Generating{
                             .session = session,
                             .prng = generate.prng,
@@ -111,11 +114,15 @@ pub fn tick(self: *Self) !void {
                             .from_ladder = generate.from_ladder,
                         },
                     },
-                    .load_level => |load| .{
+                    .load_level => |load| self.process = .{
                         .loading = Loading.loadLevel(session, load.depth, load.direction),
                     },
-                    .done => .done,
-                };
+                    .callback => |callback| {
+                        self.process = .done;
+                        try callback.handle(callback.context);
+                    },
+                    .nothing => self.process = .done,
+                }
             }
         },
         .loading => |*loading| {
@@ -125,8 +132,10 @@ pub fn tick(self: *Self) !void {
                 return err;
             };
             if (!is_continue) {
+                const session = loading.session;
                 loading.deinit();
                 self.process = .done;
+                try session.playerMovedToLevel();
             }
         },
         .generating => |*generating| {
@@ -303,9 +312,6 @@ const Loading = struct {
                 try self.state.reading.endObject();
                 try self.session.level.completeInitialization(self.moving_direction);
                 try self.session.completeInitialization();
-                // the game sessions is switched to the `play` mde here,
-                // and self.deinit will be invoked inside this function:
-                try self.session.playerMovedToLevel();
                 self.progress = .completed;
             },
             .completed => unreachable,

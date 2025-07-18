@@ -150,9 +150,9 @@ pub fn load(self: *GameSession) !void {
     self.mode = .{ .save_load = SaveLoadMode.loadSession(self) };
 }
 
-pub fn save(self: *GameSession) !void {
+pub fn save(self: *GameSession, callback: SaveLoadMode.Callback) void {
     self.mode.deinit();
-    self.mode = .{ .save_load = SaveLoadMode.saveSession(self) };
+    self.mode = .{ .save_load = SaveLoadMode.saveSession(self, callback) };
 }
 
 pub fn play(self: *GameSession, entity_in_focus: ?g.Entity) !void {
