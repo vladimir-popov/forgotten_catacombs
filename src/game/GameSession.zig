@@ -282,10 +282,10 @@ pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_spe
             return doHit(self, actor, hit.by_weapon, actor_speed, hit.target, health);
         },
         .open => |door| {
-            try self.registry.setComponentsToEntity(door, g.entities.OpenedDoor);
+            try self.registry.setComponentsToEntity(door.id, g.entities.openedDoor(door.place));
         },
         .close => |door| {
-            try self.registry.setComponentsToEntity(door, g.entities.ClosedDoor);
+            try self.registry.setComponentsToEntity(door.id, g.entities.closedDoor(door.place));
         },
         .pickup => |item| {
             const inventory = self.registry.getUnsafe(self.player, c.Inventory);
@@ -356,8 +356,12 @@ fn doMove(
     return move_speed;
 }
 
-// null means that the move is completed;
-// .do_nothing or any other action means that the move should be aborted, and the action handled;
+/// Returns an action that should be done because of collision.
+/// The `null` means that the move is completed;
+/// .do_nothing or any other action means that the move should be aborted, and the action handled;
+///
+/// {actor} who is making a move;
+/// {place} a place in the dungeon with which collision should be checked.
 fn checkCollision(self: *GameSession, actor: g.Entity, place: p.Point) ?g.Action {
     switch (self.level.cellAt(place)) {
         .landscape => |cl| if (cl == .floor or cl == .doorway)
@@ -366,7 +370,7 @@ fn checkCollision(self: *GameSession, actor: g.Entity, place: p.Point) ?g.Action
         .entities => |entities| {
             if (entities[2]) |entity| {
                 if (self.registry.get(entity, c.Door)) |_|
-                    return .{ .open = entity };
+                    return .{ .open = .{ .id = entity, .place = place } };
 
                 if (self.isEnemy(entity))
                     if (self.getWeapon(actor)) |weapon|

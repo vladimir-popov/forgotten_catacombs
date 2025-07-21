@@ -7,7 +7,6 @@ const p = g.primitives;
 pub fn player(alloc: std.mem.Allocator) !c.Components {
     return .{
         .sprite = .{ .codepoint = cp.human },
-        .z_order = .{ .order = .obstacle },
         .description = .{ .preset = .player },
         .health = .{ .max = 30, .current = 30 },
         .speed = .{ .move_points = 10 },
@@ -16,57 +15,61 @@ pub fn player(alloc: std.mem.Allocator) !c.Components {
     };
 }
 
-pub const Rat = c.Components{
-    .initiative = .empty,
-    .sprite = .{ .codepoint = 'r' },
-    .z_order = .{ .order = .obstacle },
-    .description = .{ .preset = .rat },
-    .health = .{ .max = 10, .current = 10 },
-    .weapon = .{ .min_damage = 1, .max_damage = 3 },
-    .speed = .{ .move_points = 14 },
-    .state = .sleeping,
-};
+pub fn rat(place: p.Point) c.Components {
+    return .{
+        .initiative = .empty,
+        .sprite = .{ .codepoint = 'r' },
+        .position = .{ .zorder = .obstacle, .place = place },
+        .description = .{ .preset = .rat },
+        .health = .{ .max = 10, .current = 10 },
+        .weapon = .{ .min_damage = 1, .max_damage = 3 },
+        .speed = .{ .move_points = 14 },
+        .state = .sleeping,
+    };
+}
 
 pub const Club = c.Components{
     .description = .{ .preset = .club },
-    .z_order = .{ .order = .item },
     .sprite = .{ .codepoint = cp.weapon_melee },
     .weapon = .{ .min_damage = 2, .max_damage = 5 },
 };
 
 pub const Torch = c.Components{
     .description = .{ .preset = .torch },
-    .z_order = .{ .order = .item },
     .sprite = .{ .codepoint = cp.source_of_light },
     .source_of_light = .{ .radius = 5 },
 };
 
-pub const OpenedDoor = c.Components{
-    .door = .{ .state = .opened },
-    .z_order = .{ .order = .floor },
-    .sprite = .{ .codepoint = cp.door_opened },
-    .description = .{ .preset = .opened_door },
-};
+pub fn openedDoor(place: p.Point) c.Components {
+    return .{
+        .door = .{ .state = .opened },
+        .position = .{ .zorder = .floor, .place = place },
+        .sprite = .{ .codepoint = cp.door_opened },
+        .description = .{ .preset = .opened_door },
+    };
+}
 
-pub const ClosedDoor = c.Components{
-    .door = .{ .state = .closed },
-    .z_order = .{ .order = .obstacle },
-    .sprite = .{ .codepoint = cp.door_closed },
-    .description = .{ .preset = .closed_door },
-};
+pub fn closedDoor(place: p.Point) c.Components {
+    return .{
+        .door = .{ .state = .closed },
+        .position = .{ .zorder = .obstacle, .place = place },
+        .sprite = .{ .codepoint = cp.door_closed },
+        .description = .{ .preset = .closed_door },
+    };
+}
 
-pub fn ladder(l: c.Ladder) c.Components {
+pub fn ladder(l: c.Ladder, place: p.Point) c.Components {
     return switch (l.direction) {
         .up => .{
             .ladder = l,
             .description = .{ .preset = .ladder_up },
-            .z_order = .{ .order = .floor },
+            .position = .{ .zorder = .floor, .place = place },
             .sprite = .{ .codepoint = cp.ladder_up },
         },
         .down => .{
             .ladder = l,
             .description = .{ .preset = .ladder_down },
-            .z_order = .{ .order = .floor },
+            .position = .{ .zorder = .floor, .place = place },
             .sprite = .{ .codepoint = cp.ladder_down },
         },
     };
@@ -74,16 +77,15 @@ pub fn ladder(l: c.Ladder) c.Components {
 
 pub fn teleport(place: p.Point) c.Components {
     return .{
-        .position = .{ .place = place },
-        .z_order = .{ .order = .floor },
+        .position = .{ .place = place, .zorder = .floor },
         .sprite = .{ .codepoint = cp.teleport },
         .description = .{ .preset = .teleport },
     };
 }
 
-pub fn pile(alloc: std.mem.Allocator) !c.Components {
+pub fn pile(alloc: std.mem.Allocator, place: p.Point) !c.Components {
     return .{
-        .z_order = .{ .order = .item },
+        .position = .{ .zorder = .item, .place = place },
         .sprite = .{ .codepoint = cp.pile },
         .description = .{ .preset = .pile },
         .pile = try c.Pile.empty(alloc),

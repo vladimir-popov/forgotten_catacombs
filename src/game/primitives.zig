@@ -1,5 +1,8 @@
 //! This module contains algorithms, data structures, and primitive types,
 //! such as geometry primitives, which are not game domain objects.
+//!
+//! **NOTE:** coordinates begin from _one_ NOT _zero_. It mostly happened by historical
+//! reason, but is deeply used now.
 const std = @import("std");
 
 const log = std.log.scoped(.primitives);
@@ -44,8 +47,8 @@ pub const Direction = enum {
 
 /// The coordinates of a point.
 pub const Point = struct {
-    row: u8 = 0,
-    col: u8 = 0,
+    row: u8,
+    col: u8,
 
     pub fn init(r: u8, c: u8) Point {
         return .{ .row = r, .col = c };

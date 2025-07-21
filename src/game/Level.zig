@@ -129,17 +129,15 @@ pub fn initAsFirstLevel(
 
     // Add wharf
     var entity = try self.registry.addNewEntity(.{
-        .z_order = .{ .order = .floor },
         .description = .{ .preset = .wharf },
         .sprite = .{ .codepoint = cp.ladder_up },
-        .position = .{ .place = self.dungeon.entrance },
+        .position = .{ .place = self.dungeon.entrance, .zorder = .floor },
     });
     try self.entities.append(arena_alloc, entity);
 
     // Add the ladder leads to the bottom dungeons:
     entity = self.registry.newEntity();
     try self.registry.setComponentsToEntity(entity, .{
-        .z_order = .{ .order = .floor },
         .ladder = .{
             .direction = .down,
             .id = entity,
@@ -147,14 +145,13 @@ pub fn initAsFirstLevel(
         },
         .description = .{ .preset = .ladder_down },
         .sprite = .{ .codepoint = cp.ladder_down },
-        .position = .{ .place = self.dungeon.exit },
+        .position = .{ .place = self.dungeon.exit, .zorder = .floor },
     });
     try self.entities.append(arena_alloc, entity);
 
     // Add the trader
     entity = try self.registry.addNewEntity(.{
-        .z_order = .{ .order = .obstacle },
-        .position = .{ .place = d.FirstLocation.trader_place },
+        .position = .{ .place = d.FirstLocation.trader_place, .zorder = .obstacle },
         .sprite = .{ .codepoint = cp.human },
         .description = .{ .preset = .traider },
     });
@@ -162,8 +159,7 @@ pub fn initAsFirstLevel(
 
     // Add the scientist
     entity = try self.registry.addNewEntity(.{
-        .z_order = .{ .order = .obstacle },
-        .position = .{ .place = d.FirstLocation.scientist_place },
+        .position = .{ .place = d.FirstLocation.scientist_place, .zorder = .obstacle },
         .sprite = .{ .codepoint = cp.human },
         .description = .{ .preset = .scientist },
     });
@@ -176,8 +172,7 @@ pub fn initAsFirstLevel(
     // Add doors
     var doors = self.dungeon.doorways.?.iterator();
     while (doors.next()) |entry| {
-        entry.value_ptr.door_id = try self.registry.addNewEntity(g.entities.ClosedDoor);
-        try self.registry.set(entry.value_ptr.door_id, c.Position{ .place = entry.key_ptr.* });
+        entry.value_ptr.door_id = try self.registry.addNewEntity(g.entities.closedDoor(entry.key_ptr.*));
         try self.entities.append(arena_alloc, entry.value_ptr.door_id);
         log.debug(
             "For the doorway on {any} added closed door with id {d}",
@@ -230,15 +225,16 @@ pub fn tryGenerateNew(
     var prng = std.Random.DefaultPrng.init(dungeon.seed);
     const rand = prng.random();
     for (0..rand.uintLessThan(u8, 10) + 10) |_| {
-        try self.addEnemy(rand, g.entities.Rat);
+        if (self.randomEmptyPlace(rand)) |place| {
+            try self.addEnemy(rand, g.entities.rat(place));
+        }
     }
 
     // Add doors
     if (self.dungeon.doorways) |doorways| {
         var doors = doorways.iterator();
         while (doors.next()) |entry| {
-            entry.value_ptr.door_id = try self.registry.addNewEntity(g.entities.ClosedDoor);
-            try self.registry.set(entry.value_ptr.door_id, c.Position{ .place = entry.key_ptr.* });
+            entry.value_ptr.door_id = try self.registry.addNewEntity(g.entities.closedDoor(entry.key_ptr.*));
             try self.entities.append(arena_alloc, entry.value_ptr.door_id);
             log.debug(
                 "For the doorway on {any} added closed door with id {d}",
@@ -259,7 +255,7 @@ pub fn completeInitialization(self: *Self, moving_direction: ?c.Ladder.Direction
             .up => self.dungeon.exit,
         };
         log.debug("Move the player to the ladder in direction {s}.", .{@tagName(direction)});
-        try self.registry.set(self.player, c.Position{ .place = init_place });
+        try self.registry.set(self.player, c.Position{ .place = init_place, .zorder = .obstacle });
     }
     self.player_placement = self.dungeon.placementWith(self.playerPosition().place).?;
 
@@ -308,7 +304,7 @@ pub fn removeEntity(self: *Self, entity: g.Entity) !void {
     }
 }
 
-/// Adds an item to the list of entities on this level, and put it at the place.
+/// Adds an item to the list of entities on this level, and puts it at the specified place.
 /// Three possible scenario can happened here:
 ///   - If no one other item on the place, then the item will be dropped as is:
 ///     the position and appropriate sprite will be added to the item;
@@ -318,7 +314,7 @@ pub fn removeEntity(self: *Self, entity: g.Entity) !void {
 ///   - If a pile is on the place, the item will be added to this pile;
 ///
 /// Returns entity id for the pile if it was created;
-pub fn addEntityAtPlace(self: *Self, item: g.Entity, place: p.Point) !?g.Entity {
+pub fn addItemAtPlace(self: *Self, item: g.Entity, place: p.Point) !?g.Entity {
     switch (self.cellAt(place)) {
         .entities => |entities| {
             // if some item already exists on the place
@@ -331,9 +327,10 @@ pub fn addEntityAtPlace(self: *Self, item: g.Entity, place: p.Point) !?g.Entity 
                     return entity;
                 } else {
                     // or create a new pile and add the item to the pile
-                    const pile_id = try self.registry.addNewEntity(try g.entities.pile(self.registry.allocator()));
+                    const pile_id = try self.registry.addNewEntity(
+                        try g.entities.pile(self.registry.allocator(), place),
+                    );
                     try self.entities.append(self.arena.allocator(), pile_id);
-                    try self.registry.set(pile_id, c.Position{ .place = place });
                     const pile = self.registry.getUnsafe(pile_id, c.Pile);
                     log.debug("Created a pile {any} at {any}", .{ pile_id, place });
 
@@ -350,7 +347,7 @@ pub fn addEntityAtPlace(self: *Self, item: g.Entity, place: p.Point) !?g.Entity 
         else => {},
     }
     log.debug("Adding item {any} to the empty place {any}", .{ item, place });
-    try self.registry.set(item, c.Position{ .place = place });
+    try self.registry.set(item, c.Position{ .place = place, .zorder = .item });
     try self.entities.append(self.arena.allocator(), item);
     return null;
 }
@@ -417,17 +414,17 @@ pub fn cellAt(self: Self, place: p.Point) Cell {
     var found_entity = false;
     // up to 3 entities with different z-orders may exists at same position
     var result = [3]?g.Entity{ null, null, null };
-    var itr = self.registry.query2(c.Position, c.ZOrder);
+    var itr = self.registry.query(c.Position);
     while (itr.next()) |tuple| {
-        const entity, const position, const zorder = tuple;
-        const order = @intFromEnum(zorder.order);
+        const entity, const position = tuple;
+        const order = @intFromEnum(position.zorder);
         if (position.place.eql(place)) {
             found_entity = true;
             // only one entity with the same order can be at the same place
             if (result[order]) |existed_item| {
                 std.debug.panic(
                     "Both items {any} and {any} with order {s} at same place {any}",
-                    .{ existed_item, entity, @tagName(zorder.order), place },
+                    .{ existed_item, entity, @tagName(position.zorder), place },
                 );
             }
             result[order] = entity;
@@ -442,10 +439,10 @@ pub fn itemAt(self: Self, place: p.Point) ?g.Entity {
         .floor, .doorway => {},
         else => return null,
     }
-    var itr = self.registry.query2(c.Position, c.ZOrder);
+    var itr = self.registry.query(c.Position);
     while (itr.next()) |tuple| {
-        const entity, const position, const zorder = tuple;
-        if (place.eql(position.place) and zorder.order == .item) {
+        const entity, const position = tuple;
+        if (place.eql(position.place) and position.zorder == .item) {
             return entity;
         }
     }
@@ -487,17 +484,13 @@ fn updatePlacement(self: *Self, player_moved_from: p.Point, player_moved_to: p.P
 }
 
 fn addLadder(self: *g.Level, ladder: c.Ladder, place: p.Point) !void {
-    try self.registry.setComponentsToEntity(ladder.id, g.entities.ladder(ladder));
-    try self.registry.set(ladder.id, c.Position{ .place = place });
+    try self.registry.setComponentsToEntity(ladder.id, g.entities.ladder(ladder, place));
     try self.entities.append(self.arena.allocator(), ladder.id);
 }
 
 fn addEnemy(self: *g.Level, rand: std.Random, enemy: c.Components) !void {
-    if (self.randomEmptyPlace(rand)) |place| {
-        const id = try self.registry.addNewEntity(enemy);
-        try self.registry.set(id, c.Position{ .place = place });
-        try self.entities.append(self.arena.allocator(), id);
-        const state: c.EnemyState = if (rand.uintLessThan(u8, 5) == 0) .sleeping else .walking;
-        try self.registry.set(id, state);
-    }
+    const id = try self.registry.addNewEntity(enemy);
+    try self.entities.append(self.arena.allocator(), id);
+    const state: c.EnemyState = if (rand.uintLessThan(u8, 5) == 0) .sleeping else .walking;
+    try self.registry.set(id, state);
 }

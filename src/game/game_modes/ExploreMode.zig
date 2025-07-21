@@ -115,11 +115,11 @@ fn updateEntitiesOnScreen(self: *ExploreMode) !void {
     const alloc = self.arena.allocator();
     self.entities_on_screen.clearRetainingCapacity();
     const level = &self.session.level;
-    var itr = level.registry.query2(c.Position, c.ZOrder);
+    var itr = level.registry.query(c.Position);
     while (itr.next()) |tuple| {
         const entity = tuple[0];
         const place = tuple[1].place;
-        const zorder = tuple[2].order;
+        const zorder = tuple[1].zorder;
         if (!self.session.viewport.region.containsPoint(place))
             continue;
 

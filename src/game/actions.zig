@@ -27,9 +27,9 @@ pub const Action = union(enum) {
     /// An entity is going to move in the direction
     move: Move,
     /// An entity is going to open a door
-    open: g.Entity,
+    open: struct { id: g.Entity, place: p.Point },
     /// An entity is going to close a door
-    close: g.Entity,
+    close: struct { id: g.Entity, place: p.Point },
     /// An entity which should be hit
     hit: Hit,
     /// The id of an item that someone is going to take from the floor

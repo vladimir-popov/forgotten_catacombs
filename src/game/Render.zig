@@ -129,9 +129,9 @@ fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order
 }
 /// Draw sprites inside the screen
 pub fn drawSpritesToBuffer(self: Render, viewport: g.Viewport, level: *const g.Level, entity_in_focus: ?g.Entity) !void {
-    var itr = level.registry.query3(cm.Position, cm.Sprite, cm.ZOrder);
+    var itr = level.registry.query2(cm.Position, cm.Sprite);
     while (itr.next()) |tuple| {
-        const entity, const position, const sprite, const zorder = tuple;
+        const entity, const position, const sprite = tuple;
         if (!viewport.region.containsPoint(position.place)) continue;
         const mode: g.DrawingMode = if (entity.eql(entity_in_focus)) .inverted else .normal;
         const visibility = level.checkVisibility(tuple[1].place);
@@ -139,7 +139,7 @@ pub fn drawSpritesToBuffer(self: Render, viewport: g.Viewport, level: *const g.L
             viewport,
             sprite.codepoint,
             position.place,
-            @intFromEnum(zorder.order),
+            @intFromEnum(position.zorder),
             mode,
             visibility,
         );

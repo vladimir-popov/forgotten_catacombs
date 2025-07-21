@@ -270,10 +270,8 @@ fn calculateQuickActionForTarget(
         self.session.registry.get(target_entity, c.Position) orelse return null;
 
     if (player_position.place.eql(target_position.place)) {
-        if (self.session.registry.get(target_entity, c.ZOrder)) |zorder| {
-            if (zorder.order == .item) {
-                return .{ .pickup = target_entity };
-            }
+        if (target_position.zorder == .item) {
+            return .{ .pickup = target_entity };
         }
         if (self.session.registry.get(target_entity, c.Ladder)) |ladder| {
             // It's impossible to go upper the first level
@@ -295,8 +293,8 @@ fn calculateQuickActionForTarget(
                 return null;
             }
             return switch (door.state) {
-                .opened => .{ .close = target_entity },
-                .closed => .{ .open = target_entity },
+                .opened => .{ .close = .{ .id = target_entity, .place = target_position.place } },
+                .closed => .{ .open = .{ .id = target_entity, .place = target_position.place } },
             };
         }
     }

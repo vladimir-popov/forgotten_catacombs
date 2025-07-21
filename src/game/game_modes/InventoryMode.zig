@@ -306,7 +306,7 @@ fn dropSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     if (item.eql(self.equipment.light)) {
         self.equipment.light = null;
     }
-    if (try self.session.level.addEntityAtPlace(item, place)) |pile_entity| {
+    if (try self.session.level.addItemAtPlace(item, place)) |pile_entity| {
         try self.addDropTab(pile_entity);
     } else {
         try self.addDropTab(item);

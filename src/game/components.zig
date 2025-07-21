@@ -3,21 +3,15 @@ const g = @import("game_pkg.zig");
 const p = g.primitives;
 const u = g.utils;
 
+/// A place in the dungeon where an entity is, and its z-order.
+/// A place with zero row and zero column is undefined.
+/// **NOTE:** do not replace the whole position. Only the place should be changed during the game,
+/// because z-order is a constant property of the entity.
 pub const Position = struct {
     place: p.Point,
-};
-
-pub const Door = struct { state: enum { opened, closed } };
-
-/// Describes how and where something should look.
-pub const Sprite = struct {
-    codepoint: g.Codepoint,
-};
-
-/// The vertical order of the entities on the same place.
-/// The sprite with bigger order should be rendered over the sprite with lower.
-pub const ZOrder = struct {
-    order: enum {
+    /// The vertical order of the entities on the same place.
+    /// The sprite with bigger order should be rendered over the sprite with lower.
+    zorder: enum {
         /// opened doors, ladders, teleports...
         floor,
         /// any dropped items, piles...
@@ -25,6 +19,13 @@ pub const ZOrder = struct {
         /// player, enemies, npc, closed doors...
         obstacle,
     },
+};
+
+pub const Door = struct { state: enum { opened, closed } };
+
+/// Describes how and where something should look.
+pub const Sprite = struct {
+    codepoint: g.Codepoint,
 };
 
 pub const Description = struct {
@@ -171,6 +172,7 @@ pub const SourceOfLight = struct {
 
 pub const Components = struct {
     animation: ?Animation = null,
+    // must be provided for every entity
     description: ?Description,
     door: ?Door = null,
     equipment: ?Equipment = null,
@@ -182,8 +184,8 @@ pub const Components = struct {
     position: ?Position = null,
     source_of_light: ?SourceOfLight = null,
     speed: ?Speed = null,
+    // must be provided for every entity
     sprite: ?Sprite,
     state: ?EnemyState = null,
     weapon: ?Weapon = null,
-    z_order: ?ZOrder,
 };
