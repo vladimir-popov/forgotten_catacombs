@@ -557,7 +557,7 @@ test "All components should be serializable" {
         .inventory = inventory,
         .ladder = c.Ladder{ .id = .{ .id = 2 }, .direction = .down, .target_ladder = .{ .id = 3 } },
         .pile = pile,
-        .position = c.Position{ .place = p.Point.init(12, 42) },
+        .position = c.Position{ .place = p.Point.init(12, 42), .zorder = .item },
         .source_of_light = c.SourceOfLight{ .radius = 4 },
         .speed = c.Speed{ .move_points = 12 },
         .sprite = c.Sprite{ .codepoint = g.codepoints.human },

@@ -13,15 +13,13 @@ pub fn ArraySet(comptime C: anytype) type {
     return struct {
         const Self = @This();
 
-        components: std.ArrayListUnmanaged(C),
+        components: std.ArrayListUnmanaged(struct { Entity, C }),
         entity_index: std.AutoHashMapUnmanaged(Entity, usize),
-        index_entity: std.AutoHashMapUnmanaged(usize, Entity),
 
         /// An instance of this ArraySet with empty inner storages.
         pub const empty = Self{
             .components = .empty,
             .entity_index = .empty,
-            .index_entity = .empty,
         };
 
         /// Deinits the inner storages and components.
@@ -29,21 +27,18 @@ pub fn ArraySet(comptime C: anytype) type {
             self.deinitComponents();
             self.components.deinit(alloc);
             self.entity_index.deinit(alloc);
-            self.index_entity.deinit(alloc);
         }
 
         pub fn clearRetainingCapacity(self: *Self, alloc: std.mem.Allocator) void {
             self.deinitComponents(alloc);
             self.components.clearRetainingCapacity();
             self.entity_index.clearRetainingCapacity();
-            self.index_entity.clearRetainingCapacity();
         }
 
         pub fn clear(self: *Self, alloc: std.mem.Allocator) void {
             self.deinitComponents(alloc);
             self.components.clearAndFree(alloc);
             self.entity_index.clearAndFree(alloc);
-            self.index_entity.clearAndFree(alloc);
         }
 
         pub const Iterator = struct {
@@ -52,10 +47,8 @@ pub fn ArraySet(comptime C: anytype) type {
 
             pub fn next(self: *Iterator) ?struct { Entity, *C } {
                 if (self.idx < self.parent.components.items.len) {
-                    if (self.parent.index_entity.get(self.idx)) |entity| {
-                        self.idx += 1;
-                        return .{ entity, &self.parent.components.items[self.idx - 1] };
-                    }
+                    defer self.idx += 1;
+                    return .{ self.parent.components.items[self.idx][0], &self.parent.components.items[self.idx][1] };
                 }
                 return null;
             }
@@ -68,7 +61,7 @@ pub fn ArraySet(comptime C: anytype) type {
         /// Returns the pointer to the component for the entity if it was added before, or null.
         pub fn getForEntity(self: Self, entity: Entity) ?*C {
             if (self.entity_index.get(entity)) |idx| {
-                return &self.components.items[idx];
+                return &self.components.items[idx][1];
             } else {
                 return null;
             }
@@ -78,11 +71,10 @@ pub fn ArraySet(comptime C: anytype) type {
         pub fn setToEntity(self: *Self, alloc: std.mem.Allocator, entity: Entity, component: C) !void {
             if (self.entity_index.get(entity)) |idx| {
                 self.deinitComponent(idx);
-                self.components.items[idx] = component;
+                self.components.items[idx] = .{ entity, component };
             } else {
                 try self.entity_index.put(alloc, entity, self.components.items.len);
-                try self.index_entity.put(alloc, self.components.items.len, entity);
-                try self.components.append(alloc, component);
+                try self.components.append(alloc, .{ entity, component });
             }
         }
 
@@ -90,7 +82,6 @@ pub fn ArraySet(comptime C: anytype) type {
         /// if they was added before, or does nothing.
         pub fn removeFromEntity(self: *Self, alloc: std.mem.Allocator, entity: Entity) !void {
             if (self.entity_index.get(entity)) |idx| {
-                _ = self.index_entity.remove(idx);
                 _ = self.entity_index.remove(entity);
 
                 const last_idx: u8 = @intCast(self.components.items.len - 1);
@@ -98,11 +89,11 @@ pub fn ArraySet(comptime C: anytype) type {
                 if (idx == last_idx) {
                     _ = self.components.pop();
                 } else {
-                    const last_entity = self.index_entity.get(last_idx).?;
-                    self.components.items[idx] = self.components.items[self.components.items.len - 1];
+                    const last_tuple = self.components.items[last_idx];
+                    self.components.items[idx] =
+                        .{ last_tuple[0], last_tuple[1] };
                     self.components.items.len -= 1;
-                    try self.entity_index.put(alloc, last_entity, idx);
-                    try self.index_entity.put(alloc, idx, last_entity);
+                    try self.entity_index.put(alloc, last_tuple[0], idx);
                 }
             }
         }
@@ -115,7 +106,7 @@ pub fn ArraySet(comptime C: anytype) type {
 
         inline fn deinitComponent(self: *Self, idx: usize) void {
             if (@hasDecl(C, "deinit")) {
-                self.components.items[idx].deinit();
+                self.components.items[idx][1].deinit();
             }
         }
     };
