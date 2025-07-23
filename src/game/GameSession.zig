@@ -257,8 +257,12 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
             log.debug("Update target after player hit", .{});
             try self.mode.play.updateQuickActions(event.player_hit.target, null);
         },
-        .entity_moved => |entity_moved| if (entity_moved.entity.id == self.player.id) {
-            try self.level.onPlayerMoved(entity_moved);
+        .entity_moved => |entity_moved| {
+            if (entity_moved.entity.id == self.player.id) {
+                try self.level.onPlayerMoved(entity_moved);
+            } else if (entity_moved.targetPlace().near8(self.level.playerPosition().place)) {
+                try self.mode.play.updateQuickActions(entity_moved.entity, null);
+            }
         },
     }
 }

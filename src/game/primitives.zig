@@ -109,7 +109,25 @@ pub const Point = struct {
         return self.row == other.row and self.col == other.col;
     }
 
-    pub inline fn near(self: Point, other: Point) bool {
+    /// Returns true if the `other` point is one of 4 neighbors:
+    /// ```
+    ///   1
+    /// 4 x 2
+    ///   3
+    /// ```
+    pub inline fn near4(self: Point, other: Point) bool {
+        const case1 = self.row == other.row and (@max(self.col, other.col) - @min(self.col, other.col) < 2);
+        const case2 = self.col == other.col and (@max(self.row, other.row) - @min(self.row, other.row) < 2);
+        return case1 or case2;
+    }
+
+    /// Returns true if the `other` point is one of 8 neighbors:
+    /// ```
+    /// 1 2 3
+    /// 4 x 5
+    /// 6 7 8
+    /// ```
+    pub inline fn near8(self: Point, other: Point) bool {
         return @max(self.row, other.row) - @min(self.row, other.row) < 2 and
             @max(self.col, other.col) - @min(self.col, other.col) < 2;
     }

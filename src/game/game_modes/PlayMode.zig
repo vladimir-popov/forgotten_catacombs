@@ -53,7 +53,6 @@ pub fn deinit(self: PlayMode) void {
 pub fn tick(self: *PlayMode) !void {
     if (try self.draw()) return;
 
-
     if (self.is_player_turn) {
         const maybe_action = try self.handleInput();
         // break this function if the mode was changed
@@ -131,7 +130,7 @@ fn handleInput(self: *PlayMode) !?g.Action {
                     return g.Action{
                         .move = .{
                             .target = .{ .direction = btn.toDirection().? },
-                            .keep_moving = false, 
+                            .keep_moving = false,
                         },
                     };
                 },
@@ -276,7 +275,7 @@ pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity, prev_action
     var itr = self.session.registry.query(c.Position);
     while (itr.next()) |tuple| {
         const entity: g.Entity, const position: *c.Position = tuple;
-        if (position.place.near(player_position.place)) {
+        if (position.place.near4(player_position.place)) {
             if (entity.eql(self.session.player) or entity.eql(target_entity)) continue;
             log.debug(
                 "The place {any} near the player {any} with {any}",
@@ -320,7 +319,7 @@ fn calculateQuickActionForTarget(
         }
     }
 
-    if (player_position.place.near(target_position.place)) {
+    if (player_position.place.near4(target_position.place)) {
         if (self.session.isEnemy(target_entity)) {
             if (self.session.getWeapon(self.session.player)) |weapon| {
                 return .{ .hit = .{ .target = target_entity, .by_weapon = weapon.* } };

@@ -35,7 +35,7 @@ inline fn actionForSleepingEnemy(
     entity_place: p.Point,
     player_place: p.Point,
 ) g.Action {
-    if (entity_place.near(player_place)) return .{ .get_angry = entity };
+    if (entity_place.near8(player_place)) return .{ .get_angry = entity };
     if (self.isPlayerIsInSight(entity_place)) {
         // TODO Probability of waking up should depends on player's skills
         if (self.rand.uintLessThan(u8, 10) == 0) return .{ .get_angry = entity };
@@ -49,7 +49,7 @@ inline fn actionForWalkingEnemy(
     entity_place: p.Point,
     player_place: p.Point,
 ) g.Action {
-    if (entity_place.near(player_place)) return .{ .get_angry = entity };
+    if (entity_place.near8(player_place)) return .{ .get_angry = entity };
 
     if (self.isPlayerIsInSight(entity_place)) {
         // TODO Probability of become aggressive should depends on player's skills
@@ -74,7 +74,7 @@ inline fn actionForAggressiveEnemy(
     entity_place: p.Point,
     player_place: p.Point,
 ) g.Action {
-    if (entity_place.near(player_place)) {
+    if (entity_place.near4(player_place)) {
         if (self.session.getWeapon(entity)) |weapon|
             return .{
                 .hit = .{
