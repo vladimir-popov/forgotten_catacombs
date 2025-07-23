@@ -322,7 +322,9 @@ pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_spe
                 c.Animation{ .preset = .get_angry },
             );
         },
-        else => {},
+        .wait => {
+            try self.registry.set(actor, c.Animation{ .preset = .wait, .is_blocked = self.player.eql(actor) });
+        },
     }
     return actor_speed;
 }

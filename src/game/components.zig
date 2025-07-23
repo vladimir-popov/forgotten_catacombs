@@ -43,11 +43,11 @@ pub const Description = struct {
 pub const Animation = struct {
     pub const FramesPresets = u.Preset(struct {
         empty: []const g.Codepoint = &[_]g.Codepoint{},
-        hit: []const g.Codepoint = &[_]g.Codepoint{ 0, '×', 0 },
-        miss: []const g.Codepoint = &[_]g.Codepoint{'.'},
-        go_sleep: []const g.Codepoint = &[_]g.Codepoint{ 0, 'z', 0, 'z' },
-        relax: []const g.Codepoint = &[_]g.Codepoint{ 0, '?', 0, '?', 0, '?' },
         get_angry: []const g.Codepoint = &[_]g.Codepoint{ 0, '!', 0, '!', 0, '!' },
+        go_sleep: []const g.Codepoint = &[_]g.Codepoint{ 0, 'z', 0, 'z', 0, 'z' },
+        hit: []const g.Codepoint = &[_]g.Codepoint{ 0, '×', 0 },
+        relax: []const g.Codepoint = &[_]g.Codepoint{ 0, '?', 0, '?', 0, '?' },
+        wait: []const g.Codepoint = &[_]g.Codepoint{ 'z', 'Z', 'z', 'Z' },
     });
 
     preset: FramesPresets.Keys,

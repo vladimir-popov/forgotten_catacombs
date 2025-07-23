@@ -131,7 +131,7 @@ fn handleInput(self: *PlayMode) !?g.Action {
                     return g.Action{
                         .move = .{
                             .target = .{ .direction = btn.toDirection().? },
-                            .keep_moving = false, // btn.state == .double_pressed,
+                            .keep_moving = false, 
                         },
                     };
                 },
