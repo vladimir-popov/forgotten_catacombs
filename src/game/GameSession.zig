@@ -398,7 +398,8 @@ fn doHit(
     const damage = actor_weapon.generateDamage(self.prng.random());
     log.debug("The entity {d} received damage {d} from entity {d}", .{ enemy.id, damage, actor.id });
     enemy_health.current -= @as(i16, @intCast(damage));
-    try self.registry.set(enemy, c.Animation{ .preset = .hit });
+    const is_blocked_animation = actor.eql(self.player) or enemy.eql(self.player);
+    try self.registry.set(enemy, c.Animation{ .preset = .hit, .is_blocked = is_blocked_animation });
     if (actor.eql(self.player)) {
         try self.events.sendEvent(.{ .player_hit = .{ .target = enemy } });
     }

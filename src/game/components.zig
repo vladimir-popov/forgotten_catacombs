@@ -42,28 +42,29 @@ pub const Description = struct {
 
 pub const Animation = struct {
     pub const FramesPresets = u.Preset(struct {
-        empty: []const g.Codepoint = &[0]g.Codepoint{},
-        hit: []const g.Codepoint = &[3]g.Codepoint{ 0, '×', 0 },
-        miss: []const g.Codepoint = &[1]g.Codepoint{'.'},
-        go_sleep: []const g.Codepoint = &[6]g.Codepoint{ 0, 'z', 'z', 0, 'z', 'z' },
-        relax: []const g.Codepoint = &[6]g.Codepoint{ 0, '?', '?', 0, '?', '?' },
-        get_angry: []const g.Codepoint = &[6]g.Codepoint{ 0, '!', '!', 0, '!', '!' },
+        empty: []const g.Codepoint = &[_]g.Codepoint{},
+        hit: []const g.Codepoint = &[_]g.Codepoint{ 0, '×', 0 },
+        miss: []const g.Codepoint = &[_]g.Codepoint{'.'},
+        go_sleep: []const g.Codepoint = &[_]g.Codepoint{ 0, 'z', 0, 'z' },
+        relax: []const g.Codepoint = &[_]g.Codepoint{ 0, '?', 0, '?', 0, '?' },
+        get_angry: []const g.Codepoint = &[_]g.Codepoint{ 0, '!', 0, '!', 0, '!' },
     });
 
     preset: FramesPresets.Keys,
     current_frame: u8 = 0,
     previous_render_time: c_uint = 0,
-    lag: u32 = 0,
+    /// true means that input should not be handled until all frames of this animation will be played.
+    is_blocked: bool = false,
 
     pub fn frame(self: *Animation, now: u32) ?g.Codepoint {
-        const frames: []const g.Codepoint = FramesPresets.get(self.preset).*;
-        self.lag += now - self.previous_render_time;
-        self.previous_render_time = now;
-        if (self.lag > g.RENDER_DELAY_MS) {
-            self.lag = 0;
+        const frames = FramesPresets.get(self.preset);
+        if (now - self.previous_render_time > g.RENDER_DELAY_MS) {
+            self.previous_render_time = now;
             self.current_frame += 1;
         }
-        return if (self.current_frame <= frames.len) frames[self.current_frame - 1] else null;
+        // the first invocation is always increments the current_frame.
+        // this is way -1 is safe here
+        return if (self.current_frame <= frames.len) frames.*[self.current_frame - 1] else null;
     }
 };
 

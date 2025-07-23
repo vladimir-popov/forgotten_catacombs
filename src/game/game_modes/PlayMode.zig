@@ -51,9 +51,8 @@ pub fn deinit(self: PlayMode) void {
 }
 
 pub fn tick(self: *PlayMode) !void {
-    try self.draw();
-    // if (self.session.registry.getAll(c.Animation).len > 0)
-    //     return;
+    if (try self.draw()) return;
+
 
     if (self.is_player_turn) {
         const maybe_action = try self.handleInput();
@@ -161,11 +160,51 @@ fn handleInput(self: *PlayMode) !?g.Action {
     return null;
 }
 
-fn draw(self: *const PlayMode) !void {
+/// If returns true then the input should be ignored
+/// until all frames from all blocked animations will be drawn.
+fn draw(self: *const PlayMode) !bool {
+    var was_blocked_animation = false;
     if (self.quick_actions_window == null) {
-        try self.session.render.drawScene(self.session, self.target());
+        const level = &self.session.level;
+        try self.session.render.drawDungeon(self.session.viewport, level);
+        try self.session.render.drawSpritesToBuffer(self.session.viewport, level, self.target());
+        was_blocked_animation = try self.drawAnimationsFrames();
+        try self.session.render.drawChangedSymbols();
         try self.drawInfoBar();
     }
+    return was_blocked_animation;
+}
+
+/// Draws a single frame from every animation.
+/// Removes the animation if the last frame was drawn.
+/// Returns true if one of animation is blocked.
+pub fn drawAnimationsFrames(self: PlayMode) !bool {
+    const now: c_uint = self.session.runtime.currentMillis();
+    var was_blocked_animation: bool = false;
+    var itr = self.session.level.registry.query2(c.Position, c.Animation);
+    while (itr.next()) |components| {
+        const entity, const position, const animation = components;
+        was_blocked_animation |= animation.is_blocked;
+        if (animation.frame(now)) |frame| {
+            if (frame > 0 and self.session.viewport.region.containsPoint(position.place)) {
+                const mode: g.DrawingMode = if (entity.eql(self.target()))
+                    .inverted
+                else
+                    .normal;
+                try self.session.render.drawSpriteToBuffer(
+                    self.session.viewport,
+                    frame,
+                    position.place,
+                    3, // animations have max z order
+                    mode,
+                    self.session.level.checkVisibility(position.place),
+                );
+            }
+        } else {
+            try self.session.level.registry.remove(entity, c.Animation);
+        }
+    }
+    return was_blocked_animation;
 }
 
 fn drawInfoBar(self: *const PlayMode) !void {

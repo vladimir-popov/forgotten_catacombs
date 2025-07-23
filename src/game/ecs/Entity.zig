@@ -6,6 +6,8 @@ pub const IdType = u32;
 /// The id of an entity.
 id: IdType,
 
+/// Compares this entity with any type.
+/// Returns true only if the `other` is an entity with same id.
 pub inline fn eql(self: @This(), other: anytype) bool {
     return switch (@typeInfo(@TypeOf(other))) {
         .optional => if (other == null) false else std.meta.eql(self, other.?),

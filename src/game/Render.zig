@@ -71,12 +71,11 @@ pub fn deinit(self: *Render) void {
     self.arena.deinit();
 }
 
-/// Draws the dungeon, sprites and animations on the screen.
+/// Draws the dungeon and visible sprites on the screen.
 pub fn drawScene(self: Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
     const level = &session.level;
     try self.drawDungeon(session.viewport, level);
     try self.drawSpritesToBuffer(session.viewport, level, entity_in_focus);
-    try self.drawAnimationsFrames(session.viewport, level, entity_in_focus);
     try self.drawChangedSymbols();
 }
 
@@ -146,7 +145,7 @@ pub fn drawSpritesToBuffer(self: Render, viewport: g.Viewport, level: *const g.L
     }
 }
 
-fn drawSpriteToBuffer(
+pub fn drawSpriteToBuffer(
     self: Render,
     viewport: g.Viewport,
     codepoint: g.Codepoint,
@@ -218,34 +217,6 @@ pub fn redrawFromSceneBuffer(self: Render) !void {
 /// Draws a single symbol directly to display
 pub fn drawSymbol(self: Render, symbol: u21, position_on_display: p.Point, mode: g.DrawingMode) !void {
     try self.runtime.drawSprite(symbol, position_on_display, mode);
-}
-
-/// Draws a single frame from every animation.
-/// Removes the animation if the last frame was drawn.
-pub fn drawAnimationsFrames(self: Render, viewport: g.Viewport, level: *g.Level, entity_in_focus: ?g.Entity) !void {
-    const now: c_uint = self.runtime.currentMillis();
-    var itr = level.registry.query2(cm.Position, cm.Animation);
-    while (itr.next()) |components| {
-        const entity, const position, const animation = components;
-        if (animation.frame(now)) |frame| {
-            if (frame > 0 and viewport.region.containsPoint(position.place)) {
-                const mode: g.DrawingMode = if (entity.eql(entity_in_focus))
-                    .inverted
-                else
-                    .normal;
-                try self.drawSpriteToBuffer(
-                    viewport,
-                    frame,
-                    position.place,
-                    3, // animations have top z order
-                    mode,
-                    level.checkVisibility(position.place),
-                );
-            }
-        } else {
-            try level.registry.remove(entity, cm.Animation);
-        }
-    }
 }
 
 pub fn drawBorder(self: Render, region: p.Region) !void {

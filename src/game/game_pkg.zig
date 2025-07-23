@@ -30,7 +30,7 @@ pub const Runtime = @import("Runtime.zig");
 pub const TextAlign = Runtime.TextAlign;
 pub const Viewport = @import("Viewport.zig");
 
-pub const RENDER_DELAY_MS = 150;
+pub const RENDER_DELAY_MS = 200;
 
 // Playdate display resolution px:
 pub const DISPLAY_HEIGHT = 240;
