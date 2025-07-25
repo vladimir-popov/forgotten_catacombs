@@ -12,6 +12,7 @@ pub fn player(alloc: std.mem.Allocator) !c.Components {
         .speed = .{ .move_points = 10 },
         .equipment = .nothing,
         .inventory = try c.Inventory.empty(alloc),
+        .wallet = .{ .money = 200 },
     };
 }
 

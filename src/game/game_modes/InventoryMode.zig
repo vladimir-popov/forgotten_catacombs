@@ -13,7 +13,7 @@
 //! ║║                                      ║║     ║║                                      ║║
 //! ║╚══════════════════════════════════════╝║     ║╚══════════════════════════════════════╝║
 //! ║════════════════════════════════════════║     ║════════════════════════════════════════║
-//! ║                     Close       Choose ║     ║                     Close       Choose ║
+//! ║    000$             Close       Choose ║     ║                     Close       Choose ║
 //! ╚════════════════════════════════════════╝     ╚════════════════════════════════════════╝
 //!
 //!                                      Modal windows:
@@ -30,7 +30,7 @@
 //! ║║                                      ║║     ║║                                      ║║
 //! ║╚══════════════════════════════════════╝║     ║╚══════════════════════════════════════╝║
 //! ║════════════════════════════════════════║     ║════════════════════════════════════════║
-//! ║                     Cancel       Use   ║     ║                                 Close  ║
+//! ║    000$             Cancel       Use   ║     ║     000$                        Close  ║
 //! ╚════════════════════════════════════════╝     ╚════════════════════════════════════════╝
 //! ```
 const std = @import("std");
@@ -130,6 +130,9 @@ fn draw(self: *Self) !void {
     } else {
         log.debug("Draw main window tab {d}", .{self.main_window.active_tab_idx});
         try self.main_window.draw(self.session.render);
+        var buf: [10]u8 = undefined;
+        const money = self.session.registry.getUnsafe(self.session.player, c.Wallet).money;
+        try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "{d}$", .{money}));
     }
 }
 

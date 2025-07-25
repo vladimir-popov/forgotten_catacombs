@@ -136,6 +136,10 @@ pub const Inventory = struct {
     }
 };
 
+pub const Wallet = struct {
+    money: u16 = 0,
+};
+
 pub const Equipment = struct {
     weapon: ?g.Entity,
     light: ?g.Entity,
@@ -189,4 +193,5 @@ pub const Components = struct {
     sprite: ?Sprite,
     state: ?EnemyState = null,
     weapon: ?Weapon = null,
+    wallet: ?Wallet = null,
 };
