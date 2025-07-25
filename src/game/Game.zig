@@ -156,7 +156,7 @@ pub fn welcome(self: *Self) !void {
 fn newGame(self: *Self) !void {
     std.debug.assert(self.state != .game_session);
     try self.deleteSessionFileIfExists();
-    _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
+    self.initMainMenu();
     self.state = .{ .game_session = undefined };
     try self.state.game_session.initNew(
         self.gpa,
@@ -167,7 +167,7 @@ fn newGame(self: *Self) !void {
 }
 
 fn continueGame(self: *Self) !void {
-    _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
+    self.initMainMenu();
     self.state = .{ .game_session = undefined };
     try self.state.game_session.preInit(
         self.gpa,
@@ -177,11 +177,23 @@ fn continueGame(self: *Self) !void {
     try self.state.game_session.load();
 }
 
+fn initMainMenu(self: *Self) void {
+    _ = self.runtime.addMenuItem("Inventory", self, openInventory);
+    _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
+}
+
 fn goToMainMenu(ptr: ?*anyopaque) callconv(.C) void {
     if (ptr == null) return;
     const self: *Self = @ptrCast(@alignCast(ptr.?));
     std.debug.assert(self.state == .game_session);
     self.state.game_session.save();
+}
+
+fn openInventory(ptr: ?*anyopaque) callconv(.C) void {
+    if (ptr == null) return;
+    const self: *Self = @ptrCast(@alignCast(ptr.?));
+    std.debug.assert(self.state == .game_session);
+    self.state.game_session.manageInventory() catch |err| std.debug.panic("Error on open inventory: {any}", .{err});
 }
 
 /// Checks that save file for a session exists.
