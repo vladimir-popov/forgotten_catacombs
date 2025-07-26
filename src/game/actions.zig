@@ -44,6 +44,8 @@ pub const Action = union(enum) {
     get_angry: g.Entity,
     //
     open_inventory,
+    //
+    trade: *c.Shop,
 
     pub fn toString(action: Action) []const u8 {
         return switch (action) {
@@ -57,6 +59,7 @@ pub const Action = union(enum) {
             },
             .pickup => "Pickup",
             .open_inventory => "Inventory",
+            .trade => "Trade",
             else => "???",
         };
     }

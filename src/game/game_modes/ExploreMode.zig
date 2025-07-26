@@ -20,7 +20,7 @@ entity_in_focus: g.Entity,
 place_in_focus: p.Point,
 /// The window to show list of entities on the place in focus
 entities_window: ?w.OptionsWindow(g.Entity) = null,
-description_window: ?w.DescriptionWindow = null,
+description_window: ?w.ModalWindow = null,
 
 pub fn init(self: *ExploreMode, alloc: std.mem.Allocator, session: *g.GameSession) !void {
     log.debug("Init LookingAroundMode", .{});
@@ -231,8 +231,8 @@ fn describeEntity(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!void {
     self.description_window = try self.windowWithDescription();
 }
 
-fn windowWithDescription(self: *ExploreMode) !w.DescriptionWindow {
-    return try w.DescriptionWindow.init(
+fn windowWithDescription(self: *ExploreMode) !w.ModalWindow {
+    return try w.ModalWindow.initEntityDescription(
         self.arena.allocator(),
         self.session.registry,
         self.entity_in_focus,

@@ -335,6 +335,9 @@ fn calculateQuickActionForTarget(
                 .closed => .{ .open = .{ .id = target_entity, .place = target_position.place } },
             };
         }
+        if (self.session.registry.get(target_entity, c.Shop)) |shop| {
+            return .{ .trade = shop };
+        }
     }
     return null;
 }

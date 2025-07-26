@@ -109,8 +109,6 @@ pub const Speed = struct {
 };
 
 pub const Pile = struct {
-    const Self = @This();
-
     items: u.EntitiesSet,
 
     pub fn empty(alloc: std.mem.Allocator) !Pile {
@@ -123,8 +121,6 @@ pub const Pile = struct {
 };
 
 pub const Inventory = struct {
-    const Self = @This();
-
     items: u.EntitiesSet,
 
     pub fn empty(alloc: std.mem.Allocator) !Inventory {
@@ -133,6 +129,27 @@ pub const Inventory = struct {
 
     pub fn deinit(self: *Inventory) void {
         self.items.deinit();
+    }
+};
+
+pub const Price = struct {
+    value: u16,
+};
+
+pub const Shop = struct {
+    // FIXME: this is a very primitive mechanic. it would be better if different items would have different
+    // multiplier, and that multiplier would depends on player's characteristics.
+    price_multiplier: f16,
+    items: u.EntitiesSet,
+    balance: u16 = 0,
+
+    pub fn empty(alloc: std.mem.Allocator, price_multiplier: f16, balance: u16) !Shop {
+        return .{ .items = try u.EntitiesSet.init(alloc), .price_multiplier = price_multiplier, .balance = balance };
+    }
+
+    pub fn deinit(self: *Shop) void {
+        self.items.deinit();
+        self.price_multiplier = undefined;
     }
 };
 
@@ -186,7 +203,9 @@ pub const Components = struct {
     inventory: ?Inventory = null,
     ladder: ?Ladder = null,
     pile: ?Pile = null,
+    price: ?Price = null,
     position: ?Position = null,
+    shop: ?Shop = null,
     source_of_light: ?SourceOfLight = null,
     speed: ?Speed = null,
     // must be provided for every entity

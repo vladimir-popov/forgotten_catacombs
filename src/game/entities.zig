@@ -12,7 +12,7 @@ pub fn player(alloc: std.mem.Allocator) !c.Components {
         .speed = .{ .move_points = 10 },
         .equipment = .nothing,
         .inventory = try c.Inventory.empty(alloc),
-        .wallet = .{ .money = 200 },
+        .wallet = .{ .money = 0 },
     };
 }
 
@@ -29,16 +29,25 @@ pub fn rat(place: p.Point) c.Components {
     };
 }
 
-pub const Club = c.Components{
-    .description = .{ .preset = .club },
-    .sprite = .{ .codepoint = cp.weapon_melee },
-    .weapon = .{ .min_damage = 2, .max_damage = 5 },
-};
-
 pub const Torch = c.Components{
     .description = .{ .preset = .torch },
     .sprite = .{ .codepoint = cp.source_of_light },
     .source_of_light = .{ .radius = 5 },
+    .price = .{ .value = 5 },
+};
+
+pub const Pickaxe = c.Components{
+    .description = .{ .preset = .pickaxe },
+    .sprite = .{ .codepoint = cp.weapon_melee },
+    .weapon = .{ .min_damage = 2, .max_damage = 3 },
+    .price = .{ .value = 15 },
+};
+
+pub const Club = c.Components{
+    .description = .{ .preset = .club },
+    .sprite = .{ .codepoint = cp.weapon_melee },
+    .weapon = .{ .min_damage = 3, .max_damage = 5 },
+    .price = .{ .value = 28 },
 };
 
 pub fn openedDoor(place: p.Point) c.Components {

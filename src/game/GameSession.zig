@@ -7,30 +7,33 @@ const c = g.components;
 const p = g.primitives;
 const ecs = g.ecs;
 
-const PlayMode = @import("game_modes/PlayMode.zig");
-const InventoryMode = @import("game_modes/InventoryMode.zig");
-const ExploreMode = @import("game_modes/ExploreMode.zig");
 const ExploreLevelMode = @import("game_modes/ExploreLevelMode.zig");
+const ExploreMode = @import("game_modes/ExploreMode.zig");
+const InventoryMode = @import("game_modes/InventoryMode.zig");
+const PlayMode = @import("game_modes/PlayMode.zig");
 const SaveLoadMode = @import("game_modes/SaveLoadMode.zig");
+const TradingMode = @import("game_modes/TradingMode.zig");
 
 const log = std.log.scoped(.game_session);
 
 const GameSession = @This();
 
 pub const Mode = union(enum) {
-    play: PlayMode,
-    inventory: InventoryMode,
     explore: ExploreMode,
     explore_level: ExploreLevelMode,
+    inventory: InventoryMode,
+    play: PlayMode,
     save_load: SaveLoadMode,
+    trading: TradingMode,
 
     inline fn deinit(self: *Mode) void {
         switch (self.*) {
-            .play => self.play.deinit(),
-            .inventory => self.inventory.deinit(),
             .explore => self.explore.deinit(),
-            .save_load => self.save_load.deinit(),
             .explore_level => {},
+            .inventory => self.inventory.deinit(),
+            .play => self.play.deinit(),
+            .save_load => self.save_load.deinit(),
+            .trading => self.trading.deinit(),
         }
     }
 };
@@ -142,9 +145,11 @@ pub fn setSeed(self: *GameSession, seed: u64) void {
 
 /// Creates the initial equipment of the player
 fn equipPlayer(self: *GameSession) !void {
+    self.registry.getUnsafe(self.player, c.Wallet).money += 200;
+
     var equipment: *c.Equipment = self.registry.getUnsafe(self.player, c.Equipment);
     var invent: *c.Inventory = self.registry.getUnsafe(self.player, c.Inventory);
-    const weapon = try self.registry.addNewEntity(g.entities.Club);
+    const weapon = try self.registry.addNewEntity(g.entities.Pickaxe);
     const light = try self.registry.addNewEntity(g.entities.Torch);
     equipment.weapon = weapon;
     equipment.light = light;
@@ -171,15 +176,6 @@ pub fn play(self: *GameSession, entity_in_focus: ?g.Entity) !void {
     try self.mode.play.init(self.arena.allocator(), self, entity_in_focus);
 }
 
-pub fn manageInventory(self: *GameSession) !void {
-    if (self.registry.get2(self.player, c.Equipment, c.Inventory)) |tuple| {
-        self.mode.deinit();
-        self.mode = .{ .inventory = undefined };
-        const drop = self.level.itemAt(self.level.playerPosition().place);
-        try self.mode.inventory.init(self.arena.allocator(), self, tuple[0], tuple[1], drop);
-    }
-}
-
 pub fn explore(self: *GameSession) !void {
     self.mode.deinit();
     self.mode = .{ .explore_level = try ExploreLevelMode.init(self) };
@@ -189,6 +185,21 @@ pub fn lookAround(self: *GameSession) !void {
     self.mode.deinit();
     self.mode = .{ .explore = undefined };
     try self.mode.explore.init(self.arena.allocator(), self);
+}
+
+pub fn manageInventory(self: *GameSession) !void {
+    if (self.registry.get2(self.player, c.Equipment, c.Inventory)) |tuple| {
+        self.mode.deinit();
+        self.mode = .{ .inventory = undefined };
+        const drop = self.level.itemAt(self.level.playerPosition().place);
+        try self.mode.inventory.init(self.arena.allocator(), self, tuple[0], tuple[1], drop);
+    }
+}
+
+pub fn trade(self: *GameSession, shop: *c.Shop) !void {
+    self.mode.deinit();
+    self.mode = .{ .trading = undefined };
+    try self.mode.trading.init(self.arena.allocator(), self, shop);
 }
 
 fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
@@ -233,11 +244,12 @@ pub fn isTool(self: *const GameSession, item: g.Entity) bool {
 
 pub inline fn tick(self: *GameSession) !void {
     switch (self.mode) {
-        .play => try self.mode.play.tick(),
-        .inventory => try self.mode.inventory.tick(),
         .explore => try self.mode.explore.tick(),
         .explore_level => try self.mode.explore_level.tick(),
+        .inventory => try self.mode.inventory.tick(),
+        .play => try self.mode.play.tick(),
         .save_load => try self.mode.save_load.tick(),
+        .trading => try self.mode.trading.tick(),
     }
     try self.events.notifySubscribers();
 }
@@ -326,6 +338,10 @@ pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_spe
                 c.Animation{ .preset = .get_angry },
             );
         },
+        .trade => |shop| {
+            try self.trade(shop);
+            return 0;
+        },
         .wait => {
             try self.registry.set(actor, c.Animation{ .preset = .wait, .is_blocked = self.player.eql(actor) });
         },
@@ -381,6 +397,10 @@ fn checkCollision(self: *GameSession, actor: g.Entity, place: p.Point) ?g.Action
                 if (self.isEnemy(entity))
                     if (self.getWeapon(actor)) |weapon|
                         return .{ .hit = .{ .target = entity, .by_weapon = weapon.* } };
+
+                if (self.registry.get(entity, c.Shop)) |shop| {
+                    return .{ .trade = shop };
+                }
 
                 // the player should not step on the place with entity with z-order = 2
                 return .do_nothing;

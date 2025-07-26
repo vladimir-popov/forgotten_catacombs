@@ -150,10 +150,13 @@ pub fn initAsFirstLevel(
     try self.entities.append(arena_alloc, entity);
 
     // Add the trader
+    var shop = try c.Shop.empty(self.registry.allocator(), 1.5, 200);
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Club));
     entity = try self.registry.addNewEntity(.{
         .position = .{ .place = d.FirstLocation.trader_place, .zorder = .obstacle },
         .sprite = .{ .codepoint = cp.human },
         .description = .{ .preset = .traider },
+        .shop = shop,
     });
     try self.entities.append(arena_alloc, entity);
 
