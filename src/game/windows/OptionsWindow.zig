@@ -62,9 +62,6 @@ pub fn OptionWindow(comptime Item: type) type {
         options: std.ArrayListUnmanaged(Option),
         left_button_label: []const u8,
         right_button_label: []const u8,
-        // if the window is above scene, the buffer should be drawn to hide the window,
-        // or fill the region with spaces otherwise
-        above_scene: bool = true,
 
         pub fn init(
             owner: *anyopaque,
@@ -102,7 +99,7 @@ pub fn OptionWindow(comptime Item: type) type {
             onReleaseButtonFn: OnReleaseButton,
             onHoldButtonFn: ?OnHoldButton,
         ) !void {
-            try self.text_area.addLine(alloc, label, false);
+            try self.text_area.addLine(alloc, label, .left, false);
             try self.options.append(
                 alloc,
                 .{ .item = item, .onReleaseButtonFn = onReleaseButtonFn, .onHoldButtonFn = onHoldButtonFn },
@@ -179,16 +176,16 @@ pub fn OptionWindow(comptime Item: type) type {
             }
         }
 
-        pub fn hide(self: *Self, render: g.Render) !void {
-            if (self.above_scene)
-                try render.redrawRegionFromSceneBuffer(self.text_area.region())
-            else
-                try render.fillRegion(' ', .normal, self.text_area.region());
+        pub fn hide(self: *Self, render: g.Render, hide_mode: w.HideMode) !void {
+            switch (hide_mode) {
+                .from_buffer => try render.redrawRegionFromSceneBuffer(self.text_area.region()),
+                .fill_region => try render.fillRegion(' ', .normal, self.text_area.region()),
+            }
         }
 
-        pub fn close(self: *Self, alloc: std.mem.Allocator, render: g.Render) !void {
+        pub fn close(self: *Self, alloc: std.mem.Allocator, render: g.Render, hide_mode: w.HideMode) !void {
             log.debug("Close options window", .{});
-            try self.hide(render);
+            try self.hide(render, hide_mode);
             self.deinit(alloc);
         }
     };

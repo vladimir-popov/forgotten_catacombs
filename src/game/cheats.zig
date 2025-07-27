@@ -17,6 +17,11 @@ pub const Cheat = union(enum) {
     // Moves the player to the point on the screen
     goto: p.Point,
     set_health: u8,
+    /// This cheat works only in trading mode, and sets up the amount of money depending on
+    /// the active tab: 
+    ///  - for Buying tab the balance of the shop will be changed;
+    ///  - for Selling tab the player's balance will be changed.
+    set_money: u8,
     hit: g.Action.Hit,
 
     pub fn init(tag: Tag, args: []const u8) ?Cheat {
@@ -42,6 +47,14 @@ pub const Cheat = union(enum) {
             } else {
                 log.warn(
                     "Wrong arguments '{s}' for 'set health' command. It expects a number value to set.",
+                    .{args},
+                );
+            },
+            .set_money => if (tryParse(u8, args)) |money| {
+                return .{ .set_money = money };
+            } else {
+                log.warn(
+                    "Wrong arguments '{s}' for 'set money' command. It expects a number value to set.",
                     .{args},
                 );
             },
@@ -100,6 +113,7 @@ pub const Cheat = union(enum) {
                 .move_player_to_ladder_down => "down ladder",
                 .move_player_to_ladder_up => "up ladder",
                 .set_health => "set health",
+                .set_money => "set money",
                 .turn_light_off => "light off",
                 .turn_light_on => "light on",
             };

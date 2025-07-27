@@ -3,6 +3,7 @@ const g = @import("game_pkg.zig");
 
 pub const Description = struct {
     name: []const u8,
+    // a line should have no more 36 symbols
     description: []const []const u8 = &.{},
 };
 
@@ -18,7 +19,7 @@ opened_door: Description = .{ .name = "Opened door" },
 pickaxe: Description = .{ .name = "Pickaxe" },
 pile: Description = .{ .name = "Pile of items" },
 player: Description = .{ .name = "You" },
-rat: Description = .{ .name = "Rat" },
+rat: Description = .{ .name = "Rat", .description = &.{ "Big nasty rat with vicious eyes" } },
 scientist: Description = .{ .name = "Scientist" },
 teleport: Description = .{ .name = "Teleport" },
 torch: Description = .{ .name = "Torch" },

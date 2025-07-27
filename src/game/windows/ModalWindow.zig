@@ -30,7 +30,7 @@ pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
 /// ```
 pub fn initNotification(alloc: std.mem.Allocator, title: []const u8, message: []const u8) !Self {
     var text_area = w.TextArea.init(.modal);
-    try text_area.addLine(alloc, message, false);
+    try text_area.addLine(alloc, message, .center, false);
     return .{ .title = title, .text_area = text_area };
 }
 
@@ -112,8 +112,11 @@ pub fn draw(self: *const Self, render: g.Render) !void {
     try render.drawRightButton(self.right_button_label, false);
 }
 
-pub fn close(self: *Self, alloc: std.mem.Allocator, render: g.Render) !void {
-    log.debug("Close description window", .{});
-    try render.redrawRegionFromSceneBuffer(self.text_area.region());
+pub fn close(self: *Self, alloc: std.mem.Allocator, render: g.Render, hide_mode: w.HideMode) !void {
+    log.debug("Close modal window", .{});
+    switch (hide_mode) {
+        .from_buffer => try render.redrawRegionFromSceneBuffer(self.text_area.region()),
+        .fill_region => try render.fillRegion(' ', .normal, self.text_area.region()),
+    }
     self.deinit(alloc);
 }

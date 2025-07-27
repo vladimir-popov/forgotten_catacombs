@@ -563,7 +563,6 @@ test "All components should be serializable" {
         .sprite = c.Sprite{ .codepoint = g.codepoints.human },
         .state = .walking,
         .weapon = c.Weapon{ .min_damage = 3, .max_damage = 32 },
-        .z_order = c.ZOrder{ .order = .obstacle },
     };
 
     var buffer: [1024]u8 = @splat(0);

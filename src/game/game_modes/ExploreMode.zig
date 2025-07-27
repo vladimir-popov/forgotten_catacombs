@@ -44,16 +44,16 @@ pub fn tick(self: *ExploreMode) anyerror!void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (self.description_window) |*description_window| {
             if (try description_window.handleButton(btn)) {
-                try description_window.close(self.arena.allocator(), self.session.render);
+                try description_window.close(self.arena.allocator(), self.session.render, .from_buffer);
                 self.description_window = null;
             }
         } else if (self.entities_window) |*entities_window| {
             switch (try entities_window.handleButton(btn)) {
                 .close_btn => {
-                    try entities_window.close(self.arena.allocator(), self.session.render);
+                    try entities_window.close(self.arena.allocator(), self.session.render, .from_buffer);
                     self.entities_window = null;
                 },
-                .choose_btn => try entities_window.hide(self.session.render),
+                .choose_btn => try entities_window.hide(self.session.render, .from_buffer),
                 else => {},
             }
         } else {

@@ -92,12 +92,12 @@ fn handleInput(self: *PlayMode) !?g.Action {
         if (self.quick_actions_window) |*window| {
             switch (try window.handleButton(btn)) {
                 .choose_btn => {
-                    try window.close(self.arena.allocator(), self.session.render);
+                    try window.close(self.arena.allocator(), self.session.render, .from_buffer);
                     self.quick_actions_window = null;
                     return self.quickAction();
                 },
                 .close_btn => {
-                    try window.close(self.arena.allocator(), self.session.render);
+                    try window.close(self.arena.allocator(), self.session.render, .from_buffer);
                     self.quick_actions_window = null;
                 },
                 .select_btn => try window.draw(self.session.render),

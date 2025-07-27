@@ -53,12 +53,6 @@ pub const Options = struct {
         .region = p.Region.init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS), // -2 rows for infoBar
     };
 
-    /// The maximum symbols in a row (few symbols can be reserved for border and/or scroll)
-    pub fn maxLineSymbols(self: Options) u8 {
-        // -2 for padding; -2 for borders; -1 for scroll.
-        return self.region.cols - 5;
-    }
-
     /// Returns the region that should be occupied (including border) according to the options and actual count of lines.
     pub fn actualRegion(self: Options, actual_rows: u8) p.Region {
         // Count of rows that should be drawn (including border)
@@ -95,6 +89,12 @@ pub inline fn isScrolled(self: TextArea) bool {
     return self.lines.items.len > self.options.region.rows - 2;
 }
 
+/// The maximum number of symbols in a row (exclude few symbols for border and/or scroll)
+pub fn maxLineSymbols(self: TextArea) u8 {
+    // -2 for borders; -1 for scroll.
+    return if (self.isScrolled()) self.options.region.cols - 3 else self.options.region.cols - 2;
+}
+
 /// Returns slice of the visible lines only.
 pub fn visibleLines(self: TextArea) [][COLS]u8 {
     return if (self.isScrolled())
@@ -103,7 +103,7 @@ pub fn visibleLines(self: TextArea) [][COLS]u8 {
         self.lines.items;
 }
 
-/// Adds one item to the `lines`, and set array of spaces to it.
+/// Adds a new line filled by ' '.
 pub fn addEmptyLine(self: *TextArea, alloc: std.mem.Allocator, highlight: bool) !*Line {
     const line = try self.lines.addOne(alloc);
     line.* = @splat(' ');
@@ -112,9 +112,27 @@ pub fn addEmptyLine(self: *TextArea, alloc: std.mem.Allocator, highlight: bool) 
     return line;
 }
 
-pub fn addLine(self: *TextArea, alloc: std.mem.Allocator, str: []const u8, highlight: bool) !void {
+pub fn addLine(
+    self: *TextArea,
+    alloc: std.mem.Allocator,
+    str: []const u8,
+    text_align: g.TextAlign,
+    highlight: bool,
+) !void {
     const line = try self.addEmptyLine(alloc, highlight);
-    _ = try std.fmt.bufPrint(line, "{s}", .{str});
+    const width = self.maxLineSymbols();
+    switch (text_align) {
+        .left => _ = try std.fmt.bufPrint(line, "{s}", .{str}),
+        .center => {
+            const pad = p.diff(usize, str.len, width) / 2;
+            std.log.warn("PAD {d}, str.len {d} width {d}", .{ pad, str.len, width });
+            _ = try std.fmt.bufPrint(line[pad..], "{s}", .{str});
+        },
+        .right => {
+            const pad = p.diff(usize, str.len, width);
+            _ = try std.fmt.bufPrint(line[pad..], "{s}", .{str});
+        },
+    }
 }
 
 pub fn highlightLine(self: *TextArea, absolute_line_idx: usize) void {

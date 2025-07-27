@@ -7,8 +7,8 @@ const log = std.log.scoped(.game);
 
 const Self = @This();
 
-const vertical_middle = g.DISPLAY_ROWS / 2;
-const horizontal_middle = g.DISPLAY_COLS / 2;
+const VERTICAL_MIDDLE = g.DISPLAY_ROWS / 2;
+const HORIZONTAL_MIDDLE = g.DISPLAY_COLS / 2;
 
 const WelcomeScreen = struct {
     const MenuOption = enum { Continue, NewGame, Manual };
@@ -139,15 +139,15 @@ pub fn tick(self: *Self) !void {
 pub fn welcome(self: *Self) !void {
     log.debug("Welcome screen. The game state is {s}", .{@tagName(self.state)});
     self.state = .{ .welcome = .{ .menu = w.TextArea.init(.{
-        .region = p.Region.init(vertical_middle + 2, horizontal_middle - 6, 5, 12),
+        .region = p.Region.init(VERTICAL_MIDDLE + 2, HORIZONTAL_MIDDLE - 6, 5, 12),
     }) } };
 
     self.runtime.removeAllMenuItems();
 
     if (try self.isSessionFileExists())
-        try self.state.welcome.menu.addLine(self.gpa, " Continue ", true);
-    try self.state.welcome.menu.addLine(self.gpa, " New game ", !try self.isSessionFileExists());
-    try self.state.welcome.menu.addLine(self.gpa, "  About   ", false);
+        try self.state.welcome.menu.addLine(self.gpa, "Continue", .center, true);
+    try self.state.welcome.menu.addLine(self.gpa, "New game", .center, !try self.isSessionFileExists());
+    try self.state.welcome.menu.addLine(self.gpa, "About", .center, false);
 
     try self.render.clearDisplay();
     try self.drawWelcomeScreen();
@@ -211,21 +211,21 @@ fn drawWelcomeScreen(self: Self) !void {
     try self.render.drawTextWithAlign(
         g.DISPLAY_COLS,
         "Welcome ",
-        .{ .row = vertical_middle - 3, .col = 1 },
+        .{ .row = VERTICAL_MIDDLE - 3, .col = 1 },
         .normal,
         .center,
     );
     try self.render.drawTextWithAlign(
         g.DISPLAY_COLS,
         "to ",
-        .{ .row = vertical_middle - 2, .col = 1 },
+        .{ .row = VERTICAL_MIDDLE - 2, .col = 1 },
         .normal,
         .center,
     );
     try self.render.drawTextWithAlign(
         g.DISPLAY_COLS,
         "Forgotten catacombs",
-        .{ .row = vertical_middle - 1, .col = 1 },
+        .{ .row = VERTICAL_MIDDLE - 1, .col = 1 },
         .normal,
         .center,
     );

@@ -95,14 +95,14 @@ pub fn tick(self: *Self) !void {
         if (self.description_window) |*window| {
             if (try window.handleButton(btn)) {
                 std.log.debug("Close description window", .{});
-                try window.close(self.alloc, self.session.render);
+                try window.close(self.alloc, self.session.render, .fill_region);
                 self.description_window = null;
             }
         } else if (self.actions_window) |*window| {
             switch (try window.handleButton(btn)) {
                 .close_btn, .choose_btn => {
                     std.log.debug("Close actions window", .{});
-                    try window.close(self.alloc, self.session.render);
+                    try window.close(self.alloc, self.session.render, .fill_region);
                     self.actions_window = null;
                 },
                 else => {},
@@ -169,7 +169,7 @@ fn updateInventoryTab(self: *Self) !void {
 
 const inventory_line_fmt = std.fmt.comptimePrint(
     "{{u}} {{s:<{d}}}{{s}}",
-    .{w.WindowWithTabs.TAB_CONTENT_OPTIONS.maxLineSymbols() - 5}, // "{u} ".len == 2 + "[ ]".len == 3
+    .{w.WindowWithTabs.TAB_CONTENT_OPTIONS.region.cols - 7}, // "{u} ".len == 2 + "[ ]".len == 3 + 2 for pads
 );
 
 fn formatInventoryLine(self: *Self, line: *w.TextArea.Line, item: g.Entity) ![]const u8 {
@@ -189,7 +189,6 @@ fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Buttons is helt. Show modal window for {any}", .{item});
     var window = w.OptionsWindow(g.Entity).init(self, .modal, "Cancel", "Choose");
-    window.above_scene = false;
     try window.addOption(self.alloc, "Use", item, useSelectedItem, null);
     try window.addOption(self.alloc, "Drop", item, dropSelectedItem, null);
     try window.addOption(self.alloc, "Describe", item, describeSelectedItem, null);

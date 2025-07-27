@@ -88,19 +88,27 @@ pub fn deinit(self: *Self) void {
     self.main_window.deinit(self.alloc);
 }
 
+fn buyingTab(self: *Self) *w.WindowWithTabs.Tab {
+    return &self.main_window.tabs[0];
+}
+
+fn sellingTab(self: *Self) *w.WindowWithTabs.Tab {
+    return &self.main_window.tabs[1];
+}
+
 pub fn tick(self: *Self) !void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (self.modal_window) |*window| {
             if (try window.handleButton(btn)) {
                 std.log.debug("Close description window", .{});
-                try window.close(self.alloc, self.session.render);
+                try window.close(self.alloc, self.session.render, .fill_region);
                 self.modal_window = null;
             }
         } else if (self.actions_window) |*window| {
             switch (try window.handleButton(btn)) {
                 .close_btn, .choose_btn => {
                     std.log.debug("Close actions window", .{});
-                    try window.close(self.alloc, self.session.render);
+                    try window.close(self.alloc, self.session.render, .fill_region);
                     self.actions_window = null;
                 },
                 else => {},
@@ -112,6 +120,22 @@ pub fn tick(self: *Self) !void {
             }
         }
         try self.draw();
+    }
+    if (self.session.runtime.popCheat()) |cheat| {
+        log.debug("Run cheat {any}", .{cheat});
+        switch (cheat) {
+            .set_money => |money| {
+                if (self.main_window.active_tab_idx == 0) {
+                    self.shop.balance = money;
+                } else {
+                    self.wallet.money = money;
+                }
+                try self.drawBalance();
+            },
+            else => {
+                log.warn("The cheat {any} is ignored in trading mode.", .{cheat});
+            },
+        }
     }
 }
 
@@ -125,23 +149,22 @@ fn draw(self: *Self) !void {
     } else {
         log.debug("Draw main window tab {d}", .{self.main_window.active_tab_idx});
         try self.main_window.draw(self.session.render);
-        var buf: [10]u8 = undefined;
-        const money = self.session.registry.getUnsafe(self.session.player, c.Wallet).money;
-        try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "{d}$", .{money}));
+        try self.drawBalance();
     }
 }
 
-fn buyingTab(self: *Self) *w.WindowWithTabs.Tab {
-    return &self.main_window.tabs[0];
-}
-
-fn sellingTab(self: *Self) *w.WindowWithTabs.Tab {
-    return &self.main_window.tabs[1];
+fn drawBalance(self: Self) !void {
+    var buf: [30]u8 = undefined;
+    if (self.main_window.active_tab_idx == 0) {
+        try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "Traider's: {d:4}$", .{self.shop.balance}));
+    } else {
+        try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "Your:      {d:4}$", .{self.wallet.money}));
+    }
 }
 
 const product_fmt = std.fmt.comptimePrint(
-    "{{u}} {{s:<{d}}}{{d}}$",
-    .{w.WindowWithTabs.TAB_CONTENT_OPTIONS.maxLineSymbols() - 7}, // "{u} ".len == 2 + "0000$".len == 5
+    "{{u}} {{s:<{d}}}{{d:4}}$",
+    .{w.WindowWithTabs.TAB_CONTENT_OPTIONS.region.cols - 9}, // "{u} ".len == 2 + "0000$".len == 5 + 2 for pads
 );
 
 fn formatProduct(self: *Self, line: *w.TextArea.Line, item: g.Entity, for_buying: bool) ![]const u8 {
@@ -215,7 +238,6 @@ fn buyOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Buttons is helt. Show modal window for {any}", .{item});
     var window = w.OptionsWindow(g.Entity).init(self, .modal, "Cancel", "Choose");
-    window.above_scene = false;
     try window.addOption(self.alloc, "Buy", item, buySelectedItem, null);
     try window.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
     self.actions_window = window;
@@ -240,7 +262,7 @@ fn buySelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         try self.updateBuyingTab();
         try self.updateSellingTab();
     } else {
-        self.modal_window = try w.ModalWindow.initNotification(self.alloc, "", "Not enough money");
+        self.modal_window = try w.ModalWindow.initNotification(self.alloc, "", "You have not enough money");
     }
 }
 
