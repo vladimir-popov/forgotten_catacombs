@@ -12,8 +12,9 @@ const HORIZONTAL_MIDDLE = g.DISPLAY_COLS / 2;
 
 const WelcomeScreen = struct {
     const MenuOption = enum { Continue, NewGame, Manual };
+    const MENU_REGION = p.Region.init(VERTICAL_MIDDLE + 2, HORIZONTAL_MIDDLE - 6, 5, 12);
 
-    menu: w.TextArea,
+    menu: w.OptionsArea(void),
     selected_option: usize = 0,
 
     fn menuOption(self: WelcomeScreen) MenuOption {
@@ -21,24 +22,6 @@ const WelcomeScreen = struct {
             @enumFromInt(self.selected_option + 1)
         else
             @enumFromInt(self.selected_option);
-    }
-
-    fn selectPreviousLine(self: *@This()) void {
-        self.menu.unhighlightLine(self.selected_option);
-        if (self.selected_option > 0)
-            self.selected_option -= 1
-        else
-            self.selected_option = self.menu.lines.items.len - 1;
-        self.menu.highlightLine(self.selected_option);
-    }
-
-    fn selectNextLine(self: *@This()) void {
-        self.menu.unhighlightLine(self.selected_option);
-        if (self.selected_option < self.menu.lines.items.len - 1)
-            self.selected_option += 1
-        else
-            self.selected_option = 0;
-        self.menu.highlightLine(self.selected_option);
     }
 };
 
@@ -85,30 +68,9 @@ pub fn deinit(self: *Self) void {
 pub fn tick(self: *Self) !void {
     switch (self.state) {
         .welcome => if (try self.runtime.readPushedButtons()) |btn| {
-            switch (btn.game_button) {
-                .a => if (btn.state == .released) {
-                    switch (self.state.welcome.menuOption()) {
-                        .NewGame => {
-                            self.state.welcome.menu.deinit(self.gpa);
-                            try self.newGame();
-                        },
-                        .Continue => {
-                            self.state.welcome.menu.deinit(self.gpa);
-                            try self.continueGame();
-                        },
-                        else => {},
-                    }
-                },
-                .up => {
-                    self.state.welcome.selectPreviousLine();
-                    try self.state.welcome.menu.draw(self.render);
-                },
-                .down => {
-                    self.state.welcome.selectNextLine();
-                    try self.state.welcome.menu.draw(self.render);
-                },
-                else => {},
-            }
+            try self.state.welcome.menu.handleButton(btn);
+            if (btn.game_button.isMove())
+                try self.state.welcome.menu.draw(self.render, WelcomeScreen.MENU_REGION, 0);
         },
         .game_over => if (try self.runtime.readPushedButtons()) |btn| {
             switch (btn.game_button) {
@@ -138,23 +100,25 @@ pub fn tick(self: *Self) !void {
 /// removes all items from the global menu, and draws the Welcome screen.
 pub fn welcome(self: *Self) !void {
     log.debug("Welcome screen. The game state is {s}", .{@tagName(self.state)});
-    self.state = .{ .welcome = .{ .menu = w.TextArea.init(.{
-        .region = p.Region.init(VERTICAL_MIDDLE + 2, HORIZONTAL_MIDDLE - 6, 5, 12),
-    }) } };
+    self.state = .{ .welcome = .{ .menu = w.OptionsArea(void).init(self, .center) } };
+    self.state.welcome.menu.selected_line = 0;
 
     self.runtime.removeAllMenuItems();
 
+    // The choice will be handled manually in the `tick` method
     if (try self.isSessionFileExists())
-        try self.state.welcome.menu.addLine(self.gpa, "Continue", .center, true);
-    try self.state.welcome.menu.addLine(self.gpa, "New game", .center, !try self.isSessionFileExists());
-    try self.state.welcome.menu.addLine(self.gpa, "About", .center, false);
+        try self.state.welcome.menu.addOption(self.gpa, " Continue ", {}, continueGame, null);
+    try self.state.welcome.menu.addOption(self.gpa, " New game ", {}, newGame, null);
+    try self.state.welcome.menu.addOption(self.gpa, "  About   ", {}, showAbout, null);
 
     try self.render.clearDisplay();
     try self.drawWelcomeScreen();
 }
 
-fn newGame(self: *Self) !void {
-    std.debug.assert(self.state != .game_session);
+fn newGame(ptr: *anyopaque, _: usize, _: void) !void {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    std.debug.assert(self.state == .welcome);
+    self.state.welcome.menu.deinit(self.gpa);
     try self.deleteSessionFileIfExists();
     self.initMainMenu();
     self.state = .{ .game_session = undefined };
@@ -166,7 +130,10 @@ fn newGame(self: *Self) !void {
     );
 }
 
-fn continueGame(self: *Self) !void {
+fn continueGame(ptr: *anyopaque, _: usize, _: void) !void {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    std.debug.assert(self.state == .welcome);
+    self.state.welcome.menu.deinit(self.gpa);
     self.initMainMenu();
     self.state = .{ .game_session = undefined };
     try self.state.game_session.preInit(
@@ -176,6 +143,8 @@ fn continueGame(self: *Self) !void {
     );
     try self.state.game_session.load();
 }
+
+fn showAbout(_: *anyopaque, _: usize, _: void) !void {}
 
 fn initMainMenu(self: *Self) void {
     _ = self.runtime.addMenuItem("Inventory", self, openInventory);
@@ -229,7 +198,7 @@ fn drawWelcomeScreen(self: Self) !void {
         .normal,
         .center,
     );
-    try self.state.welcome.menu.draw(self.render);
+    try self.state.welcome.menu.draw(self.render, WelcomeScreen.MENU_REGION, 0);
 }
 
 fn drawGameOverScreen(self: Self) !void {

@@ -82,7 +82,8 @@ pub const Point = struct {
         return point;
     }
 
-    pub inline fn moveNTimes(point: *Point, direction: Direction, n: u8) void {
+    pub inline fn moveNTimes(point: *Point, direction: Direction, count: usize) void {
+        const n: u8 = @intCast(count);
         switch (direction) {
             .up => if (point.row >= n) {
                 point.row -= n;
@@ -99,7 +100,7 @@ pub const Point = struct {
         }
     }
 
-    pub fn movedToNTimes(self: Point, direction: Direction, n: u8) Point {
+    pub fn movedToNTimes(self: Point, direction: Direction, n: usize) Point {
         var point = self;
         point.moveNTimes(direction, n);
         return point;
@@ -244,6 +245,23 @@ pub const Region = struct {
     /// Returns the area of this region.
     pub inline fn area(self: Region) u16 {
         return std.math.mulWide(u8, self.rows, self.cols);
+    }
+
+    /// ┌───────────────────────┐
+    /// │        top_pad        │
+    /// │           󰹹           │
+    /// │left_pad┌────┐right_pad│
+    /// │       │    │        │
+    /// │        └────┘         │
+    /// │           󰹹           │
+    /// │      bottom_pad       │
+    /// └───────────────────────┘
+    pub fn innerRegion(self: Region, left_pad: u8, right_pad: u8, top_pad: u8, bottom_pad: u8) Region {
+        return .{
+            .top_left = Point.init(self.top_left.row + top_pad, self.top_left.col + left_pad),
+            .rows = self.rows - top_pad - bottom_pad,
+            .cols = self.cols - left_pad - right_pad,
+        };
     }
 
     /// Multiplies rows by `v_scale` and columns by `h_scale`
@@ -514,7 +532,7 @@ pub const Region = struct {
         }
     };
 
-    /// Returns an iterator of all cells inside the region, include borders.
+    /// Returns an iterator of all cells inside the region, including borders.
     pub fn cells(self: Region) CellsIterator {
         return .{ .region = self, .cursor = self.top_left };
     }

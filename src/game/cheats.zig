@@ -18,7 +18,7 @@ pub const Cheat = union(enum) {
     goto: p.Point,
     set_health: u8,
     /// This cheat works only in trading mode, and sets up the amount of money depending on
-    /// the active tab: 
+    /// the active tab:
     ///  - for Buying tab the balance of the shop will be changed;
     ///  - for Selling tab the player's balance will be changed.
     set_money: u8,

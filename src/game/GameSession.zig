@@ -172,7 +172,7 @@ pub fn save(self: *GameSession) void {
 pub fn play(self: *GameSession, entity_in_focus: ?g.Entity) !void {
     self.mode.deinit();
     self.mode = .{ .play = undefined };
-    try self.render.clearDisplay();
+    try self.render.redrawFromSceneBuffer();
     try self.mode.play.init(self.arena.allocator(), self, entity_in_focus);
 }
 

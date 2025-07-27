@@ -219,6 +219,7 @@ pub fn drawSymbol(self: Render, symbol: u21, position_on_display: p.Point, mode:
     try self.runtime.drawSprite(symbol, position_on_display, mode);
 }
 
+/// Draws a one line border of the region directly on the screen.
 pub fn drawBorder(self: Render, region: p.Region) !void {
     var itr = region.cells();
     while (itr.next()) |point| {
@@ -437,7 +438,7 @@ const SceneBuffer = struct {
     }
 
     pub fn region(self: SceneBuffer) p.Region {
-        return p.Region.init(@intCast(self.rows.len), @intCast(self.rows[0].len));
+        return p.Region.init(1, 1, @intCast(self.rows.len), @intCast(self.rows[0].len));
     }
 
     fn getSymbol(self: SceneBuffer, point: p.Point) ?DrawableSymbol {

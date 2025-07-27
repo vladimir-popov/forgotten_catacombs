@@ -19,8 +19,8 @@ entity_in_focus: g.Entity,
 /// Highlighted a focused place in the dungeon
 place_in_focus: p.Point,
 /// The window to show list of entities on the place in focus
-entities_window: ?w.OptionsWindow(g.Entity) = null,
-description_window: ?w.ModalWindow = null,
+entities_window: ?w.ModalWindow(w.OptionsArea(g.Entity)) = null,
+description_window: ?w.ModalWindow(w.TextArea) = null,
 
 pub fn init(self: *ExploreMode, alloc: std.mem.Allocator, session: *g.GameSession) !void {
     log.debug("Init LookingAroundMode", .{});
@@ -44,17 +44,15 @@ pub fn tick(self: *ExploreMode) anyerror!void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (self.description_window) |*description_window| {
             if (try description_window.handleButton(btn)) {
-                try description_window.close(self.arena.allocator(), self.session.render, .from_buffer);
+                try description_window.hide(self.session.render, .from_buffer);
+                description_window.deinit(self.arena.allocator());
                 self.description_window = null;
             }
         } else if (self.entities_window) |*entities_window| {
-            switch (try entities_window.handleButton(btn)) {
-                .close_btn => {
-                    try entities_window.close(self.arena.allocator(), self.session.render, .from_buffer);
-                    self.entities_window = null;
-                },
-                .choose_btn => try entities_window.hide(self.session.render, .from_buffer),
-                else => {},
+            if (try entities_window.handleButton(btn)) {
+                try entities_window.hide(self.session.render, .from_buffer);
+                entities_window.deinit(self.arena.allocator());
+                self.entities_window = null;
             }
         } else {
             switch (btn.game_button) {
@@ -210,16 +208,16 @@ inline fn sub(x: u8, y: u8) u8 {
 fn windowWithEntities(
     self: *ExploreMode,
     variants: [3]?g.Entity,
-) !w.OptionsWindow(g.Entity) {
-    var window = w.OptionsWindow(g.Entity).init(self, .modal, "Close", "Choose");
+) !w.ModalWindow(w.OptionsArea(g.Entity)) {
+    var window = w.options(g.Entity, self);
     for (variants) |maybe_entity| {
         if (maybe_entity) |entity| {
             // Every entity has to have description, or handling indexes become complicated
             const description = self.session.registry.getUnsafe(entity, c.Description);
-            try window.addOption(self.arena.allocator(), description.name(), entity, describeEntity, null);
+            try window.area.addOption(self.arena.allocator(), description.name(), entity, describeEntity, null);
             if (entity.eql(self.entity_in_focus))
                 // the variants array has to have at least one (focused) entity
-                try window.selectLine(window.options.items.len - 1);
+                try window.area.selectLine(window.area.options.items.len - 1);
         }
     }
     return window;
@@ -231,8 +229,8 @@ fn describeEntity(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!void {
     self.description_window = try self.windowWithDescription();
 }
 
-fn windowWithDescription(self: *ExploreMode) !w.ModalWindow {
-    return try w.ModalWindow.initEntityDescription(
+fn windowWithDescription(self: *ExploreMode) !w.ModalWindow(w.TextArea) {
+    return try w.entityDescription(
         self.arena.allocator(),
         self.session.registry,
         self.entity_in_focus,

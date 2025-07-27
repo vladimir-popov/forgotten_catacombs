@@ -1,3 +1,11 @@
+//! A pop up window placed in the middle of the screen above info bar.
+//! It has fixed width and dynamic hight that depends on number of lines
+//! in the aria with content.
+//!
+//! The Modal window always has 'Close' button, and may have an optional button
+//! provided by the area.
+//!
+//! If the area has more lines than the region of the window, the scrollbar is drawn.
 const std = @import("std");
 const g = @import("../game_pkg.zig");
 const c = g.components;
@@ -6,117 +14,89 @@ const w = g.windows;
 
 const log = std.log.scoped(.windows);
 
-const Self = @This();
+pub fn ModalWindow(comptime Area: type) type {
+    return struct {
+        const Self = @This();
 
-const COLS = w.TextArea.COLS;
+        area: Area,
+        title: []const u8 = "",
+        scrolled_lines: usize = 0,
 
-const Line = w.TextArea.Line;
-
-title: []const u8,
-text_area: w.TextArea,
-right_button_label: []const u8 = "Close",
-
-pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
-    self.text_area.deinit(alloc);
-}
-
-/// Example:
-/// ```
-/// ┌───────────────Title───────────────┐
-/// │              Message              │
-/// └───────────────────────────────────┘
-///═══════════════════════════════════════
-///                                Close
-/// ```
-pub fn initNotification(alloc: std.mem.Allocator, title: []const u8, message: []const u8) !Self {
-    var text_area = w.TextArea.init(.modal);
-    try text_area.addLine(alloc, message, .center, false);
-    return .{ .title = title, .text_area = text_area };
-}
-
-/// Example:
-/// ```
-/// ┌────────────────Club───────────────┐
-/// │ Id: 12                            │
-/// │ Damage: 2-5                       │
-/// └───────────────────────────────────┘
-///═══════════════════════════════════════
-///                                Close
-/// ```
-pub fn initEntityDescription(
-    alloc: std.mem.Allocator,
-    registry: g.Registry,
-    entity: g.Entity,
-    dev_mode: bool,
-) !Self {
-    var title: []const u8 = "";
-    var text_area = w.TextArea.init(.modal);
-    if (registry.get(entity, c.Description)) |description| {
-        title = description.name();
-        for (description.description()) |str| {
-            const line = try text_area.addEmptyLine(alloc, false);
-            std.mem.copyForwards(u8, line, str);
+        pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
+            self.area.deinit(alloc);
         }
-        if (description.description().len > 0) {
-            const line = try text_area.lines.addOne(alloc);
-            line.* = @splat('-');
+
+        /// Returns the region that should be occupied (including borders)
+        /// according to the number of actual rows in the area.
+        fn region(self: Self) p.Region {
+            // Count of rows that should be drawn (including border)
+            const rows: usize = self.area.totalLines() + 2; // 2 for border
+            return .{
+                .top_left = if (rows < w.MAX_REGION.rows)
+                    w.MAX_REGION.top_left.movedToNTimes(.down, (w.MAX_REGION.rows - rows) / 2)
+                else
+                    w.MAX_REGION.top_left,
+                .rows = @min(rows, w.MAX_REGION.rows),
+                .cols = w.MAX_REGION.cols,
+            };
         }
-    }
-    if (dev_mode) {
-        var line = try text_area.addEmptyLine(alloc, false);
-        _ = try std.fmt.bufPrint(line[1..], "Id: {d}", .{entity.id});
-        if (registry.get(entity, c.Position)) |position| {
-            line = try text_area.addEmptyLine(alloc, false);
-            _ = try std.fmt.bufPrint(line[1..], "Position: {any}", .{position.place});
+
+        /// Returns true if the 'close' button was pressed.
+        pub fn handleButton(self: *Self, btn: g.Button) !bool {
+            try self.area.handleButton(btn);
+            switch (btn.game_button) {
+                // pressing the right button is always lead to closing the window
+                .a => return true,
+                // if the aria has a special handler for the right button, then
+                // the left is 'Close' button
+                .b => return self.area.button() != null,
+                .up, .down => self.scrolling(),
+                else => {},
+            }
+            return false;
         }
-    }
-    if (registry.get(entity, c.EnemyState)) |state| {
-        const line = try text_area.addEmptyLine(alloc, false);
-        _ = try std.fmt.bufPrint(line[1..], "State: is {s}", .{@tagName(state.*)});
-    }
-    if (registry.get(entity, c.Health)) |health| {
-        const line = try text_area.addEmptyLine(alloc, false);
-        _ = try std.fmt.bufPrint(line[1..], "Health: {d}/{d}", .{ health.current, health.max });
-    }
-    if (registry.get(entity, c.Speed)) |speed| {
-        const line = try text_area.addEmptyLine(alloc, false);
-        _ = try std.fmt.bufPrint(line[1..], "Speed: {d}", .{speed.move_points});
-    }
-    if (registry.get(entity, c.Weapon)) |weapon| {
-        const line = try text_area.addEmptyLine(alloc, false);
-        _ = try std.fmt.bufPrint(line[1..], "Damage: {d}-{d}", .{ weapon.min_damage, weapon.max_damage });
-    }
-    if (registry.get(entity, c.SourceOfLight)) |light| {
-        const line = try text_area.addEmptyLine(alloc, false);
-        _ = try std.fmt.bufPrint(line[1..], "Radius of light: {d}", .{light.radius});
-    }
-    return .{ .title = title, .text_area = text_area };
-}
 
-/// true means that the button is recognized
-pub fn handleButton(_: *Self, btn: g.Button) !bool {
-    return btn.game_button == .a;
-}
+        fn scrolling(_: *Self) void {}
 
-pub fn draw(self: *const Self, render: g.Render) !void {
-    try self.text_area.draw(render);
-    // Draw the title
-    const reg = self.text_area.region();
-    const padding: u8 = @intCast(reg.cols - self.title.len);
-    var point = reg.top_left.movedToNTimes(.right, padding / 2);
-    for (self.title) |char| {
-        try render.runtime.drawSprite(char, point, .normal);
-        point.move(.right);
-    }
-    try render.hideLeftButton();
-    try render.drawRightButton(self.right_button_label, false);
-}
+        pub fn draw(self: *const Self, render: g.Render) !void {
+            const reg = self.region();
+            log.debug("Drawing modal window in region {any}", .{reg});
+            // Draw the border
+            try render.drawBorder(reg);
+            // Draw the title
+            const padding: u8 = @intCast(reg.cols - self.title.len);
+            var point = reg.top_left.movedToNTimes(.right, padding / 2);
+            for (self.title) |char| {
+                try render.runtime.drawSprite(char, point, .normal);
+                point.move(.right);
+            }
+            // Draw the scrollbar
+            if (self.scrolled_lines > 0) {
+                point = reg.topRight().movedTo(.left);
+                for (0..reg.rows - 2) |_| {
+                    point.move(.down);
+                    try render.runtime.drawSprite(' ', point, .inverted);
+                }
+            }
+            // Draw the content inside the region excluding borders and space for scrollbar
+            const right_pad: u8 = if (self.scrolled_lines > 0) 2 else 1;
+            try self.area.draw(render, reg.innerRegion(1, right_pad, 1, 1), self.scrolled_lines);
+            // Draw buttons
+            if (self.area.button()) |button| {
+                try render.drawRightButton(button[0], button[1]);
+                try render.drawLeftButton("Close", false);
+            } else {
+                try render.drawRightButton("Close", false);
+                try render.hideLeftButton();
+            }
+        }
 
-pub fn close(self: *Self, alloc: std.mem.Allocator, render: g.Render, hide_mode: w.HideMode) !void {
-    log.debug("Close modal window", .{});
-    switch (hide_mode) {
-        .from_buffer => try render.redrawRegionFromSceneBuffer(self.text_area.region()),
-        .fill_region => try render.fillRegion(' ', .normal, self.text_area.region()),
-    }
-    self.deinit(alloc);
+        pub fn hide(self: *Self, render: g.Render, hide_mode: w.HideMode) !void {
+            log.debug("Hide modal window", .{});
+            switch (hide_mode) {
+                .from_buffer => try render.redrawRegionFromSceneBuffer(self.region()),
+                .fill_region => try render.fillRegion(' ', .normal, self.region()),
+            }
+        }
+    };
 }

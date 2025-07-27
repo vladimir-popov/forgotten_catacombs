@@ -17,31 +17,36 @@
 //! ```
 const std = @import("std");
 const g = @import("../game_pkg.zig");
+const p = g.primitives;
 const w = g.windows;
+
+const log = std.log.scoped(.windows);
 
 const Self = @This();
 
 pub const Tab = struct {
     title: []const u8,
-    window: w.OptionsWindow(g.Entity),
+    area: w.OptionsArea(g.Entity),
 
     fn deinit(self: *Tab, alloc: std.mem.Allocator) void {
-        self.window.deinit(alloc);
+        self.area.deinit(alloc);
         self.title = undefined;
     }
 };
 
-const MAX_TABS = 2;
-const BORDERED_REGION = w.TextArea.Options.full_screen.region;
-pub const TAB_CONTENT_OPTIONS = blk: {
-    var prototype = w.TextArea.Options.full_screen;
-    // reserve one line for the title separator and one line for upper border
-    prototype.region.top_left.row += 2;
-    prototype.region.rows -= 3;
-    // reserve two columns for border
-    prototype.region.top_left.col += 1;
-    prototype.region.cols -= 2;
-    break :blk prototype;
+pub const MAX_TABS = 2;
+pub const BORDERED_REGION = p.Region.init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS); // -2 rows for infoBar
+pub const CONTENT_AREA_REGION: p.Region = .{
+    .top_left = .{
+        // reserve one line for the title, separator and one line for upper border
+        .row = 4,
+        // reserve  for border
+        .col = 2,
+    },
+    // -2 rows for infoBar -4 for title, separator and borders
+    .rows = g.DISPLAY_ROWS - 2 - 4,
+    // -2 for border
+    .cols = g.DISPLAY_COLS - 2,
 };
 
 owner: *anyopaque,
@@ -59,16 +64,11 @@ pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
     }
 }
 
-pub fn addTab(self: *Self, title: []const u8, left_button_label: []const u8, right_button_label: []const u8) void {
+pub fn addTab(self: *Self, title: []const u8) void {
     std.debug.assert(self.tabs_count < MAX_TABS);
     self.tabs[self.tabs_count] = .{
         .title = title,
-        .window = w.OptionsWindow(g.Entity).init(
-            self.owner,
-            TAB_CONTENT_OPTIONS,
-            left_button_label,
-            right_button_label,
-        ),
+        .area = w.OptionsArea(g.Entity).init(self.owner, .left),
     };
     self.tabs_count += 1;
 }
@@ -82,25 +82,26 @@ pub fn removeLastTab(self: *Self, alloc: std.mem.Allocator) void {
     }
 }
 
-// true for close
+// true means the window should be closed close
 pub fn handleButton(self: *Self, btn: g.Button) !bool {
     switch (btn.game_button) {
+        .b => return true,
         .left => if (self.active_tab_idx > 0) {
             self.active_tab_idx -= 1;
         },
         .right => if (self.active_tab_idx < self.tabs_count - 1) {
             self.active_tab_idx += 1;
         },
-        else => switch (try self.tabs[self.active_tab_idx].window.handleButton(btn)) {
-            .close_btn => return true,
-            else => {},
-        },
+        else => try self.tabs[self.active_tab_idx].area.handleButton(btn),
     }
     return false;
 }
 
 pub fn draw(self: Self, render: g.Render) !void {
-    try self.tabs[self.active_tab_idx].window.draw(render);
+    log.debug(
+        "Drawing window with tabs in {any}. Tab {d}/{d}",
+        .{ BORDERED_REGION, self.active_tab_idx, self.tabs_count },
+    );
     const tab_title_width: u8 = @intCast((BORDERED_REGION.cols - 2) / self.tabs_count);
     try render.drawDoubledBorder(BORDERED_REGION);
     try render.drawHorizontalLine(
@@ -143,4 +144,15 @@ pub fn draw(self: Self, render: g.Render) !void {
         underline_cursor.movedToNTimes(.right, tab_title_width + 1),
         .normal,
     );
+
+    try self.tabs[self.active_tab_idx].area.draw(render, CONTENT_AREA_REGION, 0);
+
+    // Draw buttons
+    if (self.tabs[self.active_tab_idx].area.button()) |button| {
+        try render.drawRightButton(button[0], button[1]);
+        try render.drawLeftButton("Close", false);
+    } else {
+        try render.drawRightButton("Close", false);
+        try render.hideLeftButton();
+    }
 }

@@ -50,8 +50,8 @@ equipment: *c.Equipment,
 /// The entity under the player's feet. Can be a pile or a single item
 drop: ?g.Entity,
 main_window: w.WindowWithTabs,
-description_window: ?w.ModalWindow = null,
-actions_window: ?w.OptionsWindow(g.Entity) = null,
+description_window: ?w.ModalWindow(w.TextArea) = null,
+actions_window: ?w.ModalWindow(w.OptionsArea(g.Entity)) = null,
 
 pub fn init(
     self: *Self,
@@ -70,7 +70,7 @@ pub fn init(
         .drop = drop,
         .main_window = w.WindowWithTabs.init(self),
     };
-    self.main_window.addTab("Inventory", "Close", "Choose");
+    self.main_window.addTab("Inventory");
     try self.updateInventoryTab();
 
     if (drop) |item| {
@@ -95,20 +95,20 @@ pub fn tick(self: *Self) !void {
         if (self.description_window) |*window| {
             if (try window.handleButton(btn)) {
                 std.log.debug("Close description window", .{});
-                try window.close(self.alloc, self.session.render, .fill_region);
+                try window.hide(self.session.render, .fill_region);
+                window.deinit(self.alloc);
                 self.description_window = null;
             }
         } else if (self.actions_window) |*window| {
-            switch (try window.handleButton(btn)) {
-                .close_btn, .choose_btn => {
-                    std.log.debug("Close actions window", .{});
-                    try window.close(self.alloc, self.session.render, .fill_region);
-                    self.actions_window = null;
-                },
-                else => {},
+            if (try window.handleButton(btn)) {
+                std.log.debug("Close actions window", .{});
+                try window.hide(self.session.render, .fill_region);
+                window.deinit(self.alloc);
+                self.actions_window = null;
             }
         } else {
             if (try self.main_window.handleButton(btn)) {
+                // the  deinit method will be invoked here:
                 try self.session.play(null);
                 return;
             }
@@ -146,12 +146,11 @@ fn tabWithDrop(self: *Self) ?*w.WindowWithTabs.Tab {
 
 fn updateInventoryTab(self: *Self) !void {
     const tab = self.tabWithInventory();
-    const selected_line = tab.window.selected_line orelse 0;
-    tab.window.clearRetainingCapacity();
+    tab.area.clearRetainingCapacity();
     var itr = self.inventory.items.iterator();
     while (itr.next()) |item_ptr| {
         var buffer: w.TextArea.Line = undefined;
-        try tab.window.addOption(
+        try tab.area.addOption(
             self.alloc,
             try self.formatInventoryLine(&buffer, item_ptr.*),
             item_ptr.*,
@@ -159,17 +158,17 @@ fn updateInventoryTab(self: *Self) !void {
             describeSelectedItem,
         );
     }
-    if (tab.window.options.items.len > 0) {
-        try tab.window.selectLine(if (selected_line < tab.window.options.items.len)
-            selected_line
+    if (tab.area.options.items.len > 0) {
+        try tab.area.selectLine(if (tab.area.selected_line < tab.area.options.items.len)
+            tab.area.selected_line
         else
-            tab.window.options.items.len - 1);
+            tab.area.options.items.len - 1);
     }
 }
 
 const inventory_line_fmt = std.fmt.comptimePrint(
     "{{u}} {{s:<{d}}}{{s}}",
-    .{w.WindowWithTabs.TAB_CONTENT_OPTIONS.region.cols - 7}, // "{u} ".len == 2 + "[ ]".len == 3 + 2 for pads
+    .{w.WindowWithTabs.CONTENT_AREA_REGION.cols - 7}, // "{u} ".len == 2 + "[ ]".len == 3 + 2 for pads
 );
 
 fn formatInventoryLine(self: *Self, line: *w.TextArea.Line, item: g.Entity) ![]const u8 {
@@ -188,18 +187,18 @@ fn formatInventoryLine(self: *Self, line: *w.TextArea.Line, item: g.Entity) ![]c
 fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Buttons is helt. Show modal window for {any}", .{item});
-    var window = w.OptionsWindow(g.Entity).init(self, .modal, "Cancel", "Choose");
-    try window.addOption(self.alloc, "Use", item, useSelectedItem, null);
-    try window.addOption(self.alloc, "Drop", item, dropSelectedItem, null);
-    try window.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
+    var window = w.options(g.Entity, self);
+    try window.area.addOption(self.alloc, "Use", item, useSelectedItem, null);
+    try window.area.addOption(self.alloc, "Drop", item, dropSelectedItem, null);
+    try window.area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
     self.actions_window = window;
 }
 
 fn takeFromPileOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    var window = w.OptionsWindow(g.Entity).init(self, .modal, "Cancel", "Take");
-    try window.addOption(self.alloc, "Take", item, takeSelectedItem, null);
-    try window.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
+    var window = w.options(g.Entity, self);
+    try window.area.addOption(self.alloc, "Take", item, takeSelectedItem, null);
+    try window.area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
     self.actions_window = window;
 }
 
@@ -223,7 +222,7 @@ fn useSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
 fn addDropTab(self: *Self, drop: g.Entity) !void {
     if (self.main_window.tabs_count < 2) {
         log.debug("Add drop tab for {any}", .{drop});
-        self.main_window.addTab("Drop", "Close", "Choose");
+        self.main_window.addTab("Drop");
     }
     try self.updateDropTab(drop);
 }
@@ -231,8 +230,7 @@ fn addDropTab(self: *Self, drop: g.Entity) !void {
 fn updateDropTab(self: *Self, drop: g.Entity) !void {
     self.drop = drop;
     const tab = &self.main_window.tabs[1];
-    const selected_line = tab.window.selected_line orelse 0;
-    tab.window.clearRetainingCapacity();
+    tab.area.clearRetainingCapacity();
     if (self.session.registry.get(drop, c.Pile)) |pile| {
         var itr = pile.items.iterator();
         while (itr.next()) |item_ptr| {
@@ -241,11 +239,11 @@ fn updateDropTab(self: *Self, drop: g.Entity) !void {
     } else {
         try self.addDropOption(tab, drop);
     }
-    if (tab.window.options.items.len > 0) {
-        try tab.window.selectLine(if (selected_line < tab.window.options.items.len)
-            selected_line
+    if (tab.area.options.items.len > 0) {
+        try tab.area.selectLine(if (tab.area.selected_line < tab.area.options.items.len)
+            tab.area.selected_line
         else
-            tab.window.options.items.len - 1);
+            tab.area.options.items.len - 1);
     }
 }
 
@@ -257,13 +255,13 @@ fn addDropOption(self: *Self, tab: *w.WindowWithTabs.Tab, item: g.Entity) !void 
     else
         "???";
     const label = try std.fmt.bufPrint(&buffer, "{u} {s}", .{ sprite.codepoint, name });
-    try tab.window.addOption(self.alloc, label, item, takeFromPileOrDescribe, describeSelectedItem);
+    try tab.area.addOption(self.alloc, label, item, takeFromPileOrDescribe, describeSelectedItem);
 }
 
 fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Show info about item {d}", .{item.id});
-    self.description_window = try w.ModalWindow.initEntityDescription(
+    self.description_window = try w.entityDescription(
         self.alloc,
         self.session.registry,
         item,

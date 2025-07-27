@@ -24,7 +24,7 @@ quick_actions: std.ArrayListUnmanaged(QuickAction),
 // The index of the quick action for the target entity
 selected_action_idx: usize = 0,
 is_player_turn: bool = true,
-quick_actions_window: ?w.OptionsWindow(void) = null,
+quick_actions_window: ?w.ModalWindow(w.OptionsArea(void)) = null,
 
 pub fn init(
     self: *PlayMode,
@@ -90,17 +90,14 @@ pub fn tick(self: *PlayMode) !void {
 fn handleInput(self: *PlayMode) !?g.Action {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (self.quick_actions_window) |*window| {
-            switch (try window.handleButton(btn)) {
-                .choose_btn => {
-                    try window.close(self.arena.allocator(), self.session.render, .from_buffer);
-                    self.quick_actions_window = null;
-                    return self.quickAction();
-                },
-                .close_btn => {
-                    try window.close(self.arena.allocator(), self.session.render, .from_buffer);
-                    self.quick_actions_window = null;
-                },
-                .select_btn => try window.draw(self.session.render),
+            if (try window.handleButton(btn)) {
+                try window.hide(self.session.render, .from_buffer);
+                window.deinit(self.arena.allocator());
+                self.quick_actions_window = null;
+            }
+            switch (btn.game_button) {
+                .a => return self.quickAction(),
+                .up, .down => try window.draw(self.session.render),
                 else => {},
             }
         } else {
@@ -346,12 +343,12 @@ fn windowWithQuickActions(
     self: *PlayMode,
     variants: []const QuickAction,
     selected: usize,
-) !w.OptionsWindow(void) {
-    var window = w.OptionsWindow(void).init(self, .modal, "Close", "Choose");
+) !w.ModalWindow(w.OptionsArea(void)) {
+    var window = w.options(void, self);
     for (variants, 0..) |qa, idx| {
-        try window.addOption(self.arena.allocator(), qa.action.toString(), {}, chooseEntity, null);
+        try window.area.addOption(self.arena.allocator(), qa.action.toString(), {}, chooseEntity, null);
         if (idx == selected)
-            try window.selectLine(idx);
+            try window.area.selectLine(idx);
     }
     return window;
 }

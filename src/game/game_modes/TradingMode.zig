@@ -50,9 +50,9 @@ inventory: *c.Inventory,
 shop: *c.Shop,
 main_window: w.WindowWithTabs,
 /// Contains an entity description, or a notification.
-modal_window: ?w.ModalWindow = null,
+modal_window: ?w.ModalWindow(w.TextArea) = null,
 /// Contains available actions
-actions_window: ?w.OptionsWindow(g.Entity) = null,
+actions_window: ?w.ModalWindow(w.OptionsArea(g.Entity)) = null,
 
 pub fn init(
     self: *Self,
@@ -68,10 +68,10 @@ pub fn init(
         .shop = shop,
         .main_window = w.WindowWithTabs.init(self),
     };
-    self.main_window.addTab("Buy", "Close", "Choose");
+    self.main_window.addTab("Buy");
     try self.updateBuyingTab();
 
-    self.main_window.addTab("Sell", "Close", "Choose");
+    self.main_window.addTab("Sell");
     try self.updateSellingTab();
 
     try self.draw();
@@ -101,17 +101,16 @@ pub fn tick(self: *Self) !void {
         if (self.modal_window) |*window| {
             if (try window.handleButton(btn)) {
                 std.log.debug("Close description window", .{});
-                try window.close(self.alloc, self.session.render, .fill_region);
+                try window.hide(self.session.render, .fill_region);
+                window.deinit(self.alloc);
                 self.modal_window = null;
             }
         } else if (self.actions_window) |*window| {
-            switch (try window.handleButton(btn)) {
-                .close_btn, .choose_btn => {
-                    std.log.debug("Close actions window", .{});
-                    try window.close(self.alloc, self.session.render, .fill_region);
-                    self.actions_window = null;
-                },
-                else => {},
+            if (try window.handleButton(btn)) {
+                std.log.debug("Close actions window", .{});
+                try window.hide(self.session.render, .fill_region);
+                window.deinit(self.alloc);
+                self.actions_window = null;
             }
         } else {
             if (try self.main_window.handleButton(btn)) {
@@ -164,7 +163,7 @@ fn drawBalance(self: Self) !void {
 
 const product_fmt = std.fmt.comptimePrint(
     "{{u}} {{s:<{d}}}{{d:4}}$",
-    .{w.WindowWithTabs.TAB_CONTENT_OPTIONS.region.cols - 9}, // "{u} ".len == 2 + "0000$".len == 5 + 2 for pads
+    .{w.WindowWithTabs.CONTENT_AREA_REGION.cols - 9}, // "{u} ".len == 2 + "0000$".len == 5 + 2 for pads
 );
 
 fn formatProduct(self: *Self, line: *w.TextArea.Line, item: g.Entity, for_buying: bool) ![]const u8 {
@@ -190,12 +189,11 @@ fn actualPrice(self: Self, price: *const c.Price, for_buying: bool) u16 {
 
 fn updateBuyingTab(self: *Self) !void {
     const tab = self.buyingTab();
-    const selected_line = tab.window.selected_line orelse 0;
-    tab.window.clearRetainingCapacity();
+    tab.area.clearRetainingCapacity();
     var itr = self.shop.items.iterator();
     while (itr.next()) |item_ptr| {
         var buffer: w.TextArea.Line = undefined;
-        try tab.window.addOption(
+        try tab.area.addOption(
             self.alloc,
             try self.formatProduct(&buffer, item_ptr.*, true),
             item_ptr.*,
@@ -203,22 +201,21 @@ fn updateBuyingTab(self: *Self) !void {
             describeSelectedItem,
         );
     }
-    if (tab.window.options.items.len > 0) {
-        try tab.window.selectLine(if (selected_line < tab.window.options.items.len)
-            selected_line
+    if (tab.area.options.items.len > 0) {
+        try tab.area.selectLine(if (tab.area.selected_line < tab.area.options.items.len)
+            tab.area.selected_line
         else
-            tab.window.options.items.len - 1);
+            tab.area.options.items.len - 1);
     }
 }
 
 fn updateSellingTab(self: *Self) !void {
     const tab = self.sellingTab();
-    const selected_line = tab.window.selected_line orelse 0;
-    tab.window.clearRetainingCapacity();
+    tab.area.clearRetainingCapacity();
     var itr = self.inventory.items.iterator();
     while (itr.next()) |item_ptr| {
         var buffer: w.TextArea.Line = undefined;
-        try tab.window.addOption(
+        try tab.area.addOption(
             self.alloc,
             try self.formatProduct(&buffer, item_ptr.*, false),
             item_ptr.*,
@@ -226,28 +223,28 @@ fn updateSellingTab(self: *Self) !void {
             describeSelectedItem,
         );
     }
-    if (tab.window.options.items.len > 0) {
-        try tab.window.selectLine(if (selected_line < tab.window.options.items.len)
-            selected_line
+    if (tab.area.options.items.len > 0) {
+        try tab.area.selectLine(if (tab.area.selected_line < tab.area.options.items.len)
+            tab.area.selected_line
         else
-            tab.window.options.items.len - 1);
+            tab.area.options.items.len - 1);
     }
 }
 
 fn buyOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Buttons is helt. Show modal window for {any}", .{item});
-    var window = w.OptionsWindow(g.Entity).init(self, .modal, "Cancel", "Choose");
-    try window.addOption(self.alloc, "Buy", item, buySelectedItem, null);
-    try window.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
+    var window = w.options(g.Entity, self);
+    try window.area.addOption(self.alloc, "Buy", item, buySelectedItem, null);
+    try window.area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
     self.actions_window = window;
 }
 
 fn sellOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    var window = w.OptionsWindow(g.Entity).init(self, .modal, "Cancel", "Choose");
-    try window.addOption(self.alloc, "Sell", item, sellSelectedItem, null);
-    try window.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
+    var window = w.options(g.Entity, self);
+    try window.area.addOption(self.alloc, "Sell", item, sellSelectedItem, null);
+    try window.area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
     self.actions_window = window;
 }
 
@@ -262,7 +259,7 @@ fn buySelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         try self.updateBuyingTab();
         try self.updateSellingTab();
     } else {
-        self.modal_window = try w.ModalWindow.initNotification(self.alloc, "", "You have not enough money");
+        self.modal_window = try w.notification(self.alloc, "You have not enough money");
     }
 }
 
@@ -277,14 +274,14 @@ fn sellSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         try self.updateBuyingTab();
         try self.updateSellingTab();
     } else {
-        self.modal_window = try w.ModalWindow.initNotification(self.alloc, "", "Traider doesn't have enough money");
+        self.modal_window = try w.notification(self.alloc, "Traider doesn't have enough money");
     }
 }
 
 fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Show info about item {d}", .{item.id});
-    self.modal_window = try w.ModalWindow.initEntityDescription(
+    self.modal_window = try w.entityDescription(
         self.alloc,
         self.session.registry,
         item,
