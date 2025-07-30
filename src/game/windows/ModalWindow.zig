@@ -41,6 +41,11 @@ pub fn ModalWindow(comptime Area: type) type {
             };
         }
 
+        pub fn isScrolled(self: Self) bool {
+            const content_lines = self.area.totalLines();
+            return content_lines + 2 > w.MAX_REGION.rows;
+        }
+
         /// Returns true if the 'close' button was pressed.
         pub fn handleButton(self: *Self, btn: g.Button) !bool {
             try self.area.handleButton(btn);
@@ -50,16 +55,33 @@ pub fn ModalWindow(comptime Area: type) type {
                 // if the aria has a special handler for the right button, then
                 // the left is 'Close' button
                 .b => return self.area.button() != null,
-                .up, .down => self.scrolling(),
+                .up, .down => self.scrollingUpOrDown(btn.game_button == .up),
                 else => {},
             }
             return false;
         }
 
-        fn scrolling(_: *Self) void {}
+        fn scrollingUpOrDown(self: *Self, scrolling_up: bool) void {
+            if (!self.isScrolled()) return;
+
+            // this doesn't work with OptionsArea, but combination of the ModalWindow
+            // and an OptionsArea never have many lines.
+            if (scrolling_up) {
+                if (self.scrolled_lines > 0)
+                    self.scrolled_lines -= 1;
+            } else if (self.scrolled_lines < self.maxScrollingCount()) {
+                self.scrolled_lines += 1;
+            }
+        }
+
+        inline fn maxScrollingCount(self: Self) usize {
+            return self.area.totalLines() - (w.MAX_REGION.rows - 2); // -2 borders
+        }
 
         pub fn draw(self: *const Self, render: g.Render) !void {
             const reg = self.region();
+            const total_lines = self.area.totalLines();
+
             log.debug("Drawing modal window in region {any}", .{reg});
             // Draw the border
             try render.drawBorder(reg);
@@ -71,15 +93,34 @@ pub fn ModalWindow(comptime Area: type) type {
                 point.move(.right);
             }
             // Draw the scrollbar
-            if (self.scrolled_lines > 0) {
+            if (self.isScrolled()) {
+                const content_height = reg.rows - 2;
+                const max_scroll_count = self.maxScrollingCount();
+                var progress = self.scrolled_lines * content_height / max_scroll_count;
+                log.debug(
+                    "Drawing scroll bar. Scrolled lines {d}; progress {d}; total lines {d}",
+                    .{ self.scrolled_lines, progress, total_lines },
+                );
+                // Two corner cases for better UX:
+                // 1. Move the scroll after the first scrolling
+                if (progress == 0 and self.scrolled_lines > 0) progress += 1;
+                // 2. Do not move the scroll to the end until the last possible line is scrolled
+                // (progress become == content_height)
+                if (progress == content_height - 1 or progress == content_height)
+                    progress -= 1;
+
+                log.debug("Actual progress {d}", .{progress});
                 point = reg.topRight().movedTo(.left);
-                for (0..reg.rows - 2) |_| {
+                for (0..reg.rows - 2) |i| {
                     point.move(.down);
-                    try render.runtime.drawSprite(' ', point, .inverted);
+                    if (i == progress)
+                        try render.runtime.drawSprite('▒', point, .normal)
+                    else
+                        try render.runtime.drawSprite('░', point, .normal);
                 }
             }
             // Draw the content inside the region excluding borders and space for scrollbar
-            const right_pad: u8 = if (self.scrolled_lines > 0) 2 else 1;
+            const right_pad: u8 = if (self.isScrolled()) 2 else 1;
             try self.area.draw(render, reg.innerRegion(1, right_pad, 1, 1), self.scrolled_lines);
             // Draw buttons
             if (self.area.button()) |button| {

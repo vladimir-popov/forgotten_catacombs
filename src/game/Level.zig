@@ -152,6 +152,29 @@ pub fn initAsFirstLevel(
     // Add the trader
     var shop = try c.Shop.empty(self.registry.allocator(), 1.5, 200);
     try shop.items.add(try self.registry.addNewEntity(g.entities.Club));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Club));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Club));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Club));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Club));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Club));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Club));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Club));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Club));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Club));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Club));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Club));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Torch));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Torch));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Torch));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Torch));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Torch));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Torch));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Torch));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Torch));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Torch));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Torch));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Torch));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.Torch));
     entity = try self.registry.addNewEntity(.{
         .position = .{ .place = d.FirstLocation.trader_place, .zorder = .obstacle },
         .sprite = .{ .codepoint = cp.human },

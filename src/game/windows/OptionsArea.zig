@@ -42,7 +42,7 @@ pub fn OptionsArea(comptime Item: type) type {
             onReleaseButtonFn: OnReleaseButton,
             onHoldButtonFn: ?OnHoldButton,
 
-            pub inline fn label(self: @This()) []const u8 {
+            pub fn label(self: *const @This()) []const u8 {
                 return self.label_buffer[0..self.label_len];
             }
         };
