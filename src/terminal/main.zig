@@ -19,7 +19,7 @@ pub const std_options: std.Options = .{
         // .{ .scope = .cmd, .level = .debug },
         // .{ .scope = .events, .level = .debug },
         // .{ .scope = .game, .level = .debug },
-        // .{ .scope = .inventory_mode, .level = .debug },
+        .{ .scope = .inventory_mode, .level = .debug },
         // .{ .scope = .level, .level = .debug },
         // .{ .scope = .load_level_mode, .level = .debug },
         // .{ .scope = .looking_around_mode, .level = .debug },
@@ -28,7 +28,7 @@ pub const std_options: std.Options = .{
         // .{ .scope = .save_load_mode, .level = .debug },
         // .{ .scope = .tty_runtime, .level = .debug },
         // .{ .scope = .visibility, .level = .debug },
-        .{ .scope = .windows, .level = .debug },
+        // .{ .scope = .windows, .level = .debug },
     },
 };
 

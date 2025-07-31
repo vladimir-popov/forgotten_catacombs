@@ -41,11 +41,6 @@ pub fn ModalWindow(comptime Area: type) type {
             };
         }
 
-        pub fn isScrolled(self: Self) bool {
-            const content_lines = self.area.totalLines();
-            return content_lines + 2 > w.MAX_REGION.rows;
-        }
-
         /// Returns true if the 'close' button was pressed.
         pub fn handleButton(self: *Self, btn: g.Button) !bool {
             try self.area.handleButton(btn);
@@ -74,6 +69,10 @@ pub fn ModalWindow(comptime Area: type) type {
             }
         }
 
+        pub fn isScrolled(self: Self) bool {
+            return self.area.totalLines() + 2 > w.MAX_REGION.rows;
+        }
+
         inline fn maxScrollingCount(self: Self) usize {
             return self.area.totalLines() - (w.MAX_REGION.rows - 2); // -2 borders
         }
@@ -96,7 +95,7 @@ pub fn ModalWindow(comptime Area: type) type {
             if (self.isScrolled()) {
                 const progress = w.scrollingProgress(self.scrolled_lines, reg.rows - 2, self.maxScrollingCount());
                 log.debug(
-                    "Drawing scroll bar. Scrolled lines {d}; progress {d}; total lines {d}",
+                    "Drawing the scroll bar. Scrolled lines {d}; progress {d}; total lines {d}",
                     .{ self.scrolled_lines, progress, total_lines },
                 );
                 point = reg.topRight().movedTo(.left);

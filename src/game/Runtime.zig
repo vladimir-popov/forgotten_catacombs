@@ -29,12 +29,6 @@ const VTable = struct {
         position_on_display: p.Point,
         mode: DrawingMode,
     ) anyerror!void,
-    drawText: *const fn (
-        context: *anyopaque,
-        text: []const u8,
-        position_on_display: p.Point,
-        mode: DrawingMode,
-    ) anyerror!void,
     currentMillis: *const fn (context: *anyopaque) c_uint,
     isDevMode: *const fn (context: *anyopaque) bool,
     popCheat: *const fn (context: *anyopaque) ?g.Cheat,
@@ -89,10 +83,6 @@ pub inline fn clearDisplay(self: Runtime) !void {
 
 pub inline fn drawSprite(self: Runtime, codepoint: u21, position_on_display: p.Point, mode: DrawingMode) !void {
     try self.vtable.drawSprite(self.context, codepoint, position_on_display, mode);
-}
-
-pub inline fn drawText(self: Runtime, text: []const u8, position_on_display: p.Point, mode: DrawingMode) !void {
-    try self.vtable.drawText(self.context, text, position_on_display, mode);
 }
 
 pub inline fn openFile(self: Runtime, file_path: []const u8, mode: FileMode) anyerror!File {

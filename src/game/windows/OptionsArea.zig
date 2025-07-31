@@ -156,27 +156,17 @@ pub fn OptionsArea(comptime Item: type) type {
                 "Draw {d} options inside {any}; Scrolled lines {d}; Selected line is {any};",
                 .{ self.options.items.len, region, scrolled, self.selected_line },
             );
-            for (0..region.rows) |row_idx| {
-                var point = region.top_left.movedToNTimes(.down, row_idx);
-                if (row_idx + scrolled < self.options.items.len) {
-                    const label = self.options.items[row_idx + scrolled].label();
-                    const mode: g.DrawingMode = if (self.selected_line == row_idx) .inverted else .normal;
-                    const pad = switch (self.text_align) {
-                        .left => 0,
-                        .center => p.diff(u8, region.cols, @min(region.cols, label.len)) / 2,
-                        .right => p.diff(u8, region.cols, @min(region.cols, label.len)),
-                    };
-                    for (0..region.cols) |col_idx| {
-                        if (col_idx < pad or col_idx >= pad + label.len)
-                            try render.drawSymbol(' ', point, mode)
-                        else
-                            try render.drawSymbol(label[col_idx - pad], point, mode);
-
-                        point.move(.right);
-                    }
+            var point = region.top_left;
+            for (0..region.rows) |r| {
+                const line_idx = scrolled + r;
+                if (line_idx < self.options.items.len) {
+                    const label = self.options.items[line_idx].label();
+                    const mode: g.DrawingMode = if (self.selected_line == line_idx) .inverted else .normal;
+                    try render.drawTextWithAlign(region.cols, label, point, mode, self.text_align);
                 } else {
                     try render.drawHorizontalLine(' ', point, region.cols);
                 }
+                point.move(.down);
             }
         }
     };

@@ -64,18 +64,13 @@ pub fn addEmptyLine(self: *Self, alloc: std.mem.Allocator) !*Line {
 /// - `scrolled` - How many scrolled lines should be skipped.
 pub fn draw(self: *const Self, render: g.Render, region: p.Region, scrolled: usize) !void {
     log.debug("Drawing a text area inside {any}", .{region});
-    var itr = region.cells();
-    while (itr.next()) |point| {
-        const ridx = point.row - region.top_left.row + scrolled;
-        if (ridx < self.lines.items.len) {
-            const cidx = point.col - region.top_left.col;
-            const line = &self.lines.items[ridx];
-            const symbol = if (cidx < line.len) line[cidx] else ' ';
-            try render.drawSymbol(symbol, point, .normal);
-        } else {
-            try render.drawSymbol(' ', point, .normal);
-        }
+    var point = region.top_left;
+    for (0..region.rows) |row_idx| {
+        const line_idx = scrolled + row_idx;
+        try render.drawTextWithAlign(region.cols, &self.lines.items[line_idx], point, .normal, .left);
+        point.move(.down);
     }
 }
+
 /// true means that the button is recognized and handled
 pub fn handleButton(_: *Self, _: g.Button) !void {}

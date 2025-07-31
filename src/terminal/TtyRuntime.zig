@@ -102,7 +102,6 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                     .readPushedButtons = readPushedButtons,
                     .clearDisplay = clearDisplay,
                     .drawSprite = drawSprite,
-                    .drawText = drawText,
                     .openFile = openFile,
                     .closeFile = closeFile,
                     .readFromFile = readFromFile,
@@ -255,16 +254,6 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             // the buffer used indexes begun from 0, but the position coordinates begun from 1
             // we do not convert them here because we need a margin for border
             self.buffer.setSymbol(symbol, position_on_display.row, position_on_display.col, mode);
-        }
-
-        fn drawText(
-            ptr: *anyopaque,
-            text: []const u8,
-            position_on_display: p.Point,
-            mode: g.DrawingMode,
-        ) !void {
-            const self: *Self = @ptrCast(@alignCast(ptr));
-            self.buffer.setAsciiText(text, position_on_display.row, position_on_display.col, mode);
         }
 
         fn openFile(ptr: *anyopaque, file_path: []const u8, mode: g.Runtime.FileMode) anyerror!*anyopaque {

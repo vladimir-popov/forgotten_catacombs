@@ -72,7 +72,6 @@ pub fn runtime(self: *Self) g.Runtime {
             .readPushedButtons = readPushedButtons,
             .clearDisplay = clearDisplay,
             .drawSprite = drawSprite,
-            .drawText = drawText,
             .openFile = openFile,
             .closeFile = closeFile,
             .readFromFile = readFromFile,
@@ -143,15 +142,6 @@ fn drawSprite(ptr: *anyopaque, codepoint: g.Codepoint, position_on_display: p.Po
     self.playdate.graphics.drawBitmap(self.getBitmap(codepoint), x, y, .BitmapUnflipped);
 }
 
-fn drawText(ptr: *anyopaque, text: []const u8, position_on_display: p.Point, mode: g.DrawingMode) !void {
-    var itr = std.unicode.Utf8View.initUnchecked(text).iterator();
-    var position = position_on_display;
-    while (itr.nextCodepoint()) |codepoint| {
-        try drawSprite(ptr, codepoint, position, mode);
-        position.move(.right);
-    }
-}
-
 fn getBitmap(self: Self, codepoint: g.Codepoint) *api.LCDBitmap {
     const idx = getCodepointIdx(codepoint);
     return self.playdate.graphics.getTableBitmap(self.bitmap_table, idx) orelse {
@@ -187,6 +177,9 @@ fn getCodepointIdx(codepoint: g.Codepoint) c_int {
         '…' => 117,
         '⇧' => 118,
         '×' => 119,
+        '¿' => 120,
+        '¡' => 121,
+        '±' => 122,
         else => getCodepointIdx('×'),
     };
 }

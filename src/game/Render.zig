@@ -265,7 +265,7 @@ pub fn drawPlayerHp(self: Render, health: *const cm.Health) !void {
         try std.fmt.bufPrint(&buf, "{d:2}", .{@abs(health.current)})
     else
         try std.fmt.bufPrint(&buf, "{d:2}", .{health.current});
-    try self.runtime.drawText(text, .{ .row = 1, .col = g.DISPLAY_COLS - 1 }, .inverted);
+    try self.drawText(text, .{ .row = 1, .col = g.DISPLAY_COLS - 1 }, .inverted);
 }
 
 pub fn drawEnemyHealth(self: Render, codepoint: g.Codepoint, health: *const cm.Health) !void {
@@ -300,7 +300,7 @@ pub fn cleanInfo(self: Render) !void {
 }
 
 /// Draws the label for the B button
-pub inline fn drawLeftButton(self: Render, text: []const u8, has_alternatives: bool) !void {
+pub fn drawLeftButton(self: Render, text: []const u8, has_alternatives: bool) !void {
     var pos = p.Point{ .row = g.DISPLAY_ROWS, .col = INFO_ZONE_LENGTH + 1 };
     try self.runtime.drawSprite(
         if (has_alternatives) cp.variants else ' ',
@@ -369,31 +369,57 @@ pub fn setBorderWithArrow(self: Render, viewport: g.Viewport, side: p.Direction)
     }
 }
 
+/// Draws the passed text as utf8 encoded. Fills padding by the ' ' symbol to align the text
+/// inside a zone with `zone_codepoints_max_count` width. If the text has more symbols, all extra
+/// symbols will be cropped.
 pub fn drawTextWithAlign(
     self: Render,
-    zone_length: u8,
-    text: []const u8,
+    zone_codepoints_max_count: usize,
+    utf8_text: []const u8,
     absolut_position: p.Point,
     mode: g.DrawingMode,
     aln: g.TextAlign,
 ) !void {
-    const text_length = @min(zone_length, text.len);
+    const text_length = @min(zone_codepoints_max_count, try std.unicode.utf8CountCodepoints(utf8_text));
     const left_pad = switch (aln) {
         .left => 0,
-        .center => (zone_length - text_length) / 2,
-        .right => zone_length - text_length,
+        .center => (zone_codepoints_max_count - text_length) / 2,
+        .right => zone_codepoints_max_count - text_length,
     };
-    const right_pad = zone_length - text_length - left_pad;
+    const right_pad = zone_codepoints_max_count - text_length - left_pad;
     var cursor = absolut_position;
     for (0..left_pad) |_| {
-        try self.runtime.drawText(" ", cursor, mode);
+        try self.drawSymbol(' ', cursor, mode);
         cursor.move(.right);
     }
-    try self.runtime.drawText(text[0..text_length], cursor, mode);
+    try self.drawTextWithMaxLength(utf8_text, text_length, cursor, mode);
     cursor.moveNTimes(.right, text_length);
     for (0..right_pad) |_| {
-        try self.runtime.drawText(" ", cursor, mode);
+        try self.drawSymbol(' ', cursor, mode);
         cursor.move(.right);
+    }
+}
+
+/// Draws the text directly on the screen without aligning and cropping.
+pub fn drawText(self: Render, utf8_text: []const u8, position_on_display: p.Point, mode: g.DrawingMode) !void {
+    try self.drawTextWithMaxLength(utf8_text, std.math.maxInt(usize), position_on_display, mode);
+}
+
+fn drawTextWithMaxLength(
+    self: Render,
+    utf8_text: []const u8,
+    max_length: usize,
+    position_on_display: p.Point,
+    mode: g.DrawingMode,
+) !void {
+    var point = position_on_display;
+    var lines: usize = 0;
+    var itr = (try std.unicode.Utf8View.init(utf8_text)).iterator();
+    while (itr.nextCodepoint()) |symbol| : (lines += 1) {
+        if (lines >= max_length) break;
+
+        try self.drawSymbol(symbol, point, mode);
+        point.move(.right);
     }
 }
 

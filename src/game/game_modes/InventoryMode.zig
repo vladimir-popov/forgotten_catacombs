@@ -180,7 +180,7 @@ fn formatInventoryLine(self: *Self, line: *w.TextArea.Line, item: g.Entity) ![]c
     const using = if (item.eql(self.equipment.weapon) or item.eql(self.equipment.light))
         "[x]"
     else if (self.session.isTool(item)) "[ ]" else "   ";
-    log.debug("{d}: {u} {s} {s}", .{ item.id, sprite.codepoint, name, using });
+    log.debug("{d}: {u}({d}) {s} {s}", .{ item.id, sprite.codepoint, sprite.codepoint, name, using });
     return try std.fmt.bufPrint(line, inventory_line_fmt, .{ sprite.codepoint, name, using });
 }
 
