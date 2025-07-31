@@ -27,6 +27,18 @@ pub const OptionsArea = @import("OptionsArea.zig").OptionsArea;
 pub const TextArea = @import("TextArea.zig");
 pub const WindowWithTabs = @import("WindowWithTabs.zig");
 
+pub fn scrollingProgress(scrolled_lines: usize, area_height: usize, max_scroll_count: usize) usize {
+    var progress = scrolled_lines * area_height / max_scroll_count;
+    // Two corner cases for better UX:
+    // 1. Move the scroll after the first scrolling
+    if (progress == 0 and scrolled_lines > 0) progress += 1;
+    // 2. Do not move the scroll to the end until the last possible line is scrolled
+    // (progress become == content_height)
+    if (progress == area_height - 1 or progress == area_height)
+        progress -= 1;
+    return progress;
+}
+
 /// Example:
 /// ```
 /// ┌───────────────Title───────────────┐

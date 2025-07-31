@@ -94,22 +94,11 @@ pub fn ModalWindow(comptime Area: type) type {
             }
             // Draw the scrollbar
             if (self.isScrolled()) {
-                const content_height = reg.rows - 2;
-                const max_scroll_count = self.maxScrollingCount();
-                var progress = self.scrolled_lines * content_height / max_scroll_count;
+                const progress = w.scrollingProgress(self.scrolled_lines, reg.rows - 2, self.maxScrollingCount());
                 log.debug(
                     "Drawing scroll bar. Scrolled lines {d}; progress {d}; total lines {d}",
                     .{ self.scrolled_lines, progress, total_lines },
                 );
-                // Two corner cases for better UX:
-                // 1. Move the scroll after the first scrolling
-                if (progress == 0 and self.scrolled_lines > 0) progress += 1;
-                // 2. Do not move the scroll to the end until the last possible line is scrolled
-                // (progress become == content_height)
-                if (progress == content_height - 1 or progress == content_height)
-                    progress -= 1;
-
-                log.debug("Actual progress {d}", .{progress});
                 point = reg.topRight().movedTo(.left);
                 for (0..reg.rows - 2) |i| {
                     point.move(.down);
