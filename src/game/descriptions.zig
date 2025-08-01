@@ -10,6 +10,7 @@ pub const Description = struct {
 pub const Presets = g.utils.Preset(@This());
 
 unknown_key: Description = .{ .name = "Unknown" },
+unknown_potion: Description = .{ .name = "Unknown potion" },
 closed_door: Description = .{ .name = "Closed door" },
 club: Description = .{ .name = "Club" },
 ladder_down: Description = .{ .name = "Ladder down" },

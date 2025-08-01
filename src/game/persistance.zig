@@ -133,6 +133,15 @@ pub fn Writer(comptime Underlying: type) type {
                 try self.writeEntitiesSet(@as(u.EntitiesSet, value));
                 return;
             }
+            if (std.meta.hasMethod(T, "constIterator")) {
+                try self.beginCollection();
+                var itr = value.constIterator(0);
+                while (itr.next()) |item| {
+                    try self.write(item);
+                }
+                try self.endCollection();
+                return;
+            }
             switch (@typeInfo(T)) {
                 .bool, .int, .float, .comptime_int, .comptime_float, .@"enum", .enum_literal => {
                     try self.writeValue(value);
@@ -154,6 +163,8 @@ pub fn Writer(comptime Underlying: type) type {
                         try self.write(v);
                     }
                     try self.endCollection();
+                } else {
+                    try self.write(value.*);
                 },
                 .@"struct" => |s| {
                     try self.beginObject();
@@ -170,7 +181,6 @@ pub fn Writer(comptime Underlying: type) type {
                     try self.endObject();
                 },
                 .@"union" => |un| {
-                    // not tagged unions are not supported
                     if (un.tag_type) |tt| {
                         try self.beginObject();
                         inline for (un.fields) |u_field| {
@@ -183,10 +193,12 @@ pub fn Writer(comptime Underlying: type) type {
                                 } else {
                                     try self.write(@field(value, u_field.name));
                                 }
-                                break;
                             }
                         }
                         try self.endObject();
+                    } else {
+                        log.err("Untagged unions are not supported. {s}", .{@typeName(T)});
+                        return error.UnsupportedType;
                     }
                 },
                 else => {
@@ -256,27 +268,27 @@ pub fn Reader(comptime Underlying: type) type {
         }
 
         pub fn readSeed(self: *Self) Error!u64 {
-            try assertEql(self.readStringKey(), "seed");
+            try assertEql(self.readKeyAsString(), "seed");
             return try self.readNumber(u64);
         }
 
         pub fn readNextEntityId(self: *Self) Error!g.Entity {
-            try assertEql(self.readStringKey(), "next_entity");
+            try assertEql(self.readKeyAsString(), "next_entity");
             return .{ .id = try self.readNumber(g.Entity.IdType) };
         }
 
         pub fn readDepth(self: *Self) Error!u8 {
-            try assertEql(self.readStringKey(), "depth");
+            try assertEql(self.readKeyAsString(), "depth");
             return try self.readNumber(u8);
         }
 
         pub fn readMaxDepth(self: *Self) Error!u8 {
-            try assertEql(self.readStringKey(), "max_depth");
+            try assertEql(self.readKeyAsString(), "max_depth");
             return try self.readNumber(u8);
         }
 
         pub fn readLevelEntities(self: *Self, level: *g.Level) Error!void {
-            try assertEql(self.readStringKey(), "entities");
+            try assertEql(self.readKeyAsString(), "entities");
             const alloc = level.arena.allocator();
             try self.beginCollection();
             while (!try self.isCollectionEnd()) {
@@ -286,7 +298,7 @@ pub fn Reader(comptime Underlying: type) type {
         }
 
         pub fn readVisitedPlaces(self: *Self, level: *g.Level) Error!void {
-            try assertEql(self.readStringKey(), "visited_places");
+            try assertEql(self.readKeyAsString(), "visited_places");
             try self.beginCollection();
             for (0..level.dungeon.rows) |i| {
                 try self.beginCollection();
@@ -298,12 +310,12 @@ pub fn Reader(comptime Underlying: type) type {
         }
 
         pub fn readRememberedObjects(self: *Self, level: *g.Level) Error!void {
-            try assertEql(self.readStringKey(), "remembered_objects");
+            try assertEql(self.readKeyAsString(), "remembered_objects");
             try self.beginCollection();
             const alloc = level.arena.allocator();
             while (!try self.isCollectionEnd()) {
                 try self.beginObject();
-                const entity = g.Entity{ .id = try self.readNumericKey(g.Entity.IdType) };
+                const entity = g.Entity{ .id = try self.readKeyAsNumber(g.Entity.IdType) };
                 const place = try self.readValue(p.Point);
                 try level.remembered_objects.put(alloc, place, entity);
                 try self.endObject();
@@ -312,13 +324,13 @@ pub fn Reader(comptime Underlying: type) type {
         }
 
         pub fn readPlayer(self: *Self) anyerror!g.Entity {
-            try assertEql(self.readStringKey(), "player");
+            try assertEql(self.readKeyAsString(), "player");
             return try self.readEntity();
         }
 
         fn readEntity(self: *Self) anyerror!g.Entity {
             try self.beginObject();
-            const entity = g.Entity{ .id = try self.readNumericKey(g.Entity.IdType) };
+            const entity = g.Entity{ .id = try self.readKeyAsNumber(g.Entity.IdType) };
             const components = self.read(c.Components) catch |err| {
                 log.err("Error on reading components of the entity {d}", .{entity.id});
                 return err;
@@ -342,6 +354,15 @@ pub fn Reader(comptime Underlying: type) type {
         fn read(self: *Self, comptime T: type) Error!T {
             if (T == u.EntitiesSet) {
                 return @as(T, try self.readEntitiesSet());
+            }
+            if (std.meta.hasMethod(T, "append")) {
+                var list: T = .{};
+                try self.beginCollection();
+                while (!try self.isCollectionEnd()) {
+                    try list.append(self.registry.allocator(), try self.read(g.Effect));
+                }
+                try self.endCollection();
+                return list;
             }
             switch (@typeInfo(T)) {
                 .void => {
@@ -382,7 +403,7 @@ pub fn Reader(comptime Underlying: type) type {
                     var key: ?[]const u8 = null;
                     inline for (s.fields) |field| {
                         if (key == null and !try self.isObjectEnd()) {
-                            key = try self.readStringKey();
+                            key = try self.readKeyAsString();
                         }
                         if (key != null and std.mem.eql(u8, field.name, key.?)) {
                             @field(&result, field.name) = self.read(field.type) catch |err| {
@@ -405,18 +426,45 @@ pub fn Reader(comptime Underlying: type) type {
                 },
                 .@"union" => |un| {
                     try self.beginObject();
-                    const key = try self.readStringKey();
+                    const key = try self.readKeyAsString();
                     inline for (un.fields) |u_field| {
                         if (std.mem.eql(u8, u_field.name, key)) {
-                            return @unionInit(T, u_field.name, try self.read(u_field.type));
+                            const value = try self.read(u_field.type);
+                            try self.endObject();
+                            return @unionInit(T, u_field.name, value);
                         }
                     }
-                    try self.endObject();
                 },
                 else => {},
             }
             log.err("Unsupported type for desrialization {s}", .{@typeName(T)});
             return error.UnsupportedType;
+        }
+
+        fn readValue(self: *Self, comptime T: type) Error!T {
+            switch (@typeInfo(T)) {
+                .bool => {
+                    const next = try self.reader.next();
+                    return if (next == .true) true else if (next == .false) false else {
+                        log.err("Wrong input. Expected bool, but was {any}", .{next});
+                        return error.WrongInput;
+                    };
+                },
+                .int, .comptime_int => {
+                    return try std.fmt.parseInt(T, try self.readBytes(), 10);
+                },
+                .float, .comptime_float => {
+                    return try std.fmt.parseFloat(T, try self.readBytes());
+                },
+                .@"enum", .enum_literal => {
+                    const str = try self.readBytes();
+                    return std.meta.stringToEnum(T, str) orelse {
+                        log.err("Wrong value {s} for the enum {s}", .{ str, @typeName(T) });
+                        return error.WrongInput;
+                    };
+                },
+                else => return error.WrongInput,
+            }
         }
 
         fn isObjectEnd(self: *Self) Error!bool {
@@ -435,45 +483,19 @@ pub fn Reader(comptime Underlying: type) type {
             return try self.reader.peekNextTokenType() == .array_end;
         }
 
-        fn readStringKey(self: *Self) Error![]const u8 {
-            return try self.readSymbols();
+        fn readKeyAsString(self: *Self) Error![]const u8 {
+            return try self.readBytes();
         }
 
-        fn readNumericKey(self: *Self, comptime N: type) Error!N {
-            return try std.fmt.parseInt(N, try self.readStringKey(), 10);
+        fn readKeyAsNumber(self: *Self, comptime N: type) Error!N {
+            return try std.fmt.parseInt(N, try self.readKeyAsString(), 10);
         }
 
         fn readNumber(self: *Self, comptime T: type) Error!T {
-            return try std.fmt.parseInt(T, try self.readSymbols(), 10);
+            return try std.fmt.parseInt(T, try self.readBytes(), 10);
         }
 
-        fn readValue(self: *Self, comptime T: type) Error!T {
-            switch (@typeInfo(T)) {
-                .bool => {
-                    const next = try self.reader.next();
-                    return if (next == .true) true else if (next == .false) false else {
-                        log.err("Wrong input. Expected bool, but was {any}", .{next});
-                        return error.WrongInput;
-                    };
-                },
-                .int, .comptime_int => {
-                    return try std.fmt.parseInt(T, try self.readSymbols(), 10);
-                },
-                .float, .comptime_float => {
-                    return try std.fmt.parseFloat(T, try self.readSymbols());
-                },
-                .@"enum", .enum_literal => {
-                    const str = try self.readSymbols();
-                    return std.meta.stringToEnum(T, str) orelse {
-                        log.err("Wrong value {s} for the enum {s}", .{ str, @typeName(T) });
-                        return error.WrongInput;
-                    };
-                },
-                else => return error.WrongInput,
-            }
-        }
-
-        fn readSymbols(self: *Self) Error![]const u8 {
+        fn readBytes(self: *Self) Error![]const u8 {
             var capacity: usize = 0;
             while (true) {
                 switch (try self.reader.next()) {
@@ -540,11 +562,11 @@ test "All components should be serializable" {
 
     var inventory = try c.Inventory.empty(std.testing.allocator);
     try inventory.items.add(.{ .id = 7 });
-    defer inventory.deinit();
+    defer inventory.deinit(std.testing.allocator);
 
     var pile = try c.Pile.empty(std.testing.allocator);
     try pile.items.add(.{ .id = 9 });
-    defer pile.deinit();
+    defer pile.deinit(std.testing.allocator);
 
     // Random components to check serialization:
     const expected = c.Components{
@@ -558,14 +580,15 @@ test "All components should be serializable" {
         .ladder = c.Ladder{ .id = .{ .id = 2 }, .direction = .down, .target_ladder = .{ .id = 3 } },
         .pile = pile,
         .position = c.Position{ .place = p.Point.init(12, 42), .zorder = .item },
+        .potion = c.Potion.health(20, .green),
         .source_of_light = c.SourceOfLight{ .radius = 4 },
         .speed = c.Speed{ .move_points = 12 },
         .sprite = c.Sprite{ .codepoint = g.codepoints.human },
         .state = .walking,
-        .weapon = c.Weapon{ .min_damage = 3, .max_damage = 32 },
+        .weapon = c.Weapon.melee(1, 2, .cutting),
     };
 
-    var buffer: [1024]u8 = @splat(0);
+    var buffer: [4048]u8 = @splat(0);
     var buffer_writer = std.io.fixedBufferStream(&buffer);
     const underlying_writer = buffer_writer.writer();
     var writer = Writer(@TypeOf(underlying_writer)).init(&original_registry, underlying_writer);
@@ -574,7 +597,7 @@ test "All components should be serializable" {
     try writer.write(expected);
     original_registry.deinit();
 
-    std.debug.print("{s}\n", .{buffer});
+    std.debug.print("Generated json:\n{s}\n", .{buffer});
 
     // then:
     var actual_registry = try g.Registry.init(std.testing.allocator);
@@ -585,6 +608,7 @@ test "All components should be serializable" {
     var reader = Reader(@TypeOf(underlying_reader)).init(&actual_registry, underlying_reader);
 
     const actual = try reader.read(c.Components);
+    std.debug.print("Actual components:\n{any}\n", .{actual});
 
     try expectEql(expected, actual);
 }
@@ -592,12 +616,18 @@ test "All components should be serializable" {
 fn expectEql(expected: anytype, actual: anytype) !void {
     try std.testing.expectEqual(@TypeOf(expected), @TypeOf(actual));
 
+    if (@TypeOf(expected) == std.SegmentedList(g.Effect, 1)) {
+        return std.testing.expectEqual(expected, actual);
+    }
+
     switch (@typeInfo(@TypeOf(expected))) {
         .pointer => try expectEql(expected.*, actual.*),
         .optional => if (expected == null)
             try std.testing.expectEqual(null, actual)
+        else if (actual) |value|
+            try expectEql(expected.?, value)
         else
-            try expectEql(expected.?, actual.?),
+            std.debug.panic("Expected value {any}, but was null", .{expected.?}),
         .@"struct" => |s| inline for (s.fields) |field| {
             if (@hasDecl(@TypeOf(expected), "eql")) {
                 try std.testing.expect(expected.eql(actual));

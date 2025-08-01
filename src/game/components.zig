@@ -98,7 +98,7 @@ pub const Health = struct {
     // The count of maximum hp
     max: u8,
     // The count of the current hp
-    current: i16,
+    current: u8,
 };
 
 pub const Speed = struct {
@@ -115,7 +115,7 @@ pub const Pile = struct {
         return .{ .items = try u.EntitiesSet.init(alloc) };
     }
 
-    pub fn deinit(self: *Pile) void {
+    pub fn deinit(self: *Pile, _: std.mem.Allocator) void {
         self.items.deinit();
     }
 };
@@ -127,7 +127,7 @@ pub const Inventory = struct {
         return .{ .items = try u.EntitiesSet.init(alloc) };
     }
 
-    pub fn deinit(self: *Inventory) void {
+    pub fn deinit(self: *Inventory, _: std.mem.Allocator) void {
         self.items.deinit();
     }
 };
@@ -147,7 +147,7 @@ pub const Shop = struct {
         return .{ .items = try u.EntitiesSet.init(alloc), .price_multiplier = price_multiplier, .balance = balance };
     }
 
-    pub fn deinit(self: *Shop) void {
+    pub fn deinit(self: *Shop, _: std.mem.Allocator) void {
         self.items.deinit();
         self.price_multiplier = undefined;
     }
@@ -164,15 +164,31 @@ pub const Equipment = struct {
     pub const nothing: Equipment = .{ .weapon = null, .light = null };
 };
 
-pub const Weapon = struct {
-    min_damage: u8,
-    max_damage: u8,
+pub const Potion = struct {
+    pub const Color = enum { white, blue, red, green, black };
+    color: Color,
+    effect: g.Effect,
 
-    pub inline fn generateDamage(self: Weapon, rand: std.Random) u8 {
-        return if (self.max_damage > self.min_damage)
-            rand.uintLessThan(u8, self.max_damage - self.min_damage) + self.min_damage
-        else
-            self.min_damage;
+    pub fn health(amount: u8, color: Color) Potion {
+        return .{ .color = color, .effect = .{ .heal = amount } };
+    }
+};
+
+pub const Weapon = struct {
+    effects: std.SegmentedList(g.Effect, 1),
+
+    pub fn deinit(self: *Weapon, alloc: std.mem.Allocator) void {
+        self.effects.deinit(alloc);
+    }
+
+    pub fn melee(min_damage: u8, max_damage: u8, damage_type: g.Effect.PhysicalDamageType) Weapon {
+        const permanent_effect: g.Effect = .{
+            .physical_damage = .{ .min_value = min_damage, .max_value = max_damage, .type = damage_type },
+        };
+        return .{ .effects = .{
+            .prealloc_segment = .{permanent_effect},
+            .len = 1,
+        } };
     }
 };
 
@@ -205,6 +221,7 @@ pub const Components = struct {
     pile: ?Pile = null,
     price: ?Price = null,
     position: ?Position = null,
+    potion: ?Potion = null,
     shop: ?Shop = null,
     source_of_light: ?SourceOfLight = null,
     speed: ?Speed = null,

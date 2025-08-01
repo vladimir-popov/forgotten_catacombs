@@ -18,7 +18,7 @@ pub const Action = union(enum) {
     };
     pub const Hit = struct {
         target: g.Entity,
-        by_weapon: c.Weapon,
+        weapon: c.Weapon,
     };
     /// Do nothing, as example, when trying to move to the wall
     do_nothing,
@@ -30,7 +30,7 @@ pub const Action = union(enum) {
     open: struct { id: g.Entity, place: p.Point },
     /// An entity is going to close a door
     close: struct { id: g.Entity, place: p.Point },
-    /// An entity which should be hit
+    /// 
     hit: Hit,
     /// The id of an item that someone is going to take from the floor
     pickup: g.Entity,

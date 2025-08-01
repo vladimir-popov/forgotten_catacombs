@@ -23,7 +23,7 @@ pub fn rat(place: p.Point) c.Components {
         .position = .{ .zorder = .obstacle, .place = place },
         .description = .{ .preset = .rat },
         .health = .{ .max = 10, .current = 10 },
-        .weapon = .{ .min_damage = 1, .max_damage = 3 },
+        .weapon = c.Weapon.melee(1, 3, .thrusting),
         .speed = .{ .move_points = 14 },
         .state = .sleeping,
     };
@@ -39,15 +39,22 @@ pub const Torch = c.Components{
 pub const Pickaxe = c.Components{
     .description = .{ .preset = .pickaxe },
     .sprite = .{ .codepoint = cp.weapon_melee },
-    .weapon = .{ .min_damage = 2, .max_damage = 3 },
+    .weapon = c.Weapon.melee(2, 3, .cutting),
     .price = .{ .value = 15 },
 };
 
 pub const Club = c.Components{
     .description = .{ .preset = .club },
     .sprite = .{ .codepoint = cp.weapon_melee },
-    .weapon = .{ .min_damage = 3, .max_damage = 5 },
+    .weapon = c.Weapon.melee(3, 5, .blunt),
     .price = .{ .value = 28 },
+};
+
+pub const HealthPotion = c.Components{
+    .description = .{ .preset = .unknown_potion },
+    .sprite = .{ .codepoint = cp.potion },
+    .potion = .{ .color = .red, .effect = .{ .heal = 20 } },
+    .price = .{ .value = 20 },
 };
 
 pub fn openedDoor(place: p.Point) c.Components {

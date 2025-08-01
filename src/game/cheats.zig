@@ -65,7 +65,7 @@ pub const Cheat = union(enum) {
                         return .{
                             .hit = .{
                                 .target = target,
-                                .by_weapon = .{ .min_damage = damage, .max_damage = damage },
+                                .weapon = c.Weapon.melee(damage, damage, .cutting),
                             },
                         };
                     };

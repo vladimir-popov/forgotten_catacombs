@@ -104,10 +104,10 @@ pub fn entityDescription(
         const line = try text_area.addEmptyLine(alloc);
         _ = try std.fmt.bufPrint(line[1..], "Speed: {d}", .{speed.move_points});
     }
-    if (registry.get(entity, c.Weapon)) |weapon| {
-        const line = try text_area.addEmptyLine(alloc);
-        _ = try std.fmt.bufPrint(line[1..], "Damage: {d}-{d}", .{ weapon.min_damage, weapon.max_damage });
-    }
+    // if (registry.get(entity, c.Weapon)) |weapon| {
+    //     const line = try text_area.addEmptyLine(alloc);
+    //     _ = try std.fmt.bufPrint(line[1..], "Damage: {d}-{d}", .{ weapon.min_damage, weapon.max_damage });
+    // }
     if (registry.get(entity, c.SourceOfLight)) |light| {
         const line = try text_area.addEmptyLine(alloc);
         _ = try std.fmt.bufPrint(line[1..], "Radius of light: {d}", .{light.radius});

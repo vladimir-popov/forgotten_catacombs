@@ -39,9 +39,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
 
         /// Cleans up all inner storages.
         pub fn deinit(self: *Self) void {
-            // const alloc = self.arena.child_allocator;
             self.arena.deinit();
-            // alloc.destroy(self.arena);
         }
 
         pub fn allocator(self: *Self) std.mem.Allocator {
@@ -246,7 +244,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
                 }
             }
             if (!has_at_least_one_component)
-                log.warn("Entity {d} doesn't have any component", .{entity.id});
+                log.warn("entityToStruct: Entity {d} doesn't have any component.", .{entity.id});
 
             return structure;
         }
@@ -269,7 +267,7 @@ test "Add/Get/Remove component" {
             return instance;
         }
 
-        pub fn deinit(self: *Self) void {
+        pub fn deinit(self: *Self, _: std.mem.Allocator) void {
             self.state.deinit();
             self.deinited.* = true;
         }
@@ -311,7 +309,7 @@ test "deinit entity on update" {
     const Cmp = struct {
         value: u8,
         deinited: *bool,
-        pub fn deinit(self: *@This()) void {
+        pub fn deinit(self: *@This(), _: std.mem.Allocator) void {
             self.deinited.* = true;
         }
     };

@@ -79,7 +79,7 @@ inline fn actionForAggressiveEnemy(
             return .{
                 .hit = .{
                     .target = self.session.player,
-                    .by_weapon = weapon.*,
+                    .weapon = weapon.*,
                 },
             };
     }

@@ -24,7 +24,7 @@ pub fn ArraySet(comptime C: anytype) type {
 
         /// Deinits the inner storages and components.
         pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
-            self.deinitComponents();
+            self.deinitComponents(alloc);
             self.components.deinit(alloc);
             self.entity_index.deinit(alloc);
         }
@@ -70,7 +70,7 @@ pub fn ArraySet(comptime C: anytype) type {
         /// Adds the component of the type `C` for the entity, or replaces existed.
         pub fn setToEntity(self: *Self, alloc: std.mem.Allocator, entity: Entity, component: C) !void {
             if (self.entity_index.get(entity)) |idx| {
-                self.deinitComponent(idx);
+                self.deinitComponent(alloc, idx);
                 self.components.items[idx] = .{ entity, component };
             } else {
                 try self.entity_index.put(alloc, entity, self.components.items.len);
@@ -85,7 +85,7 @@ pub fn ArraySet(comptime C: anytype) type {
                 _ = self.entity_index.remove(entity);
 
                 const last_idx: u8 = @intCast(self.components.items.len - 1);
-                self.deinitComponent(idx);
+                self.deinitComponent(alloc, idx);
                 if (idx == last_idx) {
                     _ = self.components.pop();
                 } else {
@@ -98,15 +98,15 @@ pub fn ArraySet(comptime C: anytype) type {
             }
         }
 
-        fn deinitComponents(self: *Self) void {
+        fn deinitComponents(self: *Self, alloc: std.mem.Allocator) void {
             for (0..self.components.items.len) |idx| {
-                self.deinitComponent(idx);
+                self.deinitComponent(alloc, idx);
             }
         }
 
-        inline fn deinitComponent(self: *Self, idx: usize) void {
+        inline fn deinitComponent(self: *Self, alloc: std.mem.Allocator, idx: usize) void {
             if (@hasDecl(C, "deinit")) {
-                self.components.items[idx][1].deinit();
+                self.components.items[idx][1].deinit(alloc);
             }
         }
     };

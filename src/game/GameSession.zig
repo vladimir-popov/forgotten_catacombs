@@ -294,8 +294,9 @@ pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_spe
             if (self.registry.get(actor, c.Position)) |position|
                 return doMove(self, actor, position, move.target, actor_speed);
         },
-        .hit => |hit| if (self.registry.get(hit.target, c.Health)) |health| {
-            return doHit(self, actor, hit.by_weapon, actor_speed, hit.target, health);
+        .hit => |hit| {
+            try doHit(self, actor, hit.weapon, hit.target);
+            return actor_speed;
         },
         .open => |door| {
             try self.registry.setComponentsToEntity(door.id, g.entities.openedDoor(door.place));
@@ -396,7 +397,7 @@ fn checkCollision(self: *GameSession, actor: g.Entity, place: p.Point) ?g.Action
 
                 if (self.isEnemy(entity))
                     if (self.getWeapon(actor)) |weapon|
-                        return .{ .hit = .{ .target = entity, .by_weapon = weapon.* } };
+                        return .{ .hit = .{ .target = entity, .weapon = weapon.* } };
 
                 if (self.registry.get(entity, c.Shop)) |shop| {
                     return .{ .trade = shop };
@@ -417,27 +418,48 @@ fn doHit(
     self: *GameSession,
     actor: g.Entity,
     actor_weapon: c.Weapon,
-    actor_speed: g.MovePoints,
     enemy: g.Entity,
-    enemy_health: *c.Health,
-) !g.MovePoints {
-    const damage = actor_weapon.generateDamage(self.prng.random());
-    log.debug("The entity {d} received damage {d} from entity {d}", .{ enemy.id, damage, actor.id });
-    enemy_health.current -= @as(i16, @intCast(damage));
-    const is_blocked_animation = actor.eql(self.player) or enemy.eql(self.player);
-    try self.registry.set(enemy, c.Animation{ .preset = .hit, .is_blocked = is_blocked_animation });
-    if (actor.eql(self.player)) {
-        try self.events.sendEvent(.{ .player_hit = .{ .target = enemy } });
-    }
-    if (enemy_health.current <= 0) {
-        const is_player = enemy.eql(self.player);
-        log.debug("The {s} {d} died", .{ if (is_player) "player" else "enemy", enemy.id });
-        try self.registry.removeEntity(enemy);
-        try self.level.removeEntity(enemy);
-        if (is_player) {
-            log.info("Player is dead. Game over.", .{});
-            return error.GameOver;
+) !void {
+    if (self.registry.get(enemy, c.Health)) |enemy_health| {
+        var itr = actor_weapon.effects.constIterator(0);
+        while (itr.next()) |effect| {
+            try self.applyEffect(actor, enemy, enemy_health, effect.*);
+        }
+        // a special case to give to player a chance to notice what happened
+        const is_blocked_animation = actor.eql(self.player) or enemy.eql(self.player);
+        try self.registry.set(enemy, c.Animation{ .preset = .hit, .is_blocked = is_blocked_animation });
+        if (actor.eql(self.player)) {
+            try self.events.sendEvent(.{ .player_hit = .{ .target = enemy } });
+        }
+        if (enemy_health.current == 0) {
+            try self.registry.removeEntity(enemy);
+            try self.level.removeEntity(enemy);
+            if (enemy.eql(self.player)) {
+                log.info("Player is dead. Game over.", .{});
+                return error.GameOver;
+            } else {
+                log.debug("The enemy {d} has been died", .{ enemy.id });
+            }
         }
     }
-    return actor_speed;
+}
+
+fn applyEffect(
+    self: *GameSession,
+    actor: g.Entity,
+    target: g.Entity,
+    target_health: *c.Health,
+    effect: g.Effect,
+) !void {
+    _ = actor;
+    _ = target;
+    switch (effect) {
+        .physical_damage => |damage| {
+            const amount = self.prng.random().intRangeLessThan(u8, damage.min_value, damage.max_value);
+            target_health.current -|= amount;
+        },
+        .heal => |hp| {
+            target_health.current += hp;
+        }
+    }
 }
