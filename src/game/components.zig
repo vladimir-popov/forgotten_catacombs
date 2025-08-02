@@ -115,7 +115,7 @@ pub const Pile = struct {
         return .{ .items = try u.EntitiesSet.init(alloc) };
     }
 
-    pub fn deinit(self: *Pile, _: std.mem.Allocator) void {
+    pub fn deinit(self: *Pile) void {
         self.items.deinit();
     }
 };
@@ -127,7 +127,7 @@ pub const Inventory = struct {
         return .{ .items = try u.EntitiesSet.init(alloc) };
     }
 
-    pub fn deinit(self: *Inventory, _: std.mem.Allocator) void {
+    pub fn deinit(self: *Inventory) void {
         self.items.deinit();
     }
 };
@@ -147,7 +147,7 @@ pub const Shop = struct {
         return .{ .items = try u.EntitiesSet.init(alloc), .price_multiplier = price_multiplier, .balance = balance };
     }
 
-    pub fn deinit(self: *Shop, _: std.mem.Allocator) void {
+    pub fn deinit(self: *Shop) void {
         self.items.deinit();
         self.price_multiplier = undefined;
     }

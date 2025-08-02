@@ -106,7 +106,15 @@ pub fn ArraySet(comptime C: anytype) type {
 
         inline fn deinitComponent(self: *Self, alloc: std.mem.Allocator, idx: usize) void {
             if (@hasDecl(C, "deinit")) {
-                self.components.items[idx][1].deinit(alloc);
+                switch (@typeInfo(@TypeOf(C.deinit))) {
+                    .@"fn" => |f| {
+                        if (f.params.len > 1)
+                            self.components.items[idx][1].deinit(alloc)
+                        else
+                            self.components.items[idx][1].deinit();
+                    },
+                    else => {},
+                }
             }
         }
     };

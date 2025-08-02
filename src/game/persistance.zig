@@ -562,11 +562,11 @@ test "All components should be serializable" {
 
     var inventory = try c.Inventory.empty(std.testing.allocator);
     try inventory.items.add(.{ .id = 7 });
-    defer inventory.deinit(std.testing.allocator);
+    defer inventory.deinit();
 
     var pile = try c.Pile.empty(std.testing.allocator);
     try pile.items.add(.{ .id = 9 });
-    defer pile.deinit(std.testing.allocator);
+    defer pile.deinit();
 
     // Random components to check serialization:
     const expected = c.Components{
@@ -597,8 +597,6 @@ test "All components should be serializable" {
     try writer.write(expected);
     original_registry.deinit();
 
-    std.debug.print("Generated json:\n{s}\n", .{buffer});
-
     // then:
     var actual_registry = try g.Registry.init(std.testing.allocator);
     defer actual_registry.deinit();
@@ -608,9 +606,12 @@ test "All components should be serializable" {
     var reader = Reader(@TypeOf(underlying_reader)).init(&actual_registry, underlying_reader);
 
     const actual = try reader.read(c.Components);
-    std.debug.print("Actual components:\n{any}\n", .{actual});
 
-    try expectEql(expected, actual);
+    expectEql(expected, actual) catch |err| {
+        std.debug.print("Generated json:\n{s}\n", .{buffer});
+        std.debug.print("Actual components:\n{any}\n", .{actual});
+        return err;
+    };
 }
 
 fn expectEql(expected: anytype, actual: anytype) !void {
