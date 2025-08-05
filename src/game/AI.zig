@@ -75,13 +75,7 @@ inline fn actionForAggressiveEnemy(
     player_place: p.Point,
 ) g.Action {
     if (entity_place.near4(player_place)) {
-        if (self.session.getWeapon(entity)) |weapon|
-            return .{
-                .hit = .{
-                    .target = self.session.player,
-                    .weapon = weapon.*,
-                },
-            };
+        return .{ .hit = self.session.player };
     }
     const level = &self.session.level;
     if (level.dijkstra_map.get(entity_place)) |vector| {

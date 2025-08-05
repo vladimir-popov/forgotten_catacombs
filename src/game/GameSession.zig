@@ -222,26 +222,6 @@ pub fn playerMovedToLevel(self: *GameSession) !void {
     try self.events.sendEvent(event);
 }
 
-pub fn getWeapon(self: *const GameSession, actor: g.Entity) ?*c.Weapon {
-    if (self.registry.get(actor, c.Weapon)) |weapon| return weapon;
-
-    if (self.registry.get(actor, c.Equipment)) |equipment|
-        if (equipment.weapon) |weapon_id|
-            if (self.registry.get(weapon_id, c.Weapon)) |weapon|
-                return weapon;
-
-    return null;
-}
-
-pub fn isEnemy(self: *const GameSession, entity: g.Entity) bool {
-    return self.registry.get(entity, c.Health) != null;
-}
-
-pub fn isTool(self: *const GameSession, item: g.Entity) bool {
-    return (self.registry.get(item, c.Weapon) != null) or
-        (self.registry.get(item, c.SourceOfLight) != null);
-}
-
 pub inline fn tick(self: *GameSession) !void {
     switch (self.mode) {
         .explore => try self.mode.explore.tick(),
@@ -279,6 +259,19 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
     }
 }
 
+pub fn isEnemy(self: *const GameSession, entity: g.Entity) bool {
+    return self.registry.has(entity, c.EnemyState);
+}
+
+pub fn isItem(self: *const GameSession, entity: g.Entity) bool {
+    return self.registry.has(entity, c.Weight);
+}
+
+pub fn isEquipment(self: *const GameSession, item: g.Entity) bool {
+    return self.isItem(item) and
+        (self.registry.has(item, c.PhysicalDamage) or self.registry.has(item, c.SourceOfLight));
+}
+
 /// Handles intentions to do some actions
 pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_speed: g.MovePoints) !g.MovePoints {
     if (std.log.logEnabled(.debug, .action_system) and action != .do_nothing) {
@@ -294,8 +287,8 @@ pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_spe
             if (self.registry.get(actor, c.Position)) |position|
                 return doMove(self, actor, position, move.target, actor_speed);
         },
-        .hit => |hit| {
-            try doHit(self, actor, hit.weapon, hit.target);
+        .hit => |target| {
+            try doHit(self, actor, target);
             return actor_speed;
         },
         .open => |door| {
@@ -363,8 +356,8 @@ fn doMove(
     };
     if (from_position.place.eql(new_place)) return 0;
 
-    if (checkCollision(self, entity, new_place)) |action| {
-        return try doAction(self, entity, action, move_speed);
+    if (self.checkCollision(new_place)) |action| {
+        return try self.doAction(entity, action, move_speed);
     }
     const event = g.events.Event{
         .entity_moved = .{
@@ -383,9 +376,8 @@ fn doMove(
 /// The `null` means that the move is completed;
 /// .do_nothing or any other action means that the move should be aborted, and the action handled;
 ///
-/// {actor} who is making a move;
 /// {place} a place in the dungeon with which collision should be checked.
-fn checkCollision(self: *GameSession, actor: g.Entity, place: p.Point) ?g.Action {
+fn checkCollision(self: *GameSession, place: p.Point) ?g.Action {
     switch (self.level.cellAt(place)) {
         .landscape => |cl| if (cl == .floor or cl == .doorway)
             return null,
@@ -396,8 +388,7 @@ fn checkCollision(self: *GameSession, actor: g.Entity, place: p.Point) ?g.Action
                     return .{ .open = .{ .id = entity, .place = place } };
 
                 if (self.isEnemy(entity))
-                    if (self.getWeapon(actor)) |weapon|
-                        return .{ .hit = .{ .target = entity, .weapon = weapon.* } };
+                    return .{ .hit = entity };
 
                 if (self.registry.get(entity, c.Shop)) |shop| {
                     return .{ .trade = shop };
@@ -417,14 +408,31 @@ fn checkCollision(self: *GameSession, actor: g.Entity, place: p.Point) ?g.Action
 fn doHit(
     self: *GameSession,
     actor: g.Entity,
-    actor_weapon: c.Weapon,
     enemy: g.Entity,
 ) !void {
     if (self.registry.get(enemy, c.Health)) |enemy_health| {
-        var itr = actor_weapon.effects.constIterator(0);
-        while (itr.next()) |effect| {
-            try self.applyEffect(actor, enemy, enemy_health, effect.*);
+        // if the actor doesn't have an equipment,
+        // then it must have damage components (it means bare hand, or tooth, etc)
+        var weapon_id = actor;
+        if (self.registry.get(actor, c.Equipment)) |equipment| {
+            if (equipment.weapon) |weapon|
+                weapon_id = weapon;
         }
+
+        // Applying all effects of the weapon
+        if (self.registry.get(weapon_id, c.Effects)) |effects| {
+            if (try applyEffects(effects, enemy_health)) {
+                try self.registry.remove(weapon_id, c.Effects);
+            }
+        }
+
+        // Applying physical damage
+        const damage = self.registry.get(weapon_id, c.PhysicalDamage) orelse
+            std.debug.panic("The weapon entity {d} doesn't have a PhysicalDamage", .{weapon_id.id});
+
+        const amount = self.prng.random().intRangeLessThan(u8, damage.min, damage.max);
+        enemy_health.current -|= amount;
+
         // a special case to give to player a chance to notice what happened
         const is_blocked_animation = actor.eql(self.player) or enemy.eql(self.player);
         try self.registry.set(enemy, c.Animation{ .preset = .hit, .is_blocked = is_blocked_animation });
@@ -438,28 +446,32 @@ fn doHit(
                 log.info("Player is dead. Game over.", .{});
                 return error.GameOver;
             } else {
-                log.debug("The enemy {d} has been died", .{ enemy.id });
+                log.debug("The enemy {d} has been died", .{enemy.id});
             }
         }
     }
 }
 
-fn applyEffect(
-    self: *GameSession,
-    actor: g.Entity,
-    target: g.Entity,
+/// true - if all effects were applied and can be removed from the entity;
+fn applyEffects(
+    effects: *c.Effects,
     target_health: *c.Health,
-    effect: g.Effect,
-) !void {
-    _ = actor;
-    _ = target;
-    switch (effect) {
-        .physical_damage => |damage| {
-            const amount = self.prng.random().intRangeLessThan(u8, damage.min_value, damage.max_value);
-            target_health.current -|= amount;
-        },
-        .heal => |hp| {
-            target_health.current += hp;
+) !bool {
+    var expired_effects: usize = 0;
+    var itr = effects.items.iterator(0);
+    while (itr.next()) |effect| {
+        switch (effect.*) {
+            .heal => |hp| {
+                target_health.current += hp;
+                expired_effects += 1;
+                effect.heal = 0;
+            },
+            .fire => |fire| {
+                target_health.current -|= fire.damage;
+                effect.fire.damage -|= fire.step;
+                if (fire.damage == 0) expired_effects += 1;
+            },
         }
     }
+    return effects.items.len == expired_effects;
 }

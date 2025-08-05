@@ -133,9 +133,9 @@ pub fn Writer(comptime Underlying: type) type {
                 try self.writeEntitiesSet(@as(u.EntitiesSet, value));
                 return;
             }
-            if (std.meta.hasMethod(T, "constIterator")) {
+            if (T == c.Effects) {
                 try self.beginCollection();
-                var itr = value.constIterator(0);
+                var itr = value.items.constIterator(0);
                 while (itr.next()) |item| {
                     try self.write(item);
                 }
@@ -355,14 +355,14 @@ pub fn Reader(comptime Underlying: type) type {
             if (T == u.EntitiesSet) {
                 return @as(T, try self.readEntitiesSet());
             }
-            if (std.meta.hasMethod(T, "append")) {
-                var list: T = .{};
+            if (T == c.Effects) {
+                var effects: c.Effects = .nothing;
                 try self.beginCollection();
                 while (!try self.isCollectionEnd()) {
-                    try list.append(self.registry.allocator(), try self.read(g.Effect));
+                    try effects.items.append(self.registry.allocator(), try self.read(c.Effects.Effect));
                 }
                 try self.endCollection();
-                return list;
+                return effects;
             }
             switch (@typeInfo(T)) {
                 .void => {
@@ -386,12 +386,12 @@ pub fn Reader(comptime Underlying: type) type {
                     return buf;
                 },
                 .pointer => |ptr| if (ptr.size == .slice) {
-                    const buf: std.ArrayListUnmanaged(ptr.child) = .empty;
-                    errdefer buf.deinit(self.registry.alloc);
+                    var buf: std.ArrayListUnmanaged(ptr.child) = .empty;
+                    errdefer buf.deinit(self.registry.allocator());
 
                     try self.beginCollection();
                     while (!try self.isCollectionEnd()) {
-                        const item = buf.addOne(self.registry.alloc);
+                        const item = buf.addOne(self.registry.allocator());
                         item.* = try self.read(ptr.child);
                     }
                     try self.endCollection();

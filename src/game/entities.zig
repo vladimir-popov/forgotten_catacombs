@@ -23,7 +23,7 @@ pub fn rat(place: p.Point) c.Components {
         .position = .{ .zorder = .obstacle, .place = place },
         .description = .{ .preset = .rat },
         .health = .{ .max = 10, .current = 10 },
-        .weapon = c.Weapon.melee(1, 3, .thrusting),
+        .physical_damage = .{ .min = 1, .max = 3, .damage_type = .thrusting },
         .speed = .{ .move_points = 14 },
         .state = .sleeping,
     };
@@ -32,28 +32,35 @@ pub fn rat(place: p.Point) c.Components {
 pub const Torch = c.Components{
     .description = .{ .preset = .torch },
     .sprite = .{ .codepoint = cp.source_of_light },
+    .weight = .{ .kg = 1 },
     .source_of_light = .{ .radius = 5 },
     .price = .{ .value = 5 },
+    .physical_damage = .{ .min = 2, .max = 3, .damage_type = .blunt },
+    .effects = c.Effects.one(.{ .fire = .{ .damage = 2 } }),
 };
 
 pub const Pickaxe = c.Components{
     .description = .{ .preset = .pickaxe },
     .sprite = .{ .codepoint = cp.weapon_melee },
-    .weapon = c.Weapon.melee(2, 3, .cutting),
+    .weight = .{ .kg = 10 },
+    .physical_damage = .{ .min = 3, .max = 5, .damage_type = .cutting },
     .price = .{ .value = 15 },
 };
 
 pub const Club = c.Components{
     .description = .{ .preset = .club },
     .sprite = .{ .codepoint = cp.weapon_melee },
-    .weapon = c.Weapon.melee(3, 5, .blunt),
+    .weight = .{ .kg = 8 },
+    .physical_damage = .{ .min = 5, .max = 8, .damage_type = .blunt },
     .price = .{ .value = 28 },
 };
 
 pub const HealthPotion = c.Components{
     .description = .{ .preset = .unknown_potion },
     .sprite = .{ .codepoint = cp.potion },
-    .potion = .{ .color = .red, .effect = .{ .heal = 20 } },
+    .weight = .{ .kg = 2 },
+    .potion = .{ .color = .red },
+    .effects = c.Effects.one(.{ .heal = 20 }),
     .price = .{ .value = 20 },
 };
 

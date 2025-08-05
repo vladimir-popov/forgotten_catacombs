@@ -76,6 +76,10 @@ pub fn Registry(comptime ComponentsStruct: type) type {
             return entity;
         }
 
+        pub fn has(self: Self, entity: Entity, comptime C: type) bool {
+            return @field(self.components_map, @typeName(C)).existsForEntity(entity);
+        }
+
         /// Returns the pointer to the component for the entity, if it was added before, or null.
         pub fn get(self: Self, entity: Entity, comptime C: type) ?*C {
             return @field(self.components_map, @typeName(C)).getForEntity(entity);

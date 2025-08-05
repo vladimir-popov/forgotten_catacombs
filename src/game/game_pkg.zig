@@ -56,13 +56,6 @@ pub const DUNGEON_REGION: primitives.Region = .{
     .cols = DUNGEON_COLS,
 };
 
-pub const Effect = union(enum) {
-    pub const PhysicalDamageType = enum { cutting, blunt, thrusting };
-
-    physical_damage: struct { min_value: u8, max_value: u8, type: PhysicalDamageType },
-    heal: u8, // hit points
-};
-
 test {
     std.testing.refAllDecls(@This());
 }

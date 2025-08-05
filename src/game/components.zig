@@ -166,30 +166,48 @@ pub const Equipment = struct {
 
 pub const Potion = struct {
     pub const Color = enum { white, blue, red, green, black };
-    color: Color,
-    effect: g.Effect,
 
-    pub fn health(amount: u8, color: Color) Potion {
-        return .{ .color = color, .effect = .{ .heal = amount } };
+    color: Color,
+};
+
+pub const PhysicalDamage = struct {
+    pub const Type = enum { cutting, blunt, thrusting };
+
+    min: u8,
+    max: u8,
+    damage_type: Type,
+};
+
+pub const Effects = struct {
+    pub const Effect = union(enum) {
+        heal: u8, // hit points
+        // This effect applies an initial damage and continue applies the damage decreased by the
+        // `step` value until the damage become 0.
+        fire: struct { damage: u8, step: u8 = 1 },
+
+        pub fn format(self: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+            switch (self) {
+                .heal => |hp| try writer.print("Heal {d} hp", .{hp}),
+                .fire => |fire| try writer.print("Fire damage from {d}, step {d}", .{ fire.damage, fire.step }),
+            }
+        }
+    };
+
+    items: std.SegmentedList(Effect, 1),
+
+    pub const nothing: Effects = .{ .items = .{} };
+
+    pub fn one(effect: Effect) Effects {
+        return .{ .items = .{ .prealloc_segment = .{effect}, .len = 1 } };
+    }
+
+    pub fn deinit(self: *Effects, alloc: std.mem.Allocator) void {
+        self.items.deinit(alloc);
     }
 };
 
-pub const Weapon = struct {
-    effects: std.SegmentedList(g.Effect, 1),
-
-    pub fn deinit(self: *Weapon, alloc: std.mem.Allocator) void {
-        self.effects.deinit(alloc);
-    }
-
-    pub fn melee(min_damage: u8, max_damage: u8, damage_type: g.Effect.PhysicalDamageType) Weapon {
-        const permanent_effect: g.Effect = .{
-            .physical_damage = .{ .min_value = min_damage, .max_value = max_damage, .type = damage_type },
-        };
-        return .{ .effects = .{
-            .prealloc_segment = .{permanent_effect},
-            .len = 1,
-        } };
-    }
+pub const Nutritions = struct {
+    calories: u8,
 };
 
 pub const Initiative = struct {
@@ -208,17 +226,23 @@ pub const SourceOfLight = struct {
     radius: f16,
 };
 
+pub const Weight = struct {
+    kg: u8,
+};
+
 pub const Components = struct {
     animation: ?Animation = null,
     // must be provided for every entity
     description: ?Description,
     door: ?Door = null,
+    effects: ?Effects = null,
     equipment: ?Equipment = null,
     health: ?Health = null,
     initiative: ?Initiative = null,
     inventory: ?Inventory = null,
     ladder: ?Ladder = null,
     pile: ?Pile = null,
+    physical_damage: ?PhysicalDamage = null,
     price: ?Price = null,
     position: ?Position = null,
     potion: ?Potion = null,
@@ -228,6 +252,6 @@ pub const Components = struct {
     // must be provided for every entity
     sprite: ?Sprite,
     state: ?EnemyState = null,
-    weapon: ?Weapon = null,
     wallet: ?Wallet = null,
+    weight: ?Weight = null,
 };

@@ -58,6 +58,10 @@ pub fn ArraySet(comptime C: anytype) type {
             return .{ .parent = self };
         }
 
+        pub fn existsForEntity(self: Self, entity: Entity) bool {
+            return self.entity_index.contains(entity);
+        }
+
         /// Returns the pointer to the component for the entity if it was added before, or null.
         pub fn getForEntity(self: Self, entity: Entity) ?*C {
             if (self.entity_index.get(entity)) |idx| {

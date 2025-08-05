@@ -318,9 +318,7 @@ fn calculateQuickActionForTarget(
 
     if (player_position.place.near4(target_position.place)) {
         if (self.session.isEnemy(target_entity)) {
-            if (self.session.getWeapon(self.session.player)) |weapon| {
-                return .{ .hit = .{ .target = target_entity, .weapon = weapon.* } };
-            }
+            return .{ .hit = target_entity };
         }
         if (self.session.registry.get(target_entity, c.Door)) |door| {
             // the player should not be able to open/close the door stay in the doorway

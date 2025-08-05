@@ -22,7 +22,6 @@ pub const Cheat = union(enum) {
     ///  - for Buying tab the balance of the shop will be changed;
     ///  - for Selling tab the player's balance will be changed.
     set_money: u8,
-    hit: g.Action.Hit,
 
     pub fn init(tag: Tag, args: []const u8) ?Cheat {
         switch (tag) {
@@ -55,22 +54,6 @@ pub const Cheat = union(enum) {
             } else {
                 log.warn(
                     "Wrong arguments '{s}' for 'set money' command. It expects a number value to set.",
-                    .{args},
-                );
-            },
-            .hit => {
-                var itr = std.mem.tokenizeScalar(u8, args, ' ');
-                if (itr.next()) |entity_str| if (g.Entity.parse(entity_str)) |target|
-                    if (itr.next()) |value_str| if (tryParse(u8, value_str)) |damage| {
-                        return .{
-                            .hit = .{
-                                .target = target,
-                                .weapon = c.Weapon.melee(damage, damage, .cutting),
-                            },
-                        };
-                    };
-                log.warn(
-                    "Wrong arguments '{s}' for 'hit' command. It expects an ID of the target and a damage amount.",
                     .{args},
                 );
             },
@@ -109,7 +92,6 @@ pub const Cheat = union(enum) {
             return switch (self) {
                 .dump_vector_field => "dump vectors",
                 .goto => "goto",
-                .hit => "hit",
                 .move_player_to_ladder_down => "down ladder",
                 .move_player_to_ladder_up => "up ladder",
                 .set_health => "set health",
@@ -156,7 +138,6 @@ pub const Cheat = union(enum) {
                     .col = goto.col + screen_corner.col,
                 });
             },
-            .hit => return .{ .hit = self.hit },
             else => return null,
         }
         return null;

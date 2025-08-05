@@ -42,16 +42,6 @@ pub fn ComponentsMap(comptime ComponentsStruct: anytype) type {
             },
         }
     }
-    // every type in the struct should be unique:
-    std.sort.pdq(Type.StructField, &components, {}, compareTypes);
-    for (0..components.len - 1) |i| {
-        if (components[i].type == components[i + 1].type) {
-            @compileError(std.fmt.comptimePrint(
-                "The `{s}` has fields with the same type `{s}`, but all types of the components must be unique",
-                .{ @typeName(ComponentsStruct), components[i].name },
-            ));
-        }
-    }
 
     return @Type(.{
         .@"struct" = .{
@@ -61,10 +51,4 @@ pub fn ComponentsMap(comptime ComponentsStruct: anytype) type {
             .is_tuple = false,
         },
     });
-}
-
-/// Compares types of the two fields of the ComponentsStruct.
-/// Used to check uniqueness of the components.
-fn compareTypes(_: void, a: Type.StructField, b: Type.StructField) bool {
-    return a.type != b.type;
 }

@@ -179,7 +179,7 @@ fn formatInventoryLine(self: *Self, line: *w.TextArea.Line, item: g.Entity) ![]c
         "???";
     const using = if (item.eql(self.equipment.weapon) or item.eql(self.equipment.light))
         "[x]"
-    else if (self.session.isTool(item)) "[ ]" else "   ";
+    else if (self.session.isEquipment(item)) "[ ]" else "   ";
     log.debug("{d}: {u}({d}) {s} {s}", .{ item.id, sprite.codepoint, sprite.codepoint, name, using });
     return try std.fmt.bufPrint(line, inventory_line_fmt, .{ sprite.codepoint, name, using });
 }
@@ -206,15 +206,15 @@ fn useSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Use item {d} ({any})", .{ item.id, self.equipment });
 
-    if (item.eql(self.equipment.weapon)) {
-        self.equipment.weapon = null;
-    } else if (self.session.registry.get(item, c.Weapon)) |_| {
-        self.equipment.weapon = item;
-    }
     if (item.eql(self.equipment.light)) {
         self.equipment.light = null;
     } else if (self.session.registry.get(item, c.SourceOfLight)) |_| {
         self.equipment.light = item;
+    }
+    if (item.eql(self.equipment.weapon)) {
+        self.equipment.weapon = null;
+    } else if (self.session.registry.get(item, c.PhysicalDamage)) |_| {
+        self.equipment.weapon = item;
     }
     try self.updateInventoryTab();
 }

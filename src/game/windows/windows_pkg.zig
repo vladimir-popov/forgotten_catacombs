@@ -58,9 +58,21 @@ pub fn notification(alloc: std.mem.Allocator, message: []const u8) !ModalWindow(
 
 /// Example:
 /// ```
-/// ┌────────────────Club───────────────┐
-/// │ Id: 12                            │
-/// │ Damage: 2-5                       │
+/// ┌────────────────Club───────────────┐---
+/// │ Id: 12                            │ ^
+/// │ Position: 12                      │ |
+/// │ State: sleep                      │ |
+/// │ Health: 10/10                     │ |
+/// │ Speed: 10                         │ | Only in devmode
+/// │ Weight: 3                         │ |
+/// │ Weapon: Club                      │ |
+/// │   Damage: cutting 2-3             │ |
+/// │   Effects:                        │ |
+/// │      fire from 5 step 2           │ |
+/// │ Light: Torch 5 radius             │ v
+/// │-----------------------------------│---
+/// │ The same information, but as a    │
+/// │ text with short description.      │
 /// └───────────────────────────────────┘
 ///═══════════════════════════════════════
 ///                                Close
@@ -71,19 +83,10 @@ pub fn entityDescription(
     entity: g.Entity,
     dev_mode: bool,
 ) !ModalWindow(TextArea) {
+    // TODO: write test for description of every entity
     var text_area: TextArea = .empty;
     const description = registry.get(entity, c.Description);
     const title: []const u8 = if (description) |d| d.name() else "";
-    if (description) |descr| {
-        for (descr.description()) |str| {
-            const line = try text_area.addEmptyLine(alloc);
-            std.mem.copyForwards(u8, line, str);
-        }
-        if (descr.description().len > 0) {
-            const line = try text_area.lines.addOne(alloc);
-            line.* = @splat('-');
-        }
-    }
     if (dev_mode) {
         var line = try text_area.addEmptyLine(alloc);
         _ = try std.fmt.bufPrint(line[1..], "Id: {d}", .{entity.id});
@@ -91,28 +94,81 @@ pub fn entityDescription(
             line = try text_area.addEmptyLine(alloc);
             _ = try std.fmt.bufPrint(line[1..], "Position: {any}", .{position.place});
         }
+        if (registry.get(entity, c.EnemyState)) |state| {
+            line = try text_area.addEmptyLine(alloc);
+            _ = try std.fmt.bufPrint(line[1..], "State: is {s}", .{@tagName(state.*)});
+        }
+        if (registry.get(entity, c.Health)) |health| {
+            line = try text_area.addEmptyLine(alloc);
+            _ = try std.fmt.bufPrint(line[1..], "Health: {d}/{d}", .{ health.current, health.max });
+        }
+        if (registry.get(entity, c.Speed)) |speed| {
+            line = try text_area.addEmptyLine(alloc);
+            _ = try std.fmt.bufPrint(line[1..], "Speed: {d}", .{speed.move_points});
+        }
+        if (registry.get(entity, c.Equipment)) |equipment| {
+            if (equipment.weapon) |weapon| {
+                if (registry.get2(weapon, c.Description, c.PhysicalDamage)) |tuple| {
+                    line = try text_area.addEmptyLine(alloc);
+                    _ = try std.fmt.bufPrint(line[1..], "Weapon: {s}", .{tuple[0].name()});
+                    line = try text_area.addEmptyLine(alloc);
+                    _ = try std.fmt.bufPrint(
+                        line[3..],
+                        "Damage: {s} {d}-{d}",
+                        .{ @tagName(tuple[1].damage_type), tuple[1].min, tuple[1].max },
+                    );
+                    if (registry.get(weapon, c.Effects)) |effects| {
+                        try describeEffects(alloc, &text_area, effects, 3);
+                    }
+                }
+            }
+            if (equipment.light) |light| {
+                if (registry.get2(light, c.Description, c.SourceOfLight)) |tuple| {
+                    line = try text_area.addEmptyLine(alloc);
+                    _ = try std.fmt.bufPrint(line[1..], "Light: {s} radius {d}", .{ tuple[0].name(), tuple[1].radius });
+                }
+            }
+        }
+        if (registry.get(entity, c.PhysicalDamage)) |damage| {
+            line = try text_area.addEmptyLine(alloc);
+            _ = try std.fmt.bufPrint(
+                line[1..],
+                "Damage: {s} {d}-{d}",
+                .{ @tagName(damage.damage_type), damage.min, damage.max },
+            );
+        }
+        if (registry.get(entity, c.Effects)) |effects| {
+            try describeEffects(alloc, &text_area, effects, 1);
+        }
+        if (registry.get(entity, c.SourceOfLight)) |light| {
+            line = try text_area.addEmptyLine(alloc);
+            _ = try std.fmt.bufPrint(line[1..], "Radius of light: {d}", .{light.radius});
+        }
+        if (registry.get(entity, c.Weight)) |weight| {
+            line = try text_area.addEmptyLine(alloc);
+            _ = try std.fmt.bufPrint(line[1..], "Weight: {d}", .{weight.kg});
+        }
+        line = try text_area.lines.addOne(alloc);
+        line.* = @splat('-');
     }
-    if (registry.get(entity, c.EnemyState)) |state| {
-        const line = try text_area.addEmptyLine(alloc);
-        _ = try std.fmt.bufPrint(line[1..], "State: is {s}", .{@tagName(state.*)});
-    }
-    if (registry.get(entity, c.Health)) |health| {
-        const line = try text_area.addEmptyLine(alloc);
-        _ = try std.fmt.bufPrint(line[1..], "Health: {d}/{d}", .{ health.current, health.max });
-    }
-    if (registry.get(entity, c.Speed)) |speed| {
-        const line = try text_area.addEmptyLine(alloc);
-        _ = try std.fmt.bufPrint(line[1..], "Speed: {d}", .{speed.move_points});
-    }
-    // if (registry.get(entity, c.Weapon)) |weapon| {
-    //     const line = try text_area.addEmptyLine(alloc);
-    //     _ = try std.fmt.bufPrint(line[1..], "Damage: {d}-{d}", .{ weapon.min_damage, weapon.max_damage });
-    // }
-    if (registry.get(entity, c.SourceOfLight)) |light| {
-        const line = try text_area.addEmptyLine(alloc);
-        _ = try std.fmt.bufPrint(line[1..], "Radius of light: {d}", .{light.radius});
+    // A description in form of flat text
+    if (description) |descr| {
+        for (descr.description()) |str| {
+            const line = try text_area.addEmptyLine(alloc);
+            std.mem.copyForwards(u8, line, str);
+        }
     }
     return .{ .area = text_area, .title = title };
+}
+
+fn describeEffects(alloc: std.mem.Allocator, text_area: *TextArea, effects: *c.Effects, pad: u8) !void {
+    var line = try text_area.addEmptyLine(alloc);
+    _ = try std.fmt.bufPrint(line[pad..], "Effects:", .{});
+    var itr = effects.items.constIterator(0);
+    while (itr.next()) |effect| {
+        line = try text_area.addEmptyLine(alloc);
+        _ = try std.fmt.bufPrint(line[pad + 3 ..], "{any}", .{effect});
+    }
 }
 
 /// Example:

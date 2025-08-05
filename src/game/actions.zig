@@ -16,10 +16,6 @@ pub const Action = union(enum) {
         target: Target,
         keep_moving: bool = false,
     };
-    pub const Hit = struct {
-        target: g.Entity,
-        weapon: c.Weapon,
-    };
     /// Do nothing, as example, when trying to move to the wall
     do_nothing,
     /// Skip the round
@@ -30,8 +26,8 @@ pub const Action = union(enum) {
     open: struct { id: g.Entity, place: p.Point },
     /// An entity is going to close a door
     close: struct { id: g.Entity, place: p.Point },
-    /// 
-    hit: Hit,
+    /// An entity to hit
+    hit: g.Entity,
     /// The id of an item that someone is going to take from the floor
     pickup: g.Entity,
     /// The player moves from the level to another level
