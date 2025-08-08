@@ -53,6 +53,14 @@ pub fn Writer(comptime Underlying: type) type {
             try self.writeValue(seed);
         }
 
+        pub fn writePotionColors(self: *Self, colors: []const g.Color) Error!void {
+            try self.beginCollection();
+            for (colors) |color| {
+                try self.write(color);
+            }
+            try self.endCollection();
+        }
+
         /// Writes the value for a next generated entity.
         /// It used to recovery entities registry.
         pub fn writeNextEntityId(self: *Self, next_entity: g.Entity) Error!void {
@@ -270,6 +278,14 @@ pub fn Reader(comptime Underlying: type) type {
         pub fn readSeed(self: *Self) Error!u64 {
             try assertEql(self.readKeyAsString(), "seed");
             return try self.readNumber(u64);
+        }
+
+        pub fn readPotionColors(self: *Self, colors: []g.Color) Error!void {
+            try self.beginCollection();
+            for (0..colors.len) |i| {
+                colors[i] = try self.read(g.Color);
+            }
+            try self.endCollection();
         }
 
         pub fn readNextEntityId(self: *Self) Error!g.Entity {

@@ -154,7 +154,9 @@ pub const Shop = struct {
 };
 
 pub const Wallet = struct {
-    money: u16 = 0,
+    money: u16,
+
+    pub const empty: Wallet = .{ .money = 0 };
 };
 
 pub const Equipment = struct {
@@ -162,12 +164,6 @@ pub const Equipment = struct {
     light: ?g.Entity,
 
     pub const nothing: Equipment = .{ .weapon = null, .light = null };
-};
-
-pub const Potion = struct {
-    pub const Color = enum { white, blue, red, green, black };
-
-    color: Color,
 };
 
 pub const PhysicalDamage = struct {
@@ -193,6 +189,8 @@ pub const Effects = struct {
         }
     };
 
+    pub const count: usize = @typeInfo(@typeInfo(Effect).@"union".tag_type.?).@"enum".fields.len;
+
     items: std.SegmentedList(Effect, 1),
 
     pub const nothing: Effects = .{ .items = .{} };
@@ -208,6 +206,10 @@ pub const Effects = struct {
 
 pub const Nutritions = struct {
     calories: u8,
+};
+
+pub const Potion = struct {
+    color: g.Color,
 };
 
 pub const Initiative = struct {
@@ -227,7 +229,7 @@ pub const SourceOfLight = struct {
 };
 
 pub const Weight = struct {
-    kg: u8,
+    value: u8,
 };
 
 pub const Components = struct {

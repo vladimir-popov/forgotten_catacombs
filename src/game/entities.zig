@@ -4,6 +4,9 @@ const g = @import("game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
+/// Creates components for the player with empty inventory and nothing equipped.
+///
+/// - `alloc` the ecs.Registry allocator.
 pub fn player(alloc: std.mem.Allocator) !c.Components {
     return .{
         .sprite = .{ .codepoint = cp.human },
@@ -32,7 +35,7 @@ pub fn rat(place: p.Point) c.Components {
 pub const Torch = c.Components{
     .description = .{ .preset = .torch },
     .sprite = .{ .codepoint = cp.source_of_light },
-    .weight = .{ .kg = 1 },
+    .weight = .{ .value = 20 },
     .source_of_light = .{ .radius = 5 },
     .price = .{ .value = 5 },
     .physical_damage = .{ .min = 2, .max = 3, .damage_type = .blunt },
@@ -42,7 +45,7 @@ pub const Torch = c.Components{
 pub const Pickaxe = c.Components{
     .description = .{ .preset = .pickaxe },
     .sprite = .{ .codepoint = cp.weapon_melee },
-    .weight = .{ .kg = 10 },
+    .weight = .{ .value = 100 },
     .physical_damage = .{ .min = 3, .max = 5, .damage_type = .cutting },
     .price = .{ .value = 15 },
 };
@@ -50,19 +53,22 @@ pub const Pickaxe = c.Components{
 pub const Club = c.Components{
     .description = .{ .preset = .club },
     .sprite = .{ .codepoint = cp.weapon_melee },
-    .weight = .{ .kg = 8 },
+    .weight = .{ .value = 80 },
     .physical_damage = .{ .min = 5, .max = 8, .damage_type = .blunt },
     .price = .{ .value = 28 },
 };
 
-pub const HealthPotion = c.Components{
-    .description = .{ .preset = .unknown_potion },
-    .sprite = .{ .codepoint = cp.potion },
-    .weight = .{ .kg = 2 },
-    .potion = .{ .color = .red },
-    .effects = c.Effects.one(.{ .heal = 20 }),
-    .price = .{ .value = 20 },
-};
+// The first effect describes the type of the potion
+pub fn healingPotion(colors: []const g.Color) c.Components {
+    return .{
+        .description = .{ .preset = .healing_potion },
+        .sprite = .{ .codepoint = cp.potion },
+        .potion = .{ .color = colors[@intFromEnum(c.Effects.Effect.heal)] },
+        .weight = .{ .value = 10 },
+        .effects = c.Effects.one(.{ .heal = 20 }),
+        .price = .{ .value = 20 },
+    };
+}
 
 pub fn openedDoor(place: p.Point) c.Components {
     return .{

@@ -18,6 +18,7 @@ pub const AI = @import("AI.zig");
 pub const Button = @import("Button.zig");
 pub const Cheat = @import("cheats.zig").Cheat;
 pub const Codepoint = u21;
+pub const Color = enum { red, green, blue, black, white };
 pub const DrawingMode = Runtime.DrawingMode;
 pub const Entity = ecs.Entity;
 pub const Game = @import("Game.zig");
@@ -29,6 +30,9 @@ pub const Render = @import("Render.zig");
 pub const Runtime = @import("Runtime.zig");
 pub const TextAlign = Runtime.TextAlign;
 pub const Viewport = @import("Viewport.zig");
+
+
+
 
 pub const RENDER_DELAY_MS = 200;
 

@@ -264,6 +264,7 @@ const Loading = struct {
 
                 try self.state.reading.beginObject();
                 self.session.setSeed(try self.state.reading.readSeed());
+                try self.state.reading.readPotionColors(&self.session.potion_colors);
                 self.session.registry.next_entity = try self.state.reading.readNextEntityId();
                 self.level_depth = try self.state.reading.readDepth();
                 self.session.max_depth = try self.state.reading.readMaxDepth();
@@ -388,6 +389,7 @@ const Saving = struct {
                 self.state = .{ .writing = Writer.init(&self.session.registry, self.file.writer()) };
                 try self.state.writing.beginObject();
                 try self.state.writing.writeSeed(self.session.seed);
+                try self.state.writing.writePotionColors(&self.session.potion_colors);
                 try self.state.writing.writeNextEntityId(self.session.registry.next_entity);
                 try self.state.writing.writeDepth(self.session.level.depth);
                 try self.state.writing.writeMaxDepth(self.session.max_depth);

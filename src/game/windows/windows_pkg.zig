@@ -146,7 +146,7 @@ pub fn entityDescription(
         }
         if (registry.get(entity, c.Weight)) |weight| {
             line = try text_area.addEmptyLine(alloc);
-            _ = try std.fmt.bufPrint(line[1..], "Weight: {d}", .{weight.kg});
+            _ = try std.fmt.bufPrint(line[1..], "Weight: {d}", .{weight.value});
         }
         line = try text_area.lines.addOne(alloc);
         line.* = @splat('-');

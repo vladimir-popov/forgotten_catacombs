@@ -61,15 +61,23 @@ level: g.Level,
 max_depth: u8,
 /// The current mode of the game
 mode: Mode,
+/// Randomly shaffled colors of the potions
+potion_colors: [@typeInfo(g.Color).@"enum".fields.len]g.Color,
 
-/// The GameSession should be initialized in few steps:
-///  - `preInit` sets up external dependencies, initializes inner containers and the viewport.
-///  - the seed should be set up;
-///  - the player should be added to the session;
-///  - the max depth should be set up;
-///  - the level should be completely initialized;
-///  - `completeInitialization` subscribes the viewport and the game session itself on events;
+/// Two cases of initialization exists:
+///  1. Creating a new Game Session;
+///  2. Loading existed Game Session;
+/// To create a fully initialized new session the `initNew` method should be used.
+/// To load session the follow steps should be passed:
+///  1. `preInit` sets up external dependencies, initializes inner containers and the viewport.
+///  2. the seed should be set up;
+///  3. the potions colors should be set up;
+///  4. the player should be added to the session;
+///  5. the max depth should be set up;
+///  6. the level should be completely initialized;
+///  7. `completeInitialization` subscribes the viewport and the game session itself on events;
 ///    move the viewport to the player; changes the inner state to the `play` mode.
+///
 pub fn preInit(
     self: *GameSession,
     gpa: std.mem.Allocator,
@@ -90,7 +98,12 @@ pub fn preInit(
         .player = undefined,
         .level = undefined,
         .mode = undefined,
+        .potion_colors = undefined,
     };
+    std.debug.assert(@typeInfo(g.Color).@"enum".fields.len > c.Effects.count);
+    for (0..@typeInfo(g.Color).@"enum".fields.len) |i| {
+        self.potion_colors[i] = @enumFromInt(i);
+    }
     log.debug("The game session is preinited", .{});
 }
 
@@ -116,11 +129,12 @@ pub fn initNew(
     log.debug("Begin a new game session with seed {d}", .{seed});
     try self.preInit(gpa, runtime, render);
     self.setSeed(seed);
+    self.prng.random().shuffle(g.Color, &self.potion_colors);
     self.player = try self.registry.addNewEntity(try g.entities.player(self.registry.allocator()));
     try self.equipPlayer();
     self.max_depth = 0;
     self.level = g.Level.preInit(self.arena.allocator(), &self.registry);
-    try self.level.initAsFirstLevel(self.player);
+    try self.level.initAsFirstLevel(self.player, &self.potion_colors);
     try self.completeInitialization();
 
     self.mode = .{ .play = undefined };
