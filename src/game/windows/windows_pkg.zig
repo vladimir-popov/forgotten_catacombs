@@ -108,17 +108,23 @@ pub fn entityDescription(
         }
         if (registry.get(entity, c.Equipment)) |equipment| {
             if (equipment.weapon) |weapon| {
-                if (registry.get2(weapon, c.Description, c.PhysicalDamage)) |tuple| {
+                if (registry.get2(weapon, c.Description, c.Weapon)) |tuple| {
                     line = try text_area.addEmptyLine(alloc);
                     _ = try std.fmt.bufPrint(line[1..], "Weapon: {s}", .{tuple[0].name()});
                     line = try text_area.addEmptyLine(alloc);
                     _ = try std.fmt.bufPrint(
                         line[3..],
                         "Damage: {s} {d}-{d}",
-                        .{ @tagName(tuple[1].damage_type), tuple[1].min, tuple[1].max },
+                        .{ @tagName(tuple[1].damage_type), tuple[1].damage_min, tuple[1].damage_max },
                     );
-                    if (registry.get(weapon, c.Effects)) |effects| {
-                        try describeEffects(alloc, &text_area, effects, 3);
+                    if (tuple[1].effects.len > 0) {
+                        line = try text_area.addEmptyLine(alloc);
+                        _ = try std.fmt.bufPrint(line[3..], "Effects:", .{});
+                        var itr = tuple[1].effects.constIterator(0);
+                        while (itr.next()) |effect| {
+                            line = try text_area.addEmptyLine(alloc);
+                            _ = try std.fmt.bufPrint(line[6..], "{any}", .{effect});
+                        }
                     }
                 }
             }
@@ -129,16 +135,13 @@ pub fn entityDescription(
                 }
             }
         }
-        if (registry.get(entity, c.PhysicalDamage)) |damage| {
+        if (registry.get(entity, c.Weapon)) |weapon| {
             line = try text_area.addEmptyLine(alloc);
             _ = try std.fmt.bufPrint(
                 line[1..],
                 "Damage: {s} {d}-{d}",
-                .{ @tagName(damage.damage_type), damage.min, damage.max },
+                .{ @tagName(weapon.damage_type), weapon.damage_min, weapon.damage_max },
             );
-        }
-        if (registry.get(entity, c.Effects)) |effects| {
-            try describeEffects(alloc, &text_area, effects, 1);
         }
         if (registry.get(entity, c.SourceOfLight)) |light| {
             line = try text_area.addEmptyLine(alloc);
@@ -159,16 +162,6 @@ pub fn entityDescription(
         }
     }
     return .{ .area = text_area, .title = title };
-}
-
-fn describeEffects(alloc: std.mem.Allocator, text_area: *TextArea, effects: *c.Effects, pad: u8) !void {
-    var line = try text_area.addEmptyLine(alloc);
-    _ = try std.fmt.bufPrint(line[pad..], "Effects:", .{});
-    var itr = effects.items.constIterator(0);
-    while (itr.next()) |effect| {
-        line = try text_area.addEmptyLine(alloc);
-        _ = try std.fmt.bufPrint(line[pad + 3 ..], "{any}", .{effect});
-    }
 }
 
 /// Example:

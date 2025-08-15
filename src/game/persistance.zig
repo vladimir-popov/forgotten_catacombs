@@ -48,111 +48,22 @@ pub fn Writer(comptime Underlying: type) type {
             try self.writer.endObject();
         }
 
-        pub fn writeSeed(self: *Self, seed: u64) Error!void {
-            try self.writeStringKey("seed");
-            try self.writeValue(seed);
-        }
-
-        pub fn writePotionColors(self: *Self, colors: []const g.Color) Error!void {
-            try self.beginCollection();
-            for (colors) |color| {
-                try self.write(color);
-            }
-            try self.endCollection();
-        }
-
-        /// Writes the value for a next generated entity.
-        /// It used to recovery entities registry.
-        pub fn writeNextEntityId(self: *Self, next_entity: g.Entity) Error!void {
-            try self.writeStringKey("next_entity");
-            try self.writeValue(next_entity.id);
-        }
-
-        pub fn writeDepth(self: *Self, depth: u8) Error!void {
-            try self.writeStringKey("depth");
-            try self.writeValue(depth);
-        }
-
-        pub fn writeMaxDepth(self: *Self, depth: u8) Error!void {
-            try self.writeStringKey("max_depth");
-            try self.writeValue(depth);
-        }
-
-        pub fn writeLevelEntities(self: *Self, entities: []g.Entity) Error!void {
-            try self.writeStringKey("entities");
-            try self.beginCollection();
-            for (entities) |entity| {
-                try self.writeEntity(entity);
-            }
-            try self.endCollection();
-        }
-
-        pub fn writeVisitedPlaces(self: *Self, places: []std.DynamicBitSetUnmanaged) Error!void {
-            try self.writeStringKey("visited_places");
-            try self.beginCollection();
-            for (places) |row| {
-                var itr = row.iterator(.{});
-                try self.beginCollection();
-                while (itr.next()) |idx| {
-                    try self.writeValue(idx);
-                }
-                try self.endCollection();
-            }
-            try self.endCollection();
-        }
-
-        pub fn writeRememberedObjects(self: *Self, objects: std.AutoHashMapUnmanaged(p.Point, g.Entity)) Error!void {
-            try self.writeStringKey("remembered_objects");
-            var itr = objects.iterator();
-            try self.beginCollection();
-            while (itr.next()) |kv| {
-                try self.beginObject();
-                try self.writeNumericKey(kv.value_ptr.id);
-                try self.writeValue(kv.key_ptr.*);
-                try self.endObject();
-            }
-            try self.endCollection();
-        }
-
-        pub fn writePlayer(self: *Self, entity: g.Entity) Error!void {
-            try self.writeStringKey("player");
-            try self.writeEntity(entity);
-        }
-
-        fn writeEntity(self: *Self, entity: g.Entity) Error!void {
+        pub fn writeEntity(self: *Self, entity: g.Entity) Error!void {
             try self.beginObject();
             try self.writeNumericKey(entity.id);
             try self.write(try self.registry.entityToStruct(entity));
             try self.endObject();
         }
 
-        fn writeEntitiesSet(self: *Self, items: u.EntitiesSet) Error!void {
-            try self.beginCollection();
-            var itr = items.iterator();
-            while (itr.next()) |entity| {
-                try self.writeEntity(entity.*);
-            }
-            try self.endCollection();
-        }
-
-        fn write(self: *Self, value: anytype) Error!void {
+        pub fn write(self: *Self, value: anytype) Error!void {
             const T = @TypeOf(value);
-            if (T == u.EntitiesSet) {
-                try self.writeEntitiesSet(@as(u.EntitiesSet, value));
-                return;
-            }
-            if (T == c.Effects) {
-                try self.beginCollection();
-                var itr = value.items.constIterator(0);
-                while (itr.next()) |item| {
-                    try self.write(item);
-                }
-                try self.endCollection();
+            if (std.meta.hasMethod(T, "save")) {
+                try value.save(self);
                 return;
             }
             switch (@typeInfo(T)) {
                 .bool, .int, .float, .comptime_int, .comptime_float, .@"enum", .enum_literal => {
-                    try self.writeValue(value);
+                    try self.writer.write(value);
                 },
                 .optional => if (value == null) {
                     log.err("null is not supported value.", .{});
@@ -216,19 +127,19 @@ pub fn Writer(comptime Underlying: type) type {
             }
         }
 
-        fn beginCollection(self: *Self) Error!void {
+        pub fn beginCollection(self: *Self) Error!void {
             try self.writer.beginArray();
         }
 
-        fn endCollection(self: *Self) Error!void {
+        pub fn endCollection(self: *Self) Error!void {
             try self.writer.endArray();
         }
 
-        fn writeStringKey(self: *Self, name: []const u8) Error!void {
+        pub fn writeStringKey(self: *Self, name: []const u8) Error!void {
             try self.writer.objectField(name);
         }
 
-        fn writeNumericKey(self: *Self, key: anytype) Error!void {
+        pub fn writeNumericKey(self: *Self, key: anytype) Error!void {
             const type_info = @typeInfo(@TypeOf(key));
             var buf: [@divExact(type_info.int.bits, 8)]u8 = undefined;
             switch (type_info) {
@@ -238,10 +149,6 @@ pub fn Writer(comptime Underlying: type) type {
                     return error.UnsupportedType;
                 },
             }
-        }
-
-        fn writeValue(self: *Self, value: anytype) Error!void {
-            try self.writer.write(value);
         }
     };
 }
@@ -275,76 +182,7 @@ pub fn Reader(comptime Underlying: type) type {
             try assertEql(self.reader.next(), .object_end);
         }
 
-        pub fn readSeed(self: *Self) Error!u64 {
-            try assertEql(self.readKeyAsString(), "seed");
-            return try self.readNumber(u64);
-        }
-
-        pub fn readPotionColors(self: *Self, colors: []g.Color) Error!void {
-            try self.beginCollection();
-            for (0..colors.len) |i| {
-                colors[i] = try self.read(g.Color);
-            }
-            try self.endCollection();
-        }
-
-        pub fn readNextEntityId(self: *Self) Error!g.Entity {
-            try assertEql(self.readKeyAsString(), "next_entity");
-            return .{ .id = try self.readNumber(g.Entity.IdType) };
-        }
-
-        pub fn readDepth(self: *Self) Error!u8 {
-            try assertEql(self.readKeyAsString(), "depth");
-            return try self.readNumber(u8);
-        }
-
-        pub fn readMaxDepth(self: *Self) Error!u8 {
-            try assertEql(self.readKeyAsString(), "max_depth");
-            return try self.readNumber(u8);
-        }
-
-        pub fn readLevelEntities(self: *Self, level: *g.Level) Error!void {
-            try assertEql(self.readKeyAsString(), "entities");
-            const alloc = level.arena.allocator();
-            try self.beginCollection();
-            while (!try self.isCollectionEnd()) {
-                try level.entities.append(alloc, try self.readEntity());
-            }
-            try self.endCollection();
-        }
-
-        pub fn readVisitedPlaces(self: *Self, level: *g.Level) Error!void {
-            try assertEql(self.readKeyAsString(), "visited_places");
-            try self.beginCollection();
-            for (0..level.dungeon.rows) |i| {
-                try self.beginCollection();
-                while (!try self.isCollectionEnd())
-                    level.visited_places[i].set(try self.readNumber(usize));
-                try self.endCollection();
-            }
-            try self.endCollection();
-        }
-
-        pub fn readRememberedObjects(self: *Self, level: *g.Level) Error!void {
-            try assertEql(self.readKeyAsString(), "remembered_objects");
-            try self.beginCollection();
-            const alloc = level.arena.allocator();
-            while (!try self.isCollectionEnd()) {
-                try self.beginObject();
-                const entity = g.Entity{ .id = try self.readKeyAsNumber(g.Entity.IdType) };
-                const place = try self.readValue(p.Point);
-                try level.remembered_objects.put(alloc, place, entity);
-                try self.endObject();
-            }
-            try self.endCollection();
-        }
-
-        pub fn readPlayer(self: *Self) anyerror!g.Entity {
-            try assertEql(self.readKeyAsString(), "player");
-            return try self.readEntity();
-        }
-
-        fn readEntity(self: *Self) anyerror!g.Entity {
+        pub fn readEntity(self: *Self) anyerror!g.Entity {
             try self.beginObject();
             const entity = g.Entity{ .id = try self.readKeyAsNumber(g.Entity.IdType) };
             const components = self.read(c.Components) catch |err| {
@@ -356,29 +194,10 @@ pub fn Reader(comptime Underlying: type) type {
             return entity;
         }
 
-        fn readEntitiesSet(self: *Self) Error!u.EntitiesSet {
-            const set = try u.EntitiesSet.init(self.registry.allocator());
-            try self.beginCollection();
-            while (!try self.isCollectionEnd()) {
-                try set.add(try self.readEntity());
-            }
-            try self.endCollection();
-            return set;
-        }
-
         // registry is used in case of EntitiesSet, to store the components during deserialization.
-        fn read(self: *Self, comptime T: type) Error!T {
-            if (T == u.EntitiesSet) {
-                return @as(T, try self.readEntitiesSet());
-            }
-            if (T == c.Effects) {
-                var effects: c.Effects = .nothing;
-                try self.beginCollection();
-                while (!try self.isCollectionEnd()) {
-                    try effects.items.append(self.registry.allocator(), try self.read(c.Effects.Effect));
-                }
-                try self.endCollection();
-                return effects;
+        pub fn read(self: *Self, comptime T: type) Error!T {
+            if (std.meta.hasMethod(T, "load")) {
+                return try T.load(self);
             }
             switch (@typeInfo(T)) {
                 .void => {
@@ -386,8 +205,25 @@ pub fn Reader(comptime Underlying: type) type {
                     try self.endObject();
                     return {};
                 },
-                .bool, .int, .comptime_int, .float, .comptime_float, .@"enum", .enum_literal => {
-                    return try self.readValue(T);
+                .bool => {
+                    const next = try self.reader.next();
+                    return if (next == .true) true else if (next == .false) false else {
+                        log.err("Wrong input. Expected bool, but was {any}", .{next});
+                        return error.WrongInput;
+                    };
+                },
+                .int, .comptime_int => {
+                    return try std.fmt.parseInt(T, try self.readBytes(), 10);
+                },
+                .float, .comptime_float => {
+                    return try std.fmt.parseFloat(T, try self.readBytes());
+                },
+                .@"enum", .enum_literal => {
+                    const str = try self.readBytes();
+                    return std.meta.stringToEnum(T, str) orelse {
+                        log.err("Wrong value {s} for the enum {s}", .{ str, @typeName(T) });
+                        return error.WrongInput;
+                    };
                 },
                 .optional => |op| {
                     return try self.read(op.child);
@@ -457,61 +293,37 @@ pub fn Reader(comptime Underlying: type) type {
             return error.UnsupportedType;
         }
 
-        fn readValue(self: *Self, comptime T: type) Error!T {
-            switch (@typeInfo(T)) {
-                .bool => {
-                    const next = try self.reader.next();
-                    return if (next == .true) true else if (next == .false) false else {
-                        log.err("Wrong input. Expected bool, but was {any}", .{next});
-                        return error.WrongInput;
-                    };
-                },
-                .int, .comptime_int => {
-                    return try std.fmt.parseInt(T, try self.readBytes(), 10);
-                },
-                .float, .comptime_float => {
-                    return try std.fmt.parseFloat(T, try self.readBytes());
-                },
-                .@"enum", .enum_literal => {
-                    const str = try self.readBytes();
-                    return std.meta.stringToEnum(T, str) orelse {
-                        log.err("Wrong value {s} for the enum {s}", .{ str, @typeName(T) });
-                        return error.WrongInput;
-                    };
-                },
-                else => return error.WrongInput,
-            }
-        }
-
-        fn isObjectEnd(self: *Self) Error!bool {
+        pub fn isObjectEnd(self: *Self) Error!bool {
             return try self.reader.peekNextTokenType() == .object_end;
         }
 
-        fn beginCollection(self: *Self) Error!void {
+        pub fn beginCollection(self: *Self) Error!void {
             try assertEql(self.reader.next(), .array_begin);
         }
 
-        fn endCollection(self: *Self) Error!void {
+        pub fn endCollection(self: *Self) Error!void {
             try assertEql(self.reader.next(), .array_end);
         }
 
-        fn isCollectionEnd(self: *Self) Error!bool {
+        pub fn isCollectionEnd(self: *Self) Error!bool {
             return try self.reader.peekNextTokenType() == .array_end;
         }
 
-        fn readKeyAsString(self: *Self) Error![]const u8 {
+        pub fn readKey(self: *Self, expected: []const u8) Error![]const u8 {
+            const key = try self.readBytes();
+            try assertEql(key, expected);
+            return key;
+        }
+
+        pub fn readKeyAsString(self: *Self) Error![]const u8 {
             return try self.readBytes();
         }
 
-        fn readKeyAsNumber(self: *Self, comptime N: type) Error!N {
+        pub fn readKeyAsNumber(self: *Self, comptime N: type) Error!N {
             return try std.fmt.parseInt(N, try self.readKeyAsString(), 10);
         }
 
-        fn readNumber(self: *Self, comptime T: type) Error!T {
-            return try std.fmt.parseInt(T, try self.readBytes(), 10);
-        }
-
-        fn readBytes(self: *Self) Error![]const u8 {
+        pub fn readBytes(self: *Self) Error![]const u8 {
             var capacity: usize = 0;
             while (true) {
                 switch (try self.reader.next()) {
@@ -596,12 +408,12 @@ test "All components should be serializable" {
         .ladder = c.Ladder{ .id = .{ .id = 2 }, .direction = .down, .target_ladder = .{ .id = 3 } },
         .pile = pile,
         .position = c.Position{ .place = p.Point.init(12, 42), .zorder = .item },
-        .potion = c.Potion.health(20, .green),
+        .potion = c.Potion.healing(20),
         .source_of_light = c.SourceOfLight{ .radius = 4 },
         .speed = c.Speed{ .move_points = 12 },
         .sprite = c.Sprite{ .codepoint = g.codepoints.human },
         .state = .walking,
-        .weapon = c.Weapon.melee(1, 2, .cutting),
+        .weapon = c.Weapon.withEffect(.cutting, 1, 2, .{ .burning = .{ .power = 5, .decrease = 1 } }),
     };
 
     var buffer: [4048]u8 = @splat(0);
@@ -621,7 +433,10 @@ test "All components should be serializable" {
     const underlying_reader = buffer_reader.reader();
     var reader = Reader(@TypeOf(underlying_reader)).init(&actual_registry, underlying_reader);
 
-    const actual = try reader.read(c.Components);
+    const actual = reader.read(c.Components) catch |err| {
+        std.debug.print("Generated json:\n{s}\n", .{&buffer});
+        return err;
+    };
 
     expectEql(expected, actual) catch |err| {
         std.debug.print("Generated json:\n{s}\n", .{buffer});
@@ -633,7 +448,7 @@ test "All components should be serializable" {
 fn expectEql(expected: anytype, actual: anytype) !void {
     try std.testing.expectEqual(@TypeOf(expected), @TypeOf(actual));
 
-    if (@TypeOf(expected) == std.SegmentedList(g.Effect, 1)) {
+    if (std.meta.hasMethod(@TypeOf(expected), "append")) {
         return std.testing.expectEqual(expected, actual);
     }
 

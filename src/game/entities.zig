@@ -26,7 +26,7 @@ pub fn rat(place: p.Point) c.Components {
         .position = .{ .zorder = .obstacle, .place = place },
         .description = .{ .preset = .rat },
         .health = .{ .max = 10, .current = 10 },
-        .physical_damage = .{ .min = 1, .max = 3, .damage_type = .thrusting },
+        .weapon = c.Weapon.thrusting(1, 3),
         .speed = .{ .move_points = 14 },
         .state = .sleeping,
     };
@@ -38,15 +38,14 @@ pub const Torch = c.Components{
     .weight = .{ .value = 20 },
     .source_of_light = .{ .radius = 5 },
     .price = .{ .value = 5 },
-    .physical_damage = .{ .min = 2, .max = 3, .damage_type = .blunt },
-    .effects = c.Effects.one(.{ .fire = .{ .damage = 2 } }),
+    .weapon = c.Weapon.withEffect(.blunt, 2, 3, .{ .burning = .{ .power = 2, .decrease = 1 } }),
 };
 
 pub const Pickaxe = c.Components{
     .description = .{ .preset = .pickaxe },
     .sprite = .{ .codepoint = cp.weapon_melee },
     .weight = .{ .value = 100 },
-    .physical_damage = .{ .min = 3, .max = 5, .damage_type = .cutting },
+    .weapon = c.Weapon.cutting(3, 5),
     .price = .{ .value = 15 },
 };
 
@@ -54,21 +53,18 @@ pub const Club = c.Components{
     .description = .{ .preset = .club },
     .sprite = .{ .codepoint = cp.weapon_melee },
     .weight = .{ .value = 80 },
-    .physical_damage = .{ .min = 5, .max = 8, .damage_type = .blunt },
+    .weapon = c.Weapon.blunt(5, 8),
     .price = .{ .value = 28 },
 };
 
 // The first effect describes the type of the potion
-pub fn healingPotion(colors: []const g.Color) c.Components {
-    return .{
-        .description = .{ .preset = .healing_potion },
-        .sprite = .{ .codepoint = cp.potion },
-        .potion = .{ .color = colors[@intFromEnum(c.Effects.Effect.heal)] },
-        .weight = .{ .value = 10 },
-        .effects = c.Effects.one(.{ .heal = 20 }),
-        .price = .{ .value = 20 },
-    };
-}
+pub const HealingPotion = c.Components{
+    .description = .{ .preset = .healing_potion },
+    .sprite = .{ .codepoint = cp.potion },
+    .potion = .{ .effect = .{ .healing = .{ .power = 20, .decrease = 20 } } },
+    .weight = .{ .value = 10 },
+    .price = .{ .value = 20 },
+};
 
 pub fn openedDoor(place: p.Point) c.Components {
     return .{

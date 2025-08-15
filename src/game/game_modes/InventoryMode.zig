@@ -213,7 +213,7 @@ fn useSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     }
     if (item.eql(self.equipment.weapon)) {
         self.equipment.weapon = null;
-    } else if (self.session.registry.get(item, c.PhysicalDamage)) |_| {
+    } else if (self.session.registry.get(item, c.Weapon)) |_| {
         self.equipment.weapon = item;
     }
     try self.updateInventoryTab();

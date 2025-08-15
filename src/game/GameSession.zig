@@ -61,8 +61,6 @@ level: g.Level,
 max_depth: u8,
 /// The current mode of the game
 mode: Mode,
-/// Randomly shaffled colors of the potions
-potion_colors: [@typeInfo(g.Color).@"enum".fields.len]g.Color,
 
 /// Two cases of initialization exists:
 ///  1. Creating a new Game Session;
@@ -98,12 +96,7 @@ pub fn preInit(
         .player = undefined,
         .level = undefined,
         .mode = undefined,
-        .potion_colors = undefined,
     };
-    std.debug.assert(@typeInfo(g.Color).@"enum".fields.len > c.Effects.count);
-    for (0..@typeInfo(g.Color).@"enum".fields.len) |i| {
-        self.potion_colors[i] = @enumFromInt(i);
-    }
     log.debug("The game session is preinited", .{});
 }
 
@@ -129,12 +122,11 @@ pub fn initNew(
     log.debug("Begin a new game session with seed {d}", .{seed});
     try self.preInit(gpa, runtime, render);
     self.setSeed(seed);
-    self.prng.random().shuffle(g.Color, &self.potion_colors);
     self.player = try self.registry.addNewEntity(try g.entities.player(self.registry.allocator()));
     try self.equipPlayer();
     self.max_depth = 0;
     self.level = g.Level.preInit(self.arena.allocator(), &self.registry);
-    try self.level.initAsFirstLevel(self.player, &self.potion_colors);
+    try self.level.initAsFirstLevel(self.player);
     try self.completeInitialization();
 
     self.mode = .{ .play = undefined };
@@ -283,7 +275,15 @@ pub fn isItem(self: *const GameSession, entity: g.Entity) bool {
 
 pub fn isEquipment(self: *const GameSession, item: g.Entity) bool {
     return self.isItem(item) and
-        (self.registry.has(item, c.PhysicalDamage) or self.registry.has(item, c.SourceOfLight));
+        (self.registry.has(item, c.Weapon) or self.registry.has(item, c.SourceOfLight));
+}
+
+fn getWeapon(self: *const GameSession, owner: g.Entity) ?*c.Weapon {
+    if (self.registry.get(owner, c.Equipment)) |equipment| {
+        if (equipment.weapon) |weapon_id|
+            return self.registry.get(weapon_id, c.Weapon);
+    }
+    return self.registry.get(owner, c.Weapon);
 }
 
 /// Handles intentions to do some actions
@@ -425,27 +425,27 @@ fn doHit(
     enemy: g.Entity,
 ) !void {
     if (self.registry.get(enemy, c.Health)) |enemy_health| {
-        // if the actor doesn't have an equipment,
-        // then it must have damage components (it means bare hand, or tooth, etc)
-        var weapon_id = actor;
-        if (self.registry.get(actor, c.Equipment)) |equipment| {
-            if (equipment.weapon) |weapon|
-                weapon_id = weapon;
-        }
-
-        // Applying all effects of the weapon
-        if (self.registry.get(weapon_id, c.Effects)) |effects| {
-            if (try applyEffects(effects, enemy_health)) {
-                try self.registry.remove(weapon_id, c.Effects);
-            }
-        }
+        const weapon = self.getWeapon(actor) orelse {
+            log.err("Actor {d} doesn't have any weapon", .{actor.id});
+            return;
+        };
 
         // Applying physical damage
-        const damage = self.registry.get(weapon_id, c.PhysicalDamage) orelse
-            std.debug.panic("The weapon entity {d} doesn't have a PhysicalDamage", .{weapon_id.id});
+        const damage = self.prng.random().intRangeLessThan(u8, weapon.damage_min, weapon.damage_max);
+        doDamage(damage, weapon.damage_type, enemy_health);
 
-        const amount = self.prng.random().intRangeLessThan(u8, damage.min, damage.max);
-        enemy_health.current -|= amount;
+        // Applying all effects of the weapon
+        if (weapon.effects.len > 0) {
+            const impacts = try self.registry.getOrSet(enemy, c.Impacts, .{});
+            var itr = weapon.effects.constIterator(0);
+            while (itr.next()) |effect| {
+                impacts.add(effect);
+            }
+            try makeImpacts(impacts, enemy_health);
+            if (impacts.isNothing()) {
+                try self.registry.remove(enemy, c.Impacts);
+            }
+        }
 
         // a special case to give to player a chance to notice what happened
         const is_blocked_animation = actor.eql(self.player) or enemy.eql(self.player);
@@ -466,26 +466,28 @@ fn doHit(
     }
 }
 
-/// true - if all effects were applied and can be removed from the entity;
-fn applyEffects(
-    effects: *c.Effects,
+fn makeImpacts(
+    impacts: *c.Impacts,
     target_health: *c.Health,
-) !bool {
-    var expired_effects: usize = 0;
-    var itr = effects.items.iterator(0);
-    while (itr.next()) |effect| {
-        switch (effect.*) {
-            .heal => |hp| {
-                target_health.current += hp;
-                expired_effects += 1;
-                effect.heal = 0;
-            },
-            .fire => |fire| {
-                target_health.current -|= fire.damage;
-                effect.fire.damage -|= fire.step;
-                if (fire.damage == 0) expired_effects += 1;
-            },
+) !void {
+    inline for (std.meta.fields(c.Impacts.Type)) |impact_field| {
+        const impact_type: c.Impacts.Type = @enumFromInt(impact_field.value);
+        if (@field(impacts, impact_field.name)) |*impact| {
+            switch (impact_type) {
+                .burning => doDamage(impact.power, .fire, target_health),
+                .corrosion => doDamage(impact.power, .acid, target_health),
+                .poisoning => doDamage(impact.power, .poison, target_health),
+                .healing => target_health.add(impact.power),
+            }
+            impact.power -|= impact.decrease;
+            if (impact.power == 0) {
+                @field(impacts, impact_field.name) = null;
+            }
         }
     }
-    return effects.items.len == expired_effects;
+}
+
+fn doDamage(value: u8, damage_type: c.DamageType, target_health: *c.Health) void {
+    _ = damage_type;
+    target_health.current -|= value;
 }

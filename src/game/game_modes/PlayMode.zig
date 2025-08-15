@@ -54,22 +54,21 @@ pub fn tick(self: *PlayMode) !void {
     if (try self.draw()) return;
 
     if (self.is_player_turn) {
-        const maybe_action = try self.handleInput();
+        const action = (try self.handleInput()) orelse return;
+        // If the player did some action
+        self.is_player_turn = false;
         // break this function if the mode was changed
         if (self.session.mode != .play) return;
-        // If the player did some action
-        if (maybe_action) |action| {
-            self.is_player_turn = false;
-            const speed = self.session.registry.getUnsafe(self.session.player, c.Speed);
-            const mp = try self.session.doAction(self.session.player, action, speed.move_points);
-            if (mp > 0) {
-                log.debug("Spent {d} move points", .{mp});
-                log.debug("Update quick actions after action '{s}'", .{@tagName(action)});
-                try self.updateQuickActions(self.target(), self.quickAction());
-                var itr = self.session.registry.query(c.Initiative);
-                while (itr.next()) |initiative| {
-                    initiative[1].move_points += mp;
-                }
+
+        const speed = self.session.registry.getUnsafe(self.session.player, c.Speed);
+        const mp = try self.session.doAction(self.session.player, action, speed.move_points);
+        if (mp > 0) {
+            log.debug("Spent {d} move points", .{mp});
+            log.debug("Update quick actions after action '{s}'", .{@tagName(action)});
+            try self.updateQuickActions(self.target(), self.quickAction());
+            var itr = self.session.registry.query(c.Initiative);
+            while (itr.next()) |initiative| {
+                initiative[1].move_points += mp;
             }
         }
     } else {

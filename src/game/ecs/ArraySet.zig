@@ -82,6 +82,17 @@ pub fn ArraySet(comptime C: anytype) type {
             }
         }
 
+        pub fn getOrSetForEntity(self: *Self, alloc: std.mem.Allocator, entity: Entity, component: C) !*C {
+            if (self.entity_index.get(entity)) |idx| {
+                return &self.components.items[idx][1];
+            } else {
+                try self.entity_index.put(alloc, entity, self.components.items.len);
+                const result = try self.components.addOne(alloc);
+                result.* = .{ entity, component };
+                return &result[1];
+            }
+        }
+
         /// Deletes the components of the entity from the all inner stores
         /// if they was added before, or does nothing.
         pub fn removeFromEntity(self: *Self, alloc: std.mem.Allocator, entity: Entity) !void {

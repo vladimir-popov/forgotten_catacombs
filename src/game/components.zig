@@ -99,6 +99,11 @@ pub const Health = struct {
     max: u8,
     // The count of the current hp
     current: u8,
+
+    pub fn add(self: *Health, value: u8) void {
+        self.current += value;
+        self.current = @min(self.current, self.max);
+    }
 };
 
 pub const Speed = struct {
@@ -166,50 +171,172 @@ pub const Equipment = struct {
     pub const nothing: Equipment = .{ .weapon = null, .light = null };
 };
 
-pub const PhysicalDamage = struct {
-    pub const Type = enum { cutting, blunt, thrusting };
+/// Faded impact of different effects. This is not a component, because
+/// only one instance of the component with same type can be defined for an entity.
+/// Instead, the `Impacts` component exists.
+pub const Effect = union(enum) {
+    pub const Tag = std.meta.Tag(Effect);
 
-    min: u8,
-    max: u8,
-    damage_type: Type,
-};
+    pub const Impact = struct {
+        /// The power of the effect that should be applied
+        power: u8,
+        /// The value to decrease the power of the effect after every applying
+        decrease: u8,
 
-pub const Effects = struct {
-    pub const Effect = union(enum) {
-        heal: u8, // hit points
-        // This effect applies an initial damage and continue applies the damage decreased by the
-        // `step` value until the damage become 0.
-        fire: struct { damage: u8, step: u8 = 1 },
+        pub fn sumWith(this: Impact, impact: ?Impact) Impact {
+            return if (impact) |other|
+                .{ .power = @max(this.power, other.power), .decrease = @min(this.decrease, other.decrease) }
+            else
+                this;
+        }
 
         pub fn format(self: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
-            switch (self) {
-                .heal => |hp| try writer.print("Heal {d} hp", .{hp}),
-                .fire => |fire| try writer.print("Fire damage from {d}, step {d}", .{ fire.damage, fire.step }),
-            }
+            try writer.print("{d}/{d}", .{ self.power, self.decrease });
         }
     };
 
-    pub const count: usize = @typeInfo(@typeInfo(Effect).@"union".tag_type.?).@"enum".fields.len;
+    burning: Impact,
+    corrosion: Impact,
+    healing: Impact,
+    poisoning: Impact,
 
-    items: std.SegmentedList(Effect, 1),
+    pub fn format(self: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        switch (self) {
+            .burning, .corrosion, .healing, .poisoning => |impact| {
+                try writer.print("{s} {any}", .{ @tagName(self), impact });
+            },
+        }
+    }
+};
 
-    pub const nothing: Effects = .{ .items = .{} };
+// this is not a component
+pub const DamageType = enum { cutting, blunt, thrusting, poison, fire, acid };
 
-    pub fn one(effect: Effect) Effects {
-        return .{ .items = .{ .prealloc_segment = .{effect}, .len = 1 } };
+pub const Weapon = struct {
+    damage_type: DamageType,
+    damage_min: u8,
+    damage_max: u8,
+    effects: std.SegmentedList(Effect, 1) = .{},
+
+    pub fn cutting(from: u8, to: u8) Weapon {
+        return .{ .damage_min = from, .damage_max = to, .damage_type = .cutting };
     }
 
-    pub fn deinit(self: *Effects, alloc: std.mem.Allocator) void {
-        self.items.deinit(alloc);
+    pub fn blunt(from: u8, to: u8) Weapon {
+        return .{ .damage_min = from, .damage_max = to, .damage_type = .blunt };
     }
+
+    pub fn thrusting(from: u8, to: u8) Weapon {
+        return .{ .damage_min = from, .damage_max = to, .damage_type = .thrusting };
+    }
+
+    pub fn withEffect(damage_type: DamageType, from: u8, to: u8, effect: Effect) Weapon {
+        return .{
+            .damage_min = from,
+            .damage_max = to,
+            .damage_type = damage_type,
+            .effects = .{ .prealloc_segment = .{effect}, .len = 1 },
+        };
+    }
+
+    /// - `writer` - as example: `*persistance.Writer(Runtime.FileWriter.Writer)`
+    pub fn save(self: Weapon, writer: anytype) !void {
+        try writer.beginObject();
+        try writer.writeStringKey("damage_type");
+        try writer.write(self.damage_type);
+        try writer.writeStringKey("damage_min");
+        try writer.write(self.damage_min);
+        try writer.writeStringKey("damage_max");
+        try writer.write(self.damage_max);
+        try writer.writeStringKey("effects");
+        try writer.beginCollection();
+        var itr = self.effects.constIterator(0);
+        while (itr.next()) |effect| {
+            try writer.write(effect);
+        }
+        try writer.endCollection();
+        try writer.endObject();
+    }
+
+    /// - `reader` - as example: `*persistance.Reader(Runtime.FileReader.Reader)`
+    pub fn load(reader: anytype) !Weapon {
+        var weapon: Weapon = undefined;
+        weapon.effects = .{};
+        try reader.beginObject();
+        _ = try reader.readKeyAsString();
+        weapon.damage_type = try reader.read(DamageType);
+        _ = try reader.readKeyAsString();
+        weapon.damage_min = try reader.read(u8);
+        _ = try reader.readKeyAsString();
+        weapon.damage_max = try reader.read(u8);
+        _ = try reader.readKeyAsString();
+        try reader.beginCollection();
+        while (!try reader.isCollectionEnd()) {
+            try weapon.effects.append(reader.registry.allocator(), try reader.read(Effect));
+        }
+        try reader.endCollection();
+        try reader.endObject();
+        return weapon;
+    }
+};
+
+/// A set of faded effects. An effect of the any type can be applied to an entity only once.
+pub const Impacts = struct {
+    pub const Type = std.meta.FieldEnum(Impacts);
+
+    burning: ?Effect.Impact = null,
+    corrosion: ?Effect.Impact = null,
+    healing: ?Effect.Impact = null,
+    poisoning: ?Effect.Impact = null,
+
+    pub fn isNothing(self: Impacts) bool {
+        return self.burning == null and self.corrosion == null and self.healing == null and self.poisoning == null;
+    }
+
+    pub fn add(self: *Impacts, effect: *const Effect) void {
+        switch (effect.*) {
+            .burning => |impact| {
+                self.burning = impact.sumWith(self.burning);
+            },
+            .corrosion => |impact| {
+                self.corrosion = impact.sumWith(self.corrosion);
+            },
+            .healing => |impact| {
+                self.healing = impact.sumWith(self.healing);
+            },
+            .poisoning => |impact| {
+                self.poisoning = impact.sumWith(self.poisoning);
+            },
+        }
+    }
+
+    pub fn toDamageType(impact_type: Type) ?DamageType {
+        return switch (impact_type) {
+            .burning => .fire,
+            .corrosion => .acid,
+            .poisoning => .poison,
+            else => null,
+        };
+    }
+};
+
+pub const Potion = struct {
+    effect: Effect,
+
+    pub fn healing(value: u8) Potion {
+        return .{ .effect = .{ .healing = .{ .power = value, .decrease = value } } };
+    }
+};
+
+pub const Regeneration = struct {
+    /// An amount of health point to restore (or decrease in case of poisoning)
+    hp: i8,
+    /// A number of move points on each hp should be recovered
+    mp: u8,
 };
 
 pub const Nutritions = struct {
     calories: u8,
-};
-
-pub const Potion = struct {
-    color: g.Color,
 };
 
 pub const Initiative = struct {
@@ -234,26 +361,24 @@ pub const Weight = struct {
 
 pub const Components = struct {
     animation: ?Animation = null,
-    // must be provided for every entity
-    description: ?Description,
+    description: ?Description, // must be provided for every entity
     door: ?Door = null,
-    effects: ?Effects = null,
     equipment: ?Equipment = null,
     health: ?Health = null,
+    impacts: ?Impacts = null,
     initiative: ?Initiative = null,
     inventory: ?Inventory = null,
     ladder: ?Ladder = null,
     pile: ?Pile = null,
-    physical_damage: ?PhysicalDamage = null,
-    price: ?Price = null,
     position: ?Position = null,
     potion: ?Potion = null,
+    price: ?Price = null,
     shop: ?Shop = null,
     source_of_light: ?SourceOfLight = null,
     speed: ?Speed = null,
-    // must be provided for every entity
-    sprite: ?Sprite,
+    sprite: ?Sprite, // must be provided for every entity
     state: ?EnemyState = null,
     wallet: ?Wallet = null,
+    weapon: ?Weapon = null,
     weight: ?Weight = null,
 };

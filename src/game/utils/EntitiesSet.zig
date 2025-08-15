@@ -25,6 +25,27 @@ pub fn clone(self: Self, alloc: std.mem.Allocator) !Self {
     return .{ .alloc = alloc, .underlying_map = try self.underlying_map.clone(alloc) };
 }
 
+/// - `writer` - as example: `*persistance.Writer(Runtime.FileWriter.Writer)`
+pub fn save(self: Self, writer: anytype) !void {
+    try writer.beginCollection();
+    var itr = self.iterator();
+    while (itr.next()) |entity| {
+        try writer.writeEntity(entity.*);
+    }
+    try writer.endCollection();
+}
+
+/// - `reader` - as example: `*persistance.Reader(Runtime.FileReader.Reader)`
+pub fn load(reader: anytype) !Self {
+    const set = try init(reader.registry.allocator());
+    try reader.beginCollection();
+    while (!try reader.isCollectionEnd()) {
+        try set.add(try reader.readEntity());
+    }
+    try reader.endCollection();
+    return set;
+}
+
 pub fn size(self: Self) usize {
     return self.underlying_map.size;
 }

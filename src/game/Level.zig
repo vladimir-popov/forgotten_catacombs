@@ -121,7 +121,6 @@ fn setupDungeon(
 pub fn initAsFirstLevel(
     self: *Self,
     player: g.Entity,
-    colors: []const g.Color,
 ) !void {
     log.debug("Start creating the first level.", .{});
 
@@ -153,7 +152,7 @@ pub fn initAsFirstLevel(
     // Add the trader
     var shop = try c.Shop.empty(self.registry.allocator(), 1.5, 200);
     try shop.items.add(try self.registry.addNewEntity(g.entities.Club));
-    try shop.items.add(try self.registry.addNewEntity(g.entities.healingPotion(colors)));
+    try shop.items.add(try self.registry.addNewEntity(g.entities.HealingPotion));
 
     entity = try self.registry.addNewEntity(.{
         .position = .{ .place = d.FirstLocation.trader_place, .zorder = .obstacle },

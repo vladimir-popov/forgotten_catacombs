@@ -89,6 +89,10 @@ pub fn Registry(comptime ComponentsStruct: type) type {
             return get(self, entity, C) orelse unreachable;
         }
 
+        pub fn getOrSet(self: *Self, entity: Entity, comptime C: type, default: C) !*C {
+            return try @field(self.components_map, @typeName(C)).getOrSetForEntity(self.allocator(), entity, default);
+        }
+
         pub fn get2(self: Self, entity: Entity, comptime C1: type, comptime C2: type) ?struct { *C1, *C2 } {
             if (self.get(entity, C1)) |c1| {
                 if (self.get(entity, C2)) |c2| {

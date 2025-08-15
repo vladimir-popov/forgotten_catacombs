@@ -263,12 +263,20 @@ const Loading = struct {
                 defer self.state.reading.deinit();
 
                 try self.state.reading.beginObject();
-                self.session.setSeed(try self.state.reading.readSeed());
-                try self.state.reading.readPotionColors(&self.session.potion_colors);
-                self.session.registry.next_entity = try self.state.reading.readNextEntityId();
-                self.level_depth = try self.state.reading.readDepth();
-                self.session.max_depth = try self.state.reading.readMaxDepth();
-                self.session.player = try self.state.reading.readPlayer();
+                _ = try self.state.reading.readKey("seed");
+                self.session.setSeed(try self.state.reading.read(u64));
+
+                _ = try self.state.reading.readKey("next_entity");
+                self.session.registry.next_entity = .{ .id = try self.state.reading.read(g.Entity.IdType) };
+
+                _ = try self.state.reading.readKey("depth");
+                self.level_depth = try self.state.reading.read(u8);
+
+                _ = try self.state.reading.readKey("max_depth");
+                self.session.max_depth = try self.state.reading.read(u8);
+
+                _ = try self.state.reading.readKey("player");
+                self.session.player = try self.state.reading.readEntity();
                 try self.state.reading.endObject();
 
                 self.session.level = g.Level.preInit(self.session.arena.allocator(), &self.session.registry);
@@ -282,7 +290,9 @@ const Loading = struct {
                 self.state = .{ .reading = Reader.init(&self.session.registry, self.file.reader()) };
 
                 try self.state.reading.beginObject();
-                const seed = try self.state.reading.readSeed();
+                _ = try self.state.reading.readKey("seed");
+                const seed = try self.state.reading.read(u64);
+
                 self.session.level.reset();
                 try self.session.level.initWithEmptyDungeon(
                     self.session.player,
@@ -292,15 +302,39 @@ const Loading = struct {
                 self.progress = .level_inited;
             },
             .level_inited => {
-                try self.state.reading.readLevelEntities(&self.session.level);
+                _ = try self.state.reading.readKey("entities");
+                const alloc = self.session.level.arena.allocator();
+                try self.state.reading.beginCollection();
+                while (!try self.state.reading.isCollectionEnd()) {
+                    try self.session.level.entities.append(alloc, try self.state.reading.readEntity());
+                }
+                try self.state.reading.endCollection();
                 self.progress = .entities_loaded;
             },
             .entities_loaded => {
-                try self.state.reading.readVisitedPlaces(&self.session.level);
+                _ = try self.state.reading.readKey("visited_places");
+                try self.state.reading.beginCollection();
+                for (0..self.session.level.dungeon.rows) |i| {
+                    try self.state.reading.beginCollection();
+                    while (!try self.state.reading.isCollectionEnd())
+                        self.session.level.visited_places[i].set(try self.state.reading.read(usize));
+                    try self.state.reading.endCollection();
+                }
+                try self.state.reading.endCollection();
                 self.progress = .visited_places_loaded;
             },
             .visited_places_loaded => {
-                try self.state.reading.readRememberedObjects(&self.session.level);
+                _ = try self.state.reading.readKey("remembered_objects");
+                try self.state.reading.beginCollection();
+                const alloc = self.session.level.arena.allocator();
+                while (!try self.state.reading.isCollectionEnd()) {
+                    try self.state.reading.beginObject();
+                    const entity = g.Entity{ .id = try self.state.reading.readKeyAsNumber(g.Entity.IdType) };
+                    const place = try self.state.reading.read(p.Point);
+                    try self.session.level.remembered_objects.put(alloc, place, entity);
+                    try self.state.reading.endObject();
+                }
+                try self.state.reading.endCollection();
                 self.progress = .remembered_objects_loaded;
             },
             .remembered_objects_loaded => {
@@ -388,12 +422,16 @@ const Saving = struct {
                 self.file = try self.session.runtime.fileWriter(g.persistance.PATH_TO_SESSION_FILE);
                 self.state = .{ .writing = Writer.init(&self.session.registry, self.file.writer()) };
                 try self.state.writing.beginObject();
-                try self.state.writing.writeSeed(self.session.seed);
-                try self.state.writing.writePotionColors(&self.session.potion_colors);
-                try self.state.writing.writeNextEntityId(self.session.registry.next_entity);
-                try self.state.writing.writeDepth(self.session.level.depth);
-                try self.state.writing.writeMaxDepth(self.session.max_depth);
-                try self.state.writing.writePlayer(self.session.player);
+                try self.state.writing.writeStringKey("seed");
+                try self.state.writing.write(self.session.seed);
+                try self.state.writing.writeStringKey("next_entity");
+                try self.state.writing.write(self.session.registry.next_entity.id);
+                try self.state.writing.writeStringKey("depth");
+                try self.state.writing.write(self.session.level.depth);
+                try self.state.writing.writeStringKey("max_depth");
+                try self.state.writing.write(self.session.max_depth);
+                try self.state.writing.writeStringKey("player");
+                try self.state.writing.writeEntity(self.session.player);
                 try self.state.writing.endObject();
                 self.state.writing.deinit();
                 self.file.close();
@@ -402,24 +440,50 @@ const Saving = struct {
             },
             .session_saved => {
                 var buf: [16]u8 = undefined;
-                self.file =
-                    try self.session.runtime.fileWriter(try g.persistance.pathToLevelFile(&buf, self.session.level.depth));
+                self.file = try self.session.runtime.fileWriter(
+                    try g.persistance.pathToLevelFile(&buf, self.session.level.depth),
+                );
                 self.state = .{ .writing = Writer.init(&self.session.registry, self.file.writer()) };
 
                 try self.state.writing.beginObject();
-                try self.state.writing.writeSeed(self.session.level.dungeon.seed);
+                try self.state.writing.writeStringKey("seed");
+                try self.state.writing.write(self.session.level.dungeon.seed);
                 self.progress = .level_seed_saved;
             },
             .level_seed_saved => {
-                try self.state.writing.writeLevelEntities(self.session.level.entities.items);
+                try self.state.writing.writeStringKey("entities");
+                try self.state.writing.beginCollection();
+                for (self.session.level.entities.items) |entity| {
+                    try self.state.writing.writeEntity(entity);
+                }
+                try self.state.writing.endCollection();
                 self.progress = .entities_saved;
             },
             .entities_saved => {
-                try self.state.writing.writeVisitedPlaces(self.session.level.visited_places);
+                try self.state.writing.writeStringKey("visited_places");
+                try self.state.writing.beginCollection();
+                for (self.session.level.visited_places) |row| {
+                    var itr = row.iterator(.{});
+                    try self.state.writing.beginCollection();
+                    while (itr.next()) |idx| {
+                        try self.state.writing.write(idx);
+                    }
+                    try self.state.writing.endCollection();
+                }
+                try self.state.writing.endCollection();
                 self.progress = .visited_places_saved;
             },
             .visited_places_saved => {
-                try self.state.writing.writeRememberedObjects(self.session.level.remembered_objects);
+                try self.state.writing.writeStringKey("remembered_objects");
+                var itr = self.session.level.remembered_objects.iterator();
+                try self.state.writing.beginCollection();
+                while (itr.next()) |kv| {
+                    try self.state.writing.beginObject();
+                    try self.state.writing.writeNumericKey(kv.value_ptr.id);
+                    try self.state.writing.write(kv.key_ptr.*);
+                    try self.state.writing.endObject();
+                }
+                try self.state.writing.endCollection();
                 self.progress = .remembered_objects_saved;
             },
             .remembered_objects_saved => {
