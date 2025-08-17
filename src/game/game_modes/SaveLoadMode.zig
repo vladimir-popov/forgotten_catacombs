@@ -141,6 +141,7 @@ pub fn tick(self: *Self) !void {
                     seed,
                 },
             );
+            generating.session.level.reset();
             const is_success = try generating.session.level.tryGenerateNew(
                 generating.session.player,
                 generating.depth,
