@@ -114,9 +114,9 @@ pub fn cellsAround(self: Dungeon, place: p.Point) ?CellsIterator {
     });
 }
 
-pub inline fn doorwayAt(self: Dungeon, place: p.Point) ?d.Doorway {
+pub inline fn doorwayAt(self: Dungeon, place: p.Point) ?*d.Doorway {
     if (self.doorways) |dws|
-        return dws.get(place)
+        return dws.getPtr(place)
     else
         return null;
 }

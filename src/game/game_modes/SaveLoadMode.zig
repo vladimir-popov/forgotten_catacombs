@@ -310,6 +310,7 @@ const Loading = struct {
                     try self.session.level.entities.append(alloc, try self.state.reading.readEntity());
                 }
                 try self.state.reading.endCollection();
+                self.session.level.bindDoorsWithDoorways();
                 self.progress = .entities_loaded;
             },
             .entities_loaded => {

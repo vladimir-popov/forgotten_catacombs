@@ -62,7 +62,7 @@ pub fn deinit(self: *Self) void {
 /// Resets the inner arena, and sets up all containers to the empty state.
 /// Sets up the level to the preinited state.
 pub fn reset(self: *Self) void {
-    log.debug("Reset level on depth {d}", .{self.depth});
+    log.debug("Reset the level", .{});
     std.debug.assert(self.arena.reset(.retain_capacity));
     self.entities = .empty;
     self.remembered_objects = .empty;
@@ -106,9 +106,9 @@ fn setupDungeon(
         .first_location => g.visibility.showTheCurrentPlacement,
         .cave => g.visibility.showInRadiusOfSourceOfLight,
         .catacomb => if (depth < 3)
-            g.visibility.showTheCurrentPlacement
+            g.visibility.showNearestWholePlacements
         else
-            g.visibility.showTheCurrentPlacementInLight,
+            g.visibility.showNearestPlacementsInLight,
     };
     self.visited_places = try alloc.alloc(std.DynamicBitSetUnmanaged, dungeon.rows);
 
@@ -249,6 +249,17 @@ pub fn tryGenerateNew(
     }
     try self.completeInitialization(from_ladder.direction);
     return true;
+}
+
+/// Sets up id of the doors to the doorways in the dungeon.
+/// This method is used during loading the level.
+pub fn bindDoorsWithDoorways(self: *Self) void {
+    var itr = self.registry.query2(c.Door, c.Position);
+    while (itr.next()) |tuple| {
+        if (self.dungeon.doorwayAt(tuple[2].place)) |doorway| {
+            doorway.door_id = tuple[0];
+        }
+    }
 }
 
 /// Sets up a position for the player if the direction is provided, and remembers the placement with the player.
