@@ -51,7 +51,7 @@ render: g.Render,
 /// Visible area
 viewport: g.Viewport,
 ///
-registry: g.Registry,
+entities: g.Entities,
 ///
 events: g.events.EventBus,
 player: g.Entity,
@@ -87,7 +87,7 @@ pub fn preInit(
         .runtime = runtime,
         .render = render,
         .viewport = g.Viewport.init(render.scene_rows, render.scene_cols),
-        .registry = try g.Registry.init(self.arena.allocator()),
+        .entities = .{ .registry = try g.Registry.init(self.arena.allocator()) },
         .events = g.events.EventBus.init(&self.arena),
         .seed = 0,
         .max_depth = 0,
@@ -122,10 +122,10 @@ pub fn initNew(
     log.debug("Begin a new game session with seed {d}", .{seed});
     try self.preInit(gpa, runtime, render);
     self.setSeed(seed);
-    self.player = try self.registry.addNewEntity(try g.entities.player(self.registry.allocator()));
+    self.player = try self.entities.registry.addNewEntity(try g.entities.player(self.entities.registry.allocator()));
     try self.equipPlayer();
     self.max_depth = 0;
-    self.level = g.Level.preInit(self.arena.allocator(), &self.registry);
+    self.level = g.Level.preInit(self.arena.allocator(), &self.entities);
     try self.level.initAsFirstLevel(self.player);
     try self.completeInitialization();
 
@@ -151,12 +151,12 @@ pub fn setSeed(self: *GameSession, seed: u64) void {
 
 /// Creates the initial equipment of the player
 fn equipPlayer(self: *GameSession) !void {
-    self.registry.getUnsafe(self.player, c.Wallet).money += 200;
+    self.entities.registry.getUnsafe(self.player, c.Wallet).money += 200;
 
-    var equipment: *c.Equipment = self.registry.getUnsafe(self.player, c.Equipment);
-    var invent: *c.Inventory = self.registry.getUnsafe(self.player, c.Inventory);
-    const weapon = try self.registry.addNewEntity(g.entities.Pickaxe);
-    const light = try self.registry.addNewEntity(g.entities.Torch);
+    var equipment: *c.Equipment = self.entities.registry.getUnsafe(self.player, c.Equipment);
+    var invent: *c.Inventory = self.entities.registry.getUnsafe(self.player, c.Inventory);
+    const weapon = try self.entities.registry.addNewEntity(g.entities.Pickaxe);
+    const light = try self.entities.registry.addNewEntity(g.entities.Torch);
     equipment.weapon = weapon;
     equipment.light = light;
     try invent.items.add(weapon);
@@ -194,7 +194,7 @@ pub fn lookAround(self: *GameSession) !void {
 }
 
 pub fn manageInventory(self: *GameSession) !void {
-    if (self.registry.get2(self.player, c.Equipment, c.Inventory)) |tuple| {
+    if (self.entities.registry.get2(self.player, c.Equipment, c.Inventory)) |tuple| {
         self.mode.deinit();
         self.mode = .{ .inventory = undefined };
         const drop = self.level.itemAt(self.level.playerPosition().place);
@@ -265,27 +265,6 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
     }
 }
 
-pub fn isEnemy(self: *const GameSession, entity: g.Entity) bool {
-    return self.registry.has(entity, c.EnemyState);
-}
-
-pub fn isItem(self: *const GameSession, entity: g.Entity) bool {
-    return self.registry.has(entity, c.Weight);
-}
-
-pub fn isEquipment(self: *const GameSession, item: g.Entity) bool {
-    return self.isItem(item) and
-        (self.registry.has(item, c.Weapon) or self.registry.has(item, c.SourceOfLight));
-}
-
-fn getWeapon(self: *const GameSession, owner: g.Entity) ?*c.Weapon {
-    if (self.registry.get(owner, c.Equipment)) |equipment| {
-        if (equipment.weapon) |weapon_id|
-            return self.registry.get(weapon_id, c.Weapon);
-    }
-    return self.registry.get(owner, c.Weapon);
-}
-
 /// Handles intentions to do some actions
 pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_speed: g.MovePoints) !g.MovePoints {
     if (std.log.logEnabled(.debug, .action_system) and action != .do_nothing) {
@@ -298,7 +277,7 @@ pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_spe
             return 0;
         },
         .move => |move| {
-            if (self.registry.get(actor, c.Position)) |position|
+            if (self.entities.registry.get(actor, c.Position)) |position|
                 return doMove(self, actor, position, move.target, actor_speed);
         },
         .hit => |target| {
@@ -306,19 +285,19 @@ pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_spe
             return actor_speed;
         },
         .open => |door| {
-            try self.registry.setComponentsToEntity(door.id, g.entities.openedDoor(door.place));
+            try self.entities.registry.setComponentsToEntity(door.id, g.entities.openedDoor(door.place));
         },
         .close => |door| {
-            try self.registry.setComponentsToEntity(door.id, g.entities.closedDoor(door.place));
+            try self.entities.registry.setComponentsToEntity(door.id, g.entities.closedDoor(door.place));
         },
         .pickup => |item| {
-            const inventory = self.registry.getUnsafe(self.player, c.Inventory);
-            if (self.registry.get(item, c.Pile)) |_| {
+            const inventory = self.entities.registry.getUnsafe(self.player, c.Inventory);
+            if (self.entities.registry.get(item, c.Pile)) |_| {
                 try self.manageInventory();
                 return 0;
             } else {
                 try inventory.items.add(item);
-                try self.registry.remove(item, c.Position);
+                try self.entities.registry.remove(item, c.Position);
                 try self.level.removeEntity(item);
             }
         },
@@ -326,22 +305,22 @@ pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_spe
             try self.movePlayerToLevel(ladder);
         },
         .go_sleep => |target| {
-            self.registry.getUnsafe(target, c.EnemyState).* = .sleeping;
-            try self.registry.set(
+            self.entities.registry.getUnsafe(target, c.EnemyState).* = .sleeping;
+            try self.entities.registry.set(
                 target,
                 c.Animation{ .preset = .go_sleep },
             );
         },
         .chill => |target| {
-            self.registry.getUnsafe(target, c.EnemyState).* = .walking;
-            try self.registry.set(
+            self.entities.registry.getUnsafe(target, c.EnemyState).* = .walking;
+            try self.entities.registry.set(
                 target,
                 c.Animation{ .preset = .relax },
             );
         },
         .get_angry => |target| {
-            self.registry.getUnsafe(target, c.EnemyState).* = .aggressive;
-            try self.registry.set(
+            self.entities.registry.getUnsafe(target, c.EnemyState).* = .aggressive;
+            try self.entities.registry.set(
                 target,
                 c.Animation{ .preset = .get_angry },
             );
@@ -351,7 +330,7 @@ pub fn doAction(self: *GameSession, actor: g.Entity, action: g.Action, actor_spe
             return 0;
         },
         .wait => {
-            try self.registry.set(actor, c.Animation{ .preset = .wait, .is_blocked = self.player.eql(actor) });
+            try self.entities.registry.set(actor, c.Animation{ .preset = .wait, .is_blocked = self.player.eql(actor) });
         },
     }
     return actor_speed;
@@ -398,13 +377,13 @@ fn checkCollision(self: *GameSession, place: p.Point) ?g.Action {
 
         .entities => |entities| {
             if (entities[2]) |entity| {
-                if (self.registry.get(entity, c.Door)) |_|
+                if (self.entities.registry.get(entity, c.Door)) |_|
                     return .{ .open = .{ .id = entity, .place = place } };
 
-                if (self.isEnemy(entity))
+                if (self.entities.isEnemy(entity))
                     return .{ .hit = entity };
 
-                if (self.registry.get(entity, c.Shop)) |shop| {
+                if (self.entities.registry.get(entity, c.Shop)) |shop| {
                     return .{ .trade = shop };
                 }
 
@@ -424,8 +403,8 @@ fn doHit(
     actor: g.Entity,
     enemy: g.Entity,
 ) !void {
-    if (self.registry.get(enemy, c.Health)) |enemy_health| {
-        const weapon = self.getWeapon(actor) orelse {
+    if (self.entities.registry.get(enemy, c.Health)) |enemy_health| {
+        const weapon = self.entities.getWeapon(actor) orelse {
             log.err("Actor {d} doesn't have any weapon", .{actor.id});
             return;
         };
@@ -436,25 +415,25 @@ fn doHit(
 
         // Applying all effects of the weapon
         if (weapon.effects.len > 0) {
-            const impacts = try self.registry.getOrSet(enemy, c.Impacts, .{});
+            const impacts = try self.entities.registry.getOrSet(enemy, c.Impacts, .{});
             var itr = weapon.effects.constIterator(0);
             while (itr.next()) |effect| {
                 impacts.add(effect);
             }
             try makeImpacts(impacts, enemy_health);
             if (impacts.isNothing()) {
-                try self.registry.remove(enemy, c.Impacts);
+                try self.entities.registry.remove(enemy, c.Impacts);
             }
         }
 
         // a special case to give to player a chance to notice what happened
         const is_blocked_animation = actor.eql(self.player) or enemy.eql(self.player);
-        try self.registry.set(enemy, c.Animation{ .preset = .hit, .is_blocked = is_blocked_animation });
+        try self.entities.registry.set(enemy, c.Animation{ .preset = .hit, .is_blocked = is_blocked_animation });
         if (actor.eql(self.player)) {
             try self.events.sendEvent(.{ .player_hit = .{ .target = enemy } });
         }
         if (enemy_health.current == 0) {
-            try self.registry.removeEntity(enemy);
+            try self.entities.registry.removeEntity(enemy);
             try self.level.removeEntity(enemy);
             if (enemy.eql(self.player)) {
                 log.info("Player is dead. Game over.", .{});

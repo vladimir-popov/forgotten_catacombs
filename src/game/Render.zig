@@ -128,7 +128,7 @@ fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order
 }
 /// Draw sprites inside the screen
 pub fn drawSpritesToBuffer(self: Render, viewport: g.Viewport, level: *const g.Level, entity_in_focus: ?g.Entity) !void {
-    var itr = level.registry.query2(cm.Position, cm.Sprite);
+    var itr = level.entities.registry.query2(cm.Position, cm.Sprite);
     while (itr.next()) |tuple| {
         const entity, const position, const sprite = tuple;
         if (!viewport.region.containsPoint(position.place)) continue;

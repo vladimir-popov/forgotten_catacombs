@@ -34,7 +34,7 @@ fn showNearestPlacements(comptime check_source_of_light: bool) VisibilityStrateg
             var doorways = level.player_placement.doorways();
             while (doorways.next()) |door_place| {
                 if (level.dungeon.doorwayAt(door_place.*)) |doorway| {
-                    if (level.registry.get(doorway.door_id, c.Door)) |door| {
+                    if (level.entities.registry.get(doorway.door_id, c.Door)) |door| {
                         if (door.state == .closed) continue;
                         if (doorway.oppositePlacement(level.player_placement)) |placement| {
                             if (placement.contains(place)) return if (check_source_of_light)
@@ -77,13 +77,7 @@ pub fn showTheCurrentPlacement(level: *const g.Level, place: p.Point) g.Render.V
 pub fn showInRadiusOfSourceOfLight(level: *const g.Level, place: p.Point) g.Render.Visibility {
     if (turn_light_on) return .visible;
 
-    var radius: f16 = 1.5;
-    if (level.registry.get(level.player, c.Equipment)) |equipment| {
-        if (equipment.light) |light| {
-            if (level.registry.get(light, c.SourceOfLight)) |sol|
-                radius = sol.radius;
-        }
-    }
+    const radius: f16 = if (level.entities.getSourceOfLight(level.player)) |sol| sol.radius else 1.5;
 
     if (level.playerPosition().place.distanceTo(place) > radius) {
         log.debug("The place {any} is out of the light radius {d:.2}", .{ place, radius });

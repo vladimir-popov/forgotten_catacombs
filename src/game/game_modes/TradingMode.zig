@@ -63,8 +63,8 @@ pub fn init(
     self.* = .{
         .alloc = alloc,
         .session = session,
-        .wallet = session.registry.getUnsafe(session.player, c.Wallet),
-        .inventory = session.registry.getUnsafe(session.player, c.Inventory),
+        .wallet = session.entities.registry.getUnsafe(session.player, c.Wallet),
+        .inventory = session.entities.registry.getUnsafe(session.player, c.Inventory),
         .shop = shop,
         .main_window = w.WindowWithTabs.init(self),
     };
@@ -167,7 +167,7 @@ const product_fmt = std.fmt.comptimePrint(
 );
 
 fn formatProduct(self: *Self, line: *w.TextArea.Line, item: g.Entity, for_buying: bool) ![]const u8 {
-    if (self.session.registry.get3(item, c.Price, c.Description, c.Sprite)) |tuple| {
+    if (self.session.entities.registry.get3(item, c.Price, c.Description, c.Sprite)) |tuple| {
         const price, const description, const sprite = tuple;
         return try std.fmt.bufPrint(
             line,
@@ -250,7 +250,7 @@ fn sellOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
 
 fn buySelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    const price = self.actualPrice(self.session.registry.getUnsafe(item, c.Price), true);
+    const price = self.actualPrice(self.session.entities.registry.getUnsafe(item, c.Price), true);
     log.debug("Buying item {d}", .{item.id});
     if (self.wallet.money > price) {
         _ = self.shop.items.remove(item);
@@ -265,7 +265,7 @@ fn buySelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
 
 fn sellSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    const price = self.actualPrice(self.session.registry.getUnsafe(item, c.Price), false);
+    const price = self.actualPrice(self.session.entities.registry.getUnsafe(item, c.Price), false);
     log.debug("Selling {d}", .{item.id});
     if (self.shop.balance > price) {
         _ = self.inventory.items.remove(item);
@@ -283,7 +283,7 @@ fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     log.debug("Show info about item {d}", .{item.id});
     self.modal_window = try w.entityDescription(
         self.alloc,
-        self.session.registry,
+        self.session.entities,
         item,
         self.session.runtime.isDevMode(),
     );

@@ -60,19 +60,19 @@ pub fn tick(self: *PlayMode) !void {
         // break this function if the mode was changed
         if (self.session.mode != .play) return;
 
-        const speed = self.session.registry.getUnsafe(self.session.player, c.Speed);
+        const speed = self.session.entities.registry.getUnsafe(self.session.player, c.Speed);
         const mp = try self.session.doAction(self.session.player, action, speed.move_points);
         if (mp > 0) {
             log.debug("Spent {d} move points", .{mp});
             log.debug("Update quick actions after action '{s}'", .{@tagName(action)});
             try self.updateQuickActions(self.target(), self.quickAction());
-            var itr = self.session.registry.query(c.Initiative);
+            var itr = self.session.entities.registry.query(c.Initiative);
             while (itr.next()) |initiative| {
                 initiative[1].move_points += mp;
             }
         }
     } else {
-        var itr = self.session.registry.query4(c.Position, c.Initiative, c.Speed, c.EnemyState);
+        var itr = self.session.entities.registry.query4(c.Position, c.Initiative, c.Speed, c.EnemyState);
         while (itr.next()) |tuple| {
             const entity, const position, const initiative, const speed, const state = tuple;
             if (speed.move_points > initiative.move_points) continue;
@@ -143,7 +143,7 @@ fn handleInput(self: *PlayMode) !?g.Action {
             .turn_light_on => g.visibility.turn_light_on = true,
             .turn_light_off => g.visibility.turn_light_on = false,
             .set_health => |hp| {
-                if (self.session.registry.get(self.session.player, c.Health)) |health| {
+                if (self.session.entities.registry.get(self.session.player, c.Health)) |health| {
                     health.current = hp;
                 }
             },
@@ -176,7 +176,7 @@ fn draw(self: *const PlayMode) !bool {
 pub fn drawAnimationsFrames(self: PlayMode) !bool {
     const now: c_uint = self.session.runtime.currentMillis();
     var was_blocked_animation: bool = false;
-    var itr = self.session.level.registry.query2(c.Position, c.Animation);
+    var itr = self.session.level.entities.registry.query2(c.Position, c.Animation);
     while (itr.next()) |components| {
         const entity, const position, const animation = components;
         was_blocked_animation |= animation.is_blocked;
@@ -196,14 +196,14 @@ pub fn drawAnimationsFrames(self: PlayMode) !bool {
                 );
             }
         } else {
-            try self.session.level.registry.remove(entity, c.Animation);
+            try self.session.level.entities.registry.remove(entity, c.Animation);
         }
     }
     return was_blocked_animation;
 }
 
 fn drawInfoBar(self: *const PlayMode) !void {
-    if (self.session.registry.get(self.session.player, c.Health)) |health| {
+    if (self.session.entities.registry.get(self.session.player, c.Health)) |health| {
         try self.session.render.drawPlayerHp(health);
     }
     try self.session.render.drawLeftButton("Explore", true);
@@ -214,12 +214,12 @@ fn drawInfoBar(self: *const PlayMode) !void {
     // Draw the name or health of the target entity
     if (self.target()) |entity| {
         if (!entity.eql(self.session.player)) {
-            if (self.session.registry.get2(entity, c.Sprite, c.Health)) |tuple| {
+            if (self.session.entities.registry.get2(entity, c.Sprite, c.Health)) |tuple| {
                 try self.session.render.drawEnemyHealth(tuple[0].codepoint, tuple[1]);
                 return;
             }
         }
-        const name = if (self.session.registry.get(entity, c.Description)) |desc| desc.name() else "?";
+        const name = if (self.session.entities.registry.get(entity, c.Description)) |desc| desc.name() else "?";
         try self.session.render.drawInfo(name);
     } else {
         try self.session.render.cleanInfo();
@@ -268,7 +268,7 @@ pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity, prev_action
     const player_position = self.session.level.playerPosition();
     // Check the nearest entities:
     // TODO improve:
-    var itr = self.session.registry.query(c.Position);
+    var itr = self.session.entities.registry.query(c.Position);
     while (itr.next()) |tuple| {
         const entity: g.Entity, const position: *c.Position = tuple;
         if (position.place.near4(player_position.place)) {
@@ -301,13 +301,13 @@ fn calculateQuickActionForTarget(
 ) ?g.Action {
     const player_position = self.session.level.playerPosition();
     const target_position =
-        self.session.registry.get(target_entity, c.Position) orelse return null;
+        self.session.entities.registry.get(target_entity, c.Position) orelse return null;
 
     if (player_position.place.eql(target_position.place)) {
         if (target_position.zorder == .item) {
             return .{ .pickup = target_entity };
         }
-        if (self.session.registry.get(target_entity, c.Ladder)) |ladder| {
+        if (self.session.entities.registry.get(target_entity, c.Ladder)) |ladder| {
             // It's impossible to go upper the first level
             if (ladder.direction == .up and self.session.level.depth == 0) return null;
 
@@ -316,10 +316,10 @@ fn calculateQuickActionForTarget(
     }
 
     if (player_position.place.near4(target_position.place)) {
-        if (self.session.isEnemy(target_entity)) {
+        if (self.session.entities.isEnemy(target_entity)) {
             return .{ .hit = target_entity };
         }
-        if (self.session.registry.get(target_entity, c.Door)) |door| {
+        if (self.session.entities.registry.get(target_entity, c.Door)) |door| {
             // the player should not be able to open/close the door stay in the doorway
             if (player_position.place.eql(target_position.place)) {
                 return null;
@@ -329,7 +329,7 @@ fn calculateQuickActionForTarget(
                 .closed => .{ .open = .{ .id = target_entity, .place = target_position.place } },
             };
         }
-        if (self.session.registry.get(target_entity, c.Shop)) |shop| {
+        if (self.session.entities.registry.get(target_entity, c.Shop)) |shop| {
             return .{ .trade = shop };
         }
     }

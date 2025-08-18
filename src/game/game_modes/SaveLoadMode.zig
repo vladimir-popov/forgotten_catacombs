@@ -260,7 +260,7 @@ const Loading = struct {
                     self.file.close();
                     self.state = .file_closed;
                 }
-                self.state = .{ .reading = Reader.init(&self.session.registry, self.file.reader()) };
+                self.state = .{ .reading = Reader.init(&self.session.entities.registry, self.file.reader()) };
                 defer self.state.reading.deinit();
 
                 try self.state.reading.beginObject();
@@ -268,7 +268,7 @@ const Loading = struct {
                 self.session.setSeed(try self.state.reading.read(u64));
 
                 _ = try self.state.reading.readKey("next_entity");
-                self.session.registry.next_entity = .{ .id = try self.state.reading.read(g.Entity.IdType) };
+                self.session.entities.registry.next_entity = .{ .id = try self.state.reading.read(g.Entity.IdType) };
 
                 _ = try self.state.reading.readKey("depth");
                 self.level_depth = try self.state.reading.read(u8);
@@ -280,7 +280,7 @@ const Loading = struct {
                 self.session.player = try self.state.reading.readEntity();
                 try self.state.reading.endObject();
 
-                self.session.level = g.Level.preInit(self.session.arena.allocator(), &self.session.registry);
+                self.session.level = g.Level.preInit(self.session.arena.allocator(), &self.session.entities);
 
                 self.progress = .session_loaded;
             },
@@ -288,7 +288,7 @@ const Loading = struct {
                 var buf: [16]u8 = undefined;
                 self.file =
                     try self.session.runtime.fileReader(try g.persistance.pathToLevelFile(&buf, self.level_depth));
-                self.state = .{ .reading = Reader.init(&self.session.registry, self.file.reader()) };
+                self.state = .{ .reading = Reader.init(&self.session.entities.registry, self.file.reader()) };
 
                 try self.state.reading.beginObject();
                 _ = try self.state.reading.readKey("seed");
@@ -307,7 +307,7 @@ const Loading = struct {
                 const alloc = self.session.level.arena.allocator();
                 try self.state.reading.beginCollection();
                 while (!try self.state.reading.isCollectionEnd()) {
-                    try self.session.level.entities.append(alloc, try self.state.reading.readEntity());
+                    try self.session.level.entities_on_level.append(alloc, try self.state.reading.readEntity());
                 }
                 try self.state.reading.endCollection();
                 self.session.level.bindDoorsWithDoorways();
@@ -422,12 +422,12 @@ const Saving = struct {
         switch (self.progress) {
             .inited => {
                 self.file = try self.session.runtime.fileWriter(g.persistance.PATH_TO_SESSION_FILE);
-                self.state = .{ .writing = Writer.init(&self.session.registry, self.file.writer()) };
+                self.state = .{ .writing = Writer.init(&self.session.entities.registry, self.file.writer()) };
                 try self.state.writing.beginObject();
                 try self.state.writing.writeStringKey("seed");
                 try self.state.writing.write(self.session.seed);
                 try self.state.writing.writeStringKey("next_entity");
-                try self.state.writing.write(self.session.registry.next_entity.id);
+                try self.state.writing.write(self.session.entities.registry.next_entity.id);
                 try self.state.writing.writeStringKey("depth");
                 try self.state.writing.write(self.session.level.depth);
                 try self.state.writing.writeStringKey("max_depth");
@@ -445,7 +445,7 @@ const Saving = struct {
                 self.file = try self.session.runtime.fileWriter(
                     try g.persistance.pathToLevelFile(&buf, self.session.level.depth),
                 );
-                self.state = .{ .writing = Writer.init(&self.session.registry, self.file.writer()) };
+                self.state = .{ .writing = Writer.init(&self.session.entities.registry, self.file.writer()) };
 
                 try self.state.writing.beginObject();
                 try self.state.writing.writeStringKey("seed");
@@ -455,7 +455,7 @@ const Saving = struct {
             .level_seed_saved => {
                 try self.state.writing.writeStringKey("entities");
                 try self.state.writing.beginCollection();
-                for (self.session.level.entities.items) |entity| {
+                for (self.session.level.entities_on_level.items) |entity| {
                     try self.state.writing.writeEntity(entity);
                 }
                 try self.state.writing.endCollection();
@@ -490,9 +490,9 @@ const Saving = struct {
             },
             .remembered_objects_saved => {
                 try self.state.writing.endObject();
-                for (self.session.level.entities.items) |entity| {
+                for (self.session.level.entities_on_level.items) |entity| {
                     if (!entity.eql(self.session.player))
-                        try self.session.registry.removeEntity(entity);
+                        try self.session.entities.registry.removeEntity(entity);
                 }
                 self.state.writing.deinit();
                 self.file.close();
