@@ -108,7 +108,10 @@ pub fn completeInitialization(self: *GameSession) !void {
     try self.events.subscribe(self.viewport.subscriber());
     try self.events.subscribe(self.subscriber());
     self.viewport.centeredAround(self.level.playerPosition().place);
-    log.debug("The game session is completely initialized. Seed {d}; Max depth {d}", .{ self.seed, self.max_depth });
+    log.debug(
+        "The game session is completely initialized. Seed {d}; Max depth {d}; Player id {d}",
+        .{ self.seed, self.max_depth, self.player.id },
+    );
 }
 
 /// Completely initializes an undefined GameSession.
@@ -163,6 +166,13 @@ fn equipPlayer(self: *GameSession) !void {
     try invent.items.add(light);
 }
 
+pub fn play(self: *GameSession, entity_in_focus: ?g.Entity) !void {
+    self.mode.deinit();
+    self.mode = .{ .play = undefined };
+    try self.render.redrawFromSceneBuffer();
+    try self.mode.play.init(self.arena.allocator(), self, entity_in_focus);
+}
+
 pub fn load(self: *GameSession) !void {
     log.debug("Start loading a game session", .{});
     self.mode = .{ .save_load = SaveLoadMode.loadSession(self) };
@@ -175,41 +185,69 @@ pub fn save(self: *GameSession) void {
     self.mode = .{ .save_load = SaveLoadMode.saveSession(self) };
 }
 
-pub fn play(self: *GameSession, entity_in_focus: ?g.Entity) !void {
-    self.mode.deinit();
-    self.mode = .{ .play = undefined };
-    try self.render.redrawFromSceneBuffer();
-    try self.mode.play.init(self.arena.allocator(), self, entity_in_focus);
-}
-
 pub fn explore(self: *GameSession) !void {
-    self.mode.deinit();
-    self.mode = .{ .explore_level = try ExploreLevelMode.init(self) };
+    try self.events.sendEvent(.{ .mode_changed = .to_explore });
 }
 
 pub fn lookAround(self: *GameSession) !void {
-    self.mode.deinit();
-    self.mode = .{ .explore = undefined };
-    try self.mode.explore.init(self.arena.allocator(), self);
+    try self.events.sendEvent(.{ .mode_changed = .to_looking_around });
 }
 
 pub fn manageInventory(self: *GameSession) !void {
-    if (self.entities.registry.get2(self.player, c.Equipment, c.Inventory)) |tuple| {
-        self.mode.deinit();
-        self.mode = .{ .inventory = undefined };
-        const drop = self.level.itemAt(self.level.playerPosition().place);
-        try self.mode.inventory.init(self.arena.allocator(), self, tuple[0], tuple[1], drop);
-    }
+    try self.events.sendEvent(.{ .mode_changed = .to_inventory });
 }
 
 pub fn trade(self: *GameSession, shop: *c.Shop) !void {
-    self.mode.deinit();
-    self.mode = .{ .trading = undefined };
-    try self.mode.trading.init(self.arena.allocator(), self, shop);
+    try self.events.sendEvent(.{ .mode_changed = .{ .to_trading = shop } });
 }
 
 pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
     try self.events.sendEvent(.{ .level_changed = .{ .by_ladder = by_ladder } });
+}
+
+fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
+    const self: *GameSession = @ptrCast(@alignCast(ptr));
+    switch (event) {
+        .mode_changed => |new_mode| switch (new_mode) {
+            .to_explore => {
+                self.mode.deinit();
+                self.mode = .{ .explore_level = try ExploreLevelMode.init(self) };
+            },
+            .to_looking_around => {
+                self.mode.deinit();
+                self.mode = .{ .explore = undefined };
+                try self.mode.explore.init(self.arena.allocator(), self);
+            },
+            .to_inventory => {
+                if (self.entities.registry.get2(self.player, c.Equipment, c.Inventory)) |tuple| {
+                    self.mode.deinit();
+                    self.mode = .{ .inventory = undefined };
+                    const drop = self.level.itemAt(self.level.playerPosition().place);
+                    try self.mode.inventory.init(self.arena.allocator(), self, tuple[0], tuple[1], drop);
+                }
+            },
+            .to_trading => |shop| {
+                self.mode.deinit();
+                self.mode = .{ .trading = undefined };
+                try self.mode.trading.init(self.arena.allocator(), self, shop);
+            },
+        },
+        .level_changed => |lvl| {
+            self.mode.deinit();
+            self.mode = .{ .save_load = try SaveLoadMode.loadOrGenerateLevel(self, lvl.by_ladder) };
+        },
+        .player_hit => {
+            log.debug("Update target after player hit", .{});
+            try self.mode.play.updateQuickActions(event.player_hit.target, null);
+        },
+        .entity_moved => |entity_moved| {
+            if (entity_moved.entity.id == self.player.id) {
+                try self.level.onPlayerMoved(entity_moved);
+            } else if (entity_moved.targetPlace().near8(self.level.playerPosition().place)) {
+                try self.mode.play.updateQuickActions(entity_moved.entity, null);
+            }
+        },
+    }
 }
 
 pub fn playerMovedToLevel(self: *GameSession) !void {
@@ -228,6 +266,10 @@ pub fn playerMovedToLevel(self: *GameSession) !void {
     try self.events.sendEvent(event);
 }
 
+pub fn subscriber(self: *GameSession) g.events.Subscriber {
+    return .{ .context = self, .onEvent = handleEvent };
+}
+
 pub inline fn tick(self: *GameSession) !void {
     switch (self.mode) {
         .explore => try self.mode.explore.tick(),
@@ -240,27 +282,8 @@ pub inline fn tick(self: *GameSession) !void {
     try self.events.notifySubscribers();
 }
 
-pub fn subscriber(self: *GameSession) g.events.Subscriber {
-    return .{ .context = self, .onEvent = handleEvent };
-}
-
-fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
-    const self: *GameSession = @ptrCast(@alignCast(ptr));
-    switch (event) {
-        .level_changed => |lvl| {
-            self.mode.deinit();
-            self.mode = .{ .save_load = try SaveLoadMode.loadOrGenerateLevel(self, lvl.by_ladder) };
-        },
-        .player_hit => {
-            log.debug("Update target after player hit", .{});
-            try self.mode.play.updateQuickActions(event.player_hit.target, null);
-        },
-        .entity_moved => |entity_moved| {
-            if (entity_moved.entity.id == self.player.id) {
-                try self.level.onPlayerMoved(entity_moved);
-            } else if (entity_moved.targetPlace().near8(self.level.playerPosition().place)) {
-                try self.mode.play.updateQuickActions(entity_moved.entity, null);
-            }
-        },
-    }
+pub fn doDamage(self: *GameSession, target: g.Entity, value: u8, damage_type: c.DamageType) void {
+    _ = damage_type;
+    const target_health = self.entities.registry.getUnsafe(target, c.Health);
+    target_health.current -|= value;
 }

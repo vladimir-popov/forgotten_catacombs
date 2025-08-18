@@ -14,22 +14,22 @@ rand: std.Random,
 /// Do not mutate anything, only creates an action.
 pub fn action(
     self: AI,
-    entity: g.Entity,
-    entity_place: p.Point,
-    enemy_state: c.EnemyState,
+    npc: g.Entity,
 ) g.actions.Action {
+    const npc_place = self.session.entities.registry.getUnsafe(npc, c.Position).place;
+    const npc_state = self.session.entities.registry.getUnsafe(npc, c.EnemyState);
     const player_place = self.session.level.playerPosition().place;
 
-    const act = switch (enemy_state) {
-        .sleeping => self.actionForSleepingEnemy(entity, entity_place, player_place),
-        .walking => self.actionForWalkingEnemy(entity, entity_place, player_place),
-        .aggressive => self.actionForAggressiveEnemy(entity, entity_place, player_place),
+    const act = switch (npc_state.*) {
+        .sleeping => self.actionForSleepingEnemy(npc, npc_place, player_place),
+        .walking => self.actionForWalkingEnemy(npc, npc_place, player_place),
+        .aggressive => self.actionForAggressiveEnemy(npc, npc_place, player_place),
     };
-    log.debug("The action for the entity {d} in state {s} is {any}", .{ entity.id, @tagName(enemy_state), act });
+    log.debug("The action for the entity {d} in state {s} is {any}", .{ npc.id, @tagName(npc_state.*), act });
     return act;
 }
 
-inline fn actionForSleepingEnemy(
+fn actionForSleepingEnemy(
     self: AI,
     entity: g.Entity,
     entity_place: p.Point,
@@ -43,7 +43,7 @@ inline fn actionForSleepingEnemy(
     return .wait;
 }
 
-inline fn actionForWalkingEnemy(
+fn actionForWalkingEnemy(
     self: AI,
     entity: g.Entity,
     entity_place: p.Point,
@@ -68,7 +68,7 @@ inline fn actionForWalkingEnemy(
     return .{ .go_sleep = entity };
 }
 
-inline fn actionForAggressiveEnemy(
+fn actionForAggressiveEnemy(
     self: AI,
     entity: g.Entity,
     entity_place: p.Point,

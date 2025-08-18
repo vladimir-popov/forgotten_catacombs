@@ -139,10 +139,6 @@ pub fn Registry(comptime ComponentsStruct: type) type {
             return null;
         }
 
-        pub fn getAll(self: Self, comptime C: type) []C {
-            return @field(self.components_map, @typeName(C)).components.items;
-        }
-
         pub fn query(self: Self, comptime C: type) ArraySet(C).Iterator {
             return @field(self.components_map, @typeName(C)).iterator();
         }

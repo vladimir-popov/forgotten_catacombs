@@ -54,33 +54,23 @@ pub fn tick(self: *PlayMode) !void {
     if (try self.draw()) return;
 
     if (self.is_player_turn) {
+        // break this function if no input
         const action = (try self.handleInput()) orelse return;
-        // If the player did some action
-        self.is_player_turn = false;
-        // break this function if the mode was changed
+        // break this function if the mode was changed to
+        // "looking around" or "explore" mode
         if (self.session.mode != .play) return;
 
-        const speed = self.session.entities.registry.getUnsafe(self.session.player, c.Speed);
-        const mp = try g.actions.doAction(self.session, self.session.player, action, speed.move_points);
-        if (mp > 0) {
-            log.debug("Spent {d} move points", .{mp});
-            log.debug("Update quick actions after action '{s}'", .{@tagName(action)});
-            try self.updateQuickActions(self.target(), self.quickAction());
-            var itr = self.session.entities.registry.query(c.Initiative);
-            while (itr.next()) |initiative| {
-                initiative[1].move_points += mp;
-            }
-        }
+        try self.doTurn(self.session.player, action);
+        self.is_player_turn = false;
     } else {
-        var itr = self.session.entities.registry.query4(c.Position, c.Initiative, c.Speed, c.EnemyState);
+        var itr = self.session.entities.registry.query3(c.EnemyState, c.Initiative, c.Speed);
         while (itr.next()) |tuple| {
-            const entity, const position, const initiative, const speed, const state = tuple;
+            const npc, const state, const initiative, const speed = tuple;
+            _ = state;
             if (speed.move_points > initiative.move_points) continue;
 
-            const action = self.session.ai.action(entity, position.place, state.*);
-            const mp = try g.actions.doAction(self.session, entity, action, speed.move_points);
-            std.debug.assert(0 < mp and mp <= initiative.move_points);
-            initiative.move_points -= mp;
+            const action = self.session.ai.action(npc);
+            try self.doTurn(npc, action);
         }
         self.is_player_turn = true;
     }
@@ -153,6 +143,84 @@ fn handleInput(self: *PlayMode) !?g.actions.Action {
         }
     }
     return null;
+}
+
+pub fn doTurn(self: *PlayMode, actor: g.Entity, action: g.actions.Action) !void {
+    log.info(
+        "The turn of the entity {d}. The player {d}; is player {any}",
+        .{ actor.id, self.session.player.id, self.is_player_turn },
+    );
+    const health = self.session.entities.registry.get(actor, c.Health) orelse {
+        log.err("The entity {d} doesn't have health.", .{actor.id});
+        return error.NotEnoughComponents;
+    };
+    // Handle Impacts
+    if (self.session.entities.registry.get(actor, c.Impacts)) |impacts| {
+        inline for (std.meta.fields(c.Impacts.Type)) |impact_field| {
+            const impact_type: c.Impacts.Type = @enumFromInt(impact_field.value);
+            if (@field(impacts, impact_field.name)) |*impact| {
+                switch (impact_type) {
+                    .burning => self.session.doDamage(actor, impact.power, .fire),
+                    .corrosion => self.session.doDamage(actor, impact.power, .acid),
+                    .poisoning => self.session.doDamage(actor, impact.power, .poison),
+                    .healing => health.add(impact.power),
+                }
+                impact.power -|= impact.decrease;
+                if (impact.power == 0) {
+                    @field(impacts, impact_field.name) = null;
+                }
+            }
+        }
+        if (impacts.isNothing()) {
+            try self.session.entities.registry.remove(actor, c.Impacts);
+        }
+    }
+    // Check health
+    if (health.current == 0) {
+        try self.session.entities.registry.removeEntity(actor);
+        try self.session.level.removeEntity(actor);
+        if (actor.eql(self.session.player)) {
+            log.info("Player is dead. Game is over.", .{});
+            // return error for break the game loop:
+            return error.GameOver;
+        } else {
+            log.debug("The enemy {d} has been died", .{actor.id});
+            return;
+        }
+    }
+
+    // Do Actions
+    const speed = self.session.entities.registry.get(actor, c.Speed) orelse {
+        log.err("The entity {d} doesn't have speed and can't do action.", .{actor.id});
+        return error.NotEnoughComponents;
+    };
+    const mp = try g.actions.doAction(self.session, actor, action, speed.move_points);
+    log.info("MP {d}", .{mp});
+
+    // Handle Initiative
+    if (self.is_player_turn) {
+        if (mp > 0) {
+            log.debug("Update quick actions after action '{s}'", .{@tagName(action)});
+            try self.updateQuickActions(self.target(), self.quickAction());
+            var itr = self.session.entities.registry.query(c.Initiative);
+            while (itr.next()) |tuple| {
+                tuple[1].move_points += mp;
+            }
+        }
+        log.info("The player spent {d} move points", .{mp});
+    } else {
+        log.info(
+            "Initiative for actor {d}. The player {d}; is player {any}",
+            .{ actor.id, self.session.player.id, self.is_player_turn },
+        );
+        const initiative = self.session.entities.registry.get(actor, c.Initiative) orelse {
+            log.err("The entity {d} doesn't have initiative.", .{actor.id});
+            return error.NotEnoughComponents;
+        };
+        std.debug.assert(0 < mp and mp <= initiative.move_points);
+        initiative.move_points -= mp;
+    }
+    log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
 }
 
 /// If returns true then the input should be ignored

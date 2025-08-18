@@ -309,15 +309,6 @@ pub const Impacts = struct {
             },
         }
     }
-
-    pub fn toDamageType(impact_type: Type) ?DamageType {
-        return switch (impact_type) {
-            .burning => .fire,
-            .corrosion => .acid,
-            .poisoning => .poison,
-            else => null,
-        };
-    }
 };
 
 pub const Potion = struct {

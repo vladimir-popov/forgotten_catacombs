@@ -26,12 +26,21 @@ pub const EntityMoved = struct {
 
 pub const PlayerHit = struct { target: g.Entity };
 
+/// The mode of the GameSession should be changed on handling this event.
+pub const ModeChanged = union(enum) {
+    to_explore,
+    to_looking_around,
+    to_inventory,
+    to_trading: *c.Shop,
+};
+
 pub const Event = union(enum) {
     const Tag = @typeInfo(Event).@"union".tag_type.?;
 
     level_changed: ChangingLevel,
     entity_moved: EntityMoved,
     player_hit: PlayerHit,
+    mode_changed: ModeChanged,
 
     pub fn get(self: Event, comptime tag: Tag) ?std.meta.TagPayload(Event, tag) {
         switch (self) {

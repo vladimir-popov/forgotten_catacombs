@@ -1,4 +1,4 @@
-//! This module contains logic for most gameplay mechanic of the game.
+//! This module contains logic to handle actions of the player or NPC.
 const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
@@ -33,6 +33,8 @@ pub const Action = union(enum) {
     hit: g.Entity,
     /// The id of an item that someone is going to take from the floor
     pickup: g.Entity,
+    /// The id of a potion to drink it
+    drink: g.Entity,
     /// The player moves from the level to another level
     move_to_level: c.Ladder,
     /// Change the state of the entity to sleep
@@ -48,18 +50,19 @@ pub const Action = union(enum) {
 
     pub fn toString(action: Action) []const u8 {
         return switch (action) {
-            .wait => "Wait",
-            .open => "Open",
             .close => "Close",
+            .drink => "Drink",
             .hit => "Attack",
             .move_to_level => |ladder| switch (ladder.direction) {
                 .up => "Go up",
                 .down => "Go down",
             },
-            .pickup => "Pickup",
+            .open => "Open",
             .open_inventory => "Inventory",
+            .pickup => "Pickup",
             .trade => "Trade",
-            else => "???",
+            .wait => "Wait",
+            .get_angry, .chill, .go_sleep, .do_nothing, .move => "???",
         };
     }
 
@@ -81,7 +84,7 @@ pub fn calculateQuickActionForTarget(
         session.entities.registry.get(target_entity, c.Position) orelse return null;
 
     if (player_position.place.eql(target_position.place)) {
-        if (target_position.zorder == .item) {
+        if (session.entities.isItem(target_entity)) {
             return .{ .pickup = target_entity };
         }
         if (session.entities.registry.get(target_entity, c.Ladder)) |ladder| {
@@ -117,14 +120,19 @@ pub fn calculateQuickActionForTarget(
 /// Returns count of used move points.
 /// If returns 0, then it means that action was declined (moving to the wall as example).
 pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action, actor_speed: g.MovePoints) !g.MovePoints {
-    if (std.log.logEnabled(.debug, .action_system) and action != .do_nothing) {
+    if (std.log.logEnabled(.debug, .actions) and action != .do_nothing) {
         log.debug("Do action {s} by the entity {d}", .{ @tagName(action), actor.id });
     }
     switch (action) {
         .do_nothing => return 0,
+        .drink => |potion_id| {
+            if (session.entities.registry.get(potion_id, c.Potion)) |potion| {
+                const impacts = try session.entities.registry.getOrSet(actor, c.Impacts, .{});
+                impacts.add(&potion.effect);
+            }
+        },
         .open_inventory => {
             try session.manageInventory();
-            return 0;
         },
         .move => |move| {
             if (session.entities.registry.get(actor, c.Position)) |position|
@@ -144,7 +152,6 @@ pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action, actor_
             const inventory = session.entities.registry.getUnsafe(session.player, c.Inventory);
             if (session.entities.registry.get(item, c.Pile)) |_| {
                 try session.manageInventory();
-                return 0;
             } else {
                 try inventory.items.add(item);
                 try session.entities.registry.remove(item, c.Position);
@@ -177,7 +184,6 @@ pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action, actor_
         },
         .trade => |shop| {
             try session.trade(shop);
-            return 0;
         },
         .wait => {
             try session.entities.registry.set(actor, c.Animation{ .preset = .wait, .is_blocked = session.player.eql(actor) });
@@ -200,6 +206,7 @@ fn doMove(
     if (from_position.place.eql(new_place)) return 0;
 
     if (checkCollision(session, new_place)) |action| {
+        log.debug("Collision lead to {any}", .{action});
         return try doAction(session, entity, action, move_speed);
     }
     const event = g.events.Event{
@@ -253,70 +260,28 @@ fn doHit(
     actor: g.Entity,
     enemy: g.Entity,
 ) !void {
-    if (session.entities.registry.get(enemy, c.Health)) |enemy_health| {
-        const weapon = session.entities.getWeapon(actor) orelse {
-            log.err("Actor {d} doesn't have any weapon", .{actor.id});
-            return;
-        };
+    const weapon = session.entities.getWeapon(actor) orelse {
+        log.err("Actor {d} doesn't have any weapon", .{actor.id});
+        return;
+    };
 
-        // Applying physical damage
-        const damage = session.prng.random().intRangeLessThan(u8, weapon.damage_min, weapon.damage_max);
-        doDamage(damage, weapon.damage_type, enemy_health);
+    // Applying physical damage
+    const damage = session.prng.random().intRangeLessThan(u8, weapon.damage_min, weapon.damage_max);
+    session.doDamage(enemy, damage, weapon.damage_type);
 
-        // Applying all effects of the weapon
-        if (weapon.effects.len > 0) {
-            const impacts = try session.entities.registry.getOrSet(enemy, c.Impacts, .{});
-            var itr = weapon.effects.constIterator(0);
-            while (itr.next()) |effect| {
-                impacts.add(effect);
-            }
-            try makeImpacts(impacts, enemy_health);
-            if (impacts.isNothing()) {
-                try session.entities.registry.remove(enemy, c.Impacts);
-            }
-        }
-
-        // a special case to give to player a chance to notice what happened
-        const is_blocked_animation = actor.eql(session.player) or enemy.eql(session.player);
-        try session.entities.registry.set(enemy, c.Animation{ .preset = .hit, .is_blocked = is_blocked_animation });
-        if (actor.eql(session.player)) {
-            try session.events.sendEvent(.{ .player_hit = .{ .target = enemy } });
-        }
-        if (enemy_health.current == 0) {
-            try session.entities.registry.removeEntity(enemy);
-            try session.level.removeEntity(enemy);
-            if (enemy.eql(session.player)) {
-                log.info("Player is dead. Game over.", .{});
-                return error.GameOver;
-            } else {
-                log.debug("The enemy {d} has been died", .{enemy.id});
-            }
+    // Applying all effects of the weapon
+    if (weapon.effects.len > 0) {
+        const impacts = try session.entities.registry.getOrSet(enemy, c.Impacts, .{});
+        var itr = weapon.effects.constIterator(0);
+        while (itr.next()) |effect| {
+            impacts.add(effect);
         }
     }
-}
 
-fn makeImpacts(
-    impacts: *c.Impacts,
-    target_health: *c.Health,
-) !void {
-    inline for (std.meta.fields(c.Impacts.Type)) |impact_field| {
-        const impact_type: c.Impacts.Type = @enumFromInt(impact_field.value);
-        if (@field(impacts, impact_field.name)) |*impact| {
-            switch (impact_type) {
-                .burning => doDamage(impact.power, .fire, target_health),
-                .corrosion => doDamage(impact.power, .acid, target_health),
-                .poisoning => doDamage(impact.power, .poison, target_health),
-                .healing => target_health.add(impact.power),
-            }
-            impact.power -|= impact.decrease;
-            if (impact.power == 0) {
-                @field(impacts, impact_field.name) = null;
-            }
-        }
+    // a special case to give to player a chance to notice what happened
+    const is_blocked_animation = actor.eql(session.player) or enemy.eql(session.player);
+    try session.entities.registry.set(enemy, c.Animation{ .preset = .hit, .is_blocked = is_blocked_animation });
+    if (actor.eql(session.player)) {
+        try session.events.sendEvent(.{ .player_hit = .{ .target = enemy } });
     }
-}
-
-fn doDamage(value: u8, damage_type: c.DamageType, target_health: *c.Health) void {
-    _ = damage_type;
-    target_health.current -|= value;
 }
