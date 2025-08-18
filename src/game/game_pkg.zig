@@ -1,5 +1,6 @@
 const std = @import("std");
 
+pub const actions = @import("actions.zig");
 pub const codepoints = @import("codepoints.zig");
 pub const components = @import("components.zig");
 pub const descriptions = @import("descriptions.zig");
@@ -13,7 +14,6 @@ pub const utils = @import("utils/utils_pkg.zig");
 pub const visibility = @import("visibility_strategies.zig");
 pub const windows = @import("windows/windows_pkg.zig");
 
-pub const Action = @import("actions.zig").Action;
 pub const AI = @import("AI.zig");
 pub const Button = @import("Button.zig");
 pub const Cheat = @import("cheats.zig").Cheat;

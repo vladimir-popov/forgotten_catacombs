@@ -11,7 +11,7 @@ const PlayMode = @This();
 
 const QuickAction = struct {
     target: g.Entity,
-    action: g.Action,
+    action: g.actions.Action,
     pub fn format(self: QuickAction, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
         try writer.print("QuickAction: {s}; target {d}", .{ @tagName(self.action), self.target.id });
     }
@@ -61,7 +61,7 @@ pub fn tick(self: *PlayMode) !void {
         if (self.session.mode != .play) return;
 
         const speed = self.session.entities.registry.getUnsafe(self.session.player, c.Speed);
-        const mp = try self.session.doAction(self.session.player, action, speed.move_points);
+        const mp = try g.actions.doAction(self.session, self.session.player, action, speed.move_points);
         if (mp > 0) {
             log.debug("Spent {d} move points", .{mp});
             log.debug("Update quick actions after action '{s}'", .{@tagName(action)});
@@ -78,7 +78,7 @@ pub fn tick(self: *PlayMode) !void {
             if (speed.move_points > initiative.move_points) continue;
 
             const action = self.session.ai.action(entity, position.place, state.*);
-            const mp = try self.session.doAction(entity, action, speed.move_points);
+            const mp = try g.actions.doAction(self.session, entity, action, speed.move_points);
             std.debug.assert(0 < mp and mp <= initiative.move_points);
             initiative.move_points -= mp;
         }
@@ -86,7 +86,7 @@ pub fn tick(self: *PlayMode) !void {
     }
 }
 
-fn handleInput(self: *PlayMode) !?g.Action {
+fn handleInput(self: *PlayMode) !?g.actions.Action {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (self.quick_actions_window) |*window| {
             if (try window.handleButton(btn)) {
@@ -123,7 +123,7 @@ fn handleInput(self: *PlayMode) !?g.Action {
                     },
                 },
                 .left, .right, .up, .down => {
-                    return g.Action{
+                    return g.actions.Action{
                         .move = .{
                             .target = .{ .direction = btn.toDirection().? },
                             .keep_moving = false,
@@ -235,11 +235,11 @@ fn target(self: PlayMode) ?g.Entity {
         self.quick_actions.items[self.selected_action_idx].target;
 }
 
-fn quickAction(self: PlayMode) g.Action {
+fn quickAction(self: PlayMode) g.actions.Action {
     return self.quick_actions.items[self.selected_action_idx].action;
 }
 
-pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity, prev_action: ?g.Action) anyerror!void {
+pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity, prev_action: ?g.actions.Action) anyerror!void {
     defer {
         log.debug(
             "{d} quick actions after update:\n{any}The selected action is {any}\nThe previous was {any}",
@@ -259,7 +259,7 @@ pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity, prev_action
     if (target_entity) |tg| {
         if (tg.id != self.session.player.id) {
             // check if quick action is available for target
-            if (self.calculateQuickActionForTarget(tg)) |qa| {
+            if (g.actions.calculateQuickActionForTarget(self.session, tg)) |qa| {
                 self.selected_action_idx = self.quick_actions.items.len;
                 try self.quick_actions.append(alloc, .{ .target = tg, .action = qa });
             }
@@ -277,7 +277,7 @@ pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity, prev_action
                 "The place {any} near the player {any} with {any}",
                 .{ position.place, player_position.place, entity },
             );
-            if (self.calculateQuickActionForTarget(entity)) |qa| {
+            if (g.actions.calculateQuickActionForTarget(self.session, entity)) |qa| {
                 log.debug("Calculated action is {any}", .{qa});
                 if (qa.eql(prev_action)) {
                     self.selected_action_idx = self.quick_actions.items.len;
@@ -293,47 +293,6 @@ pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity, prev_action
     try self.quick_actions.append(alloc, .{ .target = self.session.player, .action = .wait });
     // manage its inventory
     try self.quick_actions.append(alloc, .{ .target = self.session.player, .action = .open_inventory });
-}
-
-fn calculateQuickActionForTarget(
-    self: PlayMode,
-    target_entity: g.Entity,
-) ?g.Action {
-    const player_position = self.session.level.playerPosition();
-    const target_position =
-        self.session.entities.registry.get(target_entity, c.Position) orelse return null;
-
-    if (player_position.place.eql(target_position.place)) {
-        if (target_position.zorder == .item) {
-            return .{ .pickup = target_entity };
-        }
-        if (self.session.entities.registry.get(target_entity, c.Ladder)) |ladder| {
-            // It's impossible to go upper the first level
-            if (ladder.direction == .up and self.session.level.depth == 0) return null;
-
-            return .{ .move_to_level = ladder.* };
-        }
-    }
-
-    if (player_position.place.near4(target_position.place)) {
-        if (self.session.entities.isEnemy(target_entity)) {
-            return .{ .hit = target_entity };
-        }
-        if (self.session.entities.registry.get(target_entity, c.Door)) |door| {
-            // the player should not be able to open/close the door stay in the doorway
-            if (player_position.place.eql(target_position.place)) {
-                return null;
-            }
-            return switch (door.state) {
-                .opened => .{ .close = .{ .id = target_entity, .place = target_position.place } },
-                .closed => .{ .open = .{ .id = target_entity, .place = target_position.place } },
-            };
-        }
-        if (self.session.entities.registry.get(target_entity, c.Shop)) |shop| {
-            return .{ .trade = shop };
-        }
-    }
-    return null;
 }
 
 fn windowWithQuickActions(

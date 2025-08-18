@@ -1,7 +1,10 @@
+//! This module contains logic for most gameplay mechanic of the game.
 const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
+
+const log = std.log.scoped(.actions);
 
 pub const MovePoints = u8;
 
@@ -68,3 +71,252 @@ pub const Action = union(enum) {
         }
     }
 };
+
+pub fn calculateQuickActionForTarget(
+    session: *g.GameSession,
+    target_entity: g.Entity,
+) ?Action {
+    const player_position = session.level.playerPosition();
+    const target_position =
+        session.entities.registry.get(target_entity, c.Position) orelse return null;
+
+    if (player_position.place.eql(target_position.place)) {
+        if (target_position.zorder == .item) {
+            return .{ .pickup = target_entity };
+        }
+        if (session.entities.registry.get(target_entity, c.Ladder)) |ladder| {
+            // It's impossible to go upper the first level
+            if (ladder.direction == .up and session.level.depth == 0) return null;
+
+            return .{ .move_to_level = ladder.* };
+        }
+    }
+
+    if (player_position.place.near4(target_position.place)) {
+        if (session.entities.isEnemy(target_entity)) {
+            return .{ .hit = target_entity };
+        }
+        if (session.entities.registry.get(target_entity, c.Door)) |door| {
+            // the player should not be able to open/close the door stay in the doorway
+            if (player_position.place.eql(target_position.place)) {
+                return null;
+            }
+            return switch (door.state) {
+                .opened => .{ .close = .{ .id = target_entity, .place = target_position.place } },
+                .closed => .{ .open = .{ .id = target_entity, .place = target_position.place } },
+            };
+        }
+        if (session.entities.registry.get(target_entity, c.Shop)) |shop| {
+            return .{ .trade = shop };
+        }
+    }
+    return null;
+}
+
+/// Handles intentions to do some actions.
+/// Returns count of used move points.
+/// If returns 0, then it means that action was declined (moving to the wall as example).
+pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action, actor_speed: g.MovePoints) !g.MovePoints {
+    if (std.log.logEnabled(.debug, .action_system) and action != .do_nothing) {
+        log.debug("Do action {s} by the entity {d}", .{ @tagName(action), actor.id });
+    }
+    switch (action) {
+        .do_nothing => return 0,
+        .open_inventory => {
+            try session.manageInventory();
+            return 0;
+        },
+        .move => |move| {
+            if (session.entities.registry.get(actor, c.Position)) |position|
+                return doMove(session, actor, position, move.target, actor_speed);
+        },
+        .hit => |target| {
+            try doHit(session, actor, target);
+            return actor_speed;
+        },
+        .open => |door| {
+            try session.entities.registry.setComponentsToEntity(door.id, g.entities.openedDoor(door.place));
+        },
+        .close => |door| {
+            try session.entities.registry.setComponentsToEntity(door.id, g.entities.closedDoor(door.place));
+        },
+        .pickup => |item| {
+            const inventory = session.entities.registry.getUnsafe(session.player, c.Inventory);
+            if (session.entities.registry.get(item, c.Pile)) |_| {
+                try session.manageInventory();
+                return 0;
+            } else {
+                try inventory.items.add(item);
+                try session.entities.registry.remove(item, c.Position);
+                try session.level.removeEntity(item);
+            }
+        },
+        .move_to_level => |ladder| {
+            try session.movePlayerToLevel(ladder);
+        },
+        .go_sleep => |target| {
+            session.entities.registry.getUnsafe(target, c.EnemyState).* = .sleeping;
+            try session.entities.registry.set(
+                target,
+                c.Animation{ .preset = .go_sleep },
+            );
+        },
+        .chill => |target| {
+            session.entities.registry.getUnsafe(target, c.EnemyState).* = .walking;
+            try session.entities.registry.set(
+                target,
+                c.Animation{ .preset = .relax },
+            );
+        },
+        .get_angry => |target| {
+            session.entities.registry.getUnsafe(target, c.EnemyState).* = .aggressive;
+            try session.entities.registry.set(
+                target,
+                c.Animation{ .preset = .get_angry },
+            );
+        },
+        .trade => |shop| {
+            try session.trade(shop);
+            return 0;
+        },
+        .wait => {
+            try session.entities.registry.set(actor, c.Animation{ .preset = .wait, .is_blocked = session.player.eql(actor) });
+        },
+    }
+    return actor_speed;
+}
+
+fn doMove(
+    session: *g.GameSession,
+    entity: g.Entity,
+    from_position: *c.Position,
+    target: Action.Move.Target,
+    move_speed: g.MovePoints,
+) anyerror!g.MovePoints {
+    const new_place = switch (target) {
+        .direction => |direction| from_position.place.movedTo(direction),
+        .new_place => |place| place,
+    };
+    if (from_position.place.eql(new_place)) return 0;
+
+    if (checkCollision(session, new_place)) |action| {
+        return try doAction(session, entity, action, move_speed);
+    }
+    const event = g.events.Event{
+        .entity_moved = .{
+            .entity = entity,
+            .is_player = (entity.eql(session.player)),
+            .moved_from = from_position.place,
+            .target = target,
+        },
+    };
+    try session.events.sendEvent(event);
+    from_position.place = new_place;
+    return move_speed;
+}
+
+/// Returns an action that should be done because of collision.
+/// The `null` means that the move is completed;
+/// .do_nothing or any other action means that the move should be aborted, and the action handled;
+///
+/// {place} a place in the dungeon with which collision should be checked.
+fn checkCollision(session: *g.GameSession, place: p.Point) ?Action {
+    switch (session.level.cellAt(place)) {
+        .landscape => |cl| if (cl == .floor or cl == .doorway)
+            return null,
+
+        .entities => |entities| {
+            if (entities[2]) |entity| {
+                if (session.entities.registry.get(entity, c.Door)) |_|
+                    return .{ .open = .{ .id = entity, .place = place } };
+
+                if (session.entities.isEnemy(entity))
+                    return .{ .hit = entity };
+
+                if (session.entities.registry.get(entity, c.Shop)) |shop| {
+                    return .{ .trade = shop };
+                }
+
+                // the player should not step on the place with entity with z-order = 2
+                return .do_nothing;
+            }
+            // it's possible to step on the ladder, opened door, teleport, dropped item and
+            // other entities with z_order < 2
+            return null;
+        },
+    }
+    return .do_nothing;
+}
+
+fn doHit(
+    session: *g.GameSession,
+    actor: g.Entity,
+    enemy: g.Entity,
+) !void {
+    if (session.entities.registry.get(enemy, c.Health)) |enemy_health| {
+        const weapon = session.entities.getWeapon(actor) orelse {
+            log.err("Actor {d} doesn't have any weapon", .{actor.id});
+            return;
+        };
+
+        // Applying physical damage
+        const damage = session.prng.random().intRangeLessThan(u8, weapon.damage_min, weapon.damage_max);
+        doDamage(damage, weapon.damage_type, enemy_health);
+
+        // Applying all effects of the weapon
+        if (weapon.effects.len > 0) {
+            const impacts = try session.entities.registry.getOrSet(enemy, c.Impacts, .{});
+            var itr = weapon.effects.constIterator(0);
+            while (itr.next()) |effect| {
+                impacts.add(effect);
+            }
+            try makeImpacts(impacts, enemy_health);
+            if (impacts.isNothing()) {
+                try session.entities.registry.remove(enemy, c.Impacts);
+            }
+        }
+
+        // a special case to give to player a chance to notice what happened
+        const is_blocked_animation = actor.eql(session.player) or enemy.eql(session.player);
+        try session.entities.registry.set(enemy, c.Animation{ .preset = .hit, .is_blocked = is_blocked_animation });
+        if (actor.eql(session.player)) {
+            try session.events.sendEvent(.{ .player_hit = .{ .target = enemy } });
+        }
+        if (enemy_health.current == 0) {
+            try session.entities.registry.removeEntity(enemy);
+            try session.level.removeEntity(enemy);
+            if (enemy.eql(session.player)) {
+                log.info("Player is dead. Game over.", .{});
+                return error.GameOver;
+            } else {
+                log.debug("The enemy {d} has been died", .{enemy.id});
+            }
+        }
+    }
+}
+
+fn makeImpacts(
+    impacts: *c.Impacts,
+    target_health: *c.Health,
+) !void {
+    inline for (std.meta.fields(c.Impacts.Type)) |impact_field| {
+        const impact_type: c.Impacts.Type = @enumFromInt(impact_field.value);
+        if (@field(impacts, impact_field.name)) |*impact| {
+            switch (impact_type) {
+                .burning => doDamage(impact.power, .fire, target_health),
+                .corrosion => doDamage(impact.power, .acid, target_health),
+                .poisoning => doDamage(impact.power, .poison, target_health),
+                .healing => target_health.add(impact.power),
+            }
+            impact.power -|= impact.decrease;
+            if (impact.power == 0) {
+                @field(impacts, impact_field.name) = null;
+            }
+        }
+    }
+}
+
+fn doDamage(value: u8, damage_type: c.DamageType, target_health: *c.Health) void {
+    _ = damage_type;
+    target_health.current -|= value;
+}

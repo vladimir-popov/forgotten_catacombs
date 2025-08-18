@@ -113,7 +113,7 @@ pub const Cheat = union(enum) {
         return null;
     }
 
-    pub fn toAction(self: Cheat, session: *g.GameSession) ?g.Action {
+    pub fn toAction(self: Cheat, session: *g.GameSession) ?g.actions.Action {
         switch (self) {
             .move_player_to_ladder_up => {
                 var itr = session.entities.registry.query2(c.Ladder, c.Position);
@@ -143,8 +143,8 @@ pub const Cheat = union(enum) {
         return null;
     }
 
-    inline fn movePlayerToPoint(place: p.Point) g.Action {
-        return .{ .move = g.Action.Move{ .target = .{ .new_place = place } } };
+    inline fn movePlayerToPoint(place: p.Point) g.actions.Action {
+        return .{ .move = g.actions.Action.Move{ .target = .{ .new_place = place } } };
     }
 };
 

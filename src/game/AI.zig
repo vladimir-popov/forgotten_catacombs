@@ -17,7 +17,7 @@ pub fn action(
     entity: g.Entity,
     entity_place: p.Point,
     enemy_state: c.EnemyState,
-) g.Action {
+) g.actions.Action {
     const player_place = self.session.level.playerPosition().place;
 
     const act = switch (enemy_state) {
@@ -34,7 +34,7 @@ inline fn actionForSleepingEnemy(
     entity: g.Entity,
     entity_place: p.Point,
     player_place: p.Point,
-) g.Action {
+) g.actions.Action {
     if (entity_place.near8(player_place)) return .{ .get_angry = entity };
     if (self.isPlayerIsInSight(entity_place)) {
         // TODO Probability of waking up should depends on player's skills
@@ -48,7 +48,7 @@ inline fn actionForWalkingEnemy(
     entity: g.Entity,
     entity_place: p.Point,
     player_place: p.Point,
-) g.Action {
+) g.actions.Action {
     if (entity_place.near8(player_place)) return .{ .get_angry = entity };
 
     if (self.isPlayerIsInSight(entity_place)) {
@@ -73,7 +73,7 @@ inline fn actionForAggressiveEnemy(
     entity: g.Entity,
     entity_place: p.Point,
     player_place: p.Point,
-) g.Action {
+) g.actions.Action {
     if (entity_place.near4(player_place)) {
         return .{ .hit = self.session.player };
     }
