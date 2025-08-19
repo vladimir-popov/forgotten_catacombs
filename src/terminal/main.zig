@@ -53,7 +53,7 @@ pub fn main() !void {
     const alloc = gpa.allocator();
 
     const use_cheats = Args.flag("devmode");
-    const use_mouse = Args.flag("use-mouse");
+    const use_mouse = Args.flag("mouse");
 
     var runtime = try TtyRuntime.TtyRuntime(g.DISPLAY_ROWS + 2, g.DISPLAY_COLS + 2)
         .init(alloc, true, true, use_cheats, use_mouse);

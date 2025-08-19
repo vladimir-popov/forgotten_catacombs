@@ -107,15 +107,7 @@ pub fn removeLastTab(self: *Self, alloc: std.mem.Allocator) void {
     }
 }
 
-//  0
-// ---
-// |1 <- a
-// |2
-// |3 <- b
-// ---
-//  4
-
-// true means the window should be closed close
+/// true means the window should be closed close
 pub fn handleButton(self: *Self, btn: g.Button) !bool {
     switch (btn.game_button) {
         .a => try self.tabs[self.active_tab_idx].area.handleButton(btn),

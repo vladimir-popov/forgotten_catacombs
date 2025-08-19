@@ -30,7 +30,6 @@ pub fn init(
     self: *PlayMode,
     alloc: std.mem.Allocator,
     session: *g.GameSession,
-    target_entity: ?g.Entity,
 ) !void {
     log.debug("Init PlayMode", .{});
     self.* = .{
@@ -38,7 +37,7 @@ pub fn init(
         .session = session,
         .quick_actions = .empty,
     };
-    try self.updateQuickActions(target_entity, null);
+    try self.updateQuickActions(null, null);
     try self.session.render.drawHorizontalLine(
         '═',
         .{ .row = self.session.viewport.region.rows + 1, .col = 1 },
@@ -56,10 +55,6 @@ pub fn tick(self: *PlayMode) !void {
     if (self.is_player_turn) {
         // break this function if no input
         const action = (try self.handleInput()) orelse return;
-        // break this function if the mode was changed to
-        // "looking around" or "explore" mode
-        if (self.session.mode != .play) return;
-
         try self.doTurn(self.session.player, action);
         self.is_player_turn = false;
     } else {
@@ -73,6 +68,39 @@ pub fn tick(self: *PlayMode) !void {
             try self.doTurn(npc, action);
         }
         self.is_player_turn = true;
+    }
+}
+
+pub fn doTurn(self: *PlayMode, actor: g.Entity, action: g.actions.Action) !void {
+    log.info("The turn of the entity {d}.", .{actor.id});
+    defer log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
+
+    // Handle Impacts
+    if (try self.session.handleImpacts(actor)) {
+        // actor is dead
+        return;
+    }
+
+    // Do Actions
+    const mp = try g.actions.doAction(self.session, actor, action);
+    log.info("Entity {d} spent {d} move points", .{ actor.id, mp });
+    if (mp == 0) return;
+
+    // Handle Initiative
+    if (self.is_player_turn) {
+        log.debug("Update quick actions after action '{s}'", .{@tagName(action)});
+        try self.updateQuickActions(self.target(), self.quickAction());
+        var itr = self.session.entities.registry.query(c.Initiative);
+        while (itr.next()) |tuple| {
+            tuple[1].move_points += mp;
+        }
+    } else {
+        const initiative = self.session.entities.registry.get(actor, c.Initiative) orelse {
+            log.err("The entity {d} doesn't have initiative.", .{actor.id});
+            return error.NotEnoughComponents;
+        };
+        std.debug.assert(0 < mp and mp <= initiative.move_points);
+        initiative.move_points -= mp;
     }
 }
 
@@ -124,7 +152,7 @@ fn handleInput(self: *PlayMode) !?g.actions.Action {
         }
     }
     if (self.session.runtime.popCheat()) |cheat| {
-        log.debug("Run cheat {any}", .{cheat});
+        log.info("Run cheat {any}", .{cheat});
         switch (cheat) {
             .dump_vector_field => g.utils.DijkstraMap.dumpToLog(
                 self.session.level.dijkstra_map,
@@ -143,84 +171,6 @@ fn handleInput(self: *PlayMode) !?g.actions.Action {
         }
     }
     return null;
-}
-
-pub fn doTurn(self: *PlayMode, actor: g.Entity, action: g.actions.Action) !void {
-    log.info(
-        "The turn of the entity {d}. The player {d}; is player {any}",
-        .{ actor.id, self.session.player.id, self.is_player_turn },
-    );
-    const health = self.session.entities.registry.get(actor, c.Health) orelse {
-        log.err("The entity {d} doesn't have health.", .{actor.id});
-        return error.NotEnoughComponents;
-    };
-    // Handle Impacts
-    if (self.session.entities.registry.get(actor, c.Impacts)) |impacts| {
-        inline for (std.meta.fields(c.Impacts.Type)) |impact_field| {
-            const impact_type: c.Impacts.Type = @enumFromInt(impact_field.value);
-            if (@field(impacts, impact_field.name)) |*impact| {
-                switch (impact_type) {
-                    .burning => self.session.doDamage(actor, impact.power, .fire),
-                    .corrosion => self.session.doDamage(actor, impact.power, .acid),
-                    .poisoning => self.session.doDamage(actor, impact.power, .poison),
-                    .healing => health.add(impact.power),
-                }
-                impact.power -|= impact.decrease;
-                if (impact.power == 0) {
-                    @field(impacts, impact_field.name) = null;
-                }
-            }
-        }
-        if (impacts.isNothing()) {
-            try self.session.entities.registry.remove(actor, c.Impacts);
-        }
-    }
-    // Check health
-    if (health.current == 0) {
-        try self.session.entities.registry.removeEntity(actor);
-        try self.session.level.removeEntity(actor);
-        if (actor.eql(self.session.player)) {
-            log.info("Player is dead. Game is over.", .{});
-            // return error for break the game loop:
-            return error.GameOver;
-        } else {
-            log.debug("The enemy {d} has been died", .{actor.id});
-            return;
-        }
-    }
-
-    // Do Actions
-    const speed = self.session.entities.registry.get(actor, c.Speed) orelse {
-        log.err("The entity {d} doesn't have speed and can't do action.", .{actor.id});
-        return error.NotEnoughComponents;
-    };
-    const mp = try g.actions.doAction(self.session, actor, action, speed.move_points);
-    log.info("MP {d}", .{mp});
-
-    // Handle Initiative
-    if (self.is_player_turn) {
-        if (mp > 0) {
-            log.debug("Update quick actions after action '{s}'", .{@tagName(action)});
-            try self.updateQuickActions(self.target(), self.quickAction());
-            var itr = self.session.entities.registry.query(c.Initiative);
-            while (itr.next()) |tuple| {
-                tuple[1].move_points += mp;
-            }
-        }
-        log.info("The player spent {d} move points", .{mp});
-    } else {
-        log.info(
-            "Initiative for actor {d}. The player {d}; is player {any}",
-            .{ actor.id, self.session.player.id, self.is_player_turn },
-        );
-        const initiative = self.session.entities.registry.get(actor, c.Initiative) orelse {
-            log.err("The entity {d} doesn't have initiative.", .{actor.id});
-            return error.NotEnoughComponents;
-        };
-        std.debug.assert(0 < mp and mp <= initiative.move_points);
-        initiative.move_points -= mp;
-    }
-    log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
 }
 
 /// If returns true then the input should be ignored

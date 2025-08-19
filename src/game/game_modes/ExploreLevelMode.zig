@@ -48,7 +48,7 @@ pub fn tick(self: *ExploreLevelMode) anyerror!void {
         switch (btn.game_button) {
             .a => {
                 self.session.viewport.region.top_left = self.orig_viewport_top_left;
-                try self.session.play(null);
+                try self.session.continuePlay(null, null);
                 return;
             },
             .left, .right => {

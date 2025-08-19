@@ -24,14 +24,13 @@ pub const EntityMoved = struct {
     }
 };
 
-pub const PlayerHit = struct { target: g.Entity };
-
 /// The mode of the GameSession should be changed on handling this event.
 pub const ModeChanged = union(enum) {
     to_explore,
     to_looking_around,
     to_inventory,
     to_trading: *c.Shop,
+    to_play: struct { entity_in_focus: ?g.Entity, action: ?g.actions.Action },
 };
 
 pub const Event = union(enum) {
@@ -39,7 +38,7 @@ pub const Event = union(enum) {
 
     level_changed: ChangingLevel,
     entity_moved: EntityMoved,
-    player_hit: PlayerHit,
+    entity_died: g.Entity,
     mode_changed: ModeChanged,
 
     pub fn get(self: Event, comptime tag: Tag) ?std.meta.TagPayload(Event, tag) {

@@ -114,7 +114,7 @@ pub fn tick(self: *Self) !void {
             }
         } else {
             if (try self.main_window.handleButton(btn)) {
-                try self.session.play(null);
+                try self.session.continuePlay(null, null);
                 return;
             }
         }

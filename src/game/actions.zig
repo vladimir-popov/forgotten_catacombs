@@ -119,16 +119,21 @@ pub fn calculateQuickActionForTarget(
 /// Handles intentions to do some actions.
 /// Returns count of used move points.
 /// If returns 0, then it means that action was declined (moving to the wall as example).
-pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action, actor_speed: g.MovePoints) !g.MovePoints {
+pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action) !g.MovePoints {
     if (std.log.logEnabled(.debug, .actions) and action != .do_nothing) {
         log.debug("Do action {s} by the entity {d}", .{ @tagName(action), actor.id });
     }
+    const speed = session.entities.registry.get(actor, c.Speed) orelse {
+        log.err("The entity {d} doesn't have speed and can't do action.", .{actor.id});
+        return error.NotEnoughComponents;
+    };
     switch (action) {
         .do_nothing => return 0,
         .drink => |potion_id| {
             if (session.entities.registry.get(potion_id, c.Potion)) |potion| {
                 const impacts = try session.entities.registry.getOrSet(actor, c.Impacts, .{});
                 impacts.add(&potion.effect);
+                if (try session.handleImpacts(actor)) return 0;
             }
         },
         .open_inventory => {
@@ -136,11 +141,10 @@ pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action, actor_
         },
         .move => |move| {
             if (session.entities.registry.get(actor, c.Position)) |position|
-                return doMove(session, actor, position, move.target, actor_speed);
+                return doMove(session, actor, position, move.target, speed.move_points);
         },
         .hit => |target| {
-            try doHit(session, actor, target);
-            return actor_speed;
+            return if (try doHit(session, actor, target)) 0 else speed.move_points;
         },
         .open => |door| {
             try session.entities.registry.setComponentsToEntity(door.id, g.entities.openedDoor(door.place));
@@ -186,10 +190,13 @@ pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action, actor_
             try session.trade(shop);
         },
         .wait => {
-            try session.entities.registry.set(actor, c.Animation{ .preset = .wait, .is_blocked = session.player.eql(actor) });
+            try session.entities.registry.set(
+                actor,
+                c.Animation{ .preset = .wait, .is_blocked = session.player.eql(actor) },
+            );
         },
     }
-    return actor_speed;
+    return speed.move_points;
 }
 
 fn doMove(
@@ -206,8 +213,8 @@ fn doMove(
     if (from_position.place.eql(new_place)) return 0;
 
     if (checkCollision(session, new_place)) |action| {
-        log.debug("Collision lead to {any}", .{action});
-        return try doAction(session, entity, action, move_speed);
+        log.debug("Collision lead to {s}", .{@tagName(action)});
+        return try doAction(session, entity, action);
     }
     const event = g.events.Event{
         .entity_moved = .{
@@ -255,19 +262,20 @@ fn checkCollision(session: *g.GameSession, place: p.Point) ?Action {
     return .do_nothing;
 }
 
+/// `true` if the actor is dead
 fn doHit(
     session: *g.GameSession,
     actor: g.Entity,
     enemy: g.Entity,
-) !void {
+) !bool {
     const weapon = session.entities.getWeapon(actor) orelse {
         log.err("Actor {d} doesn't have any weapon", .{actor.id});
-        return;
+        return error.NotEnoughComponents;
     };
 
     // Applying physical damage
     const damage = session.prng.random().intRangeLessThan(u8, weapon.damage_min, weapon.damage_max);
-    session.doDamage(enemy, damage, weapon.damage_type);
+    if (try session.doDamage(enemy, damage, weapon.damage_type)) return true;
 
     // Applying all effects of the weapon
     if (weapon.effects.len > 0) {
@@ -281,7 +289,5 @@ fn doHit(
     // a special case to give to player a chance to notice what happened
     const is_blocked_animation = actor.eql(session.player) or enemy.eql(session.player);
     try session.entities.registry.set(enemy, c.Animation{ .preset = .hit, .is_blocked = is_blocked_animation });
-    if (actor.eql(session.player)) {
-        try session.events.sendEvent(.{ .player_hit = .{ .target = enemy } });
-    }
+    return false;
 }

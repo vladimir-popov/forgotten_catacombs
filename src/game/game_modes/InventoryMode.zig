@@ -49,6 +49,8 @@ inventory: *c.Inventory,
 equipment: *c.Equipment,
 /// The entity under the player's feet. Can be a pile or a single item
 drop: ?g.Entity,
+/// The action initiated during manage the inventory.
+action: ?g.actions.Action = null,
 main_window: w.WindowWithTabs,
 description_window: ?w.ModalWindow(w.TextArea) = null,
 actions_window: ?w.ModalWindow(w.OptionsArea(g.Entity)) = null,
@@ -109,7 +111,7 @@ pub fn tick(self: *Self) !void {
         } else {
             if (try self.main_window.handleButton(btn)) {
                 // the  deinit method will be invoked here:
-                try self.session.play(null);
+                try self.session.continuePlay(null, self.action);
                 return;
             }
         }
@@ -215,6 +217,9 @@ fn useSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         self.equipment.weapon = null;
     } else if (self.session.entities.registry.get(item, c.Weapon)) |_| {
         self.equipment.weapon = item;
+    }
+    if (self.session.entities.registry.get(item, c.Potion)) |_| {
+        self.action = .{ .drink = item };
     }
     try self.updateInventoryTab();
 }

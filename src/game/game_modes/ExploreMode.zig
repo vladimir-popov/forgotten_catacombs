@@ -66,7 +66,7 @@ pub fn tick(self: *ExploreMode) anyerror!void {
                     }
                 },
                 .b => {
-                    try self.session.play(self.entity_in_focus);
+                    try self.session.continuePlay(self.entity_in_focus, null);
                     return;
                 },
                 .left, .right, .up, .down => {
