@@ -1,4 +1,5 @@
 const std = @import("std");
+const archetype = @import("archetypes.zig");
 const cp = @import("../codepoints.zig");
 const g = @import("../game_pkg.zig");
 const c = g.components;
@@ -19,20 +20,7 @@ pub fn player(alloc: std.mem.Allocator) !c.Components {
     };
 }
 
-pub fn rat(place: p.Point) c.Components {
-    return .{
-        .initiative = .empty,
-        .sprite = .{ .codepoint = 'r' },
-        .position = .{ .zorder = .obstacle, .place = place },
-        .description = .{ .preset = .rat },
-        .health = .{ .max = 10, .current = 10 },
-        .damage = .{ .damage_type = .thrusting, .min = 1, .max = 3 },
-        .speed = .{ .move_points = 14 },
-        .state = .sleeping,
-    };
-}
-
-pub const Torch = c.Components{
+pub const Torch = archetype.weapon(.{
     .description = .{ .preset = .torch },
     .sprite = .{ .codepoint = cp.source_of_light },
     .weight = .{ .value = 20 },
@@ -40,32 +28,46 @@ pub const Torch = c.Components{
     .price = .{ .value = 5 },
     .damage = .{ .damage_type = .blunt, .min = 2, .max = 3 },
     .effect = .{ .effect_type = .burning, .min = 1, .max = 1 },
-};
+});
 
-pub const Pickaxe = c.Components{
+pub const Pickaxe = archetype.weapon(.{
     .description = .{ .preset = .pickaxe },
     .sprite = .{ .codepoint = cp.weapon_melee },
     .weight = .{ .value = 100 },
     .damage = .{ .damage_type = .cutting, .min = 3, .max = 5 },
     .price = .{ .value = 15 },
-};
+});
 
-pub const Club = c.Components{
+pub const Club = archetype.weapon(.{
     .description = .{ .preset = .club },
     .sprite = .{ .codepoint = cp.weapon_melee },
     .weight = .{ .value = 80 },
     .damage = .{ .damage_type = .blunt, .min = 5, .max = 8 },
     .price = .{ .value = 28 },
-};
+});
 
 // The first effect describes the type of the potion
-pub const HealingPotion = c.Components{
+pub const HealingPotion = archetype.potion(.{
     .description = .{ .preset = .healing_potion },
     .sprite = .{ .codepoint = cp.potion },
     .effect = .{ .effect_type = .healing, .min = 20, .max = 25 },
     .weight = .{ .value = 10 },
     .price = .{ .value = 20 },
-};
+    .consumable = .{ .consumable_type = .potion, .calories = 10 },
+});
+
+pub fn rat(place: p.Point) c.Components {
+    return archetype.enemy(.{
+        .description = .{ .preset = .rat },
+        .initiative = .empty,
+        .sprite = .{ .codepoint = 'r' },
+        .position = .{ .zorder = .obstacle, .place = place },
+        .health = .{ .max = 10, .current = 10 },
+        .damage = .{ .damage_type = .thrusting, .min = 1, .max = 3 },
+        .speed = .{ .move_points = 14 },
+        .state = .sleeping,
+    });
+}
 
 pub fn openedDoor(place: p.Point) c.Components {
     return .{
