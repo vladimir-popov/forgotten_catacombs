@@ -16,8 +16,8 @@ pub fn action(
     self: AI,
     npc: g.Entity,
 ) g.actions.Action {
-    const npc_place = self.session.entities.registry.getUnsafe(npc, c.Position).place;
-    const npc_state = self.session.entities.registry.getUnsafe(npc, c.EnemyState);
+    const npc_place = self.session.registry.getUnsafe(npc, c.Position).place;
+    const npc_state = self.session.registry.getUnsafe(npc, c.EnemyState);
     const player_place = self.session.level.playerPosition().place;
 
     const act = switch (npc_state.*) {

@@ -21,7 +21,6 @@ pub const Codepoint = u21;
 pub const Color = enum { red, green, blue, black, white };
 pub const DrawingMode = Runtime.DrawingMode;
 pub const Entity = ecs.Entity;
-pub const Entities = @import("Entities.zig");
 pub const Game = @import("Game.zig");
 pub const GameSession = @import("GameSession.zig");
 pub const Level = @import("Level.zig");

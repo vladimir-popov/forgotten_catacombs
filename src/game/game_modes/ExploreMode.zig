@@ -99,10 +99,10 @@ fn statusLine(self: ExploreMode, entity: g.Entity, line: []u8) !usize {
     if (self.session.runtime.isDevMode()) {
         len += (try std.fmt.bufPrint(line[len..], "{d}:", .{entity.id})).len;
     }
-    if (self.session.entities.registry.get(entity, c.Description)) |description| {
+    if (self.session.registry.get(entity, c.Description)) |description| {
         len += (try std.fmt.bufPrint(line[len..], "{s}", .{description.name()})).len;
 
-        if (self.session.entities.registry.get(entity, c.EnemyState)) |state| {
+        if (self.session.registry.get(entity, c.EnemyState)) |state| {
             len += (try std.fmt.bufPrint(line[len..], "({s})", .{@tagName(state.*)})).len;
         }
     }
@@ -113,7 +113,7 @@ fn updateEntitiesOnScreen(self: *ExploreMode) !void {
     const alloc = self.arena.allocator();
     self.entities_on_screen.clearRetainingCapacity();
     const level = &self.session.level;
-    var itr = level.entities.registry.query(c.Position);
+    var itr = level.registry.query(c.Position);
     while (itr.next()) |tuple| {
         const entity = tuple[0];
         const place = tuple[1].place;
@@ -213,7 +213,7 @@ fn windowWithEntities(
     for (variants) |maybe_entity| {
         if (maybe_entity) |entity| {
             // Every entity has to have description, or handling indexes become complicated
-            const description = self.session.entities.registry.getUnsafe(entity, c.Description);
+            const description = self.session.registry.getUnsafe(entity, c.Description);
             try window.area.addOption(self.arena.allocator(), description.name(), entity, describeEntity, null);
             if (entity.eql(self.entity_in_focus))
                 // the variants array has to have at least one (focused) entity
@@ -232,7 +232,7 @@ fn describeEntity(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!void {
 fn windowWithDescription(self: *ExploreMode) !w.ModalWindow(w.TextArea) {
     return try w.entityDescription(
         self.arena.allocator(),
-        self.session.entities,
+        self.session.registry,
         self.entity_in_focus,
         self.session.runtime.isDevMode(),
     );

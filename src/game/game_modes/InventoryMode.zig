@@ -130,7 +130,7 @@ fn draw(self: *Self) !void {
         log.debug("Draw main window tab {d}", .{self.main_window.active_tab_idx});
         try self.main_window.draw(self.session.render);
         var buf: [10]u8 = undefined;
-        const money = self.session.entities.registry.getUnsafe(self.session.player, c.Wallet).money;
+        const money = self.session.registry.getUnsafe(self.session.player, c.Wallet).money;
         try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "{d}$", .{money}));
     }
 }
@@ -174,14 +174,14 @@ const inventory_line_fmt = std.fmt.comptimePrint(
 );
 
 fn formatInventoryLine(self: *Self, line: *w.TextArea.Line, item: g.Entity) ![]const u8 {
-    const sprite = self.session.entities.registry.getUnsafe(item, c.Sprite);
-    const name = if (self.session.entities.registry.get(item, c.Description)) |desc|
+    const sprite = self.session.registry.getUnsafe(item, c.Sprite);
+    const name = if (self.session.registry.get(item, c.Description)) |desc|
         desc.name()
     else
         "???";
     const using = if (item.eql(self.equipment.weapon) or item.eql(self.equipment.light))
         "[x]"
-    else if (self.session.entities.isEquipment(item)) "[ ]" else "   ";
+    else if (self.session.isEquipment(item)) "[ ]" else "   ";
     log.debug("{d}: {u}({d}) {s} {s}", .{ item.id, sprite.codepoint, sprite.codepoint, name, using });
     return try std.fmt.bufPrint(line, inventory_line_fmt, .{ sprite.codepoint, name, using });
 }
@@ -210,15 +210,15 @@ fn useSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
 
     if (item.eql(self.equipment.light)) {
         self.equipment.light = null;
-    } else if (self.session.entities.registry.get(item, c.SourceOfLight)) |_| {
+    } else if (self.session.registry.get(item, c.SourceOfLight)) |_| {
         self.equipment.light = item;
     }
     if (item.eql(self.equipment.weapon)) {
         self.equipment.weapon = null;
-    } else if (self.session.entities.registry.get(item, c.Damage)) |_| {
+    } else if (self.session.registry.get(item, c.Damage)) |_| {
         self.equipment.weapon = item;
     }
-    if (self.session.entities.registry.get(item, c.Consumable)) |consumable| {
+    if (self.session.registry.get(item, c.Consumable)) |consumable| {
         if (consumable.consumable_type == .potion)
             self.action = .{ .drink = item };
     }
@@ -237,7 +237,7 @@ fn updateDropTab(self: *Self, drop: g.Entity) !void {
     self.drop = drop;
     const tab = &self.main_window.tabs[1];
     tab.area.clearRetainingCapacity();
-    if (self.session.entities.registry.get(drop, c.Pile)) |pile| {
+    if (self.session.registry.get(drop, c.Pile)) |pile| {
         var itr = pile.items.iterator();
         while (itr.next()) |item_ptr| {
             try self.addDropOption(tab, item_ptr.*);
@@ -255,8 +255,8 @@ fn updateDropTab(self: *Self, drop: g.Entity) !void {
 
 fn addDropOption(self: *Self, tab: *w.WindowWithTabs.Tab, item: g.Entity) !void {
     var buffer: w.TextArea.Line = undefined;
-    const sprite = self.session.entities.registry.getUnsafe(item, c.Sprite);
-    const name = if (self.session.entities.registry.get(item, c.Description)) |desc|
+    const sprite = self.session.registry.getUnsafe(item, c.Sprite);
+    const name = if (self.session.registry.get(item, c.Description)) |desc|
         desc.name()
     else
         "???";
@@ -269,7 +269,7 @@ fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     log.debug("Show info about item {d}", .{item.id});
     self.description_window = try w.entityDescription(
         self.alloc,
-        self.session.entities,
+        self.session.registry,
         item,
         self.session.runtime.isDevMode(),
     );
@@ -303,11 +303,11 @@ fn takeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     try self.inventory.items.add(item);
     const entity = self.drop orelse @panic("Attempt to take an undefined item");
-    if (self.session.entities.registry.get(entity, c.Pile)) |pile| {
+    if (self.session.registry.get(entity, c.Pile)) |pile| {
         _ = pile.items.remove(item);
         // Remove the pile only if it is became empty
         if (pile.items.size() == 0) {
-            try self.session.entities.registry.removeEntity(entity);
+            try self.session.registry.removeEntity(entity);
             self.main_window.removeLastTab(self.alloc);
             self.drop = null;
         } else {
@@ -315,7 +315,7 @@ fn takeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         }
     } else {
         std.debug.assert(entity.eql(item));
-        try self.session.entities.registry.remove(item, c.Position);
+        try self.session.registry.remove(item, c.Position);
         try self.session.level.removeEntity(item);
         self.main_window.removeLastTab(self.alloc);
     }

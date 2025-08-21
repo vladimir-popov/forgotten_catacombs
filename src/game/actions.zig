@@ -81,13 +81,13 @@ pub fn calculateQuickActionForTarget(
 ) ?Action {
     const player_position = session.level.playerPosition();
     const target_position =
-        session.entities.registry.get(target_entity, c.Position) orelse return null;
+        session.registry.get(target_entity, c.Position) orelse return null;
 
     if (player_position.place.eql(target_position.place)) {
-        if (session.entities.isItem(target_entity)) {
+        if (session.isItem(target_entity)) {
             return .{ .pickup = target_entity };
         }
-        if (session.entities.registry.get(target_entity, c.Ladder)) |ladder| {
+        if (session.registry.get(target_entity, c.Ladder)) |ladder| {
             // It's impossible to go upper the first level
             if (ladder.direction == .up and session.level.depth == 0) return null;
 
@@ -96,10 +96,10 @@ pub fn calculateQuickActionForTarget(
     }
 
     if (player_position.place.near4(target_position.place)) {
-        if (session.entities.isEnemy(target_entity)) {
+        if (session.isEnemy(target_entity)) {
             return .{ .hit = target_entity };
         }
-        if (session.entities.registry.get(target_entity, c.Door)) |door| {
+        if (session.registry.get(target_entity, c.Door)) |door| {
             // the player should not be able to open/close the door stay in the doorway
             if (player_position.place.eql(target_position.place)) {
                 return null;
@@ -109,7 +109,7 @@ pub fn calculateQuickActionForTarget(
                 .closed => .{ .open = .{ .id = target_entity, .place = target_position.place } },
             };
         }
-        if (session.entities.registry.get(target_entity, c.Shop)) |shop| {
+        if (session.registry.get(target_entity, c.Shop)) |shop| {
             return .{ .trade = shop };
         }
     }
@@ -123,47 +123,47 @@ pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action) !g.Mov
     if (std.log.logEnabled(.debug, .actions) and action != .do_nothing) {
         log.debug("Do action {s} by the entity {d}", .{ @tagName(action), actor.id });
     }
-    const speed = session.entities.registry.get(actor, c.Speed) orelse {
+    const speed = session.registry.get(actor, c.Speed) orelse {
         log.err("The entity {d} doesn't have speed and can't do action.", .{actor.id});
         return error.NotEnoughComponents;
     };
     switch (action) {
         .do_nothing => return 0,
         .drink => |potion_id| {
-            if (session.entities.registry.get(potion_id, c.Effect)) |effect| {
+            if (session.registry.get(potion_id, c.Effect)) |effect| {
                 if (effect.damage()) |damage|
                     if (try session.doDamage(damage, actor)) return 0;
             }
             // try to remove from the inventory
-            if (session.entities.registry.get(actor, c.Inventory)) |inventory| {
+            if (session.registry.get(actor, c.Inventory)) |inventory| {
                 _ = inventory.items.remove(potion_id);
             }
             // remove the potion
-            try session.entities.registry.removeEntity(potion_id);
+            try session.registry.removeEntity(potion_id);
         },
         .open_inventory => {
             try session.manageInventory();
         },
         .move => |move| {
-            if (session.entities.registry.get(actor, c.Position)) |position|
+            if (session.registry.get(actor, c.Position)) |position|
                 return doMove(session, actor, position, move.target, speed.move_points);
         },
         .hit => |target| {
             return if (try doHit(session, actor, target)) 0 else speed.move_points;
         },
         .open => |door| {
-            try session.entities.registry.setComponentsToEntity(door.id, g.entities.openedDoor(door.place));
+            try session.registry.setComponentsToEntity(door.id, g.entities.openedDoor(door.place));
         },
         .close => |door| {
-            try session.entities.registry.setComponentsToEntity(door.id, g.entities.closedDoor(door.place));
+            try session.registry.setComponentsToEntity(door.id, g.entities.closedDoor(door.place));
         },
         .pickup => |item| {
-            const inventory = session.entities.registry.getUnsafe(session.player, c.Inventory);
-            if (session.entities.registry.get(item, c.Pile)) |_| {
+            const inventory = session.registry.getUnsafe(session.player, c.Inventory);
+            if (session.registry.get(item, c.Pile)) |_| {
                 try session.manageInventory();
             } else {
                 try inventory.items.add(item);
-                try session.entities.registry.remove(item, c.Position);
+                try session.registry.remove(item, c.Position);
                 try session.level.removeEntity(item);
             }
         },
@@ -171,22 +171,22 @@ pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action) !g.Mov
             try session.movePlayerToLevel(ladder);
         },
         .go_sleep => |target| {
-            session.entities.registry.getUnsafe(target, c.EnemyState).* = .sleeping;
-            try session.entities.registry.set(
+            session.registry.getUnsafe(target, c.EnemyState).* = .sleeping;
+            try session.registry.set(
                 target,
                 c.Animation{ .preset = .go_sleep },
             );
         },
         .chill => |target| {
-            session.entities.registry.getUnsafe(target, c.EnemyState).* = .walking;
-            try session.entities.registry.set(
+            session.registry.getUnsafe(target, c.EnemyState).* = .walking;
+            try session.registry.set(
                 target,
                 c.Animation{ .preset = .relax },
             );
         },
         .get_angry => |target| {
-            session.entities.registry.getUnsafe(target, c.EnemyState).* = .aggressive;
-            try session.entities.registry.set(
+            session.registry.getUnsafe(target, c.EnemyState).* = .aggressive;
+            try session.registry.set(
                 target,
                 c.Animation{ .preset = .get_angry },
             );
@@ -195,7 +195,7 @@ pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action) !g.Mov
             try session.trade(shop);
         },
         .wait => {
-            try session.entities.registry.set(
+            try session.registry.set(
                 actor,
                 c.Animation{ .preset = .wait, .is_blocked = session.player.eql(actor) },
             );
@@ -246,13 +246,13 @@ fn checkCollision(session: *g.GameSession, place: p.Point) ?Action {
 
         .entities => |entities| {
             if (entities[2]) |entity| {
-                if (session.entities.registry.get(entity, c.Door)) |_|
+                if (session.registry.get(entity, c.Door)) |_|
                     return .{ .open = .{ .id = entity, .place = place } };
 
-                if (session.entities.isEnemy(entity))
+                if (session.isEnemy(entity))
                     return .{ .hit = entity };
 
-                if (session.entities.registry.get(entity, c.Shop)) |shop| {
+                if (session.registry.get(entity, c.Shop)) |shop| {
                     return .{ .trade = shop };
                 }
 
@@ -273,16 +273,16 @@ fn doHit(
     actor: g.Entity,
     enemy: g.Entity,
 ) !bool {
-    const maybe_weapon = if (session.entities.registry.get(actor, c.Equipment)) |equipment|
+    const maybe_weapon = if (session.registry.get(actor, c.Equipment)) |equipment|
         equipment.weapon
     else
         null;
 
     const damage = (if (maybe_weapon) |weapon|
-        session.entities.registry.get(weapon, c.Damage)
+        session.registry.get(weapon, c.Damage)
     else
         null) orelse
-        session.entities.registry.get(actor, c.Damage) orelse {
+        session.registry.get(actor, c.Damage) orelse {
         log.err("Actor {d} doesn't have any weapon", .{actor.id});
         return error.NotEnoughComponents;
     };
@@ -292,7 +292,7 @@ fn doHit(
 
     // Applying an effect of the weapon
     if (maybe_weapon) |weapon| {
-        if (session.entities.registry.get(weapon, c.Effect)) |effect| {
+        if (session.registry.get(weapon, c.Effect)) |effect| {
             if (effect.damage()) |dmg|
                 if (try session.doDamage(dmg, enemy)) return true;
         }
@@ -300,6 +300,6 @@ fn doHit(
 
     // a special case to give to player a chance to notice what happened
     const is_blocked_animation = actor.eql(session.player) or enemy.eql(session.player);
-    try session.entities.registry.set(enemy, c.Animation{ .preset = .hit, .is_blocked = is_blocked_animation });
+    try session.registry.set(enemy, c.Animation{ .preset = .hit, .is_blocked = is_blocked_animation });
     return false;
 }

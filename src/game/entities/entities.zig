@@ -26,7 +26,7 @@ pub fn rat(place: p.Point) c.Components {
         .position = .{ .zorder = .obstacle, .place = place },
         .description = .{ .preset = .rat },
         .health = .{ .max = 10, .current = 10 },
-    .damage = .{ .damage_type = .thrusting, .min = 1, .max = 3 },
+        .damage = .{ .damage_type = .thrusting, .min = 1, .max = 3 },
         .speed = .{ .move_points = 14 },
         .state = .sleeping,
     };

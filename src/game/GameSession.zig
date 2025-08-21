@@ -51,7 +51,7 @@ render: g.Render,
 /// Visible area
 viewport: g.Viewport,
 ///
-entities: g.Entities,
+registry: g.Registry,
 ///
 events: g.events.EventBus,
 player: g.Entity,
@@ -87,7 +87,7 @@ pub fn preInit(
         .runtime = runtime,
         .render = render,
         .viewport = g.Viewport.init(render.scene_rows, render.scene_cols),
-        .entities = .{ .registry = try g.Registry.init(self.arena.allocator()) },
+        .registry = try g.Registry.init(self.arena.allocator()),
         .events = g.events.EventBus.init(&self.arena),
         .seed = 0,
         .max_depth = 0,
@@ -125,21 +125,21 @@ pub fn initNew(
     log.debug("Begin a new game session with seed {d}", .{seed});
     try self.preInit(gpa, runtime, render);
     self.setSeed(seed);
-    self.player = try self.entities.registry.addNewEntity(try g.entities.player(self.entities.registry.allocator()));
+    self.player = try self.registry.addNewEntity(try g.entities.player(self.registry.allocator()));
 
     // Creates the initial equipment of the player
-    self.entities.registry.getUnsafe(self.player, c.Wallet).money += 200;
-    var equipment: *c.Equipment = self.entities.registry.getUnsafe(self.player, c.Equipment);
-    var invent: *c.Inventory = self.entities.registry.getUnsafe(self.player, c.Inventory);
-    const weapon = try self.entities.registry.addNewEntity(g.entities.Pickaxe);
-    const light = try self.entities.registry.addNewEntity(g.entities.Torch);
+    self.registry.getUnsafe(self.player, c.Wallet).money += 200;
+    var equipment: *c.Equipment = self.registry.getUnsafe(self.player, c.Equipment);
+    var invent: *c.Inventory = self.registry.getUnsafe(self.player, c.Inventory);
+    const weapon = try self.registry.addNewEntity(g.entities.Pickaxe);
+    const light = try self.registry.addNewEntity(g.entities.Torch);
     equipment.weapon = weapon;
     equipment.light = light;
     try invent.items.add(weapon);
     try invent.items.add(light);
 
     self.max_depth = 0;
-    self.level = g.Level.preInit(self.arena.allocator(), &self.entities);
+    self.level = g.Level.preInit(self.arena.allocator(), &self.registry);
     try self.level.initAsFirstLevel(self.player);
     try self.completeInitialization();
 
@@ -214,7 +214,7 @@ pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
 }
 
 pub fn entityDied(self: *GameSession, entity: g.Entity) !void {
-    try self.entities.registry.removeEntity(entity);
+    try self.registry.removeEntity(entity);
     try self.level.removeEntity(entity);
     if (entity.eql(self.player)) {
         log.info("Player is dead. Game is over.", .{});
@@ -249,7 +249,7 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
                 try self.mode.explore.init(self.arena.allocator(), self);
             },
             .to_inventory => {
-                if (self.entities.registry.get2(self.player, c.Equipment, c.Inventory)) |tuple| {
+                if (self.registry.get2(self.player, c.Equipment, c.Inventory)) |tuple| {
                     self.mode.deinit();
                     self.mode = .{ .inventory = undefined };
                     const drop = self.level.itemAt(self.level.playerPosition().place);
@@ -311,9 +311,22 @@ pub inline fn tick(self: *GameSession) !void {
     try self.events.notifySubscribers();
 }
 
+pub fn isEnemy(self: *const GameSession, entity: g.Entity) bool {
+    return self.registry.has(entity, c.EnemyState);
+}
+
+pub fn isItem(self: *const GameSession, entity: g.Entity) bool {
+    return self.registry.has(entity, c.Weight);
+}
+
+pub fn isEquipment(self: *const GameSession, item: g.Entity) bool {
+    return self.isItem(item) and
+        (self.registry.has(item, c.Damage) or self.registry.has(item, c.SourceOfLight));
+}
+
 /// `true` means that entity is dead
 pub fn doDamage(self: *GameSession, damage: c.Damage, target: g.Entity) !bool {
-    const target_health = self.entities.registry.get(target, c.Health) orelse {
+    const target_health = self.registry.get(target, c.Health) orelse {
         log.err("Actor {d} doesn't have a Health component", .{target.id});
         return error.NotEnoughComponents;
     };

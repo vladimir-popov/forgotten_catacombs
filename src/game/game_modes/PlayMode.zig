@@ -58,7 +58,7 @@ pub fn tick(self: *PlayMode) !void {
         try self.doTurn(self.session.player, action);
         self.is_player_turn = false;
     } else {
-        var itr = self.session.entities.registry.query3(c.EnemyState, c.Initiative, c.Speed);
+        var itr = self.session.registry.query3(c.EnemyState, c.Initiative, c.Speed);
         while (itr.next()) |tuple| {
             const npc, const state, const initiative, const speed = tuple;
             _ = state;
@@ -84,12 +84,12 @@ pub fn doTurn(self: *PlayMode, actor: g.Entity, action: g.actions.Action) !void 
     if (self.is_player_turn) {
         log.debug("Update quick actions after action '{s}'", .{@tagName(action)});
         try self.updateQuickActions(self.target(), self.quickAction());
-        var itr = self.session.entities.registry.query(c.Initiative);
+        var itr = self.session.registry.query(c.Initiative);
         while (itr.next()) |tuple| {
             tuple[1].move_points += mp;
         }
     } else {
-        const initiative = self.session.entities.registry.get(actor, c.Initiative) orelse {
+        const initiative = self.session.registry.get(actor, c.Initiative) orelse {
             log.err("The entity {d} doesn't have initiative.", .{actor.id});
             return error.NotEnoughComponents;
         };
@@ -155,7 +155,7 @@ fn handleInput(self: *PlayMode) !?g.actions.Action {
             .turn_light_on => g.visibility.turn_light_on = true,
             .turn_light_off => g.visibility.turn_light_on = false,
             .set_health => |hp| {
-                if (self.session.entities.registry.get(self.session.player, c.Health)) |health| {
+                if (self.session.registry.get(self.session.player, c.Health)) |health| {
                     health.current = hp;
                 }
             },
@@ -188,7 +188,7 @@ fn draw(self: *const PlayMode) !bool {
 pub fn drawAnimationsFrames(self: PlayMode) !bool {
     const now: c_uint = self.session.runtime.currentMillis();
     var was_blocked_animation: bool = false;
-    var itr = self.session.level.entities.registry.query2(c.Position, c.Animation);
+    var itr = self.session.level.registry.query2(c.Position, c.Animation);
     while (itr.next()) |components| {
         const entity, const position, const animation = components;
         was_blocked_animation |= animation.is_blocked;
@@ -208,14 +208,14 @@ pub fn drawAnimationsFrames(self: PlayMode) !bool {
                 );
             }
         } else {
-            try self.session.level.entities.registry.remove(entity, c.Animation);
+            try self.session.level.registry.remove(entity, c.Animation);
         }
     }
     return was_blocked_animation;
 }
 
 fn drawInfoBar(self: *const PlayMode) !void {
-    if (self.session.entities.registry.get(self.session.player, c.Health)) |health| {
+    if (self.session.registry.get(self.session.player, c.Health)) |health| {
         try self.session.render.drawPlayerHp(health);
     }
     try self.session.render.drawLeftButton("Explore", true);
@@ -226,12 +226,12 @@ fn drawInfoBar(self: *const PlayMode) !void {
     // Draw the name or health of the target entity
     if (self.target()) |entity| {
         if (!entity.eql(self.session.player)) {
-            if (self.session.entities.registry.get2(entity, c.Sprite, c.Health)) |tuple| {
+            if (self.session.registry.get2(entity, c.Sprite, c.Health)) |tuple| {
                 try self.session.render.drawEnemyHealth(tuple[0].codepoint, tuple[1]);
                 return;
             }
         }
-        const name = if (self.session.entities.registry.get(entity, c.Description)) |desc| desc.name() else "?";
+        const name = if (self.session.registry.get(entity, c.Description)) |desc| desc.name() else "?";
         try self.session.render.drawInfo(name);
     } else {
         try self.session.render.cleanInfo();
@@ -280,7 +280,7 @@ pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity, prev_action
     const player_position = self.session.level.playerPosition();
     // Check the nearest entities:
     // TODO improve:
-    var itr = self.session.entities.registry.query(c.Position);
+    var itr = self.session.registry.query(c.Position);
     while (itr.next()) |tuple| {
         const entity: g.Entity, const position: *c.Position = tuple;
         if (position.place.near4(player_position.place)) {
