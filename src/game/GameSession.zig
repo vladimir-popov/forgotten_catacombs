@@ -312,37 +312,18 @@ pub inline fn tick(self: *GameSession) !void {
 }
 
 /// `true` means that entity is dead
-pub fn handleImpacts(self: *GameSession, entity: g.Entity) !bool {
-    const impacts, const health = self.entities.registry.get2(entity, c.Impacts, c.Health) orelse return false;
-    inline for (std.meta.fields(c.Impacts.Type)) |impact_field| {
-        const impact_type: c.Impacts.Type = @enumFromInt(impact_field.value);
-        if (@field(impacts, impact_field.name)) |*impact| {
-            switch (impact_type) {
-                .burning => if (try self.doDamage(entity, impact.power, .fire)) return true,
-                .corrosion => if (try self.doDamage(entity, impact.power, .acid)) return true,
-                .poisoning => if (try self.doDamage(entity, impact.power, .poison)) return true,
-                .healing => health.add(impact.power),
-            }
-            impact.power -|= impact.decrease;
-            if (impact.power == 0) {
-                @field(impacts, impact_field.name) = null;
-            }
-        }
-    }
-    if (impacts.isNothing()) {
-        try self.entities.registry.remove(entity, c.Impacts);
-    }
-    return false;
-}
-
-/// `true` means that entity is dead
-pub fn doDamage(self: *GameSession, target: g.Entity, value: u8, damage_type: c.DamageType) !bool {
-    const target_health = self.entities.registry.getUnsafe(target, c.Health);
+pub fn doDamage(self: *GameSession, damage: c.Damage, target: g.Entity) !bool {
+    const target_health = self.entities.registry.get(target, c.Health) orelse {
+        log.err("Actor {d} doesn't have a Health component", .{target.id});
+        return error.NotEnoughComponents;
+    };
+    std.debug.assert(damage.min <= damage.max);
+    const value = self.prng.random().intRangeAtMost(u8, damage.min, damage.max);
     const orig_health = target_health.current;
     target_health.current -|= value;
     log.debug(
         "Entity {d} received {s} damage {d}. HP: {d} -> {d}",
-        .{ target.id, @tagName(damage_type), value, orig_health, target_health.current },
+        .{ target.id, @tagName(damage.damage_type), value, orig_health, target_health.current },
     );
     if (target_health.current == 0) {
         try self.entityDied(target);

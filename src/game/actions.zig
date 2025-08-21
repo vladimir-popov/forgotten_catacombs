@@ -130,11 +130,16 @@ pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action) !g.Mov
     switch (action) {
         .do_nothing => return 0,
         .drink => |potion_id| {
-            if (session.entities.registry.get(potion_id, c.Potion)) |potion| {
-                const impacts = try session.entities.registry.getOrSet(actor, c.Impacts, .{});
-                impacts.add(&potion.effect);
-                if (try session.handleImpacts(actor)) return 0;
+            if (session.entities.registry.get(potion_id, c.Effect)) |effect| {
+                if (effect.damage()) |damage|
+                    if (try session.doDamage(damage, actor)) return 0;
             }
+            // try to remove from the inventory
+            if (session.entities.registry.get(actor, c.Inventory)) |inventory| {
+                _ = inventory.items.remove(potion_id);
+            }
+            // remove the potion
+            try session.entities.registry.removeEntity(potion_id);
         },
         .open_inventory => {
             try session.manageInventory();
@@ -268,21 +273,28 @@ fn doHit(
     actor: g.Entity,
     enemy: g.Entity,
 ) !bool {
-    const weapon = session.entities.getWeapon(actor) orelse {
+    const maybe_weapon = if (session.entities.registry.get(actor, c.Equipment)) |equipment|
+        equipment.weapon
+    else
+        null;
+
+    const damage = (if (maybe_weapon) |weapon|
+        session.entities.registry.get(weapon, c.Damage)
+    else
+        null) orelse
+        session.entities.registry.get(actor, c.Damage) orelse {
         log.err("Actor {d} doesn't have any weapon", .{actor.id});
         return error.NotEnoughComponents;
     };
 
-    // Applying physical damage
-    const damage = session.prng.random().intRangeLessThan(u8, weapon.damage_min, weapon.damage_max);
-    if (try session.doDamage(enemy, damage, weapon.damage_type)) return true;
+    // Applying regular damage
+    if (try session.doDamage(damage.*, enemy)) return true;
 
-    // Applying all effects of the weapon
-    if (weapon.effects.len > 0) {
-        const impacts = try session.entities.registry.getOrSet(enemy, c.Impacts, .{});
-        var itr = weapon.effects.constIterator(0);
-        while (itr.next()) |effect| {
-            impacts.add(effect);
+    // Applying an effect of the weapon
+    if (maybe_weapon) |weapon| {
+        if (session.entities.registry.get(weapon, c.Effect)) |effect| {
+            if (effect.damage()) |dmg|
+                if (try session.doDamage(dmg, enemy)) return true;
         }
     }
 

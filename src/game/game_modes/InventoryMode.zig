@@ -215,11 +215,12 @@ fn useSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     }
     if (item.eql(self.equipment.weapon)) {
         self.equipment.weapon = null;
-    } else if (self.session.entities.registry.get(item, c.Weapon)) |_| {
+    } else if (self.session.entities.registry.get(item, c.Damage)) |_| {
         self.equipment.weapon = item;
     }
-    if (self.session.entities.registry.get(item, c.Potion)) |_| {
-        self.action = .{ .drink = item };
+    if (self.session.entities.registry.get(item, c.Consumable)) |consumable| {
+        if (consumable.consumable_type == .potion)
+            self.action = .{ .drink = item };
     }
     try self.updateInventoryTab();
 }

@@ -20,15 +20,7 @@ pub fn isItem(self: *const Self, entity: g.Entity) bool {
 
 pub fn isEquipment(self: *const Self, item: g.Entity) bool {
     return self.isItem(item) and
-        (self.registry.has(item, c.Weapon) or self.registry.has(item, c.SourceOfLight));
-}
-
-pub fn getWeapon(self: *const Self, owner: g.Entity) ?*c.Weapon {
-    if (self.registry.get(owner, c.Equipment)) |equipment| {
-        if (equipment.weapon) |weapon_id|
-            return self.registry.get(weapon_id, c.Weapon);
-    }
-    return self.registry.get(owner, c.Weapon);
+        (self.registry.has(item, c.Damage) or self.registry.has(item, c.SourceOfLight));
 }
 
 pub fn getSourceOfLight(self: *const Self, player: g.Entity) ?*c.SourceOfLight {

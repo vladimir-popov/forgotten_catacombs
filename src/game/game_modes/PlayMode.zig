@@ -75,12 +75,6 @@ pub fn doTurn(self: *PlayMode, actor: g.Entity, action: g.actions.Action) !void 
     log.info("The turn of the entity {d}.", .{actor.id});
     defer log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
 
-    // Handle Impacts
-    if (try self.session.handleImpacts(actor)) {
-        // actor is dead
-        return;
-    }
-
     // Do Actions
     const mp = try g.actions.doAction(self.session, actor, action);
     log.info("Entity {d} spent {d} move points", .{ actor.id, mp });

@@ -26,7 +26,7 @@ pub fn rat(place: p.Point) c.Components {
         .position = .{ .zorder = .obstacle, .place = place },
         .description = .{ .preset = .rat },
         .health = .{ .max = 10, .current = 10 },
-        .weapon = c.Weapon.thrusting(1, 3),
+    .damage = .{ .damage_type = .thrusting, .min = 1, .max = 3 },
         .speed = .{ .move_points = 14 },
         .state = .sleeping,
     };
@@ -38,14 +38,15 @@ pub const Torch = c.Components{
     .weight = .{ .value = 20 },
     .source_of_light = .{ .radius = 5 },
     .price = .{ .value = 5 },
-    .weapon = c.Weapon.withEffect(.blunt, 2, 3, .{ .burning = .{ .power = 2, .decrease = 1 } }),
+    .damage = .{ .damage_type = .blunt, .min = 2, .max = 3 },
+    .effect = .{ .effect_type = .burning, .min = 1, .max = 1 },
 };
 
 pub const Pickaxe = c.Components{
     .description = .{ .preset = .pickaxe },
     .sprite = .{ .codepoint = cp.weapon_melee },
     .weight = .{ .value = 100 },
-    .weapon = c.Weapon.cutting(3, 5),
+    .damage = .{ .damage_type = .cutting, .min = 3, .max = 5 },
     .price = .{ .value = 15 },
 };
 
@@ -53,7 +54,7 @@ pub const Club = c.Components{
     .description = .{ .preset = .club },
     .sprite = .{ .codepoint = cp.weapon_melee },
     .weight = .{ .value = 80 },
-    .weapon = c.Weapon.blunt(5, 8),
+    .damage = .{ .damage_type = .blunt, .min = 5, .max = 8 },
     .price = .{ .value = 28 },
 };
 
@@ -61,7 +62,7 @@ pub const Club = c.Components{
 pub const HealingPotion = c.Components{
     .description = .{ .preset = .healing_potion },
     .sprite = .{ .codepoint = cp.potion },
-    .potion = .{ .effect = .{ .healing = .{ .power = 20, .decrease = 20 } } },
+    .effect = .{ .effect_type = .healing, .min = 20, .max = 25 },
     .weight = .{ .value = 10 },
     .price = .{ .value = 20 },
 };

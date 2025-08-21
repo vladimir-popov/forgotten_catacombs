@@ -108,23 +108,22 @@ pub fn entityDescription(
         }
         if (entities.registry.get(entity, c.Equipment)) |equipment| {
             if (equipment.weapon) |weapon| {
-                if (entities.registry.get2(weapon, c.Description, c.Weapon)) |tuple| {
+                if (entities.registry.get2(weapon, c.Description, c.Damage)) |tuple| {
                     line = try text_area.addEmptyLine(alloc);
                     _ = try std.fmt.bufPrint(line[1..], "Weapon: {s}", .{tuple[0].name()});
                     line = try text_area.addEmptyLine(alloc);
                     _ = try std.fmt.bufPrint(
                         line[3..],
                         "Damage: {s} {d}-{d}",
-                        .{ @tagName(tuple[1].damage_type), tuple[1].damage_min, tuple[1].damage_max },
+                        .{ @tagName(tuple[1].damage_type), tuple[1].min, tuple[1].max },
                     );
-                    if (tuple[1].effects.len > 0) {
+                    if (entities.registry.get(weapon, c.Effect)) |effect| {
                         line = try text_area.addEmptyLine(alloc);
-                        _ = try std.fmt.bufPrint(line[3..], "Effects:", .{});
-                        var itr = tuple[1].effects.constIterator(0);
-                        while (itr.next()) |effect| {
-                            line = try text_area.addEmptyLine(alloc);
-                            _ = try std.fmt.bufPrint(line[6..], "{any}", .{effect});
-                        }
+                        _ = try std.fmt.bufPrint(
+                            line[3..],
+                            "Effect: {s} {d}-{d}",
+                            .{ @tagName(effect.effect_type), effect.min, effect.max },
+                        );
                     }
                 }
             }
@@ -135,12 +134,12 @@ pub fn entityDescription(
                 }
             }
         }
-        if (entities.registry.get(entity, c.Weapon)) |weapon| {
+        if (entities.registry.get(entity, c.Damage)) |damage| {
             line = try text_area.addEmptyLine(alloc);
             _ = try std.fmt.bufPrint(
                 line[1..],
                 "Damage: {s} {d}-{d}",
-                .{ @tagName(weapon.damage_type), weapon.damage_min, weapon.damage_max },
+                .{ @tagName(damage.damage_type), damage.min, damage.max },
             );
         }
         if (entities.registry.get(entity, c.SourceOfLight)) |light| {
