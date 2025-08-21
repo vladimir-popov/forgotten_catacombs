@@ -3,7 +3,7 @@ const Type = std.builtin.Type;
 const Entity = @import("Entity.zig");
 const ArraySet = @import("ArraySet.zig").ArraySet;
 
-const log = std.log.scoped(.ecs);
+const log = std.log.scoped(.registry);
 
 /// The manager of the entities and components.
 pub fn Registry(comptime ComponentsStruct: type) type {
@@ -73,6 +73,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
         pub fn addNewEntity(self: *Self, components: ComponentsStruct) !Entity {
             const entity = self.newEntity();
             try self.setComponentsToEntity(entity, components);
+            log.debug("New entity {d} added: {any}", .{ entity.id, components });
             return entity;
         }
 

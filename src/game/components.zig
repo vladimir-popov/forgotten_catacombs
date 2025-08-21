@@ -45,8 +45,11 @@ pub const Animation = struct {
         empty: []const g.Codepoint = &[_]g.Codepoint{},
         get_angry: []const g.Codepoint = &[_]g.Codepoint{ 0, '!', 0, '!', 0, '!' },
         go_sleep: []const g.Codepoint = &[_]g.Codepoint{ 0, 'z', 0, 'z', 0, 'z' },
+        // healing: []const g.Codepoint = &[_]g.Codepoint{ 0, '♥', 0, '♥' },
+        healing: []const g.Codepoint = &[_]g.Codepoint{ 0, '+', 0, '+' },
         hit: []const g.Codepoint = &[_]g.Codepoint{ 0, '×', 0 },
         relax: []const g.Codepoint = &[_]g.Codepoint{ 0, '?', 0, '?', 0, '?' },
+        // teleport: []const g.Codepoint = &[_]g.Codepoint{ '-', '=', '≡' },
         wait: []const g.Codepoint = &[_]g.Codepoint{ 'z', 'Z', 'z', 'Z' },
     });
 

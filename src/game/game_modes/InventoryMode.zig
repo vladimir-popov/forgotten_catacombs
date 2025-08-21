@@ -116,6 +116,10 @@ pub fn tick(self: *Self) !void {
             }
         }
         try self.draw();
+        if (self.action) |act| {
+            try self.session.continuePlay(null, act);
+            return;
+        }
     }
 }
 
@@ -206,7 +210,7 @@ fn takeFromPileOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
 
 fn useSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    log.debug("Use item {d} ({any})", .{ item.id, self.equipment });
+    log.debug("Use item {d}. (current equipment: {any})", .{ item.id, self.equipment });
 
     if (item.eql(self.equipment.light)) {
         self.equipment.light = null;
@@ -219,8 +223,10 @@ fn useSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         self.equipment.weapon = item;
     }
     if (self.session.registry.get(item, c.Consumable)) |consumable| {
-        if (consumable.consumable_type == .potion)
+        if (consumable.consumable_type == .potion) {
             self.action = .{ .drink = item };
+            _ = self.inventory.items.remove(item);
+        }
     }
     try self.updateInventoryTab();
 }

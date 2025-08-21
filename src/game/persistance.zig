@@ -408,12 +408,11 @@ test "All components should be serializable" {
         .ladder = c.Ladder{ .id = .{ .id = 2 }, .direction = .down, .target_ladder = .{ .id = 3 } },
         .pile = pile,
         .position = c.Position{ .place = p.Point.init(12, 42), .zorder = .item },
-        .potion = c.Potion.healing(20),
         .source_of_light = c.SourceOfLight{ .radius = 4 },
         .speed = c.Speed{ .move_points = 12 },
         .sprite = c.Sprite{ .codepoint = g.codepoints.human },
         .state = .walking,
-        .weapon = c.Weapon.withEffect(.cutting, 1, 2, .{ .burning = .{ .power = 5, .decrease = 1 } }),
+        .damage = .{ .damage_type = .cutting, .min = 1, .max = 2 },
     };
 
     var buffer: [4048]u8 = @splat(0);

@@ -14,6 +14,7 @@ pub const std_options: std.Options = .{
         .{ .scope = .cheats, .level = .debug },
         .{ .scope = .game_session, .level = .debug },
         .{ .scope = .actions, .level = .debug },
+        // .{ .scope = .registry, .level = .debug },
         // .{ .scope = .ai, .level = .debug },
         // .{ .scope = .cave, .level = .debug },
         // .{ .scope = .cmd, .level = .debug },

@@ -188,6 +188,7 @@ pub fn save(self: *GameSession) void {
 ///    target, or a new target from the `LookingAround` mode.
 ///  - `action` - an action to perform; Usually is action initiated during manage the inventory.
 pub fn continuePlay(self: *GameSession, entity_in_focus: ?g.Entity, action: ?g.actions.Action) !void {
+    log.debug("Continue playing with entity_in_focus {any}, action {any}", .{ entity_in_focus, action });
     try self.events.sendEvent(
         .{ .mode_changed = .{ .to_play = .{ .entity_in_focus = entity_in_focus, .action = action } } },
     );
@@ -325,7 +326,23 @@ pub fn isEquipment(self: *const GameSession, item: g.Entity) bool {
 }
 
 /// `true` means that entity is dead
-pub fn doDamage(self: *GameSession, damage: c.Damage, target: g.Entity) !bool {
+pub fn applyEffect(self: *GameSession, actor: g.Entity, effect: c.Effect, target: g.Entity) !bool {
+    if (effect.damage()) |damage| {
+        if (try self.doDamage(actor, damage, target)) return true;
+    } else if (effect.effect_type == .healing) {
+        const health = self.registry.getUnsafe(target, c.Health);
+        const value = self.prng.random().intRangeAtMost(u8, effect.min, effect.max);
+        health.current += value;
+        health.current = @min(health.max, health.current);
+        const is_blocked_animation = actor.eql(self.player) or target.eql(self.player);
+        try self.registry.set(target, c.Animation{ .preset = .healing, .is_blocked = is_blocked_animation });
+        log.debug("Entity {d} recovered up to {d} hp", .{ target.id, value });
+    }
+    return false;
+}
+
+/// `true` means that entity is dead
+pub fn doDamage(self: *GameSession, actor: g.Entity, damage: c.Damage, target: g.Entity) !bool {
     const target_health = self.registry.get(target, c.Health) orelse {
         log.err("Actor {d} doesn't have a Health component", .{target.id});
         return error.NotEnoughComponents;
@@ -342,6 +359,9 @@ pub fn doDamage(self: *GameSession, damage: c.Damage, target: g.Entity) !bool {
         try self.entityDied(target);
         return true;
     } else {
+        // a special case to give to player a chance to notice what happened
+        const is_blocked_animation = actor.eql(self.player) or target.eql(self.player);
+        try self.registry.set(target, c.Animation{ .preset = .hit, .is_blocked = is_blocked_animation });
         return false;
     }
 }

@@ -131,8 +131,7 @@ pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action) !g.Mov
         .do_nothing => return 0,
         .drink => |potion_id| {
             if (session.registry.get(potion_id, c.Effect)) |effect| {
-                if (effect.damage()) |damage|
-                    if (try session.doDamage(damage, actor)) return 0;
+                return if (try session.applyEffect(actor, effect.*, actor)) 0 else speed.move_points;
             }
             // try to remove from the inventory
             if (session.registry.get(actor, c.Inventory)) |inventory| {
@@ -288,18 +287,14 @@ fn doHit(
     };
 
     // Applying regular damage
-    if (try session.doDamage(damage.*, enemy)) return true;
+    if (try session.doDamage(actor, damage.*, enemy)) return true;
 
     // Applying an effect of the weapon
     if (maybe_weapon) |weapon| {
         if (session.registry.get(weapon, c.Effect)) |effect| {
             if (effect.damage()) |dmg|
-                if (try session.doDamage(dmg, enemy)) return true;
+                if (try session.doDamage(actor, dmg, enemy)) return true;
         }
     }
-
-    // a special case to give to player a chance to notice what happened
-    const is_blocked_animation = actor.eql(session.player) or enemy.eql(session.player);
-    try session.registry.set(enemy, c.Animation{ .preset = .hit, .is_blocked = is_blocked_animation });
     return false;
 }
