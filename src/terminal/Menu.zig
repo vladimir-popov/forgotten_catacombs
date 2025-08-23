@@ -59,7 +59,7 @@ pub fn Menu(comptime ROWS: u8, comptime COLS: u8) type {
             try self.drawMenuItems();
         }
 
-        inline fn drawMenuItems(self: Self) !void {
+        fn drawMenuItems(self: Self) !void {
             for (0..self.items_count) |i| {
                 try self.drawMenuItem(@intCast(i), i == self.selected_item);
             }

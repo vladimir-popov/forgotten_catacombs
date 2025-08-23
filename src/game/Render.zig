@@ -54,17 +54,17 @@ pub fn init(
     self: *Render,
     gpa: std.mem.Allocator,
     runtime: g.Runtime,
-    scene_rows: u8,
-    scene_cols: u8,
+    display_rows: u8,
+    display_cols: u8,
 ) !void {
     self.* = .{
         .arena = std.heap.ArenaAllocator.init(gpa),
         .runtime = runtime,
         .scene_buffer = try self.arena.allocator().create(SceneBuffer),
-        .scene_rows = scene_rows,
-        .scene_cols = scene_cols,
+        .scene_rows = display_rows - 2,
+        .scene_cols = display_cols,
     };
-    try self.scene_buffer.init(&self.arena, scene_rows, scene_cols);
+    try self.scene_buffer.init(&self.arena, self.scene_rows, self.scene_cols);
 }
 
 pub fn deinit(self: *Render) void {

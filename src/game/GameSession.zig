@@ -69,7 +69,6 @@ mode: Mode,
 /// To load session the follow steps should be passed:
 ///  1. `preInit` sets up external dependencies, initializes inner containers and the viewport.
 ///  2. the seed should be set up;
-///  3. the potions colors should be set up;
 ///  4. the player should be added to the session;
 ///  5. the max depth should be set up;
 ///  6. the level should be completely initialized;

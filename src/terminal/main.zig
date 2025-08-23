@@ -1,10 +1,11 @@
 const std = @import("std");
 const g = @import("game");
-const tty = @import("tty.zig");
 
 const Args = @import("Args.zig");
-const TtyRuntime = @import("TtyRuntime.zig");
 const Logger = @import("Logger.zig");
+// exported for tests
+pub const tty = @import("tty.zig");
+pub const TtyRuntime = @import("TtyRuntime.zig");
 
 pub const std_options: std.Options = .{
     .logFn = Logger.writeLog,

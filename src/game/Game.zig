@@ -52,7 +52,7 @@ pub fn init(self: *Self, gpa: std.mem.Allocator, runtime: g.Runtime, seed: u64) 
         .seed = seed,
         .state = undefined,
     };
-    try self.render.init(gpa, runtime, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS);
+    try self.render.init(gpa, runtime, g.DISPLAY_ROWS, g.DISPLAY_COLS);
     try self.welcome();
 }
 
