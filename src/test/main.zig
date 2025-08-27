@@ -1,16 +1,16 @@
 const std = @import("std");
 const Frame = @import("utils/Frame.zig");
 const TestSession = @import("utils/TestSession.zig");
-const PotionsTest = @import("PotionsTest.zig");
 
 pub fn main() !void {}
 
-test "Hello world!" {
-    var tmp_dir = std.testing.tmpDir(.{});
-    defer tmp_dir.cleanup();
+test {
+    _ = @import("InventorySuite.zig");
+}
 
+test "Hello world!" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty(std.testing.allocator, tmp_dir.dir);
+    try test_session.initEmpty();
     defer test_session.deinit();
 
     try test_session.tick();

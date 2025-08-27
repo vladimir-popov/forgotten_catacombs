@@ -4,8 +4,8 @@
 //! ║ ╔═════════════════╗═══════════════════╗║     ║╔══════════════════╔══════════════════╗ ║
 //! ║ ║    Inventory    ║        Drop       ║║     ║║    Inventory     ║       Drop       ║ ║
 //! ║╔╝                 ╚═══════════════════║║     ║║══════════════════╝                  ╚╗║
-//! ║║░\░Club░░░░░░░░░░░░░░░░░░░░░░░weapon░░║║     ║║ / Torch                              ║║
-//! ║║   Apple                              ║║     ║║                                      ║║
+//! ║║░\░Club░░░░░░░░░░░░░░░░░░░░░░░weapon░░║║     ║║ % Apple                              ║║
+//! ║║ ¡ Torch                       light  ║║     ║║                                      ║║
 //! ║║                                      ║║     ║║                                      ║║
 //! ║║                                      ║║     ║║                                      ║║
 //! ║║                                      ║║     ║║                                      ║║
@@ -174,7 +174,7 @@ fn updateInventoryTab(self: *Self) !void {
 
 const inventory_line_fmt = std.fmt.comptimePrint(
     "{{u}} {{s:<{d}}}{{s}}",
-    .{w.WindowWithTabs.CONTENT_AREA_REGION.cols - 7}, // "{u} ".len == 2 + "[ ]".len == 3 + 2 for pads
+    .{w.WindowWithTabs.CONTENT_AREA_REGION.cols - 10}, // "{u} ".len == 2 + "light weapon".len == 6 + 2 for pads
 );
 
 fn formatInventoryLine(self: *Self, line: *w.TextArea.Line, item: g.Entity) ![]const u8 {
@@ -183,9 +183,12 @@ fn formatInventoryLine(self: *Self, line: *w.TextArea.Line, item: g.Entity) ![]c
         desc.name()
     else
         "???";
-    const using = if (item.eql(self.equipment.weapon) or item.eql(self.equipment.light))
-        "[x]"
-    else if (self.session.isEquipment(item)) "[ ]" else "   ";
+    const using = if (item.eql(self.equipment.weapon))
+        "weapon"
+    else if (item.eql(self.equipment.light))
+        " light"
+    else
+        "      ";
     log.debug("{d}: {u}({d}) {s} {s}", .{ item.id, sprite.codepoint, sprite.codepoint, name, using });
     return try std.fmt.bufPrint(line, inventory_line_fmt, .{ sprite.codepoint, name, using });
 }
@@ -194,10 +197,66 @@ fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Buttons is helt. Show modal window for {any}", .{item});
     var window = w.options(g.Entity, self);
-    try window.area.addOption(self.alloc, "Use", item, useSelectedItem, null);
+    if (item.eql(self.equipment.light) or item.eql(self.equipment.weapon)) {
+        try window.area.addOption(self.alloc, "Unequip", item, unequipItem, null);
+    } else {
+        if (self.session.registry.get(item, c.SourceOfLight)) |_| {
+            try window.area.addOption(self.alloc, "Use as a light", item, useAsLight, null);
+        }
+        if (self.session.registry.get(item, c.Damage)) |_| {
+            try window.area.addOption(self.alloc, "Use as a weapon", item, useAsWeapon, null);
+        }
+        if (self.session.registry.get(item, c.Consumable)) |consumable| {
+            const label = if (consumable.consumable_type == .potion) "Drink" else "Eat";
+            try window.area.addOption(self.alloc, label, item, consumeItem, null);
+        }
+    }
     try window.area.addOption(self.alloc, "Drop", item, dropSelectedItem, null);
     try window.area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
     self.actions_window = window;
+}
+
+fn unequipItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    log.debug("Unequip the item {d}. (current equipment: {any})", .{ item.id, self.equipment });
+    if (item.eql(self.equipment.light))
+        self.equipment.light = null;
+    if (item.eql(self.equipment.weapon))
+        self.equipment.weapon = null;
+
+    try self.updateInventoryTab();
+}
+
+fn useAsLight(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    log.debug("Use the item {d} as a source of light. (current equipment: {any})", .{ item.id, self.equipment });
+    self.equipment.light = item;
+    try self.updateInventoryTab();
+}
+
+fn useAsWeapon(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    log.debug("Use the item {d} as weapon. (current equipment: {any})", .{ item.id, self.equipment });
+    self.equipment.weapon = item;
+    if (self.equipment.light == null) {
+        if (self.session.registry.get(item, c.SourceOfLight)) |_| {
+            self.equipment.light = item;
+        }
+    }
+
+    try self.updateInventoryTab();
+}
+
+fn consumeItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    if (self.session.registry.get(item, c.Consumable)) |consumable| {
+        log.debug("Consume the item {d} {any}. (current equipment: {any})", .{ item.id, consumable, self.equipment });
+        if (consumable.consumable_type == .potion) {
+            self.action = .{ .drink = item };
+            _ = self.inventory.items.remove(item);
+        }
+    }
+    try self.updateInventoryTab();
 }
 
 fn takeFromPileOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
@@ -206,29 +265,6 @@ fn takeFromPileOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     try window.area.addOption(self.alloc, "Take", item, takeSelectedItem, null);
     try window.area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
     self.actions_window = window;
-}
-
-fn useSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
-    const self: *Self = @ptrCast(@alignCast(ptr));
-    log.debug("Use item {d}. (current equipment: {any})", .{ item.id, self.equipment });
-
-    if (item.eql(self.equipment.light)) {
-        self.equipment.light = null;
-    } else if (self.session.registry.get(item, c.SourceOfLight)) |_| {
-        self.equipment.light = item;
-    }
-    if (item.eql(self.equipment.weapon)) {
-        self.equipment.weapon = null;
-    } else if (self.session.registry.get(item, c.Damage)) |_| {
-        self.equipment.weapon = item;
-    }
-    if (self.session.registry.get(item, c.Consumable)) |consumable| {
-        if (consumable.consumable_type == .potion) {
-            self.action = .{ .drink = item };
-            _ = self.inventory.items.remove(item);
-        }
-    }
-    try self.updateInventoryTab();
 }
 
 fn addDropTab(self: *Self, drop: g.Entity) !void {
