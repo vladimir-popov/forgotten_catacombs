@@ -111,10 +111,12 @@ test "Drink healing potion" {
     defer test_session.deinit();
 
     test_session.player.health().current = 5;
-    const potion = try test_session.player.addToInventory(g.entities.HealingPotion);
     const inventory = try test_session.openInventory();
+    const potion = try inventory.add(g.entities.HealingPotion);
     const options = try inventory.chooseItemById(potion);
     try options.choose("Drink");
 
+    try std.testing.expect(!inventory.contains(potion));
+    try std.testing.expect(!test_session.session.registry.contains(potion));
     try std.testing.expect(test_session.player.health().current > 5);
 }

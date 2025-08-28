@@ -32,3 +32,12 @@ pub fn chooseById(self: Self, item_id: g.Entity) !void {
     }
     return error.OptionWasNotFound;
 }
+
+pub fn contains(self: Self, item_id: g.Entity) bool {
+    for (self.area.options.items) |option| {
+        if (option.item.eql(item_id)) {
+            return true;
+        }
+    }
+    return false;
+}

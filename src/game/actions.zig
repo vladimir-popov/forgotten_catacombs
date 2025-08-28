@@ -130,15 +130,7 @@ pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action) !g.Mov
     switch (action) {
         .do_nothing => return 0,
         .drink => |potion_id| {
-            if (session.registry.get(potion_id, c.Effect)) |effect| {
-                return if (try session.applyEffect(actor, effect.*, actor)) 0 else speed.move_points;
-            }
-            // try to remove from the inventory
-            if (session.registry.get(actor, c.Inventory)) |inventory| {
-                _ = inventory.items.remove(potion_id);
-            }
-            // remove the potion
-            try session.registry.removeEntity(potion_id);
+            if (try session.drinkPotion(actor, potion_id)) return 0;
         },
         .open_inventory => {
             try session.manageInventory();

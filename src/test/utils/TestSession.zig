@@ -43,5 +43,5 @@ pub fn pressButton(self: *Self, button: g.Button.GameButton) !void {
 pub fn openInventory(self: *Self) !Inventory {
     try self.session.manageInventory();
     try self.tick();
-    return .{ .test_session = self };
+    return .{ .test_session = self, .mode = &self.session.mode.inventory };
 }

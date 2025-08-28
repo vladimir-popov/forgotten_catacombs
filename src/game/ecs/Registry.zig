@@ -81,6 +81,16 @@ pub fn Registry(comptime ComponentsStruct: type) type {
             return @field(self.components_map, @typeName(C)).existsForEntity(entity);
         }
 
+        /// Returns true if the entity has at least one component.
+        pub fn contains(self: *Self, entity: Entity) bool {
+            inline for (@typeInfo(ComponentsMap).@"struct".fields) |field| {
+                if (@field(self.components_map, field.name).existsForEntity(entity)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         /// Returns the pointer to the component for the entity, if it was added before, or null.
         pub fn get(self: Self, entity: Entity, comptime C: type) ?*C {
             return @field(self.components_map, @typeName(C)).getForEntity(entity);

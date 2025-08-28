@@ -7,12 +7,12 @@ const c = g.components;
 const p = g.primitives;
 const ecs = g.ecs;
 
-const ExploreLevelMode = @import("game_modes/ExploreLevelMode.zig");
-const ExploreMode = @import("game_modes/ExploreMode.zig");
-const InventoryMode = @import("game_modes/InventoryMode.zig");
-const PlayMode = @import("game_modes/PlayMode.zig");
-const SaveLoadMode = @import("game_modes/SaveLoadMode.zig");
-const TradingMode = @import("game_modes/TradingMode.zig");
+pub const ExploreLevelMode = @import("game_modes/ExploreLevelMode.zig");
+pub const ExploreMode = @import("game_modes/ExploreMode.zig");
+pub const InventoryMode = @import("game_modes/InventoryMode.zig");
+pub const PlayMode = @import("game_modes/PlayMode.zig");
+pub const SaveLoadMode = @import("game_modes/SaveLoadMode.zig");
+pub const TradingMode = @import("game_modes/TradingMode.zig");
 
 const log = std.log.scoped(.game_session);
 
@@ -55,6 +55,7 @@ registry: g.Registry,
 ///
 events: g.events.EventBus,
 player: g.Entity,
+known_potions: g.utils.EntitiesSet,
 /// The current level
 level: g.Level,
 /// The deepest achieved level
@@ -92,6 +93,7 @@ pub fn preInit(
         .max_depth = 0,
         .prng = std.Random.DefaultPrng.init(0),
         .ai = g.AI{ .session = self, .rand = self.prng.random() },
+        .known_potions = try g.utils.EntitiesSet.init(self.arena.allocator()),
         .player = undefined,
         .level = undefined,
         .mode = undefined,
@@ -322,6 +324,20 @@ pub fn isItem(self: *const GameSession, entity: g.Entity) bool {
 pub fn isEquipment(self: *const GameSession, item: g.Entity) bool {
     return self.isItem(item) and
         (self.registry.has(item, c.Damage) or self.registry.has(item, c.SourceOfLight));
+}
+
+/// `true` means that the actor is dead
+pub fn drinkPotion(self: *GameSession, actor: g.Entity, potion_id: g.Entity) !bool {
+    if (self.registry.get(potion_id, c.Effect)) |effect| {
+        if (try self.applyEffect(actor, effect.*, actor)) return true;
+    }
+    // try to remove from the inventory
+    if (self.registry.get(actor, c.Inventory)) |inventory| {
+        _ = inventory.items.remove(potion_id);
+    }
+    // remove the potion
+    try self.registry.removeEntity(potion_id);
+    return false;
 }
 
 /// `true` means that entity is dead

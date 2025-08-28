@@ -150,7 +150,7 @@ fn tabWithDrop(self: *Self) ?*w.WindowWithTabs.Tab {
         null;
 }
 
-fn updateInventoryTab(self: *Self) !void {
+pub fn updateInventoryTab(self: *Self) !void {
     const tab = self.tabWithInventory();
     tab.area.clearRetainingCapacity();
     var itr = self.inventory.items.iterator();

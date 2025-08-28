@@ -12,8 +12,6 @@ pub fn health(self: Self) *c.Health {
     return self.test_session.session.registry.getUnsafe(self.player, c.Health);
 }
 
-pub fn addToInventory(self: Self, item: c.Components) !g.Entity {
-    const item_id = try self.test_session.session.registry.addNewEntity(item);
-    try self.test_session.session.registry.getUnsafe(self.player, c.Inventory).items.add(item_id);
-    return item_id;
+pub fn inventory(self: Self) *c.Inventory {
+    return self.test_session.session.registry.getUnsafe(self.player, c.Inventory);
 }
