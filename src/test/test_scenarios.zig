@@ -2,8 +2,6 @@ const std = @import("std");
 const Frame = @import("utils/Frame.zig");
 const TestSession = @import("utils/TestSession.zig");
 
-pub fn main() !void {}
-
 test {
     _ = @import("InventorySuite.zig");
 }
