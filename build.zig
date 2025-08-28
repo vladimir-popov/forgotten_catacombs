@@ -145,43 +145,41 @@ pub fn build(b: *std.Build) !void {
     // ------------------------------------------------------------
     //                Step to run in emulator
     // ------------------------------------------------------------
-    if (!std.process.hasEnvVarConstant(PLAYDATE_SDK_PATH)) {
-        std.debug.print("Playdate SDK was not found. The {s} is absent", .{PLAYDATE_SDK_PATH});
-        return;
+    if (std.process.hasEnvVarConstant(PLAYDATE_SDK_PATH)) {
+        const playdate_sdk_path = try std.process.getEnvVarOwned(b.allocator, PLAYDATE_SDK_PATH);
+
+        const pdc_path = b.pathJoin(&.{ playdate_sdk_path, "bin", if (native_os_tag == .windows) "pdc.exe" else "pdc" });
+        const pd_simulator_path = switch (native_os_tag) {
+            .linux => b.pathJoin(&.{ playdate_sdk_path, "bin", "PlaydateSimulator" }),
+            .macos => "open", // `open` focuses the window, while running the simulator directry doesn't.
+            .windows => b.pathJoin(&.{ playdate_sdk_path, "bin", "PlaydateSimulator.exe" }),
+            else => @panic("Unsupported OS"),
+        };
+
+        const pdc = b.addSystemCommand(&.{pdc_path});
+        pdc.addDirectoryArg(source_dir);
+        pdc.setName("pdc");
+        const pdx_path = pdc.addOutputFileArg(pdx_file_name);
+
+        b.installDirectory(.{
+            .source_dir = pdx_path,
+            .install_dir = .prefix,
+            .install_subdir = pdx_file_name,
+        });
+        b.installDirectory(.{
+            .source_dir = source_dir,
+            .install_dir = .prefix,
+            .install_subdir = "pdx_source_dir",
+        });
+
+        const emulate_cmd = b.addSystemCommand(&.{pd_simulator_path});
+        emulate_cmd.addDirectoryArg(pdx_path);
+        emulate_cmd.setName("PlaydateSimulator");
+
+        const emulate_step = b.step("emulate", "Run the Forgotten Catacomb in the Playdate Simulator");
+        emulate_step.dependOn(&emulate_cmd.step);
+        emulate_step.dependOn(b.getInstallStep());
     }
-    const playdate_sdk_path = try std.process.getEnvVarOwned(b.allocator, PLAYDATE_SDK_PATH);
-
-    const pdc_path = b.pathJoin(&.{ playdate_sdk_path, "bin", if (native_os_tag == .windows) "pdc.exe" else "pdc" });
-    const pd_simulator_path = switch (native_os_tag) {
-        .linux => b.pathJoin(&.{ playdate_sdk_path, "bin", "PlaydateSimulator" }),
-        .macos => "open", // `open` focuses the window, while running the simulator directry doesn't.
-        .windows => b.pathJoin(&.{ playdate_sdk_path, "bin", "PlaydateSimulator.exe" }),
-        else => @panic("Unsupported OS"),
-    };
-
-    const pdc = b.addSystemCommand(&.{pdc_path});
-    pdc.addDirectoryArg(source_dir);
-    pdc.setName("pdc");
-    const pdx_path = pdc.addOutputFileArg(pdx_file_name);
-
-    b.installDirectory(.{
-        .source_dir = pdx_path,
-        .install_dir = .prefix,
-        .install_subdir = pdx_file_name,
-    });
-    b.installDirectory(.{
-        .source_dir = source_dir,
-        .install_dir = .prefix,
-        .install_subdir = "pdx_source_dir",
-    });
-
-    const emulate_cmd = b.addSystemCommand(&.{pd_simulator_path});
-    emulate_cmd.addDirectoryArg(pdx_path);
-    emulate_cmd.setName("PlaydateSimulator");
-
-    const emulate_step = b.step("emulate", "Run the Forgotten Catacomb in the Playdate Simulator");
-    emulate_step.dependOn(&emulate_cmd.step);
-    emulate_step.dependOn(b.getInstallStep());
 
     // ============================================================
     //                   Dungeons generator
