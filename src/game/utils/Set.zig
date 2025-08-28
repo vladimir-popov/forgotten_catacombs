@@ -1,0 +1,86 @@
+//! A wrapper around `std.AutoHashMapUnmanaged(T, void)` with an allocator.
+const std = @import("std");
+const g = @import("../game_pkg.zig");
+
+pub fn Set(comptime T: type) type {
+    return struct {
+        const Self = @This();
+
+        const UnderlyingMap = std.AutoHashMapUnmanaged(T, void);
+        pub const Iterator = UnderlyingMap.KeyIterator;
+
+        alloc: std.mem.Allocator,
+        underlying_map: *UnderlyingMap,
+
+        pub fn init(alloc: std.mem.Allocator) !Self {
+            const self: Self = .{ .alloc = alloc, .underlying_map = try alloc.create(UnderlyingMap) };
+            self.underlying_map.* = .empty;
+            return self;
+        }
+
+        pub fn deinit(self: *Self) void {
+            self.underlying_map.deinit(self.alloc);
+            self.alloc.destroy(self.underlying_map);
+        }
+
+        pub fn clone(self: Self, alloc: std.mem.Allocator) !Self {
+            return .{ .alloc = alloc, .underlying_map = try self.underlying_map.clone(alloc) };
+        }
+
+        /// - `writer` - as example: `*persistance.Writer(Runtime.FileWriter.Writer)`
+        pub fn save(self: Self, writer: anytype) !void {
+            try writer.beginCollection();
+            var itr = self.iterator();
+            while (itr.next()) |item| {
+                try writer.write(item.*);
+            }
+            try writer.endCollection();
+        }
+
+        /// - `reader` - as example: `*persistance.Reader(Runtime.FileReader.Reader)`
+        pub fn load(reader: anytype) !Self {
+            const set = try init(reader.registry.allocator());
+            try reader.beginCollection();
+            while (!try reader.isCollectionEnd()) {
+                try set.add(try reader.read());
+            }
+            try reader.endCollection();
+            return set;
+        }
+
+        pub fn size(self: Self) usize {
+            return self.underlying_map.size;
+        }
+
+        pub fn iterator(self: Self) Iterator {
+            return self.underlying_map.keyIterator();
+        }
+
+        pub fn add(self: Self, item: T) !void {
+            try self.underlying_map.put(self.alloc, item, {});
+        }
+
+        pub fn remove(self: Self, item: T) bool {
+            return self.underlying_map.remove(item);
+        }
+
+        pub fn eql(self: Self, other: Self) bool {
+            if (self.underlying_map.size != other.underlying_map.size)
+                return false;
+
+            var self_itr = self.underlying_map.keyIterator();
+            var other_itr = self.underlying_map.keyIterator();
+            while (self_itr.next()) |s| {
+                while (other_itr.next()) |o| {
+                    if (!std.meta.eql(s, o))
+                        return false;
+                }
+            }
+            return true;
+        }
+
+        pub fn contains(self: Self, item: T) bool {
+            return self.underlying_map.contains(item);
+        }
+    };
+}

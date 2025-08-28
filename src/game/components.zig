@@ -30,14 +30,6 @@ pub const Sprite = struct {
 
 pub const Description = struct {
     preset: g.descriptions.Presets.Keys,
-
-    pub fn name(self: *const Description) []const u8 {
-        return g.descriptions.Presets.get(self.preset).name;
-    }
-
-    pub fn description(self: *const Description) []const []const u8 {
-        return g.descriptions.Presets.get(self.preset).description;
-    }
 };
 
 pub const Animation = struct {

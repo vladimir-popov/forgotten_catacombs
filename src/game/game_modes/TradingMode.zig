@@ -169,10 +169,11 @@ const product_fmt = std.fmt.comptimePrint(
 fn formatProduct(self: *Self, line: *w.TextArea.Line, item: g.Entity, for_buying: bool) ![]const u8 {
     if (self.session.registry.get3(item, c.Price, c.Description, c.Sprite)) |tuple| {
         const price, const description, const sprite = tuple;
+        const name = self.session.getName(item, description.preset);
         return try std.fmt.bufPrint(
             line,
             product_fmt,
-            .{ sprite.codepoint, description.name(), self.actualPrice(price, for_buying) },
+            .{ sprite.codepoint, name, self.actualPrice(price, for_buying) },
         );
     } else {
         std.debug.panic("Error on format product. Some component was not found", .{});
@@ -283,7 +284,7 @@ fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     log.debug("Show info about item {d}", .{item.id});
     self.modal_window = try w.entityDescription(
         self.alloc,
-        self.session.registry,
+        self.session,
         item,
         self.session.runtime.isDevMode(),
     );

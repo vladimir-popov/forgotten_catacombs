@@ -31,7 +31,7 @@ pub fn chooseItemById(self: Self, item: g.Entity) !Options {
 }
 
 pub fn contains(self: Self, item: g.Entity) bool {
-    const options =  Options{ .area = &self.mode.main_window.activeTab().area, .test_session = self.test_session };
+    const options = Options{ .area = &self.mode.main_window.activeTab().area, .test_session = self.test_session };
     return options.contains(item);
 }
 

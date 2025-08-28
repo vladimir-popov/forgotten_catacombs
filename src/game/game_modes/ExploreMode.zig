@@ -99,8 +99,8 @@ fn statusLine(self: ExploreMode, entity: g.Entity, line: []u8) !usize {
     if (self.session.runtime.isDevMode()) {
         len += (try std.fmt.bufPrint(line[len..], "{d}:", .{entity.id})).len;
     }
-    if (self.session.registry.get(entity, c.Description)) |description| {
-        len += (try std.fmt.bufPrint(line[len..], "{s}", .{description.name()})).len;
+    if (self.session.registry.get(entity, c.Description)) |descr| {
+        len += (try std.fmt.bufPrint(line[len..], "{s}", .{self.session.getDescription(entity, descr.preset)})).len;
 
         if (self.session.registry.get(entity, c.EnemyState)) |state| {
             len += (try std.fmt.bufPrint(line[len..], "({s})", .{@tagName(state.*)})).len;
@@ -214,7 +214,13 @@ fn windowWithEntities(
         if (maybe_entity) |entity| {
             // Every entity has to have description, or handling indexes become complicated
             const description = self.session.registry.getUnsafe(entity, c.Description);
-            try window.area.addOption(self.arena.allocator(), description.name(), entity, describeEntity, null);
+            try window.area.addOption(
+                self.arena.allocator(),
+                self.session.getName(entity, description.preset),
+                entity,
+                showEntityDescription,
+                null,
+            );
             if (entity.eql(self.entity_in_focus))
                 // the variants array has to have at least one (focused) entity
                 try window.area.selectLine(window.area.options.items.len - 1);
@@ -223,7 +229,7 @@ fn windowWithEntities(
     return window;
 }
 
-fn describeEntity(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!void {
+fn showEntityDescription(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!void {
     const self: *ExploreMode = @ptrCast(@alignCast(ptr));
     self.entity_in_focus = entity;
     self.description_window = try self.windowWithDescription();
@@ -232,7 +238,7 @@ fn describeEntity(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!void {
 fn windowWithDescription(self: *ExploreMode) !w.ModalWindow(w.TextArea) {
     return try w.entityDescription(
         self.arena.allocator(),
-        self.session.registry,
+        self.session,
         self.entity_in_focus,
         self.session.runtime.isDevMode(),
     );

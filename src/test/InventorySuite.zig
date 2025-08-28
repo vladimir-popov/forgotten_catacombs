@@ -2,7 +2,6 @@ const std = @import("std");
 const g = @import("game");
 const TestSession = @import("utils/TestSession.zig");
 
-
 test "Rendering initial inventory" {
     var test_session: TestSession = undefined;
     try test_session.initEmpty();
@@ -119,4 +118,5 @@ test "Drink healing potion" {
     try std.testing.expect(!inventory.contains(potion));
     try std.testing.expect(!test_session.session.registry.contains(potion));
     try std.testing.expect(test_session.player.health().current > 5);
+    try std.testing.expect(test_session.session.known_potions.contains(.healing));
 }

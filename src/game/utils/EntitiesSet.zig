@@ -1,4 +1,5 @@
 //! A set of entities ids. Used in the component-containers such as inventory or pile.
+//! Has special methods for saving/loading all contained entities.
 const std = @import("std");
 const g = @import("../game_pkg.zig");
 

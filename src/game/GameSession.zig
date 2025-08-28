@@ -55,7 +55,7 @@ registry: g.Registry,
 ///
 events: g.events.EventBus,
 player: g.Entity,
-known_potions: g.utils.EntitiesSet,
+known_potions: g.utils.Set(c.Effect.Type),
 /// The current level
 level: g.Level,
 /// The deepest achieved level
@@ -93,7 +93,7 @@ pub fn preInit(
         .max_depth = 0,
         .prng = std.Random.DefaultPrng.init(0),
         .ai = g.AI{ .session = self, .rand = self.prng.random() },
-        .known_potions = try g.utils.EntitiesSet.init(self.arena.allocator()),
+        .known_potions = try g.utils.Set(c.Effect.Type).init(self.arena.allocator()),
         .player = undefined,
         .level = undefined,
         .mode = undefined,
@@ -313,6 +313,26 @@ pub inline fn tick(self: *GameSession) !void {
     try self.events.notifySubscribers();
 }
 
+pub fn getName(
+    self: *const GameSession,
+    entity: g.Entity,
+    preset: g.descriptions.Presets.Keys,
+) []const u8 {
+    _ = self;
+    _ = entity;
+    return g.descriptions.Presets.get(preset).name;
+}
+
+pub fn getDescription(
+    self: *const GameSession,
+    entity: g.Entity,
+    preset: g.descriptions.Presets.Keys,
+) []const []const u8 {
+    _ = self;
+    _ = entity;
+    return g.descriptions.Presets.get(preset).description;
+}
+
 pub fn isEnemy(self: *const GameSession, entity: g.Entity) bool {
     return self.registry.has(entity, c.EnemyState);
 }
@@ -329,6 +349,7 @@ pub fn isEquipment(self: *const GameSession, item: g.Entity) bool {
 /// `true` means that the actor is dead
 pub fn drinkPotion(self: *GameSession, actor: g.Entity, potion_id: g.Entity) !bool {
     if (self.registry.get(potion_id, c.Effect)) |effect| {
+        try self.known_potions.add(effect.effect_type);
         if (try self.applyEffect(actor, effect.*, actor)) return true;
     }
     // try to remove from the inventory
