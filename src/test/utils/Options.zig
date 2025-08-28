@@ -22,3 +22,13 @@ pub fn choose(self: Self, option_name: []const u8) !void {
     return error.OptionWasNotFound;
 }
 
+pub fn chooseById(self: Self, item_id: g.Entity) !void {
+    for (self.area.options.items, 0..) |option, idx| {
+        if (option.item.eql(item_id)) {
+            try self.area.selectLine(idx);
+            try self.test_session.pressButton(.a);
+            return;
+        }
+    }
+    return error.OptionWasNotFound;
+}

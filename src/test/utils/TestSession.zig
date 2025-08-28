@@ -3,6 +3,7 @@ const g = @import("game");
 const p = g.primitives;
 const TestRuntime = @import("TestRuntime.zig");
 const Inventory = @import("Inventory.zig");
+const Player = @import("Player.zig");
 
 const Self = @This();
 
@@ -10,6 +11,7 @@ arena: std.heap.ArenaAllocator,
 runtime: TestRuntime,
 render: g.Render,
 session: g.GameSession,
+player: Player,
 tmp_dir: std.testing.TmpDir,
 
 /// Creates a new game session with TestRuntime and the first level.
@@ -20,6 +22,7 @@ pub fn initEmpty(self: *Self) !void {
     self.runtime = try TestRuntime.init(alloc, self.tmp_dir.dir);
     try self.render.init(alloc, self.runtime.runtime(), g.DISPLAY_ROWS, g.DISPLAY_COLS);
     try self.session.initNew(alloc, 0, self.runtime.runtime(), self.render);
+    self.player = .{ .test_session = self, .player = self.session.player };
 }
 
 pub fn deinit(self: *Self) void {

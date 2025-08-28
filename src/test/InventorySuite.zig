@@ -1,5 +1,7 @@
 const std = @import("std");
+const g = @import("game");
 const TestSession = @import("utils/TestSession.zig");
+
 
 test "Rendering initial inventory" {
     var test_session: TestSession = undefined;
@@ -101,4 +103,18 @@ test "Use torch as a weapon" {
         \\════════════════════════════════════════
         \\        200$          Close     Choose ⇧
     );
+}
+
+test "Drink healing potion" {
+    var test_session: TestSession = undefined;
+    try test_session.initEmpty();
+    defer test_session.deinit();
+
+    test_session.player.health().current = 5;
+    const potion = try test_session.player.addToInventory(g.entities.HealingPotion);
+    const inventory = try test_session.openInventory();
+    const options = try inventory.chooseItemById(potion);
+    try options.choose("Drink");
+
+    try std.testing.expect(test_session.player.health().current > 5);
 }
