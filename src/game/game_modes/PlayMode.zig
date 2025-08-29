@@ -257,7 +257,7 @@ fn quickAction(self: PlayMode) g.actions.Action {
 pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity, prev_action: ?g.actions.Action) anyerror!void {
     defer {
         log.debug(
-            "{d} quick actions after update:\n{any}The selected action is {any}\nThe previous was {any}",
+            "{d} quick actions after update:\n{any}\nThe selected action is {any}\nThe previous was {any}",
             .{
                 self.quick_actions.items.len,
                 g.utils.toStringWithListOf(self.quick_actions.items),

@@ -28,7 +28,6 @@ pub const std_options: std.Options = .{
         // .{ .scope = .play_mode, .level = .debug },
         // .{ .scope = .render, .level = .warn },
         // .{ .scope = .save_load_mode, .level = .debug },
-        // .{ .scope = .tty_runtime, .level = .debug },
         // .{ .scope = .visibility, .level = .debug },
         // .{ .scope = .windows, .level = .debug },
     },
@@ -48,9 +47,9 @@ pub fn handlePanic(
 
 pub fn main() !void {
     const seed = try Args.int(u64, "seed") orelse std.crypto.random.int(u64);
-    log.info("\n====================\nSeed of the game is {d}\n====================", .{seed});
+    log.info("========================================\nSeed of the game is {d}\n========================================", .{seed});
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK DETECTED!");
     const alloc = gpa.allocator();
 

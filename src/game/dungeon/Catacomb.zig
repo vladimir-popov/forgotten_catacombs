@@ -472,8 +472,9 @@ fn findPlaceForPassageTurn(
     const MAX_ATTEMPTS = 5;
     // to prevent infinite loop
     var current_attempt = attempt;
-    var stack = std.ArrayList(struct { p.Point, p.Point }).init(stack_arena.allocator());
-    try stack.append(.{ init_from, init_to });
+    const alloc = stack_arena.allocator();
+    var stack: std.ArrayList(struct { p.Point, p.Point }) = .empty;
+    try stack.append(alloc, .{ init_from, init_to });
     var middle1: p.Point = undefined;
     var middle2: p.Point = undefined;
     while (stack.pop()) |points| {
@@ -500,8 +501,8 @@ fn findPlaceForPassageTurn(
                 return .{ middle1, middle2 };
             }
             current_attempt += 1;
-            try stack.append(.{ from, middle2 });
-            try stack.append(.{ middle1, to });
+            try stack.append(alloc, .{ from, middle2 });
+            try stack.append(alloc, .{ middle1, to });
         }
     }
     return null;
@@ -570,8 +571,9 @@ fn findPlaceForDoorInRegionRnd(
     init_region: p.Region,
     side: p.Direction,
 ) !?p.Point {
-    var stack = std.ArrayList(p.Region).init(stack_arena.allocator());
-    try stack.append(init_region);
+    const alloc = stack_arena.allocator();
+    var stack: std.ArrayList(p.Region) = .empty;
+    try stack.append(alloc, init_region);
     while (stack.pop()) |region| {
         const place = switch (side) {
             .up => p.Point{
@@ -615,7 +617,7 @@ fn findPlaceForDoorInRegionRnd(
         for (new_regions) |new_region| {
             if (new_region) |reg| {
                 reg.validate();
-                try stack.append(reg);
+                try stack.append(alloc, reg);
             }
         }
     }

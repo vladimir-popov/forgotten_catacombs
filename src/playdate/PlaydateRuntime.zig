@@ -191,7 +191,7 @@ fn popCheat(_: *anyopaque) ?g.Cheat {
     return result;
 }
 
-fn serialMessageCallback(data: [*c]const u8) callconv(.C) void {
+fn serialMessageCallback(data: [*c]const u8) callconv(.c) void {
     cheat = g.Cheat.parse(std.mem.span(data));
 }
 
@@ -262,7 +262,7 @@ const ExpectedFile = struct {
     is_found: bool = false,
 };
 
-fn validateFile(file_name: [*c]const u8, userdata: ?*anyopaque) callconv(.C) void {
+fn validateFile(file_name: [*c]const u8, userdata: ?*anyopaque) callconv(.c) void {
     const expected_file: *ExpectedFile = @ptrCast(@alignCast(userdata));
     const actual_file = std.mem.sliceTo(file_name, 0);
     expected_file.is_found = std.mem.eql(u8, expected_file.file_name, actual_file);

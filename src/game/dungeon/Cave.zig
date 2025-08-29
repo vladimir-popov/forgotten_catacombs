@@ -120,18 +120,18 @@ fn calculateArea(
 
     var area: usize = 0;
 
-    var stack = std.ArrayList(p.Point).init(alloc);
-    defer stack.deinit();
-    try stack.append(init_point);
+    var stack: std.ArrayList(p.Point) = .empty;
+    defer stack.deinit(alloc);
+    try stack.append(alloc, init_point);
 
     while (stack.pop()) |point| {
         if (map.isSet(point.row, point.col)) continue;
         area += 1;
         map.set(point.row, point.col);
-        try stack.append(point.movedTo(.up));
-        try stack.append(point.movedTo(.down));
-        try stack.append(point.movedTo(.left));
-        try stack.append(point.movedTo(.right));
+        try stack.append(alloc, point.movedTo(.up));
+        try stack.append(alloc, point.movedTo(.down));
+        try stack.append(alloc, point.movedTo(.left));
+        try stack.append(alloc, point.movedTo(.right));
     }
     return area;
 }

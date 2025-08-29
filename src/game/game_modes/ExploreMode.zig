@@ -100,7 +100,7 @@ fn statusLine(self: ExploreMode, entity: g.Entity, line: []u8) !usize {
         len += (try std.fmt.bufPrint(line[len..], "{d}:", .{entity.id})).len;
     }
     if (self.session.registry.get(entity, c.Description)) |descr| {
-        len += (try std.fmt.bufPrint(line[len..], "{s}", .{self.session.getDescription(entity, descr.preset)})).len;
+        len += (try std.fmt.bufPrint(line[len..], "{s}", .{self.session.getName(entity, descr.preset)})).len;
 
         if (self.session.registry.get(entity, c.EnemyState)) |state| {
             len += (try std.fmt.bufPrint(line[len..], "({s})", .{@tagName(state.*)})).len;

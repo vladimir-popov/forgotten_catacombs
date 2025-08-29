@@ -50,8 +50,8 @@ pub fn panic(
     while (true) {}
 }
 
-var playdate_error_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) void = undefined;
-var playdate_log_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) void = undefined;
+var playdate_error_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.c) void = undefined;
+var playdate_log_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.c) void = undefined;
 
 pub const GlobalState = struct {
     playdate_runtime: PlaydateRuntime,
@@ -62,7 +62,7 @@ pub const GlobalState = struct {
 // the eventHandler
 var global_state: *GlobalState = undefined;
 
-pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent, arg: u32) callconv(.C) c_int {
+pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent, arg: u32) callconv(.c) c_int {
     _ = arg;
     switch (event) {
         .EventInit => {
@@ -90,7 +90,7 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
     return 0;
 }
 
-fn updateAndRender(userdata: ?*anyopaque) callconv(.C) c_int {
+fn updateAndRender(userdata: ?*anyopaque) callconv(.c) c_int {
     const state: *GlobalState = @ptrCast(@alignCast(userdata.?));
     state.game.tick() catch |err|
         std.debug.panic("Error {any} on game tick", .{err});

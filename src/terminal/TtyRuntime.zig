@@ -28,7 +28,7 @@ pub fn disableGameMode() !void {
     try tty.Display.showCursor();
 }
 
-fn handleWindowResize(_: i32) callconv(.C) void {
+fn handleWindowResize(_: i32) callconv(.c) void {
     window_size = tty.Display.getWindowSize() catch unreachable;
     tty.Display.clearScreen() catch unreachable;
     if (should_render_in_center) {
@@ -114,21 +114,23 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
 
         /// Run the main loop of the game
         pub fn run(self: *Self, game: anytype) !void {
-            const stdout = std.io.getStdOut().writer().any();
+            var buffer: [2048]u8 = undefined;
+            var stdout = std.fs.File.stdout().writer(&buffer);
             handleWindowResize(0);
             while (!self.is_exit) {
                 if (self.menu.is_shown) {
-                    try self.menu.buffer.writeBuffer(stdout, rows_pad, cols_pad + (display_cols - menu_cols));
+                    try self.menu.buffer.writeBuffer(&stdout.interface, rows_pad, cols_pad + (display_cols - menu_cols));
                     if (try readPushedButtons(self)) |btn| {
                         try self.menu.handleKeyboardButton(btn);
                     }
                 } else if (self.cmd.cursor_idx > 0) {
                     self.cheat = try self.cmd.readCheat();
-                    try self.cmd.buffer.writeBuffer(stdout, rows_pad + display_rows - 2, cols_pad + 1);
+                    try self.cmd.buffer.writeBuffer(&stdout.interface, rows_pad + display_rows - 2, cols_pad + 1);
                 } else {
                     try game.tick();
-                    try self.buffer.writeBuffer(stdout, rows_pad, cols_pad);
+                    try self.buffer.writeBuffer(&stdout.interface, rows_pad, cols_pad);
                 }
+                try stdout.interface.flush();
             }
         }
 

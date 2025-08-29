@@ -9,7 +9,7 @@ const Runtime = @This();
 
 pub const DrawingMode = enum { normal, inverted };
 pub const TextAlign = enum { center, left, right };
-pub const MenuItemCallback = *const fn (userdata: ?*anyopaque) callconv(.C) void;
+pub const MenuItemCallback = *const fn (userdata: ?*anyopaque) callconv(.c) void;
 pub const File = *anyopaque;
 pub const FileMode = enum { read, write };
 
@@ -102,55 +102,76 @@ pub fn deleteFileIfExists(self: Runtime, path: []const u8) anyerror!void {
 }
 
 pub const FileReader = struct {
-    pub const Error = anyerror;
-    pub const Reader = std.io.Reader(FileReader, Error, read);
-
     runtime: Runtime,
     file: File,
+    interface: std.io.Reader,
 
-    pub fn read(self: FileReader, buffer: []u8) Error!usize {
-        return try self.runtime.vtable.readFromFile(self.runtime.context, self.file, buffer);
+    pub fn init(runtime: Runtime, file: File, buffer: []u8) FileReader {
+        return .{
+            .runtime = runtime,
+            .file = file,
+            .interface = .{
+                .buffer = buffer,
+                .seek = 0,
+                .end = buffer.len,
+                .vtable = &.{ .stream = FileReader.stream },
+            },
+        };
+    }
+
+    pub fn stream(io_r: *std.io.Reader, io_w: *std.io.Writer, limit: std.io.Limit) std.io.Reader.StreamError!usize {
+        _ = limit;
+        const self: *FileReader = @fieldParentPtr("interface", io_r);
+        var buffer: [128]u8 = undefined;
+        const len = self.runtime.vtable.readFromFile(self.runtime.context, self.file, &buffer) catch |err| {
+            log.err("Error on reading from the file {any}: {any}", .{self.file, err});
+            return error.ReadFailed;
+        };
+        try io_w.writeAll(buffer[0..len]);
+        return len;
     }
 
     pub fn close(self: FileReader) void {
         self.runtime.closeFile(self.file);
     }
-
-    pub fn reader(self: FileReader) Reader {
-        return .{ .context = self };
-    }
 };
 
-pub fn fileReader(self: Runtime, file_path: []const u8) !FileReader {
-    return .{ .runtime = self, .file = try self.openFile(file_path, .read) };
+pub fn fileReader(self: Runtime, file_path: []const u8, buffer: []u8) !FileReader {
+    return .init(self, try self.openFile(file_path, .read), buffer);
 }
 
 pub const FileWriter = struct {
-    pub const Error = anyerror;
-    pub const Writer = std.io.Writer(FileWriter, Error, write);
-
     runtime: Runtime,
     file: File,
+    interface: std.io.Writer,
+
+    pub fn init(runtime: Runtime, file: File, buffer: []u8) FileWriter {
+        return .{
+            .runtime = runtime,
+            .file = file,
+            .interface = .{ .buffer = buffer, .vtable = &.{ .drain = FileWriter.drain } },
+        };
+    }
 
     pub fn close(self: FileWriter) void {
         self.runtime.closeFile(self.file);
     }
 
-    pub fn write(self: FileWriter, bytes: []const u8) Error!usize {
-        return try self.runtime.vtable.writeToFile(self.runtime.context, self.file, bytes);
-    }
-
-    pub fn writeAll(self: FileWriter, bytes: []const u8) Error!void {
-        const len = try self.write(bytes);
-        if (len < bytes.len)
-            return error.NoSpaceLeft;
-    }
-
-    pub fn writer(self: FileWriter) Writer {
-        return .{ .context = self };
+    pub fn drain(io_w: *std.io.Writer, data: []const []const u8, splat: usize) std.io.Writer.Error!usize {
+        _ = splat;
+        const self: *FileWriter = @fieldParentPtr("interface", io_w);
+        const len = self.runtime.vtable.writeToFile(self.runtime.context, self.file, data[0]) catch |err| {
+            log.err("Error on writing to the file {any}: {any}", .{ self.file, err });
+            return error.WriteFailed;
+        };
+        if (len < data[0].len) {
+            log.err("No space left in the file {any}", .{self.file});
+            return error.WriteFailed;
+        }
+        return len;
     }
 };
 
-pub fn fileWriter(self: Runtime, file_path: []const u8) !FileWriter {
-    return .{ .runtime = self, .file = try self.openFile(file_path, .write) };
+pub fn fileWriter(self: Runtime, file_path: []const u8, buffer: []u8) !FileWriter {
+    return .init(self, try self.openFile(file_path, .write), buffer);
 }

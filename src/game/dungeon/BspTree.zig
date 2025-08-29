@@ -163,24 +163,25 @@ fn GenericNode(comptime V: type) type {
         ) !void {
             std.debug.assert(self.left == null);
             std.debug.assert(self.right == null);
-            var stack = std.ArrayList(*NodeV).init(arena.allocator());
-            try stack.append(self);
+            const alloc = arena.allocator();
+            var stack: std.ArrayList(*NodeV) = .empty;
+            try stack.append(alloc, self);
             while (stack.pop()) |node| {
                 const maybe_values = try splitter.split(splitter.ptr, node);
                 if (maybe_values) |values| {
                     log.debug("Splitted into regions: {any}", .{values});
-                    node.left = try arena.allocator().create(NodeV);
+                    node.left = try alloc.create(NodeV);
                     node.left.?.* = NodeV{
                         .parent = node,
                         .value = values[0],
                     };
-                    node.right = try arena.allocator().create(NodeV);
+                    node.right = try alloc.create(NodeV);
                     node.right.?.* = NodeV{
                         .parent = node,
                         .value = values[1],
                     };
-                    try stack.append(node.right.?);
-                    try stack.append(node.left.?);
+                    try stack.append(alloc, node.right.?);
+                    try stack.append(alloc, node.left.?);
                 }
             }
         }
@@ -216,15 +217,16 @@ fn GenericNode(comptime V: type) type {
 
         /// Traverse all nodes of this tree in depth, and pass them to the callback.
         pub fn traverse(self: *NodeV, arena: *std.heap.ArenaAllocator, handler: TraverseHandler) !void {
-            var stack = std.ArrayList(*NodeV).init(arena.allocator());
-            try stack.append(self);
+            const alloc = arena.allocator();
+            var stack: std.ArrayList(*NodeV) = .empty;
+            try stack.append(alloc, self);
             while (stack.pop()) |node| {
                 try handler.handle(handler.ptr, node);
                 if (node.right) |right| {
-                    try stack.append(right);
+                    try stack.append(alloc, right);
                 }
                 if (node.left) |left| {
-                    try stack.append(left);
+                    try stack.append(alloc, left);
                 }
             }
         }
@@ -234,12 +236,13 @@ fn GenericNode(comptime V: type) type {
         /// Note, that only values from paired leafs are used.  Values of all other nodes are ignored,
         /// and replaces by the handler result.
         pub fn foldModify(self: *NodeV, arena: *std.heap.ArenaAllocator, handler: FoldHandler) !V {
-            var stack = std.ArrayList(struct { *NodeV, *NodeV }).init(arena.allocator());
+            const alloc = arena.allocator();
+            var stack: std.ArrayList(struct { *NodeV, *NodeV }) = .empty;
             var stack_prev_size: usize = 0;
             if (self.left orelse self.right == null) {
                 return self.value;
             }
-            try stack.append(.{ self.left.?, self.right.? });
+            try stack.append(alloc, .{ self.left.?, self.right.? });
             while (stack.getLastOrNull()) |nodes| {
                 // if the pair is not leafs
                 if (stack.items.len > stack_prev_size) {
@@ -247,7 +250,7 @@ fn GenericNode(comptime V: type) type {
                     inline for (0..2) |i| {
                         if (nodes[i].left) |left| {
                             if (nodes[i].right) |right| {
-                                try stack.append(.{ left, right });
+                                try stack.append(alloc, .{ left, right });
                             } else {
                                 nodes[i].value = left.value;
                             }

@@ -67,8 +67,8 @@ pub fn build(b: *std.Build) !void {
     const terminal_game_exe = b.addExecutable(.{
         .name = target_name,
         .root_module = terminal_module,
-        .link_libc = true,
     });
+    terminal_game_exe.linkLibC();
     b.installArtifact(terminal_game_exe);
 
     const run_game_step = b.step("run", "Run the Forgotten Catacombs in the terminal");
@@ -114,11 +114,9 @@ pub fn build(b: *std.Build) !void {
     const source_dir = writer.getDirectory();
     writer.step.name = "write source directory";
 
-    const lib = b.addSharedLibrary(.{
+    const lib = b.addLibrary(.{
         .name = "pdex",
-        .root_source_file = b.path("src/playdate/main.zig"),
-        .optimize = .ReleaseFast,
-        .target = b.graph.host,
+        .root_module = playdate_module,
     });
     lib.root_module.addImport("game", game_module);
     _ = writer.addCopyFile(lib.getEmittedBin(), "pdex" ++ switch (native_os_tag) {

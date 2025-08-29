@@ -92,8 +92,8 @@ pub const Text = struct {
         }
     }
 
-    pub fn writeSetCursorPosition(wr: std.io.AnyWriter, row: u16, col: u16) !void {
-        try std.fmt.format(wr, "\x1b[{d};{d}H", .{ row, col });
+    pub fn writeSetCursorPosition(wr: *std.io.Writer, row: u16, col: u16) !void {
+        try wr.print("\x1b[{d};{d}H", .{ row, col });
     }
 };
 
@@ -223,7 +223,7 @@ pub const Display = struct {
         }
     }
 
-    pub fn handleWindowResize(act: *std.posix.Sigaction, handler: *align(1) const fn (i32) callconv(.C) void) void {
+    pub fn handleWindowResize(act: *std.posix.Sigaction, handler: *align(1) const fn (i32) callconv(.c) void) void {
         act.flags = std.posix.SA.RESTART;
         act.handler = .{ .handler = handler };
         act.mask = std.posix.sigemptyset();

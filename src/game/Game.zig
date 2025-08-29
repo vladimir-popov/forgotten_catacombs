@@ -151,14 +151,14 @@ fn initMainMenu(self: *Self) void {
     _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
 }
 
-fn goToMainMenu(ptr: ?*anyopaque) callconv(.C) void {
+fn goToMainMenu(ptr: ?*anyopaque) callconv(.c) void {
     if (ptr == null) return;
     const self: *Self = @ptrCast(@alignCast(ptr.?));
     std.debug.assert(self.state == .game_session);
     self.state.game_session.save();
 }
 
-fn openInventory(ptr: ?*anyopaque) callconv(.C) void {
+fn openInventory(ptr: ?*anyopaque) callconv(.c) void {
     if (ptr == null) return;
     const self: *Self = @ptrCast(@alignCast(ptr.?));
     std.debug.assert(self.state == .game_session);

@@ -69,7 +69,7 @@ pub fn handleEvent(
     down: c_int,
     when: u32,
     ptr: ?*anyopaque,
-) callconv(.C) c_int {
+) callconv(.c) c_int {
     log.debug("Handle {d} buttons at {d} down {d}", .{ buttons, when, down });
     const self: *LastButton = @ptrCast(@alignCast(ptr));
     if (self.is_menu_shown) {

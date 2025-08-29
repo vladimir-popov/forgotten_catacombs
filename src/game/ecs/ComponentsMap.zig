@@ -31,7 +31,7 @@ pub fn ComponentsMap(comptime ComponentsStruct: anytype) type {
                     .type = ArraySet(opt.child),
                     .default_value_ptr = null,
                     .is_comptime = false,
-                    .alignment = 0,
+                    .alignment = @alignOf(ArraySet(opt.child)),
                 };
             },
             else => {

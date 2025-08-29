@@ -70,10 +70,10 @@ pub fn Menu(comptime ROWS: u8, comptime COLS: u8) type {
 
             const mode: g.DrawingMode = if (is_selected) .inverted else .normal;
             const item = self.items[item_idx];
-            var buf: [TITLE_LENGTH]u8 = undefined;
-            var fbs = std.io.fixedBufferStream(&buf);
-            try std.fmt.formatBuf(item.title, .{ .alignment = .center, .width = TITLE_LENGTH }, fbs.writer().any());
-            self.buffer.setAsciiText(fbs.getWritten(), item_idx * 3 + 2, 1, mode);
+            var buf: [TITLE_LENGTH]u8 = @splat(' ');
+            const pad = (TITLE_LENGTH - item.title.len) / 2;
+            @memmove(buf[pad..(pad + item.title.len)], item.title);
+            self.buffer.setAsciiText(&buf, item_idx * 3 + 2, 1, mode);
         }
 
         pub fn close(self: *Self) void {
