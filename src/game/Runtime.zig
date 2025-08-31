@@ -10,7 +10,7 @@ const Runtime = @This();
 pub const DrawingMode = enum { normal, inverted };
 pub const TextAlign = enum { center, left, right };
 pub const MenuItemCallback = *const fn (userdata: ?*anyopaque) callconv(.c) void;
-pub const File = *anyopaque;
+pub const OpaqueFile = *anyopaque;
 pub const FileMode = enum { read, write };
 
 const VTable = struct {
@@ -34,10 +34,10 @@ const VTable = struct {
     popCheat: *const fn (context: *anyopaque) ?g.Cheat,
     // --------- FS operations ---------
     // All paths should be relative to a directory with save files
-    openFile: *const fn (context: *anyopaque, file_path: []const u8, mode: FileMode) anyerror!File,
-    closeFile: *const fn (context: *anyopaque, file: File) void,
-    readFromFile: *const fn (context: *anyopaque, file: File, buffer: []u8) anyerror!usize,
-    writeToFile: *const fn (context: *anyopaque, file: File, bytes: []const u8) anyerror!usize,
+    openFile: *const fn (context: *anyopaque, file_path: []const u8, mode: FileMode, buffer: []u8) anyerror!OpaqueFile,
+    closeFile: *const fn (context: *anyopaque, file: OpaqueFile) void,
+    readFile: *const fn (context: *anyopaque, file: OpaqueFile) *std.io.Reader,
+    writeToFile: *const fn (context: *anyopaque, file: OpaqueFile) *std.io.Writer,
     isFileExists: *const fn (context: *anyopaque, path: []const u8) anyerror!bool,
     deleteFileIfExists: *const fn (context: *anyopaque, path: []const u8) anyerror!void,
     //  ----------------------------------
@@ -67,30 +67,38 @@ pub inline fn addMenuItem(
     return self.vtable.addMenuItem(self.context, title, game_object, callback);
 }
 
-pub inline fn removeAllMenuItems(self: Runtime) void {
+pub fn removeAllMenuItems(self: Runtime) void {
     self.vtable.removeAllMenuItems(self.context);
 }
 
-pub inline fn readPushedButtons(self: Runtime) !?g.Button {
+pub fn readPushedButtons(self: Runtime) !?g.Button {
     const btn = try self.vtable.readPushedButtons(self.context);
     if (btn) |b| log.debug("Pressed button {s}", .{@tagName(b.game_button)});
     return btn;
 }
 
-pub inline fn clearDisplay(self: Runtime) !void {
+pub fn clearDisplay(self: Runtime) !void {
     try self.vtable.clearDisplay(self.context);
 }
 
-pub inline fn drawSprite(self: Runtime, codepoint: u21, position_on_display: p.Point, mode: DrawingMode) !void {
+pub fn drawSprite(self: Runtime, codepoint: u21, position_on_display: p.Point, mode: DrawingMode) !void {
     try self.vtable.drawSprite(self.context, codepoint, position_on_display, mode);
 }
 
-pub inline fn openFile(self: Runtime, file_path: []const u8, mode: FileMode) anyerror!File {
-    return try self.vtable.openFile(self.context, file_path, mode);
+pub fn openFile(self: Runtime, file_path: []const u8, mode: FileMode, buffer: []u8) anyerror!OpaqueFile {
+    return try self.vtable.openFile(self.context, file_path, mode, buffer);
 }
 
-pub inline fn closeFile(self: Runtime, file: File) void {
+pub fn closeFile(self: Runtime, file: OpaqueFile) void {
     self.vtable.closeFile(self.context, file);
+}
+
+pub fn readFile(self: Runtime, file: OpaqueFile) *std.io.Reader {
+    return self.vtable.readFile(self.context, file);
+}
+
+pub fn writeToFile(self: Runtime, file: OpaqueFile) *std.io.Writer {
+    return self.vtable.writeToFile(self.context, file);
 }
 
 pub fn isFileExists(self: Runtime, path: []const u8) anyerror!bool {
@@ -99,79 +107,4 @@ pub fn isFileExists(self: Runtime, path: []const u8) anyerror!bool {
 
 pub fn deleteFileIfExists(self: Runtime, path: []const u8) anyerror!void {
     try self.vtable.deleteFileIfExists(self.context, path);
-}
-
-pub const FileReader = struct {
-    runtime: Runtime,
-    file: File,
-    interface: std.io.Reader,
-
-    pub fn init(runtime: Runtime, file: File, buffer: []u8) FileReader {
-        return .{
-            .runtime = runtime,
-            .file = file,
-            .interface = .{
-                .buffer = buffer,
-                .seek = 0,
-                .end = buffer.len,
-                .vtable = &.{ .stream = FileReader.stream },
-            },
-        };
-    }
-
-    pub fn stream(io_r: *std.io.Reader, io_w: *std.io.Writer, limit: std.io.Limit) std.io.Reader.StreamError!usize {
-        _ = limit;
-        const self: *FileReader = @fieldParentPtr("interface", io_r);
-        var buffer: [128]u8 = undefined;
-        const len = self.runtime.vtable.readFromFile(self.runtime.context, self.file, &buffer) catch |err| {
-            log.err("Error on reading from the file {any}: {any}", .{self.file, err});
-            return error.ReadFailed;
-        };
-        try io_w.writeAll(buffer[0..len]);
-        return len;
-    }
-
-    pub fn close(self: FileReader) void {
-        self.runtime.closeFile(self.file);
-    }
-};
-
-pub fn fileReader(self: Runtime, file_path: []const u8, buffer: []u8) !FileReader {
-    return .init(self, try self.openFile(file_path, .read), buffer);
-}
-
-pub const FileWriter = struct {
-    runtime: Runtime,
-    file: File,
-    interface: std.io.Writer,
-
-    pub fn init(runtime: Runtime, file: File, buffer: []u8) FileWriter {
-        return .{
-            .runtime = runtime,
-            .file = file,
-            .interface = .{ .buffer = buffer, .vtable = &.{ .drain = FileWriter.drain } },
-        };
-    }
-
-    pub fn close(self: FileWriter) void {
-        self.runtime.closeFile(self.file);
-    }
-
-    pub fn drain(io_w: *std.io.Writer, data: []const []const u8, splat: usize) std.io.Writer.Error!usize {
-        _ = splat;
-        const self: *FileWriter = @fieldParentPtr("interface", io_w);
-        const len = self.runtime.vtable.writeToFile(self.runtime.context, self.file, data[0]) catch |err| {
-            log.err("Error on writing to the file {any}: {any}", .{ self.file, err });
-            return error.WriteFailed;
-        };
-        if (len < data[0].len) {
-            log.err("No space left in the file {any}", .{self.file});
-            return error.WriteFailed;
-        }
-        return len;
-    }
-};
-
-pub fn fileWriter(self: Runtime, file_path: []const u8, buffer: []u8) !FileWriter {
-    return .init(self, try self.openFile(file_path, .write), buffer);
 }

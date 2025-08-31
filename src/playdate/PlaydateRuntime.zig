@@ -1,5 +1,6 @@
 const std = @import("std");
 const api = @import("api.zig");
+const io = @import("io.zig");
 const g = @import("game");
 const c = g.components;
 const p = g.primitives;
@@ -74,7 +75,7 @@ pub fn runtime(self: *Self) g.Runtime {
             .drawSprite = drawSprite,
             .openFile = openFile,
             .closeFile = closeFile,
-            .readFromFile = readFromFile,
+            .readFile = readFile,
             .writeToFile = writeToFile,
             .isFileExists = isFileExists,
             .deleteFileIfExists = deleteFileIfExists,
@@ -195,55 +196,56 @@ fn serialMessageCallback(data: [*c]const u8) callconv(.c) void {
     cheat = g.Cheat.parse(std.mem.span(data));
 }
 
-fn openFile(ptr: *anyopaque, file_path: []const u8, mode: g.Runtime.FileMode) anyerror!*anyopaque {
+fn openFile(ptr: *anyopaque, file_path: []const u8, mode: g.Runtime.FileMode, buffer: []u8) anyerror!*anyopaque {
+    log.debug("Open file {s} to {t}", .{ file_path, mode });
     const self: *Self = @ptrCast(@alignCast(ptr));
     const file_options: c_int = switch (mode) {
         .read => api.FILE_READ_DATA,
         .write => api.FILE_WRITE,
     };
-    var buf: [50]u8 = undefined;
-    const full_path = try std.fmt.bufPrint(&buf, "{s}/{s}", .{ save_dir, file_path });
-    buf[full_path.len] = 0;
-    return self.playdate.file.open(full_path.ptr, file_options) orelse {
+    var path_buf: [50]u8 = undefined;
+    const full_path = try std.fmt.bufPrint(&path_buf, "{s}/{s}", .{ save_dir, file_path });
+    path_buf[full_path.len] = 0;
+    const file_ptr = self.playdate.file.open(full_path.ptr, file_options) orelse {
         log.err(
             "Error on opening file {s} in mode {s}: {s}",
             .{ full_path, @tagName(mode), self.playdate.file.geterr() },
         );
         return error.IOError;
     };
+    const file_wrapper = try self.alloc.create(io.FileWrapper);
+    file_wrapper.* = switch (mode) {
+        .read => .{ .reader = .init(self.playdate, file_ptr, buffer) },
+        .write => .{ .writer = .init(self.playdate, file_ptr, buffer) },
+    };
+    log.debug("Opened file {*}", .{file_wrapper});
+    return file_wrapper;
 }
 
 fn closeFile(ptr: *anyopaque, file: *anyopaque) void {
+    log.debug("Close file {*}", .{file});
     const self: *Self = @ptrCast(@alignCast(ptr));
-    const sdfile: ?*api.SDFile = @ptrCast(@alignCast(file));
-    if (self.playdate.file.flush(sdfile) < 0) {
-        std.debug.panic("Error on flushing file {any}: {s}", .{ file, self.playdate.file.geterr() });
-    }
-    if (self.playdate.file.close(sdfile) < 0) {
+    const file_wrapper: *io.FileWrapper = @ptrCast(@alignCast(file));
+    if (file_wrapper.* == .writer)
+        file_wrapper.writer.interface.flush() catch |err| {
+            std.debug.panic("Error on flushing file {any}: {any}", .{ file, err });
+        };
+    if (self.playdate.file.close(file_wrapper.sdfile()) < 0) {
         std.debug.panic("Error on closing file {any}: {s}", .{ file, self.playdate.file.geterr() });
     }
+    self.alloc.destroy(file_wrapper);
 }
 
-fn readFromFile(ptr: *anyopaque, file: *anyopaque, buffer: []u8) anyerror!usize {
-    const self: *Self = @ptrCast(@alignCast(ptr));
-    const sdfile: ?*api.SDFile = @ptrCast(@alignCast(file));
-    const result = self.playdate.file.read(sdfile, buffer.ptr, @intCast(buffer.len));
-    if (result < 0) {
-        log.err("Error on reading the file {any}: {s}", .{ file, self.playdate.file.geterr() });
-        return error.IOError;
-    }
-    return @intCast(result);
+fn readFile(_: *anyopaque, file: *anyopaque) *std.io.Reader {
+    const file_wrapper: *io.FileWrapper = @ptrCast(@alignCast(file));
+    log.debug("Prepare a reader to read from the file {*}", .{file_wrapper});
+    return &file_wrapper.reader.interface;
 }
 
-fn writeToFile(ptr: *anyopaque, file: *anyopaque, bytes: []const u8) anyerror!usize {
-    const self: *Self = @ptrCast(@alignCast(ptr));
-    const sdfile: ?*api.SDFile = @ptrCast(@alignCast(file));
-    const result = self.playdate.file.write(sdfile, bytes.ptr, @intCast(bytes.len));
-    if (result < 0) {
-        log.err("Error on writing to the file {any}: {s}", .{ file, self.playdate.file.geterr() });
-        return error.IOError;
-    }
-    return @intCast(result);
+fn writeToFile(_: *anyopaque, file: *anyopaque) *std.io.Writer {
+    const file_wrapper: *io.FileWrapper = @ptrCast(@alignCast(file));
+    log.debug("Prepare a writer to write to the file {*}", .{file_wrapper});
+    return &file_wrapper.writer.interface;
 }
 
 fn isFileExists(ptr: *anyopaque, file_path: []const u8) anyerror!bool {
@@ -257,17 +259,6 @@ fn isFileExists(ptr: *anyopaque, file_path: []const u8) anyerror!bool {
     return result.is_found;
 }
 
-const ExpectedFile = struct {
-    file_name: []const u8,
-    is_found: bool = false,
-};
-
-fn validateFile(file_name: [*c]const u8, userdata: ?*anyopaque) callconv(.c) void {
-    const expected_file: *ExpectedFile = @ptrCast(@alignCast(userdata));
-    const actual_file = std.mem.sliceTo(file_name, 0);
-    expected_file.is_found = std.mem.eql(u8, expected_file.file_name, actual_file);
-}
-
 fn deleteFileIfExists(ptr: *anyopaque, file_path: []const u8) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     if (!try isFileExists(ptr, file_path)) return;
@@ -279,4 +270,15 @@ fn deleteFileIfExists(ptr: *anyopaque, file_path: []const u8) !void {
         log.err("Error on deleting file {s}: {s}", .{ file_path, self.playdate.file.geterr() });
         return error.IOError;
     }
+}
+
+const ExpectedFile = struct {
+    file_name: []const u8,
+    is_found: bool = false,
+};
+
+fn validateFile(file_name: [*c]const u8, userdata: ?*anyopaque) callconv(.c) void {
+    const expected_file: *ExpectedFile = @ptrCast(@alignCast(userdata));
+    const actual_file = std.mem.sliceTo(file_name, 0);
+    expected_file.is_found = std.mem.eql(u8, expected_file.file_name, actual_file);
 }

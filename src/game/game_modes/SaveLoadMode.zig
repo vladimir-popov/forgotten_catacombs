@@ -120,7 +120,10 @@ pub fn tick(self: *Self) !void {
         },
         .loading => |*loading| {
             const is_continue = loading.tick() catch |err| {
-                log.err("Error on loading level on depth {d}", .{loading.level_depth});
+                log.err(
+                    "Error on loading level on depth {d}. Progress before error: '{t}'",
+                    .{ loading.level_depth, loading.progress },
+                );
                 return err;
             };
             if (!is_continue) {
@@ -206,7 +209,7 @@ const Generating = struct {
 
 const Loading = struct {
     const Progress = enum(u8) {
-        session_preinited = 0,
+        load_session = 0,
         session_loaded = 10,
         level_inited = 20,
         entities_loaded = 70,
@@ -219,7 +222,7 @@ const Loading = struct {
     session: *g.GameSession,
     progress: Progress,
     state: union(enum) { reading: g.persistance.Reader, file_closed } = .file_closed,
-    file: g.Runtime.FileReader = undefined,
+    file: g.Runtime.OpaqueFile = undefined,
     io_buffer: [128]u8 = undefined,
     level_depth: u8 = undefined,
     /// Helps to choose a ladder on which the player should appear on the loaded level.
@@ -227,7 +230,7 @@ const Loading = struct {
     moving_direction: ?c.Ladder.Direction,
 
     pub fn loadSession(session: *g.GameSession) Loading {
-        return .{ .session = session, .progress = .session_preinited, .moving_direction = null };
+        return .{ .session = session, .progress = .load_session, .moving_direction = null };
     }
 
     pub fn loadLevel(session: *g.GameSession, depth: u8, moving_direction: c.Ladder.Direction) Loading {
@@ -243,28 +246,33 @@ const Loading = struct {
         switch (self.state) {
             .reading => |*reading| {
                 reading.deinit();
-                self.file.close();
+                self.session.runtime.closeFile(self.file);
             },
             .file_closed => {},
         }
     }
 
     pub fn tick(self: *Loading) !bool {
-        log.debug("Continue loading: {s}", .{@tagName(self.progress)});
+        log.debug("Continue loading: {t}", .{self.progress});
         try self.draw();
         switch (self.progress) {
-            .session_preinited => {
-                self.file = try self.session.runtime.fileReader(g.persistance.PATH_TO_SESSION_FILE, &self.io_buffer);
+            .load_session => {
+                self.file = try self.session.runtime.openFile(
+                    g.persistance.PATH_TO_SESSION_FILE,
+                    .read,
+                    &self.io_buffer,
+                );
                 defer {
-                    self.file.close();
+                    self.session.runtime.closeFile(self.file);
                     self.state = .file_closed;
                 }
-                self.state = .{ .reading = .init(&self.session.registry, &self.file.interface) };
+                self.state = .{ .reading = .init(&self.session.registry, self.session.runtime.readFile(self.file)) };
                 defer self.state.reading.deinit();
 
                 try self.state.reading.beginObject();
                 _ = try self.state.reading.readKey("seed");
                 self.session.setSeed(try self.state.reading.read(u64));
+                log.debug("A seed is {d}", .{self.session.seed});
 
                 _ = try self.state.reading.readKey("next_entity");
                 self.session.registry.next_entity = .{ .id = try self.state.reading.read(g.Entity.IdType) };
@@ -278,19 +286,22 @@ const Loading = struct {
                 _ = try self.state.reading.readKey("player");
                 self.session.player = try self.state.reading.readEntity();
                 try self.state.reading.endObject();
+                log.debug("A game session was loaded.", .{});
 
                 self.session.level = g.Level.preInit(self.session.arena.allocator(), &self.session.registry);
+                log.debug("A level was preinited.", .{});
 
                 self.progress = .session_loaded;
             },
             .session_loaded => {
                 var path_buf: [16]u8 = undefined;
                 self.file =
-                    try self.session.runtime.fileReader(
+                    try self.session.runtime.openFile(
                         try g.persistance.pathToLevelFile(&path_buf, self.level_depth),
+                        .read,
                         &self.io_buffer,
                     );
-                self.state = .{ .reading = .init(&self.session.registry, &self.file.interface) };
+                self.state = .{ .reading = .init(&self.session.registry, self.session.runtime.readFile(self.file)) };
 
                 try self.state.reading.beginObject();
                 _ = try self.state.reading.readKey("seed");
@@ -349,7 +360,7 @@ const Loading = struct {
                     try self.session.completeInitialization();
 
                 self.state.reading.deinit();
-                self.file.close();
+                self.session.runtime.closeFile(self.file);
                 self.state = .file_closed;
                 self.progress = .completed;
             },
@@ -362,7 +373,7 @@ const Loading = struct {
         //       |
         // Loadin|g XXX%
         //       |
-        if (self.progress == .session_preinited or self.progress == .session_loaded) {
+        if (self.progress == .load_session or self.progress == .session_loaded) {
             try self.session.render.clearDisplay();
             try self.session.render.drawTextWithAlign(
                 7,
@@ -404,14 +415,14 @@ const Saving = struct {
     session: *g.GameSession,
     progress: Progress = .inited,
     state: union(enum) { writing: g.persistance.Writer, file_closed } = .file_closed,
-    file_writer: g.Runtime.FileWriter = undefined,
+    file: g.Runtime.OpaqueFile = undefined,
     io_buffer: [128]u8 = undefined,
     next_process: NextProcess,
 
     pub fn deinit(self: *Saving) void {
         switch (self.state) {
             .writing => {
-                self.file_writer.close();
+                self.session.runtime.closeFile(self.file);
             },
             .file_closed => {},
         }
@@ -422,11 +433,14 @@ const Saving = struct {
         try self.draw();
         switch (self.progress) {
             .inited => {
-                self.file_writer = try self.session.runtime.fileWriter(
+                self.file = try self.session.runtime.openFile(
                     g.persistance.PATH_TO_SESSION_FILE,
+                    .write,
                     &self.io_buffer,
                 );
-                self.state = .{ .writing = .init(&self.session.registry, &self.file_writer.interface) };
+                self.state = .{
+                    .writing = .init(&self.session.registry, self.session.runtime.writeToFile(self.file)),
+                };
                 try self.state.writing.beginObject();
                 try self.state.writing.writeStringKey("seed");
                 try self.state.writing.write(self.session.seed);
@@ -439,17 +453,20 @@ const Saving = struct {
                 try self.state.writing.writeStringKey("player");
                 try self.state.writing.writeEntity(self.session.player);
                 try self.state.writing.endObject();
-                self.file_writer.close();
+                self.session.runtime.closeFile(self.file);
                 self.state = .file_closed;
                 self.progress = .session_saved;
             },
             .session_saved => {
                 var buf: [16]u8 = undefined;
-                self.file_writer = try self.session.runtime.fileWriter(
+                self.file = try self.session.runtime.openFile(
                     try g.persistance.pathToLevelFile(&buf, self.session.level.depth),
+                    .write,
                     &self.io_buffer,
                 );
-                self.state = .{ .writing = .init(&self.session.registry, &self.file_writer.interface) };
+                self.state = .{
+                    .writing = .init(&self.session.registry, self.session.runtime.writeToFile(self.file)),
+                };
 
                 try self.state.writing.beginObject();
                 try self.state.writing.writeStringKey("seed");
@@ -498,7 +515,7 @@ const Saving = struct {
                     if (!entity.eql(self.session.player))
                         try self.session.registry.removeEntity(entity);
                 }
-                self.file_writer.close();
+                self.session.runtime.closeFile(self.file);
                 self.state = .file_closed;
                 self.progress = .completed;
             },

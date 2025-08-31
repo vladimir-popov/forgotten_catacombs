@@ -149,25 +149,25 @@ pub const Reader = struct {
     pub const Error = anyerror;
 
     registry: *g.Registry,
-    reader: std.json.Reader,
+    json_reader: std.json.Reader,
 
     pub fn init(registry: *g.Registry, reader: *std.io.Reader) Self {
         return .{
             .registry = registry,
-            .reader = .init(registry.allocator(), reader),
+            .json_reader = .init(registry.allocator(), reader),
         };
     }
 
     pub fn deinit(self: *Self) void {
-        self.reader.deinit();
+        self.json_reader.deinit();
     }
 
     pub fn beginObject(self: *Self) Error!void {
-        try assertEql(self.reader.next(), .object_begin);
+        try assertEql(self.json_reader.next(), .object_begin);
     }
 
     pub fn endObject(self: *Self) Error!void {
-        try assertEql(self.reader.next(), .object_end);
+        try assertEql(self.json_reader.next(), .object_end);
     }
 
     pub fn readEntity(self: *Self) anyerror!g.Entity {
@@ -195,7 +195,7 @@ pub const Reader = struct {
                 return {};
             },
             .bool => {
-                const next = try self.reader.next();
+                const next = try self.json_reader.next();
                 return if (next == .true) true else if (next == .false) false else {
                     log.err("Wrong input. Expected bool, but was {any}", .{next});
                     return error.WrongInput;
@@ -287,19 +287,19 @@ pub const Reader = struct {
     }
 
     pub fn isObjectEnd(self: *Self) Error!bool {
-        return try self.reader.peekNextTokenType() == .object_end;
+        return try self.json_reader.peekNextTokenType() == .object_end;
     }
 
     pub fn beginCollection(self: *Self) Error!void {
-        try assertEql(self.reader.next(), .array_begin);
+        try assertEql(self.json_reader.next(), .array_begin);
     }
 
     pub fn endCollection(self: *Self) Error!void {
-        try assertEql(self.reader.next(), .array_end);
+        try assertEql(self.json_reader.next(), .array_end);
     }
 
     pub fn isCollectionEnd(self: *Self) Error!bool {
-        return try self.reader.peekNextTokenType() == .array_end;
+        return try self.json_reader.peekNextTokenType() == .array_end;
     }
 
     pub fn readKey(self: *Self, expected: []const u8) Error![]const u8 {
@@ -320,7 +320,7 @@ pub const Reader = struct {
     pub fn readBytes(self: *Self, buffer: []u8) Error![]const u8 {
         var capacity: usize = 0;
         while (true) {
-            switch (try self.reader.next()) {
+            switch (try self.json_reader.next()) {
                 // Accumulate partial values.
                 .partial_number, .partial_string => |slice| {
                     @memmove(buffer[capacity .. capacity + slice.len], slice);

@@ -37,6 +37,11 @@ fn handleWindowResize(_: i32) callconv(.c) void {
     }
 }
 
+pub const FileWrapper = union(enum) {
+    writer: std.fs.File.Writer,
+    reader: std.fs.File.Reader,
+};
+
 pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
     return struct {
         const Self = @This();
@@ -104,7 +109,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                     .drawSprite = drawSprite,
                     .openFile = openFile,
                     .closeFile = closeFile,
-                    .readFromFile = readFromFile,
+                    .readFile = readFile,
                     .writeToFile = writeToFile,
                     .isFileExists = isFileExists,
                     .deleteFileIfExists = deleteFileIfExists,
@@ -258,31 +263,42 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             self.buffer.setSymbol(symbol, position_on_display.row, position_on_display.col, mode);
         }
 
-        fn openFile(ptr: *anyopaque, file_path: []const u8, mode: g.Runtime.FileMode) anyerror!*anyopaque {
+        fn openFile(ptr: *anyopaque, file_path: []const u8, mode: g.Runtime.FileMode, buffer: []u8) anyerror!*anyopaque {
             const self: *Self = @ptrCast(@alignCast(ptr));
-            const file = try self.alloc.create(std.fs.File);
-            switch (mode) {
-                .read => file.* = try self.saves_dir.openFile(file_path, .{ .mode = std.fs.File.OpenMode.read_only }),
-                .write => file.* = try self.saves_dir.createFile(file_path, .{}),
+            const file_wrapper = try self.alloc.create(FileWrapper);
+            file_wrapper.* = switch (mode) {
+                .read => .{
+                    .reader = (try self.saves_dir.openFile(file_path, .{ .mode = std.fs.File.OpenMode.read_only })).reader(buffer),
+                },
+                .write => .{
+                    .writer = (try self.saves_dir.createFile(file_path, .{})).writer(buffer),
+                },
+            };
+            return file_wrapper;
+        }
+
+        fn closeFile(ptr: *anyopaque, file: *anyopaque) void {
+            const self: *Self = @ptrCast(@alignCast(ptr));
+            const file_wrapper: *FileWrapper = @ptrCast(@alignCast(file));
+            if (file_wrapper.* == .writer)
+                file_wrapper.writer.interface.flush() catch |err| {
+                    std.debug.panic("Error on flushing file {any}: {any}", .{ file, err });
+                };
+            switch (file_wrapper.*) {
+                .reader => file_wrapper.reader.file.close(),
+                .writer => file_wrapper.writer.file.close(),
             }
-            return file;
+            self.alloc.destroy(file_wrapper);
         }
 
-        fn closeFile(ptr: *anyopaque, file_ptr: *anyopaque) void {
-            const self: *Self = @ptrCast(@alignCast(ptr));
-            const file: *std.fs.File = @ptrCast(@alignCast(file_ptr));
-            file.close();
-            self.alloc.destroy(file);
+        fn readFile(_: *anyopaque, file_ptr: *anyopaque) *std.io.Reader {
+            const file: *FileWrapper = @ptrCast(@alignCast(file_ptr));
+            return &file.reader.interface;
         }
 
-        fn readFromFile(_: *anyopaque, file_ptr: *anyopaque, buffer: []u8) anyerror!usize {
-            const file: *std.fs.File = @ptrCast(@alignCast(file_ptr));
-            return try file.read(buffer);
-        }
-
-        fn writeToFile(_: *anyopaque, file_ptr: *anyopaque, bytes: []const u8) anyerror!usize {
-            const file: *std.fs.File = @ptrCast(@alignCast(file_ptr));
-            return try file.write(bytes);
+        fn writeToFile(_: *anyopaque, file_ptr: *anyopaque) *std.io.Writer {
+            const file: *FileWrapper = @ptrCast(@alignCast(file_ptr));
+            return &file.writer.interface;
         }
 
         fn isFileExists(ptr: *anyopaque, file_path: []const u8) !bool {

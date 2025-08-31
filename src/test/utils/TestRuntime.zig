@@ -9,7 +9,7 @@ const Menu = terminal.TtyRuntime.Menu;
 const Self = @This();
 
 alloc: std.mem.Allocator,
-working_dir: std.fs.Dir,
+test_dir: std.fs.Dir,
 menu: Menu(g.DISPLAY_ROWS, g.DISPLAY_COLS),
 display: Frame = .empty,
 last_frame: Frame = .empty,
@@ -21,7 +21,7 @@ cheat: ?g.Cheat = null,
 pub fn init(alloc: std.mem.Allocator, working_dir: std.fs.Dir) !Self {
     return .{
         .alloc = alloc,
-        .working_dir = working_dir,
+        .test_dir = working_dir,
         .menu = try Menu(g.DISPLAY_ROWS, g.DISPLAY_COLS).init(alloc),
     };
 }
@@ -45,7 +45,7 @@ pub fn runtime(self: *Self) g.Runtime {
             .drawSprite = drawSprite,
             .openFile = openFile,
             .closeFile = closeFile,
-            .readFromFile = readFromFile,
+            .readFile = readFile,
             .writeToFile = writeToFile,
             .isFileExists = isFileExists,
             .deleteFileIfExists = deleteFileIfExists,
@@ -99,14 +99,18 @@ fn drawSprite(ptr: *anyopaque, codepoint: u21, position_on_display: p.Point, mod
     self.last_frame.sprites[i][j] = .{ .codepoint = codepoint, .mode = mode };
 }
 
-fn openFile(ptr: *anyopaque, file_path: []const u8, mode: g.Runtime.FileMode) anyerror!*anyopaque {
+fn openFile(ptr: *anyopaque, file_path: []const u8, mode: g.Runtime.FileMode, buffer: []u8) anyerror!*anyopaque {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    const file = try self.alloc.create(std.fs.File);
-    switch (mode) {
-        .read => file.* = try self.working_dir.openFile(file_path, .{ .mode = std.fs.File.OpenMode.read_only }),
-        .write => file.* = try self.working_dir.createFile(file_path, .{}),
-    }
-    return file;
+    const file_wrapper = try self.alloc.create(terminal.TtyRuntime.FileWrapper);
+    file_wrapper.* = switch (mode) {
+        .read => .{
+            .reader = (try self.test_dir.openFile(file_path, .{ .mode = std.fs.File.OpenMode.read_only })).reader(buffer),
+        },
+        .write => .{
+            .writer = (try self.test_dir.createFile(file_path, .{})).writer(buffer),
+        },
+    };
+    return file_wrapper;
 }
 
 fn closeFile(ptr: *anyopaque, file_ptr: *anyopaque) void {
@@ -116,19 +120,19 @@ fn closeFile(ptr: *anyopaque, file_ptr: *anyopaque) void {
     self.alloc.destroy(file);
 }
 
-fn readFromFile(_: *anyopaque, file_ptr: *anyopaque, buffer: []u8) anyerror!usize {
-    const file: *std.fs.File = @ptrCast(@alignCast(file_ptr));
-    return try file.read(buffer);
+fn readFile(_: *anyopaque, file_ptr: *anyopaque) *std.io.Reader {
+    const file: *terminal.TtyRuntime.FileWrapper = @ptrCast(@alignCast(file_ptr));
+    return &file.reader.interface;
 }
 
-fn writeToFile(_: *anyopaque, file_ptr: *anyopaque, bytes: []const u8) anyerror!usize {
-    const file: *std.fs.File = @ptrCast(@alignCast(file_ptr));
-    return try file.write(bytes);
+fn writeToFile(_: *anyopaque, file_ptr: *anyopaque) *std.io.Writer {
+    const file: *terminal.TtyRuntime.FileWrapper = @ptrCast(@alignCast(file_ptr));
+    return &file.writer.interface;
 }
 
 fn isFileExists(ptr: *anyopaque, file_path: []const u8) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    if (self.working_dir.access(file_path, .{})) |_| {
+    if (self.test_dir.access(file_path, .{})) |_| {
         return true;
     } else |err| switch (err) {
         error.FileNotFound => return false,
@@ -138,7 +142,7 @@ fn isFileExists(ptr: *anyopaque, file_path: []const u8) !bool {
 
 fn deleteFileIfExists(ptr: *anyopaque, file_path: []const u8) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    self.working_dir.deleteFile(file_path) catch |err| {
+    self.test_dir.deleteFile(file_path) catch |err| {
         switch (err) {
             error.FileNotFound => {},
             else => return err,

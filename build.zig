@@ -123,7 +123,7 @@ pub fn build(b: *std.Build) !void {
     const playdate_em_module = b.createModule(.{
         .root_source_file = b.path("src/playdate/main.zig"),
         .target = b.graph.host,
-        .optimize = .ReleaseFast,
+        .optimize = optimize,
     });
 
     const lib = b.addLibrary(.{

@@ -9,7 +9,8 @@ pub const std_options = std.Options{
     .logFn = writeLog,
     .log_scope_levels = &[_]std.log.ScopeLevel{
         // .{ .scope = .default, .level = .debug },
-        // .{ .scope = .playdate_runtime, .level = .debug },
+        .{ .scope = .playdate_runtime, .level = .debug },
+        .{ .scope = .playdate_io, .level = .debug },
         // .{ .scope = .last_button, .level = .debug },
         // .{ .scope = .runtime, .level = .debug },
         // .{ .scope = .render, .level = .warn },
@@ -20,6 +21,7 @@ pub const std_options = std.Options{
         // .{ .scope = .play_mode, .level = .debug },
         // .{ .scope = .explore_mode, .level = .debug },
         // .{ .scope = .looking_around_mode, .level = .debug },
+        .{ .scope = .save_load_mode, .level = .debug },
         // .{ .scope = .level, .level = .debug },
         // .{ .scope = .cmd, .level = .debug },
         // .{ .scope = .events, .level = .debug },
@@ -33,7 +35,7 @@ fn writeLog(
     comptime format: []const u8,
     args: anytype,
 ) void {
-    var buffer = [_]u8{0} ** 128;
+    var buffer: [256]u8 = @splat(0);
     _ = std.fmt.bufPrint(&buffer, format, args) catch |err|
         std.debug.panic("Unhandled error {any} on log {s}", .{ err, format });
     playdate_log_to_console("%s (%s) %s", @tagName(lvl), @tagName(scope), (&buffer).ptr);
