@@ -270,20 +270,20 @@ test "Add/Get/Remove component" {
     var deinited: bool = false;
     const TestComponent = struct {
         const Self = @This();
-        state: std.ArrayList(u8),
+
+        state: std.ArrayListUnmanaged(u8) = .empty,
         deinited: *bool,
 
         fn init(value: u8, ptr: *bool) !Self {
             var instance: Self = .{
-                .state = try std.ArrayList(u8).initCapacity(std.testing.allocator, 1),
                 .deinited = ptr,
             };
-            try instance.state.append(value);
+            try instance.state.append(std.testing.allocator, value);
             return instance;
         }
 
         pub fn deinit(self: *Self, _: std.mem.Allocator) void {
-            self.state.deinit();
+            self.state.deinit(std.testing.allocator);
             self.deinited.* = true;
         }
     };

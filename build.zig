@@ -180,32 +180,6 @@ pub fn build(b: *std.Build) !void {
     }
 
     // ============================================================
-    //                   Dungeons generator
-    // ============================================================
-
-    // const dungeon_generator_module = b.createModule(.{
-    //     .root_source_file = b.path("src/terminal/DungeonsGenerator.zig"),
-    //     .target = target,
-    //     .optimize = optimize,
-    // });
-    // dungeon_generator_module.addImport("game", game_module);
-    //
-    // const dungeons_exe = b.addExecutable(.{
-    //     .name = "dungeons-generator",
-    //     .root_module = dungeon_generator_module,
-    //     .link_libc = true,
-    // });
-    // b.installArtifact(dungeons_exe);
-    //
-    // // Step to build and run the game in terminal
-    // const run_generator_cmd = b.addRunArtifact(dungeons_exe);
-    // if (b.args) |args| {
-    //     run_generator_cmd.addArgs(args);
-    // }
-    // const run_generator_step = b.step("generate", "Run the dungeons generator in the terminal");
-    // run_generator_step.dependOn(&run_generator_cmd.step);
-
-    // ============================================================
     //                     Tests
     // ============================================================
 

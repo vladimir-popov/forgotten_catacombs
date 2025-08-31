@@ -409,9 +409,8 @@ test "All components should be serializable" {
     };
 
     var buffer: [4048]u8 = @splat(0);
-    var buffer_writer = std.io.fixedBufferStream(&buffer);
-    const underlying_writer = buffer_writer.writer();
-    var writer = Writer(@TypeOf(underlying_writer)).init(&original_registry, underlying_writer);
+    var fixed_writer = std.io.Writer.fixed(&buffer);
+    var writer = Writer.init(&original_registry, &fixed_writer);
 
     // when:
     try writer.write(expected);
@@ -421,9 +420,8 @@ test "All components should be serializable" {
     var actual_registry = try g.Registry.init(std.testing.allocator);
     defer actual_registry.deinit();
 
-    var buffer_reader = std.io.fixedBufferStream(&buffer);
-    const underlying_reader = buffer_reader.reader();
-    var reader = Reader(@TypeOf(underlying_reader)).init(&actual_registry, underlying_reader);
+    var fixed_reader = std.io.Reader.fixed(&buffer);
+    var reader = Reader.init(&actual_registry, &fixed_reader);
 
     const actual = reader.read(c.Components) catch |err| {
         std.debug.print("Generated json:\n{s}\n", .{&buffer});
