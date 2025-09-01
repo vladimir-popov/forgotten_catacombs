@@ -79,52 +79,26 @@ pub fn build(b: *std.Build) !void {
     run_game_step.dependOn(&run_game_cmd.step);
 
     // ============================================================
-    //                  Test scenarios
-    // ============================================================
-
-    const test_scenarios_module = b.createModule(.{
-        .root_source_file = b.path("src/test/test_scenarios.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    test_scenarios_module.addImport("game", game_module);
-    test_scenarios_module.addImport("terminal", terminal_module);
-    // a library created to take part in the `check` step later
-    const test_scenarios_lib = b.addLibrary(.{
-        .name = target_name,
-        .root_module = test_scenarios_module,
-    });
-
-    // ============================================================
     //                      Playdate
     // ============================================================
 
+    const playdate_target = b.resolveTargetQuery(try std.Target.Query.parse(.{
+        .arch_os_abi = "thumb-freestanding-eabihf",
+        .cpu_features = "cortex_m7+vfp4d16sp",
+    }));
+
     const playdate_module = b.createModule(.{
         .root_source_file = b.path("src/playdate/main.zig"),
-        .target = b.resolveTargetQuery(try std.Target.Query.parse(.{
-            .arch_os_abi = "thumb-freestanding-eabihf",
-            .cpu_features = "cortex_m7+vfp4d16sp",
-        })),
+        .target = playdate_target,
         .optimize = .ReleaseFast,
         .pic = true,
+        .single_threaded = true,
     });
     playdate_module.addImport("game", game_module);
 
     const writer = b.addWriteFiles();
     const source_dir = writer.getDirectory();
     writer.step.name = "write source directory";
-
-    const lib = b.addLibrary(.{
-        .name = "pdex",
-        .root_module = playdate_module,
-    });
-    lib.root_module.addImport("game", game_module);
-    _ = writer.addCopyFile(lib.getEmittedBin(), "pdex" ++ switch (native_os_tag) {
-        .windows => ".dll",
-        .macos => ".dylib",
-        .linux => ".so",
-        else => @panic("Unsupported OS"),
-    });
 
     const elf = b.addExecutable(.{
         .name = "pdex.elf",
@@ -141,7 +115,33 @@ pub fn build(b: *std.Build) !void {
     try addCopyDirectory(writer, "assets", ".");
 
     // ------------------------------------------------------------
-    //                Step to run in emulator
+    //                Build pdex lib for emulator
+    // ------------------------------------------------------------
+
+    // TODO: build the lib for all possible host OS
+
+    const playdate_em_module = b.createModule(.{
+        .root_source_file = b.path("src/playdate/main.zig"),
+        .target = b.graph.host,
+        .optimize = .ReleaseFast,
+    });
+
+    const lib = b.addLibrary(.{
+        .name = "pdex",
+        .linkage = .dynamic,
+        .root_module = playdate_em_module,
+    });
+    lib.root_module.addImport("game", game_module);
+
+    _ = writer.addCopyFile(lib.getEmittedBin(), "pdex" ++ switch (native_os_tag) {
+        .windows => ".dll",
+        .macos => ".dylib",
+        .linux => ".so",
+        else => @panic("Unsupported OS"),
+    });
+
+    // ------------------------------------------------------------
+    //                Step to run on emulator
     // ------------------------------------------------------------
     if (std.process.hasEnvVarConstant(PLAYDATE_SDK_PATH)) {
         const playdate_sdk_path = try std.process.getEnvVarOwned(b.allocator, PLAYDATE_SDK_PATH);
@@ -182,6 +182,24 @@ pub fn build(b: *std.Build) !void {
     // ============================================================
     //                     Tests
     // ============================================================
+
+    // ------------------------------------------------------------
+    //                  Test scenarios
+    // ------------------------------------------------------------
+
+    const test_scenarios_module = b.createModule(.{
+        .root_source_file = b.path("src/test/test_scenarios.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    test_scenarios_module.addImport("game", game_module);
+    test_scenarios_module.addImport("terminal", terminal_module);
+    // a library created to take part in the `check` step later
+    const test_scenarios_lib = b.addLibrary(.{
+        .name = target_name,
+        .root_module = test_scenarios_module,
+    });
+    // ------------------------------------------------------------
 
     const test_step = b.step("test", "Run unit tests");
 
