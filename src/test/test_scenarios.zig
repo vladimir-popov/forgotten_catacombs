@@ -8,7 +8,7 @@ test {
 
 test "Hello world!" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty();
+    try test_session.initEmpty(std.testing.allocator);
     defer test_session.deinit();
 
     try test_session.tick();

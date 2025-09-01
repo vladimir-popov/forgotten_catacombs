@@ -4,7 +4,7 @@ const TestSession = @import("utils/TestSession.zig");
 
 test "Rendering initial inventory" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty();
+    try test_session.initEmpty(std.testing.allocator);
     defer test_session.deinit();
 
     _ = try test_session.openInventory();
@@ -27,7 +27,7 @@ test "Rendering initial inventory" {
 
 test "Unequip torch" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty();
+    try test_session.initEmpty(std.testing.allocator);
     defer test_session.deinit();
 
     var inventory = try test_session.openInventory();
@@ -66,7 +66,7 @@ test "Unequip torch" {
 
 test "Use torch as a weapon" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty();
+    try test_session.initEmpty(std.testing.allocator);
     defer test_session.deinit();
 
     const inventory = try test_session.openInventory();
@@ -106,17 +106,18 @@ test "Use torch as a weapon" {
 
 test "Drink healing potion" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty();
+    try test_session.initEmpty(std.testing.allocator);
     defer test_session.deinit();
 
     test_session.player.health().current = 5;
-    const inventory = try test_session.openInventory();
+    var inventory = try test_session.openInventory();
     const potion = try inventory.add(g.entities.HealingPotion);
     const options = try inventory.chooseItemById(potion);
     try options.choose("Drink");
+    try std.testing.expect(inventory.isClosed());
 
-    try std.testing.expect(!inventory.contains(potion));
     try std.testing.expect(!test_session.session.registry.contains(potion));
+    try std.testing.expect(!test_session.player.inventory().items.contains(potion));
     try std.testing.expect(test_session.player.health().current > 5);
     try std.testing.expect(test_session.session.known_potions.contains(.healing));
 }

@@ -26,6 +26,10 @@ pub fn clone(self: Self, alloc: std.mem.Allocator) !Self {
     return .{ .alloc = alloc, .underlying_map = try self.underlying_map.clone(alloc) };
 }
 
+pub fn contains(self: Self, item: g.Entity) bool {
+    return self.underlying_map.contains(item);
+}
+
 /// - `writer` - as example: `*persistance.Writer(Runtime.FileWriter.Writer)`
 pub fn save(self: Self, writer: anytype) !void {
     try writer.beginCollection();

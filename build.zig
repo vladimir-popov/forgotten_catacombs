@@ -68,7 +68,7 @@ pub fn build(b: *std.Build) !void {
         .name = target_name,
         .root_module = terminal_module,
     });
-    terminal_game_exe.linkLibC();
+    terminal_game_exe.root_module.link_libc = true;
     b.installArtifact(terminal_game_exe);
 
     const run_game_step = b.step("run", "Run the Forgotten Catacombs in the terminal");
