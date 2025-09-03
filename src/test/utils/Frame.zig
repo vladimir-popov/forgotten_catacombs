@@ -1,5 +1,9 @@
 const std = @import("std");
 const g = @import("game");
+const tty = @import("terminal").tty;
+const WriterError = std.io.Writer.Error;
+
+const log = std.log.scoped(.test_utils);
 
 const Self = @This();
 
@@ -25,7 +29,7 @@ pub fn merge(self: *Self, other: Self) void {
     }
 }
 
-pub fn format(self: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+pub fn format(self: @This(), writer: *std.io.Writer) WriterError!void {
     var buf: [4]u8 = undefined;
     for (0..g.DISPLAY_ROWS) |r| {
         for (0..g.DISPLAY_COLS) |c| {
@@ -35,7 +39,10 @@ pub fn format(self: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, w
             } else if (sprite.codepoint <= 127) {
                 try writer.writeByte(@truncate(sprite.codepoint));
             } else {
-                const len = try std.unicode.utf8Encode(sprite.codepoint, &buf);
+                const len = std.unicode.utf8Encode(sprite.codepoint, &buf) catch |err| {
+                    log.err("Error {t} on encoding utf8 {any}", .{err, sprite.codepoint});
+                    return error.WriteFailed;
+                };
                 _ = try writer.write(buf[0..len]);
             }
         }
@@ -43,60 +50,53 @@ pub fn format(self: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, w
     }
 }
 
-pub fn toTtyFromat(self: Self) TtyFormat {
-    return .{ .frame = self };
-}
-
-pub const TtyFormat = struct {
-    const tty = @import("terminal").tty;
-
-    frame: Self,
-
-    pub fn format(self: TtyFormat, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
-        var buf: [4]u8 = undefined;
-        for (0..g.DISPLAY_ROWS) |r| {
-            var mode: g.DrawingMode = .normal;
-            for (0..g.DISPLAY_COLS) |c| {
-                const sprite = self.frame.sprites[r][c];
-                if (mode != sprite.mode) {
-                    mode = sprite.mode;
-                    switch (mode) {
-                        .inverted => _ = try writer.write(tty.Text.SGR_INVERT_COLORS),
-                        else => _ = try writer.write(tty.Text.SGR_RESET),
-                    }
-                }
-                if (sprite.codepoint == 0) {
-                    _ = try writer.write("�");
-                } else if (sprite.codepoint <= 127) {
-                    try writer.writeByte(@truncate(sprite.codepoint));
-                } else {
-                    const len = try std.unicode.utf8Encode(sprite.codepoint, &buf);
-                    _ = try writer.write(buf[0..len]);
+pub fn ttyFormat(self: @This(), writer: *std.io.Writer) WriterError!void {
+    var buf: [4]u8 = undefined;
+    for (0..g.DISPLAY_ROWS) |r| {
+        var mode: g.DrawingMode = .normal;
+        for (0..g.DISPLAY_COLS) |c| {
+            const sprite = self.sprites[r][c];
+            if (mode != sprite.mode) {
+                mode = sprite.mode;
+                switch (mode) {
+                    .inverted => _ = try writer.write(tty.Text.SGR_INVERT_COLORS),
+                    else => _ = try writer.write(tty.Text.SGR_RESET),
                 }
             }
-            _ = try writer.write(tty.Text.SGR_RESET);
-            try writer.writeByte('\n');
+            if (sprite.codepoint == 0) {
+                _ = try writer.write("�");
+            } else if (sprite.codepoint <= 127) {
+                try writer.writeByte(@truncate(sprite.codepoint));
+            } else {
+                const len = std.unicode.utf8Encode(sprite.codepoint, &buf) catch |err| {
+                    log.err("Error {t} on encoding utf8 {any}", .{err, sprite.codepoint});
+                    return error.WriteFailed;
+                };
+                _ = try writer.write(buf[0..len]);
+            }
         }
+        _ = try writer.write(tty.Text.SGR_RESET);
+        try writer.writeByte('\n');
     }
-};
+}
 
-pub fn expectEqual(self: Self, other: Self) !void {
+pub fn expectEqual(self: Self, expected: Self) !void {
     var has_difference = false;
     var diff: Self = .empty;
     for (0..g.DISPLAY_ROWS) |r| {
         for (0..g.DISPLAY_COLS) |c| {
-            const expected = self.sprites[r][c];
-            const actual = other.sprites[r][c];
-            if (!std.meta.eql(expected, actual)) {
-                diff.sprites[r][c] = actual;
+            const exp = expected.sprites[r][c];
+            const act = self.sprites[r][c];
+            if (!std.meta.eql(exp, act)) {
+                diff.sprites[r][c] = act;
                 has_difference = true;
             }
         }
     }
     if (has_difference) {
-        std.debug.print("\nExpected frame:\n{any}", .{self.toTtyFromat()});
-        std.debug.print("\nActual frame:\n{any}", .{other.toTtyFromat()});
-        std.debug.print("\nDifference:\n{any}", .{diff.toTtyFromat()});
+        std.debug.print("\nExpected frame:\n{f}", .{std.fmt.alt(expected, .ttyFormat)});
+        std.debug.print("\nActual frame:\n{f}", .{std.fmt.alt(self, .ttyFormat)});
+        std.debug.print("\nDifference:\n{f}", .{std.fmt.alt(diff, .ttyFormat)});
         return error.TestExpectedEqual;
     }
 }
@@ -126,9 +126,9 @@ pub fn expectLooksLike(self: Self, str: []const u8) !void {
         c += 1;
     }
     if (has_difference) {
-        std.debug.print("\nExpected:\n{s}", .{str});
-        std.debug.print("\nActual frame:\n{any}", .{self.toTtyFromat()});
-        std.debug.print("\nDifference:\n{any}", .{diff});
+        std.debug.print("\nExpected (highlighting omitted):\n{s}", .{str});
+        std.debug.print("\nActual frame:\n{f}", .{std.fmt.alt(self, .ttyFormat)});
+        std.debug.print("\nDifference:\n{f}", .{diff});
         return error.TestExpectedEqual;
     }
 }
