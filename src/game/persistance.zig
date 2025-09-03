@@ -389,24 +389,40 @@ test "All components should be serializable" {
     try pile.items.add(.{ .id = 9 });
     defer pile.deinit();
 
+    var shop: c.Shop = try .empty(std.testing.allocator, 1.2, 42);
+    defer shop.deinit();
+
     // Random components to check serialization:
     const expected = c.Components{
         .animation = c.Animation{ .preset = .hit },
+        .consumable = .{ .calories = 12, .consumable_type = .food },
+        .damage = .{ .damage_type = .cutting, .min = 1, .max = 2 },
         .description = c.Description{ .preset = .player },
         .door = c.Door{ .state = .opened },
+        .effect = .{ .min = 1, .max = 3, .effect_type = .burning },
         .equipment = c.Equipment{ .weapon = null, .light = .{ .id = 12 } },
         .health = c.Health{ .current = 42, .max = 100 },
         .initiative = c.Initiative{ .move_points = 5 },
         .inventory = inventory,
         .ladder = c.Ladder{ .id = .{ .id = 2 }, .direction = .down, .target_ladder = .{ .id = 3 } },
         .pile = pile,
+        .price = .{ .value = 100 },
         .position = c.Position{ .place = p.Point.init(12, 42), .zorder = .item },
+        .shop = shop,
         .source_of_light = c.SourceOfLight{ .radius = 4 },
         .speed = c.Speed{ .move_points = 12 },
         .sprite = c.Sprite{ .codepoint = g.codepoints.human },
         .state = .walking,
-        .damage = .{ .damage_type = .cutting, .min = 1, .max = 2 },
+        .wallet = .{ .money = 321 },
+        .weight = .{ .value = 55 },
     };
+
+    inline for (@typeInfo(c.Components).@"struct".fields) |field| {
+        if (@field(expected, field.name) == null) {
+            log.err("A component {s} is not defined.", .{field.name});
+            return error.ComponentIsNotDefined;
+        }
+    }
 
     var buffer: [4048]u8 = @splat(0);
     var fixed_writer = std.io.Writer.fixed(&buffer);

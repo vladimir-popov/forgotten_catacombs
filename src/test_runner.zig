@@ -33,13 +33,13 @@ pub fn main() !void {
 
     // Filter tests:
     if (test_filter) |filter| {
-        std.debug.print("Run only tests contained '{s}' in the name.\n", .{filter});
+        try file_writer.interface.print("Run only tests contained \x1b[33m'{s}'\x1b[0m in the name.", .{filter});
         var arr = try arena_alloc.alloc(TestFn, builtin.test_functions.len);
         arr.len = 0;
         for (builtin.test_functions) |tst| {
             if (std.mem.containsAtLeast(u8, tst.name, 1, filter)) {
-                arr[arr.len] = tst;
                 arr.len += 1;
+                arr[arr.len - 1] = tst;
             }
         }
         tests = arr;

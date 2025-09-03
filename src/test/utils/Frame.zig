@@ -40,7 +40,7 @@ pub fn format(self: @This(), writer: *std.io.Writer) WriterError!void {
                 try writer.writeByte(@truncate(sprite.codepoint));
             } else {
                 const len = std.unicode.utf8Encode(sprite.codepoint, &buf) catch |err| {
-                    log.err("Error {t} on encoding utf8 {any}", .{err, sprite.codepoint});
+                    log.err("Error {t} on encoding utf8 {any}", .{ err, sprite.codepoint });
                     return error.WriteFailed;
                 };
                 _ = try writer.write(buf[0..len]);
@@ -69,7 +69,7 @@ pub fn ttyFormat(self: @This(), writer: *std.io.Writer) WriterError!void {
                 try writer.writeByte(@truncate(sprite.codepoint));
             } else {
                 const len = std.unicode.utf8Encode(sprite.codepoint, &buf) catch |err| {
-                    log.err("Error {t} on encoding utf8 {any}", .{err, sprite.codepoint});
+                    log.err("Error {t} on encoding utf8 {any}", .{ err, sprite.codepoint });
                     return error.WriteFailed;
                 };
                 _ = try writer.write(buf[0..len]);
