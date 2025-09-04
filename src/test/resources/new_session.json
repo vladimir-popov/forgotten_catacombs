@@ -1,0 +1,96 @@
+{
+  "seed": 0,
+  "next_entity": 16,
+  "depth": 0,
+  "max_depth": 0,
+  "player": {
+    "1": {
+      "description": {
+        "preset": "player"
+      },
+      "equipment": {
+        "weapon": {
+          "id": 2
+        },
+        "light": {
+          "id": 3
+        }
+      },
+      "health": {
+        "max": 30,
+        "current": 30
+      },
+      "inventory": {
+        "items": [
+          {
+            "2": {
+              "damage": {
+                "damage_type": "cutting",
+                "min": 3,
+                "max": 5
+              },
+              "description": {
+                "preset": "pickaxe"
+              },
+              "price": {
+                "value": 15
+              },
+              "sprite": {
+                "codepoint": 92
+              },
+              "weight": {
+                "value": 100
+              }
+            }
+          },
+          {
+            "3": {
+              "damage": {
+                "damage_type": "blunt",
+                "min": 2,
+                "max": 3
+              },
+              "description": {
+                "preset": "torch"
+              },
+              "effect": {
+                "effect_type": "burning",
+                "min": 1,
+                "max": 1
+              },
+              "price": {
+                "value": 5
+              },
+              "source_of_light": {
+                "radius": 5
+              },
+              "sprite": {
+                "codepoint": 161
+              },
+              "weight": {
+                "value": 20
+              }
+            }
+          }
+        ]
+      },
+      "position": {
+        "place": {
+          "row": 9,
+          "col": 31
+        },
+        "zorder": "obstacle"
+      },
+      "speed": {
+        "move_points": 10
+      },
+      "sprite": {
+        "codepoint": 64
+      },
+      "wallet": {
+        "money": 200
+      }
+    }
+  }
+}
+

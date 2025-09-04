@@ -78,12 +78,12 @@ mode: Mode,
 ///
 pub fn preInit(
     self: *GameSession,
-    gpa: std.mem.Allocator,
+    game_arena_allocator: std.mem.Allocator,
     runtime: g.Runtime,
     render: g.Render,
 ) !void {
     self.* = .{
-        .arena = std.heap.ArenaAllocator.init(gpa),
+        .arena = std.heap.ArenaAllocator.init(game_arena_allocator),
         .runtime = runtime,
         .render = render,
         .viewport = g.Viewport.init(render.scene_rows, render.scene_cols),
@@ -164,27 +164,28 @@ pub fn setSeed(self: *GameSession, seed: u64) void {
     self.prng.seed(seed);
 }
 
-fn play(self: *GameSession) !void {
+fn switchModeToPlay(self: *GameSession) !void {
     self.mode.deinit();
     self.mode = .{ .play = undefined };
     try self.render.redrawFromSceneBuffer();
     try self.mode.play.init(self.arena.allocator(), self);
 }
 
-pub fn load(self: *GameSession) !void {
+pub fn switchModeToLoadingSession(self: *GameSession) !void {
     log.debug("Start loading a game session", .{});
     self.mode = .{ .save_load = SaveLoadMode.loadSession(self) };
 }
 
-/// Runs the process of saving the current game session,
-/// that should be finished with GoToMainMenu error on `tick()`
-pub fn save(self: *GameSession) void {
+/// Changes the mode to the SaveLoadMode.
+/// The next process after saving the session will be `.go_to_welcome_screen`.
+/// That means that the `error.GoToMainMenu` will be returned on next tick.
+pub fn switchModeToSavingSession(self: *GameSession) void {
     self.mode.deinit();
     self.mode = .{ .save_load = SaveLoadMode.saveSession(self) };
 }
 
-/// Changes the mode to `play` to continue the game. Receives continuations: arguments to recover
-/// the previous state of the `PlayMode`.
+/// Produces an event to change the mode to `PlayMode`.
+/// Receives continuations: arguments to recover the previous state of the `PlayMode`.
 ///  - `entity_in_focus` - an entity that should be targeted in focus; This is either previous
 ///    target, or a new target from the `LookingAround` mode.
 ///  - `action` - an action to perform; Usually is action initiated during manage the inventory.
@@ -233,7 +234,7 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
     switch (event) {
         .mode_changed => |new_mode| switch (new_mode) {
             .to_play => |args| {
-                try self.play();
+                try self.switchModeToPlay();
                 if (args.entity_in_focus) |target_entity| {
                     try self.mode.play.updateQuickActions(target_entity, null);
                 }
@@ -285,7 +286,7 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
 pub fn playerMovedToLevel(self: *GameSession) !void {
     self.max_depth = @max(self.max_depth, self.level.depth);
     self.viewport.centeredAround(self.level.playerPosition().place);
-    try self.play();
+    try self.switchModeToPlay();
     const event = g.events.Event{
         .entity_moved = .{
             .entity = self.player,

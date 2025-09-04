@@ -202,6 +202,7 @@ pub fn build(b: *std.Build) !void {
     // ------------------------------------------------------------
 
     const test_step = b.step("test", "Run unit tests");
+    test_step.dependOn(&terminal_game_exe.step);
 
     const test_filter = b.option(
         []const []const u8,
@@ -230,6 +231,7 @@ pub fn build(b: *std.Build) !void {
         b.installArtifact(tests);
 
         const tests_exe = b.addRunArtifact(tests);
+        tests_exe.has_side_effects = true;
         test_step.dependOn(&tests_exe.step);
         if (b.args) |args| {
             tests_exe.addArgs(args);

@@ -10,7 +10,7 @@ const u = g.utils;
 
 const log = std.log.scoped(.persistence);
 
-pub const PATH_TO_SESSION_FILE = "session.json";
+pub const SESSION_FILE_NAME = "session.json";
 
 pub fn pathToLevelFile(buf: []u8, depth: u8) ![]const u8 {
     return try std.fmt.bufPrint(buf, "level_{d}.json", .{depth});

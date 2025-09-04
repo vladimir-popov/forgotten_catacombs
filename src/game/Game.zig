@@ -141,7 +141,7 @@ fn continueGame(ptr: *anyopaque, _: usize, _: void) !void {
         self.runtime,
         self.render,
     );
-    try self.state.game_session.load();
+    try self.state.game_session.switchModeToLoadingSession();
 }
 
 fn showAbout(_: *anyopaque, _: usize, _: void) !void {}
@@ -155,7 +155,7 @@ fn goToMainMenu(ptr: ?*anyopaque) callconv(.c) void {
     if (ptr == null) return;
     const self: *Self = @ptrCast(@alignCast(ptr.?));
     std.debug.assert(self.state == .game_session);
-    self.state.game_session.save();
+    self.state.game_session.switchModeToSavingSession();
 }
 
 fn openInventory(ptr: ?*anyopaque) callconv(.c) void {
@@ -167,12 +167,12 @@ fn openInventory(ptr: ?*anyopaque) callconv(.c) void {
 
 /// Checks that save file for a session exists.
 fn isSessionFileExists(self: Self) !bool {
-    return self.runtime.isFileExists(g.persistance.PATH_TO_SESSION_FILE);
+    return self.runtime.isFileExists(g.persistance.SESSION_FILE_NAME);
 }
 
 /// Remove the save file with a game session if exists.
 fn deleteSessionFileIfExists(self: Self) !void {
-    try self.runtime.deleteFileIfExists(g.persistance.PATH_TO_SESSION_FILE);
+    try self.runtime.deleteFileIfExists(g.persistance.SESSION_FILE_NAME);
 }
 
 fn drawWelcomeScreen(self: Self) !void {

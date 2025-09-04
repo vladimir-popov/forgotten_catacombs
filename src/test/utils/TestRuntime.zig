@@ -113,11 +113,18 @@ fn openFile(ptr: *anyopaque, file_path: []const u8, mode: g.Runtime.FileMode, bu
     return file_wrapper;
 }
 
-fn closeFile(ptr: *anyopaque, file_ptr: *anyopaque) void {
+fn closeFile(ptr: *anyopaque, file: *anyopaque) void {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    const file: *std.fs.File = @ptrCast(@alignCast(file_ptr));
-    file.close();
-    self.alloc.destroy(file);
+    const file_wrapper: *terminal.TtyRuntime.FileWrapper = @ptrCast(@alignCast(file));
+    if (file_wrapper.* == .writer)
+        file_wrapper.writer.interface.flush() catch |err| {
+            std.debug.panic("Error on flushing file {any}: {any}", .{ file, err });
+        };
+    switch (file_wrapper.*) {
+        .reader => file_wrapper.reader.file.close(),
+        .writer => file_wrapper.writer.file.close(),
+    }
+    self.alloc.destroy(file_wrapper);
 }
 
 fn readFile(_: *anyopaque, file_ptr: *anyopaque) *std.io.Reader {

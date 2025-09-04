@@ -23,6 +23,22 @@ pub fn initEmpty(self: *Self, gpa: std.mem.Allocator) !void {
     try self.render.init(arena_alloc, self.runtime.runtime(), g.DISPLAY_ROWS, g.DISPLAY_COLS);
     try self.session.initNew(arena_alloc, 0, self.runtime.runtime(), self.render);
     self.player = .{ .test_session = self, .player = self.session.player };
+    // because for optimization purpose we draw the horizontal line right in init method of the PlayMode
+    self.runtime.display.merge(self.runtime.last_frame);
+}
+
+pub fn load(self: *Self, gpa: std.mem.Allocator, working_dir: std.testing.TmpDir) !void {
+    self.tmp_dir = working_dir;
+    self.arena = std.heap.ArenaAllocator.init(gpa);
+    const arena_alloc = self.arena.allocator();
+    self.runtime = try TestRuntime.init(arena_alloc, self.tmp_dir.dir);
+    try self.render.init(arena_alloc, self.runtime.runtime(), g.DISPLAY_ROWS, g.DISPLAY_COLS);
+    try self.session.preInit(
+        arena_alloc,
+        self.runtime.runtime(),
+        self.render,
+    );
+    try self.session.switchModeToLoadingSession();
 }
 
 pub fn deinit(self: *Self) void {
@@ -30,7 +46,10 @@ pub fn deinit(self: *Self) void {
     self.arena.deinit();
 }
 
+/// Creates a new empty last_frame buffer, runs the `session.tick()` method
+/// and merges the last_frame into the display buffer.
 pub fn tick(self: *Self) !void {
+    self.runtime.last_frame = .empty;
     try self.session.tick();
     self.runtime.display.merge(self.runtime.last_frame);
 }

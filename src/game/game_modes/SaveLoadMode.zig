@@ -41,14 +41,6 @@ const Self = @This();
 
 process: Process,
 
-pub fn deinit(self: *Self) void {
-    switch (self.process) {
-        .saving => self.process.saving.deinit(),
-        .loading => self.process.loading.deinit(),
-        .generating => {},
-    }
-}
-
 // the session should be preinited
 pub fn loadSession(session: *g.GameSession) Self {
     return .{ .process = .{ .loading = Loading.loadSession(session) } };
@@ -82,6 +74,14 @@ pub fn loadOrGenerateLevel(session: *g.GameSession, from_ladder: c.Ladder) !Self
         .{ .load_level = .{ .depth = new_depth, .direction = from_ladder.direction } };
 
     return .{ .process = .{ .saving = .{ .session = session, .next_process = next } } };
+}
+
+pub fn deinit(self: *Self) void {
+    switch (self.process) {
+        .saving => self.process.saving.deinit(),
+        .loading => self.process.loading.deinit(),
+        .generating => {},
+    }
 }
 
 pub fn tick(self: *Self) !void {
@@ -191,16 +191,16 @@ const Generating = struct {
             try self.session.render.drawTextWithAlign(
                 10,
                 "Generating",
-                .{ .row = g.DISPLAY_ROWS / 2 - 1, .col = g.DISPLAY_COLS / 2 - 7 },
+                .{ .row = g.DISPLAY_ROWS / 2, .col = g.DISPLAY_COLS / 2 - 7 },
                 .normal,
                 .left,
             );
         }
         var buf: [5]u8 = undefined;
         try self.session.render.drawTextWithAlign(
-            buf.len,
+            5,
             try std.fmt.bufPrint(&buf, " {d:3}%", .{self.progress()}),
-            .{ .row = g.DISPLAY_ROWS / 2 - 1, .col = g.DISPLAY_COLS / 2 + 3 },
+            .{ .row = g.DISPLAY_ROWS / 2, .col = g.DISPLAY_COLS / 2 + 3 },
             .normal,
             .left,
         );
@@ -258,7 +258,7 @@ const Loading = struct {
         switch (self.progress) {
             .load_session => {
                 self.file = try self.session.runtime.openFile(
-                    g.persistance.PATH_TO_SESSION_FILE,
+                    g.persistance.SESSION_FILE_NAME,
                     .read,
                     &self.io_buffer,
                 );
@@ -373,21 +373,21 @@ const Loading = struct {
         //       |
         // Loadin|g XXX%
         //       |
-        if (self.progress == .load_session or self.progress == .session_loaded) {
+        if (self.progress == .load_session) {
             try self.session.render.clearDisplay();
             try self.session.render.drawTextWithAlign(
-                7,
-                "Loading",
-                .{ .row = g.DISPLAY_ROWS / 2 - 1, .col = g.DISPLAY_COLS / 2 - 6 },
+                12,
+                "Loading   0%",
+                .{ .row = g.DISPLAY_ROWS / 2, .col = g.DISPLAY_COLS / 2 - 6 },
                 .normal,
                 .left,
             );
         } else {
             var buf: [5]u8 = undefined;
             try self.session.render.drawTextWithAlign(
-                buf.len,
+                5,
                 try std.fmt.bufPrint(&buf, " {d:3}%", .{@intFromEnum(self.progress)}),
-                .{ .row = g.DISPLAY_ROWS / 2 - 1, .col = g.DISPLAY_COLS / 2 + 1 },
+                .{ .row = g.DISPLAY_ROWS / 2, .col = g.DISPLAY_COLS / 2 + 1 },
                 .normal,
                 .left,
             );
@@ -434,7 +434,7 @@ const Saving = struct {
         switch (self.progress) {
             .inited => {
                 self.file = try self.session.runtime.openFile(
-                    g.persistance.PATH_TO_SESSION_FILE,
+                    g.persistance.SESSION_FILE_NAME,
                     .write,
                     &self.io_buffer,
                 );
@@ -531,18 +531,18 @@ const Saving = struct {
         if (self.progress == .inited) {
             try self.session.render.clearDisplay();
             try self.session.render.drawTextWithAlign(
-                6,
-                "Saving",
-                .{ .row = g.DISPLAY_ROWS / 2 - 1, .col = g.DISPLAY_COLS / 2 - 6 },
+                11,
+                "Saving   0%",
+                .{ .row = g.DISPLAY_ROWS / 2, .col = g.DISPLAY_COLS / 2 - 6 },
                 .normal,
                 .left,
             );
         } else {
             var buf: [5]u8 = undefined;
             try self.session.render.drawTextWithAlign(
-                buf.len,
+                5,
                 try std.fmt.bufPrint(&buf, " {d:3}%", .{@intFromEnum(self.progress)}),
-                .{ .row = g.DISPLAY_ROWS / 2 - 1, .col = g.DISPLAY_COLS / 2 },
+                .{ .row = g.DISPLAY_ROWS / 2, .col = g.DISPLAY_COLS / 2 },
                 .normal,
                 .left,
             );

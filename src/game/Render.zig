@@ -372,6 +372,9 @@ pub fn setBorderWithArrow(self: Render, viewport: g.Viewport, side: p.Direction)
 /// Draws the passed text as utf8 encoded. Fills padding by the ' ' symbol to align the text
 /// inside a zone with `zone_codepoints_max_count` width. If the text has more symbols, all extra
 /// symbols will be cropped.
+///
+/// This method uses the `runtime.drawSprite()` to draw the text directly on the display avoiding
+/// the scene buffer.
 pub fn drawTextWithAlign(
     self: Render,
     zone_codepoints_max_count: usize,

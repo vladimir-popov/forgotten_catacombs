@@ -3,6 +3,7 @@ const Frame = @import("utils/Frame.zig");
 const TestSession = @import("utils/TestSession.zig");
 
 test {
+    _ = @import("SaveLoadSuite.zig");
     _ = @import("InventorySuite.zig");
 }
 

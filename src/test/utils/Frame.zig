@@ -30,23 +30,27 @@ pub fn merge(self: *Self, other: Self) void {
 }
 
 pub fn format(self: @This(), writer: *std.io.Writer) WriterError!void {
-    var buf: [4]u8 = undefined;
     for (0..g.DISPLAY_ROWS) |r| {
-        for (0..g.DISPLAY_COLS) |c| {
-            const sprite = self.sprites[r][c];
-            if (sprite.codepoint == 0) {
-                _ = try writer.writeByte(' ');
-            } else if (sprite.codepoint <= 127) {
-                try writer.writeByte(@truncate(sprite.codepoint));
-            } else {
-                const len = std.unicode.utf8Encode(sprite.codepoint, &buf) catch |err| {
-                    log.err("Error {t} on encoding utf8 {any}", .{ err, sprite.codepoint });
-                    return error.WriteFailed;
-                };
-                _ = try writer.write(buf[0..len]);
-            }
-        }
+        try self.formatRow(writer, r);
         try writer.writeByte('\n');
+    }
+}
+
+pub fn formatRow(self: @This(), writer: *std.io.Writer, row_idx: usize) WriterError!void {
+    var buf: [4]u8 = undefined;
+    for (0..g.DISPLAY_COLS) |c| {
+        const sprite = self.sprites[row_idx][c];
+        if (sprite.codepoint == 0) {
+            _ = try writer.writeByte(' ');
+        } else if (sprite.codepoint <= 127) {
+            try writer.writeByte(@truncate(sprite.codepoint));
+        } else {
+            const len = std.unicode.utf8Encode(sprite.codepoint, &buf) catch |err| {
+                log.err("Error {t} on encoding utf8 {any}", .{ err, sprite.codepoint });
+                return error.WriteFailed;
+            };
+            _ = try writer.write(buf[0..len]);
+        }
     }
 }
 
@@ -110,6 +114,15 @@ pub fn expectLooksLike(self: Self, str: []const u8) !void {
     var c: usize = 0;
     while (itr.nextCodepoint()) |symbol| {
         if (symbol == '\n') {
+            if (c < self.sprites[r].len) {
+                for (c..self.sprites[r].len) |c0| {
+                    const codepoint = self.sprites[r][c0].codepoint;
+                    if (codepoint > 0 and codepoint != ' ') {
+                        diff.sprites[r][c0].codepoint = if (codepoint == ' ') '¶' else codepoint;
+                        has_difference = true;
+                    }
+                }
+            }
             r += 1;
             c = 0;
             continue;
@@ -120,7 +133,7 @@ pub fn expectLooksLike(self: Self, str: []const u8) !void {
             continue;
         }
         if (codepoint != symbol) {
-            diff.sprites[r][c].codepoint = symbol;
+            diff.sprites[r][c].codepoint = if (codepoint == ' ') '¶' else codepoint;
             has_difference = true;
         }
         c += 1;
@@ -128,7 +141,52 @@ pub fn expectLooksLike(self: Self, str: []const u8) !void {
     if (has_difference) {
         std.debug.print("\nExpected (highlighting omitted):\n{s}", .{str});
         std.debug.print("\nActual frame:\n{f}", .{std.fmt.alt(self, .ttyFormat)});
-        std.debug.print("\nDifference:\n{f}", .{diff});
+        std.debug.print("\nDifference (from actual frame):\n{f}", .{diff});
+        return error.TestExpectedEqual;
+    }
+}
+
+pub fn expectRowLooksLike(self: Self, row_idx: usize, expected_row: []const u8) !void {
+    var has_difference = false;
+    var diff: Self = .empty;
+    const symbols = try std.unicode.Utf8View.init(expected_row);
+    var itr = symbols.iterator();
+    var c: usize = 0;
+    while (itr.nextCodepoint()) |symbol| {
+        if (symbol == '\n') {
+            if (c < self.sprites[row_idx].len) {
+                for (c..self.sprites[row_idx].len) |c0| {
+                    const codepoint = self.sprites[row_idx][c0].codepoint;
+                    if (codepoint > 0 and codepoint != ' ') {
+                        diff.sprites[row_idx][c0].codepoint = if (codepoint == ' ') '¶' else codepoint;
+                        has_difference = true;
+                    }
+                }
+            }
+            std.debug.assert(itr.nextCodepoint() == null);
+            break;
+        }
+        const codepoint = self.sprites[row_idx][c].codepoint;
+        if (symbol == ' ' and codepoint == 0) {
+            c += 1;
+            continue;
+        }
+        if (codepoint != symbol) {
+            diff.sprites[row_idx][c].codepoint = if (codepoint == ' ') '¶' else codepoint;
+            has_difference = true;
+        }
+        c += 1;
+    }
+    if (has_difference) {
+        std.debug.print("\nExpected row (highlighting omitted):\n{s}", .{expected_row});
+        var buffer: [64]u8 = undefined;
+        const bw = std.debug.lockStderrWriter(&buffer);
+        defer std.debug.unlockStderrWriter();
+        try bw.writeAll("\nActual row:\n");
+        try self.formatRow(bw, row_idx);
+        try bw.writeAll("\nDifference (from actual frame):\n");
+        try diff.formatRow(bw, row_idx);
+        try bw.writeByte('\n');
         return error.TestExpectedEqual;
     }
 }

@@ -86,7 +86,10 @@ pub fn drawSprite(self: Runtime, codepoint: u21, position_on_display: p.Point, m
 }
 
 pub fn openFile(self: Runtime, file_path: []const u8, mode: FileMode, buffer: []u8) anyerror!OpaqueFile {
-    return try self.vtable.openFile(self.context, file_path, mode, buffer);
+    return self.vtable.openFile(self.context, file_path, mode, buffer) catch |err| {
+        log.err("Error {t} on opening to {t} file {s}", .{ err, mode, file_path });
+        return err;
+    };
 }
 
 pub fn closeFile(self: Runtime, file: OpaqueFile) void {
