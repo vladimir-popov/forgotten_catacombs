@@ -33,7 +33,6 @@ pub fn main() !void {
 
     // Filter tests:
     if (test_filter) |filter| {
-        try file_writer.interface.print("Run only tests contained \x1b[33m'{s}'\x1b[0m in the name.", .{filter});
         var arr = try arena_alloc.alloc(TestFn, builtin.test_functions.len);
         arr.len = 0;
         for (builtin.test_functions) |tst| {
@@ -43,6 +42,14 @@ pub fn main() !void {
             }
         }
         tests = arr;
+        if (tests.len == 0) {
+            std.debug.print("\x1b[30mNo one test was found in {s}\x1b[0m\n", .{process_name});
+        } else {
+            std.debug.print(
+                "Run tests from {s} contained \x1b[33m'{s}'\x1b[0m in the name\n",
+                .{ process_name, filter },
+            );
+        }
     }
 
     if (try runAllTets(&arena, process_name, tests)) |report| {

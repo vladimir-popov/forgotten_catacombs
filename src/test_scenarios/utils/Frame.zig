@@ -119,6 +119,7 @@ pub fn expectLooksLike(self: Self, str: []const u8) !void {
                     const codepoint = self.sprites[r][c0].codepoint;
                     if (codepoint > 0 and codepoint != ' ') {
                         diff.sprites[r][c0].codepoint = if (codepoint == ' ') '¶' else codepoint;
+                        log.err("Sprite after end of the string {any}", .{self.sprites[r][c0]});
                         has_difference = true;
                     }
                 }
@@ -128,12 +129,9 @@ pub fn expectLooksLike(self: Self, str: []const u8) !void {
             continue;
         }
         const codepoint = self.sprites[r][c].codepoint;
-        if (symbol == ' ' and codepoint == 0) {
-            c += 1;
-            continue;
-        }
-        if (codepoint != symbol) {
+        if (!isEqual(codepoint, symbol)) {
             diff.sprites[r][c].codepoint = if (codepoint == ' ') '¶' else codepoint;
+            log.err("Sprite {any} != '{u}'", .{ self.sprites[r][c], symbol });
             has_difference = true;
         }
         c += 1;
@@ -144,6 +142,20 @@ pub fn expectLooksLike(self: Self, str: []const u8) !void {
         std.debug.print("\nDifference (from actual frame):\n{f}", .{diff});
         return error.TestExpectedEqual;
     }
+}
+fn isEqual(codepoint: u21, expected_symbol: u21) bool {
+    // special cases for blank symbol
+    if (codepoint == 0) {
+        return isBlank(expected_symbol);
+    }
+    return codepoint == expected_symbol;
+}
+
+fn isBlank(codepoint: u21) bool {
+    return switch (codepoint) {
+        0, ' ', '�' => true,
+        else => false,
+    };
 }
 
 pub fn expectRowLooksLike(self: Self, row_idx: usize, expected_row: []const u8) !void {

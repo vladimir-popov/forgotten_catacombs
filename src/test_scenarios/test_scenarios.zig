@@ -3,8 +3,9 @@ const Frame = @import("utils/Frame.zig");
 const TestSession = @import("utils/TestSession.zig");
 
 test {
-    _ = @import("SaveLoadSuite.zig");
-    _ = @import("InventorySuite.zig");
+    _ = @import("SaveLoadScenarios.zig");
+    _ = @import("InventoryScenarios.zig");
+    _ = @import("DescriptionScenarios.zig");
 }
 
 test "Hello world!" {

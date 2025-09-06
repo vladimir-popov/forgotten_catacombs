@@ -65,11 +65,9 @@ pub fn notification(alloc: std.mem.Allocator, message: []const u8) !ModalWindow(
 /// │ Health: 10/10                     │ |
 /// │ Speed: 10                         │ | Only in devmode
 /// │ Weight: 3                         │ |
-/// │ Weapon: Club                      │ |
-/// │   Damage: cutting 2-3             │ |
-/// │   Effects:                        │ |
-/// │      fire from 5 step 2           │ |
-/// │ Light: Torch 5 radius             │ v
+/// │ Damage: cutting 2-3               │ |
+/// │ Effect:  burning 5                │ |
+/// │ Radius of light: 5                │ v
 /// │-----------------------------------│---
 /// │ The same information, but as a    │
 /// │ text with short description.      │
@@ -122,8 +120,8 @@ pub fn entityDescription(
                         line = try text_area.addEmptyLine(alloc);
                         _ = try std.fmt.bufPrint(
                             line[3..],
-                            "Effect: {s} {d}-{d}",
-                            .{ @tagName(effect.effect_type), effect.min, effect.max },
+                            "Effect: {t} {d}-{d}",
+                            .{ effect.effect_type, effect.min, effect.max },
                         );
                     }
                 }
@@ -140,8 +138,16 @@ pub fn entityDescription(
             line = try text_area.addEmptyLine(alloc);
             _ = try std.fmt.bufPrint(
                 line[1..],
-                "Damage: {s} {d}-{d}",
-                .{ @tagName(damage.damage_type), damage.min, damage.max },
+                "Damage: {t} {d}-{d}",
+                .{ damage.damage_type, damage.min, damage.max },
+            );
+        }
+        if (session.registry.get(entity, c.Effect)) |effect| {
+            line = try text_area.addEmptyLine(alloc);
+            _ = try std.fmt.bufPrint(
+                line[1..],
+                "Effect: {t} {d}-{d}",
+                .{ effect.effect_type, effect.min, effect.max },
             );
         }
         if (session.registry.get(entity, c.SourceOfLight)) |light| {

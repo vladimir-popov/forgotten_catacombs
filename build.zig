@@ -188,7 +188,7 @@ pub fn build(b: *std.Build) !void {
     // ------------------------------------------------------------
 
     const test_scenarios_module = b.createModule(.{
-        .root_source_file = b.path("src/test/test_scenarios.zig"),
+        .root_source_file = b.path("src/test_scenarios/test_scenarios.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -216,15 +216,16 @@ pub fn build(b: *std.Build) !void {
         .mode = .simple,
     };
 
-    const modules_with_tests = [_]*std.Build.Module{
-        game_module,
-        terminal_module,
+    const modules_with_tests = [_]struct {[]const u8, *std.Build.Module}{
+        .{"game_tests", game_module},
+        .{"terminal_tests", terminal_module},
         // playdate_module, <- do not compiled with host OS as a target
-        test_scenarios_module,
+        .{"test_scenarios", test_scenarios_module},
     };
     for (modules_with_tests) |module| {
         const tests = b.addTest(.{
-            .root_module = module,
+            .name = module[0],
+            .root_module = module[1],
             .test_runner = test_runner,
             .filters = test_filter,
         });
