@@ -212,7 +212,7 @@ pub fn build(b: *std.Build) !void {
     ) orelse &[0][]const u8{};
 
     const test_runner = std.Build.Step.Compile.TestRunner{
-        .path = b.path("src/test_runner.zig"),
+        .path = b.path("src/SimpleTestRunner.zig"),
         .mode = .simple,
     };
 

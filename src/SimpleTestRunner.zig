@@ -42,36 +42,43 @@ pub fn main() !void {
             }
         }
         tests = arr;
-        if (tests.len == 0) {
-            std.debug.print("\x1b[30mNo one test was found in {s}\x1b[0m\n", .{process_name});
-        } else {
-            std.debug.print(
-                "Run tests from {s} contained \x1b[33m'{s}'\x1b[0m in the name\n",
-                .{ process_name, filter },
-            );
-        }
+        // if (tests.len == 0) {
+        //     std.debug.print("\x1b[30mNo one test was found in {s}\x1b[0m\n", .{process_name});
+        // } else {
+        //     std.debug.print(
+        //
+        //         .{ process_name, filter },
+        //     );
+        // }
     }
 
-    if (try runAllTets(&arena, process_name, tests)) |report| {
-        try writeReport(&arena, AnsiReporter{ .writer = &file_writer.interface }, report);
-        try file_writer.interface.flush();
-        if (report.failed_count != 0 or report.is_mem_leak) std.process.exit(1);
-    }
+    var report = Report{
+        .process_name = process_name,
+        .test_results = try arena.allocator().alloc(TestResult, tests.len),
+    };
+
+    const reporter = AnsiReporter{ .writer = &file_writer.interface };
+    try reporter.writeTitle(report.process_name, test_filter, tests.len);
+    try runAllTets(&arena, tests, &report);
+    try writeTestResults(&arena, reporter, report);
+    try reporter.writeSummary(
+        report.passed_count,
+        report.failed_count,
+        report.skipped_count,
+        report.total_duration,
+        report.is_mem_leak,
+    );
+    try file_writer.interface.flush();
+    if (report.failed_count != 0 or report.is_mem_leak) std.process.exit(1);
 }
 
 /// Runs passed tests and builds the report. If the reporter is passed,
 /// it's used to write the report on the fly.
 /// Returns an aggregated report of the run tests.
-fn runAllTets(arena: *std.heap.ArenaAllocator, process_name: []const u8, tests: []const TestFn) !?Report {
-    const alloc = arena.allocator();
+fn runAllTets(arena: *std.heap.ArenaAllocator, tests: []const TestFn, report: *Report) !void {
     if (tests.len == 0) {
-        return null;
+        return;
     }
-
-    var report = Report{
-        .process_name = process_name,
-        .test_results = try alloc.alloc(TestResult, tests.len),
-    };
 
     var total_timer: std.time.Timer = try std.time.Timer.start();
     var test_timer: std.time.Timer = try std.time.Timer.start();
@@ -95,11 +102,9 @@ fn runAllTets(arena: *std.heap.ArenaAllocator, process_name: []const u8, tests: 
         report.is_mem_leak = report.is_mem_leak or report.test_results[idx].isMemoryLeak();
     }
     report.total_duration = Duration.fromNanos(total_timer.lap());
-
-    return report;
 }
 
-fn writeReport(arena: *std.heap.ArenaAllocator, reporter: anytype, report: Report) !void {
+fn writeTestResults(arena: *std.heap.ArenaAllocator, reporter: anytype, report: Report) !void {
     const alloc = arena.allocator();
     var grouped_tests: std.StringHashMapUnmanaged(std.ArrayListUnmanaged(TestResult)) = .empty;
     for (report.test_results) |test_result| {
@@ -112,7 +117,6 @@ fn writeReport(arena: *std.heap.ArenaAllocator, reporter: anytype, report: Repor
         }
     }
 
-    try reporter.writeProcessName(report.process_name);
     var itr = grouped_tests.iterator();
     while (itr.next()) |group| {
         try reporter.writeNamespace(group.key_ptr.*);
@@ -121,13 +125,6 @@ fn writeReport(arena: *std.heap.ArenaAllocator, reporter: anytype, report: Repor
             try reporter.writeTestResult(test_result);
         }
     }
-    try reporter.writeSummary(
-        report.passed_count,
-        report.failed_count,
-        report.skipped_count,
-        report.total_duration,
-        report.is_mem_leak,
-    );
 }
 
 /// Meta information about a single test
@@ -142,10 +139,21 @@ const Test = struct {
 
     pub fn wrap(test_fn: TestFn) Test {
         var instance: Test = .{ .test_fn = test_fn };
-        const names = getNames(test_fn);
+        // Split a full name of a test in two parts:
+        //  1. a namespace of the test;
+        //  2. a name of the test.
+        //
+        // Possible templates of full test name are expected:
+        //  - "<namespace>.test.<test name>"
+        //  - "<namespace>.decltest.<test name>"
+        const names = if (std.mem.indexOf(u8, test_fn.name, ".test.")) |idx|
+            .{ test_fn.name[0..idx], test_fn.name[idx + 6 ..] }
+        else if (std.mem.indexOf(u8, test_fn.name, ".decltest.")) |idx|
+            .{ test_fn.name[0..idx], test_fn.name[idx + 10 ..] }
+        else
+            .{ "", test_fn.name };
         instance.namespace = names[0];
         instance.name = names[1];
-        // instance.name = test_fn.name;
         return instance;
     }
 
@@ -194,23 +202,6 @@ const Test = struct {
         return test_result;
     }
 };
-
-/// Split a full name of a test in two parts:
-///  1. a namespace of the test;
-///  2. a name of the test.
-///
-/// Possible templates of full test name are expected:
-///  - "<namespace>.test.<test name>"
-///  - "<namespace>.decltest.<test name>"
-fn getNames(test_fn: TestFn) struct { []const u8, []const u8 } {
-    if (std.mem.indexOf(u8, test_fn.name, ".test.")) |idx| {
-        return .{ test_fn.name[0..idx], test_fn.name[idx + 6 ..] };
-    } else if (std.mem.indexOf(u8, test_fn.name, ".decltest.")) |idx| {
-        return .{ test_fn.name[0..idx], test_fn.name[idx + 10 ..] };
-    } else {
-        return .{ "", test_fn.name };
-    }
-}
 
 /// Detailed information about a passed test
 const Passed = struct {
@@ -286,7 +277,6 @@ const Duration = struct {
     }
 
     pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
-        // try writer.print("{d}:{d}.{d}", .{ self.minutes, self.seconds, self.millis });
         if (self.minutes > 0) {
             try writer.print("{d}m ", .{self.minutes});
             if (self.seconds > 0)
@@ -339,6 +329,7 @@ const Duration = struct {
 const AnsiReporter = struct {
     const Color = struct {
         const default = "";
+        const black = "\x1b[30m";
         const red = "\x1b[31m";
         const green = "\x1b[32m";
         const yellow = "\x1b[33m";
@@ -346,29 +337,54 @@ const AnsiReporter = struct {
         const bold_green = "\x1b[1;32m";
         const bold_cyan = "\x1b[1;36m";
     };
+    const Colors = struct {
+        title: []const u8 = Color.bold_cyan,
+        no_tests: []const u8 = Color.black,
+        namespace: []const u8 = Color.bold_cyan,
+        test_name: []const u8 = Color.bold_cyan,
+        filter: []const u8 = Color.yellow,
+        summarize: []const u8 = Color.bold_cyan,
+        passed: []const u8 = Color.green,
+        failed: []const u8 = Color.red,
+        skipped: []const u8 = Color.yellow,
+        memory_leak: []const u8 = Color.purple,
+    };
 
     const esc = "\x1b[0m";
 
     writer: *std.io.Writer,
+    colors: Colors = .{},
 
-    pub fn writeProcessName(self: AnsiReporter, module_name: []const u8) anyerror!void {
+    pub fn writeTitle(
+        self: AnsiReporter,
+        process_name: []const u8,
+        filter: ?[]const u8,
+        tests_count: usize,
+    ) anyerror!void {
         // move to the next line and cleanup output settings:
-        const cleanup = "\r\n\x1b[0K";
-        const border = "=" ** 60;
-        try colorizeLine(self.writer, Color.bold_cyan, "{s}\n{s}\n{s}\n{s}", .{ cleanup, border, module_name, border });
+        _ = try self.writer.write("\r\n\x1b[0K");
+
+        if (tests_count == 0) {
+            try colorizeLine(self.writer, self.colors.no_tests, "No one test was found in {s}", .{process_name});
+            return;
+        }
+        if (filter) |f| {
+            try colorizeLine(self.writer, self.colors.title, "{s}", .{process_name});
+            try colorize(self.writer, self.colors.no_tests, "Only tests contain ", .{});
+            try colorize(self.writer, self.colors.filter, "'{s}'", .{f});
+            try colorizeLine(self.writer, self.colors.no_tests, " in the name are running", .{});
+        } else {
+            try colorizeLine(self.writer, self.colors.title, "{s}", .{process_name});
+        }
+        try self.writer.flush();
     }
 
     pub fn writeNamespace(self: AnsiReporter, namespace: []const u8) anyerror!void {
-        // cleanup output settings:
-        const cleanup = "\x1b[0K";
-        try colorizeLine(self.writer, Color.bold_cyan, "{s}{s}", .{
-            cleanup,
-            namespace,
-        });
+        try colorizeLine(self.writer, self.colors.namespace, "{s}", .{namespace});
     }
 
     pub fn writeTestName(self: AnsiReporter, test_name: []const u8) anyerror!void {
-        try colorize(self.writer, Color.bold_cyan, " - {s} ", .{test_name});
+        try colorize(self.writer, self.colors.test_name, " - {s} ", .{test_name});
     }
 
     pub fn writeTestResult(self: AnsiReporter, test_result: TestResult) anyerror!void {
@@ -376,7 +392,7 @@ const AnsiReporter = struct {
             .passed => |result| {
                 try colorizeLine(
                     self.writer,
-                    Color.green,
+                    self.colors.passed,
                     " PASSED in {f}",
                     .{result.duration},
                 );
@@ -384,18 +400,18 @@ const AnsiReporter = struct {
             .failed => |result| {
                 try colorizeLine(
                     self.writer,
-                    Color.red,
+                    self.colors.failed,
                     " FAILED in {f}: {s}",
                     .{ result.duration, @errorName(result.err) },
                 );
                 try self.writer.writeAll(result.stack_trace);
             },
             .skipped => {
-                try colorizeLine(self.writer, Color.yellow, " SKIPPED", .{});
+                try colorizeLine(self.writer, self.colors.skipped, " SKIPPED", .{});
             },
         }
         if (test_result.isMemoryLeak()) {
-            try colorizeLine(self.writer, Color.purple, "   MEMORY LEAK DETECTED", .{});
+            try colorizeLine(self.writer, self.colors.memory_leak, "   MEMORY LEAK DETECTED", .{});
         }
     }
 
@@ -407,28 +423,33 @@ const AnsiReporter = struct {
         total_duration: Duration,
         is_mem_leak: bool,
     ) anyerror!void {
+        if (passed + skipped + failed == 0 and !is_mem_leak)
+            return;
+
         // move to the next line and cleanup output settings:
         const border = "=" ** 60;
         try colorize(
             self.writer,
-            Color.bold_cyan,
+            self.colors.summarize,
             border ++ "\nTotal {d} tests were run in {f}: ",
             .{ passed + failed + skipped, total_duration },
         );
         if (passed > 0)
-            try colorize(self.writer, Color.green, "{d} passed; ", .{passed});
+            try colorize(self.writer, self.colors.passed, "{d} passed; ", .{passed});
         if (failed > 0)
-            try colorize(self.writer, Color.red, "{d} failed; ", .{failed});
+            try colorize(self.writer, self.colors.failed, "{d} failed; ", .{failed});
         if (skipped > 0)
-            try colorize(self.writer, Color.yellow, "{d} skipped;", .{skipped});
+            try colorize(self.writer, self.colors.skipped, "{d} skipped;", .{skipped});
         if (is_mem_leak)
-            try colorize(self.writer, Color.purple, "MEMORY LEAK", .{});
-        try colorizeLine(self.writer, Color.bold_cyan, "", .{});
+            try colorize(self.writer, self.colors.memory_leak, "MEMORY LEAK", .{});
+
+        // move to the next line and cleanup output settings:
+        _ = try self.writer.write("\r\n\x1b[0K");
     }
 
     fn colorize(
         writer: *std.io.Writer,
-        comptime color: []const u8,
+        color: []const u8,
         comptime format: []const u8,
         args: anytype,
     ) !void {
@@ -439,7 +460,7 @@ const AnsiReporter = struct {
 
     inline fn colorizeLine(
         writer: *std.io.Writer,
-        comptime color: []const u8,
+        color: []const u8,
         comptime format: []const u8,
         args: anytype,
     ) !void {
