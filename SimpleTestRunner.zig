@@ -20,15 +20,51 @@ pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(gpa.allocator());
     defer arena.deinit();
 
-    // Get a name of the process:
-    const process_name = args.next() orelse "?";
-    // Parse an optional test filter:
-    const test_filter: ?[:0]const u8 = args.next();
-    // Prepare a reporter
+    // Parse arguments and prepare a reporter
     var buffer: [2048]u8 = undefined;
-    var reporter = FileReporter.stdout(&buffer, .default);
+    const process_name = args.next() orelse "?";
+    var custom_colors: ?[:0]const u8 = null;
+    var custom_out: ?std.fs.File.Writer = null;
+    var test_filter: ?[:0]const u8 = null;
+    var failed_only: bool = false;
+    var no_colors: bool = false;
+    while (args.next()) |arg| {
+         if (std.mem.eql(u8, arg, "--no-colors")) {
+            no_colors = true;
+        } else if (std.mem.startsWith(u8, arg, "--colors=")) {
+            custom_colors = arg[9..];
+        } else if (std.mem.eql(u8, arg, "--stdout")) {
+            custom_out = std.fs.File.stdout().writer(&buffer);
+        } else if (std.mem.eql(u8, arg, "--stderr")) {
+            custom_out = std.fs.File.stderr().writer(&buffer);
+        } else if (std.mem.startsWith(u8, arg, "--file=")) {
+            const file = try std.fs.cwd().createFile(arg[7..], .{ .truncate = false });
+            custom_out = std.fs.File.writer(file, &buffer);
+        } else if (std.mem.eql(u8, arg, "--failed-only")) {
+            failed_only = true;
+        } else if (std.mem.startsWith(u8, arg, "--only=")) {
+            test_filter = arg[7..];
+        } else if (test_filter == null) {
+            test_filter = arg;
+        }
+    }
+    var diag: std.zon.parse.Diagnostics = .{};
+    const colors: FileReporter.Colors = if (custom_colors) |str|
+        std.zon.parse.fromSlice(FileReporter.Colors, arena.allocator(), str, &diag, .{ .free_on_error = false }) catch |err| {
+            std.debug.panic("Error {t} on parse colors: {f}", .{ err, diag });
+        }
+    else
+        .default;
 
-    try run(&arena, process_name, test_filter, &reporter);
+    var reporter: FileReporter = if (custom_out) |out|
+        .{ .file_writer = out, .config = std.io.tty.Config.detect(out.file), .colors = colors }
+    else
+        .stdout(&buffer, colors);
+
+    if (no_colors)
+        reporter.config = .no_color;
+
+    try run(&arena, process_name, test_filter, &reporter, failed_only);
 }
 
 pub fn run(
@@ -36,6 +72,7 @@ pub fn run(
     process_name: []const u8,
     test_filter: ?[]const u8,
     reporter: anytype,
+    failed_only: bool,
 ) !void {
     var arena_alloc = arena.allocator();
     var tests: []const TestFn = builtin.test_functions;
@@ -60,7 +97,7 @@ pub fn run(
 
     try reporter.writeTitle(report.process_name, test_filter, tests.len);
     try runAllTets(arena, tests, &report);
-    try writeTestResults(arena, reporter, report);
+    try writeTestResults(arena, reporter, report, failed_only);
     try reporter.writeSummary(
         report.passed_count,
         report.failed_count,
@@ -79,7 +116,7 @@ fn runAllTets(arena: *std.heap.ArenaAllocator, tests: []const TestFn, report: *R
     for (tests, 0..) |test_fn, idx| {
         const t = Test.wrap(test_fn);
 
-        // ***** RUN TEST ***** //
+        // Run tests:
         report.test_results[idx] = try t.run(arena, &test_timer);
 
         switch (report.test_results[idx]) {
@@ -98,10 +135,12 @@ fn runAllTets(arena: *std.heap.ArenaAllocator, tests: []const TestFn, report: *R
     report.total_duration = Duration.fromNanos(total_timer.lap());
 }
 
-fn writeTestResults(arena: *std.heap.ArenaAllocator, reporter: anytype, report: Report) !void {
+fn writeTestResults(arena: *std.heap.ArenaAllocator, reporter: anytype, report: Report, failed_only: bool) !void {
     const alloc = arena.allocator();
     var grouped_tests: std.StringHashMapUnmanaged(std.ArrayListUnmanaged(TestResult)) = .empty;
     for (report.test_results) |test_result| {
+        if (failed_only and test_result != .failed) continue;
+
         const gop = try grouped_tests.getOrPut(alloc, test_result.@"test"().namespace);
         if (gop.found_existing) {
             try gop.value_ptr.append(alloc, test_result);
@@ -125,10 +164,9 @@ fn writeTestResults(arena: *std.heap.ArenaAllocator, reporter: anytype, report: 
 const Test = struct {
     /// A name of the test
     name: []const u8 = undefined,
-    /// A name of the module, where the test is created
+    /// A full name of the namespace, where the test is created
     namespace: []const u8 = undefined,
-    /// A builtin test representation, which contains a full name of the test,
-    /// and a function with an implementation of the test.
+    /// A builtin test representation
     test_fn: TestFn,
 
     pub fn wrap(test_fn: TestFn) Test {
@@ -151,7 +189,7 @@ const Test = struct {
         return instance;
     }
 
-    /// Runs the test and builds the report.
+    /// Runs the test and builds the result. Marks a test thrown the error.SkipZigTest as skipped.
     fn run(self: Test, arena: *std.heap.ArenaAllocator, timer: *std.time.Timer) !TestResult {
         var test_result: TestResult = undefined;
         timer.reset();
@@ -197,7 +235,7 @@ const Test = struct {
     }
 };
 
-/// The report about run a single test
+/// A report about run a single test
 pub const TestResult = union(enum) {
     passed: struct { @"test": Test, duration: Duration, is_mem_leak: bool },
     failed: struct { @"test": Test, duration: Duration, err: anyerror, stack_trace: []const u8, is_mem_leak: bool },
@@ -228,8 +266,7 @@ pub const TestResult = union(enum) {
     }
 };
 
-/// The report about a tests run. Contains a name of the module with tests,
-/// results for every run test, and counts of passed, failed, and skipped tests.
+/// A report about run of all tests. 
 const Report = struct {
     process_name: []const u8,
     test_results: []TestResult,
@@ -240,6 +277,7 @@ const Report = struct {
     is_mem_leak: bool = false,
 };
 
+/// A representation of the time duration with human readable format.
 const Duration = struct {
     minutes: u6 = 0,
     seconds: u6 = 0,
@@ -303,7 +341,7 @@ const Duration = struct {
     }
 };
 
-/// Write the tests report as a colored text.
+/// Writes to a file a tests report as an optionally colored text.
 const FileReporter = struct {
     const Color = std.io.tty.Color;
 
@@ -313,7 +351,7 @@ const FileReporter = struct {
         namespace: Color = .cyan,
         test_name: Color = .cyan,
         filter: Color = .yellow,
-        summarize: Color = .cyan,
+        summary: Color = .cyan,
         passed: Color = .green,
         failed: Color = .red,
         skipped: Color = .yellow,
@@ -404,7 +442,7 @@ const FileReporter = struct {
         // move to the next line and cleanup output settings:
         const border = "=" ** 60;
         try self.colorize(
-            self.colors.summarize,
+            self.colors.summary,
             border ++ "\nTotal {d} tests were run in {f}: ",
             .{ passed + failed + skipped, total_duration },
         );
