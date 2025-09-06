@@ -212,15 +212,15 @@ pub fn build(b: *std.Build) !void {
     ) orelse &[0][]const u8{};
 
     const test_runner = std.Build.Step.Compile.TestRunner{
-        .path = b.path("src/SimpleTestRunner.zig"),
+        .path = b.path("SimpleTestRunner.zig"),
         .mode = .simple,
     };
 
-    const modules_with_tests = [_]struct {[]const u8, *std.Build.Module}{
-        .{"game_tests", game_module},
-        .{"terminal_tests", terminal_module},
+    const modules_with_tests = [_]struct { []const u8, *std.Build.Module }{
+        .{ "game_tests", game_module },
+        .{ "terminal_tests", terminal_module },
         // playdate_module, <- do not compiled with host OS as a target
-        .{"test_scenarios", test_scenarios_module},
+        .{ "test_scenarios", test_scenarios_module },
     };
     for (modules_with_tests) |module| {
         const tests = b.addTest(.{
