@@ -9,20 +9,23 @@ const log = std.log.scoped(.play_mode);
 
 const PlayMode = @This();
 
-const QuickAction = struct {
-    target: g.Entity,
-    action: g.actions.Action,
-    pub fn format(self: QuickAction, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
-        try writer.print("QuickAction: {s}; target {d}", .{ @tagName(self.action), self.target.id });
+pub const QuickActions = struct {
+    // The actions which can be applied to the entity in focus
+    actions: std.ArrayListUnmanaged(g.actions.Action) = .empty,
+    // The index of the quick action for the target entity
+    selected_idx: usize = 0,
+
+    fn reset(self: *QuickActions) void {
+        self.actions.clearRetainingCapacity();
+        self.selected_idx = 0;
     }
 };
 
 arena: std.heap.ArenaAllocator,
 session: *g.GameSession,
-// The actions which can be applied to the entity in focus
-quick_actions: std.ArrayListUnmanaged(QuickAction),
-// The index of the quick action for the target entity
-selected_action_idx: usize = 0,
+// The entity to which a quick actions can be applied
+target: ?g.Entity = null,
+quick_actions: QuickActions,
 is_player_turn: bool = true,
 quick_actions_window: ?w.ModalWindow(w.OptionsArea(void)) = null,
 
@@ -30,14 +33,16 @@ pub fn init(
     self: *PlayMode,
     alloc: std.mem.Allocator,
     session: *g.GameSession,
+    target: ?g.Entity,
 ) !void {
-    log.debug("Init PlayMode", .{});
+    log.debug("Init PlayMode. Target is {any}", .{target});
     self.* = .{
         .arena = std.heap.ArenaAllocator.init(alloc),
         .session = session,
-        .quick_actions = .empty,
+        .target = target,
+        .quick_actions = .{},
     };
-    try self.updateQuickActions(null, null);
+    try self.updateQuickActions();
     try self.session.render.drawHorizontalLine(
         '═',
         .{ .row = self.session.viewport.region.rows + 1, .col = 1 },
@@ -55,7 +60,17 @@ pub fn tick(self: *PlayMode) !void {
     if (self.is_player_turn) {
         // break this function if no input
         const action = (try self.handleInput()) orelse return;
-        try self.doTurn(self.session.player, action);
+        if (try self.doTurn(self.session.player, action)) |actual_action| {
+            switch (actual_action) {
+                .hit => |enemy| {
+                    self.setTarget(enemy);
+                },
+                .open => |door| {
+                    self.setTarget(door.id);
+                },
+                else => {},
+            }
+        }
         self.is_player_turn = false;
     } else {
         var itr = self.session.registry.query3(c.EnemyState, c.Initiative, c.Speed);
@@ -65,25 +80,30 @@ pub fn tick(self: *PlayMode) !void {
             if (speed.move_points > initiative.move_points) continue;
 
             const action = self.session.ai.action(npc);
-            try self.doTurn(npc, action);
+            _ = try self.doTurn(npc, action);
         }
         self.is_player_turn = true;
     }
+    try self.updateQuickActions();
 }
 
-pub fn doTurn(self: *PlayMode, actor: g.Entity, action: g.actions.Action) !void {
+fn setTarget(self: *PlayMode, target: g.Entity) void {
+    log.debug("Change target from {any} to {any}", .{ self.target, target });
+    self.target = target;
+    self.quick_actions.reset();
+}
+
+pub fn doTurn(self: *PlayMode, actor: g.Entity, action: g.actions.Action) !?g.actions.Action {
     log.info("The turn of the entity {d}.", .{actor.id});
     defer log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
 
     // Do Actions
-    const mp = try g.actions.doAction(self.session, actor, action);
+    const actual_action, const mp = try g.actions.doAction(self.session, actor, action);
     log.info("Entity {d} spent {d} move points", .{ actor.id, mp });
-    if (mp == 0) return;
+    if (mp == 0) return actual_action;
 
     // Handle Initiative
     if (self.is_player_turn) {
-        log.debug("Update quick actions after action '{s}'", .{@tagName(action)});
-        try self.updateQuickActions(self.target(), self.quickAction());
         var itr = self.session.registry.query(c.Initiative);
         while (itr.next()) |tuple| {
             tuple[1].move_points += mp;
@@ -96,6 +116,7 @@ pub fn doTurn(self: *PlayMode, actor: g.Entity, action: g.actions.Action) !void 
         std.debug.assert(0 < mp and mp <= initiative.move_points);
         initiative.move_points -= mp;
     }
+    return actual_action;
 }
 
 fn handleInput(self: *PlayMode) !?g.actions.Action {
@@ -115,9 +136,8 @@ fn handleInput(self: *PlayMode) !?g.actions.Action {
             switch (btn.game_button) {
                 .a => switch (btn.state) {
                     .released => return self.quickAction(),
-                    .hold => if (self.quick_actions.items.len > 0) {
-                        self.quick_actions_window =
-                            try self.windowWithQuickActions(self.quick_actions.items, self.selected_action_idx);
+                    .hold => {
+                        self.quick_actions_window = try self.windowWithQuickActions();
                         try self.quick_actions_window.?.draw(self.session.render);
                         return null;
                     },
@@ -174,7 +194,7 @@ fn draw(self: *const PlayMode) !bool {
     if (self.quick_actions_window == null) {
         const level = &self.session.level;
         try self.session.render.drawDungeon(self.session.viewport, level);
-        try self.session.render.drawSpritesToBuffer(self.session.viewport, level, self.target());
+        try self.session.render.drawSpritesToBuffer(self.session.viewport, level, self.target);
         was_blocked_animation = try self.drawAnimationsFrames();
         try self.session.render.drawChangedSymbols();
         try self.drawInfoBar();
@@ -194,7 +214,7 @@ pub fn drawAnimationsFrames(self: PlayMode) !bool {
         was_blocked_animation |= animation.is_blocked;
         if (animation.frame(now)) |frame| {
             if (frame > 0 and self.session.viewport.region.containsPoint(position.place)) {
-                const mode: g.DrawingMode = if (entity.eql(self.target()))
+                const mode: g.DrawingMode = if (entity.eql(self.target))
                     .inverted
                 else
                     .normal;
@@ -221,10 +241,10 @@ fn drawInfoBar(self: *const PlayMode) !void {
     try self.session.render.drawLeftButton("Explore", true);
     const qa = self.quickAction();
     const action_label = qa.toString();
-    try self.session.render.drawRightButton(action_label, self.quick_actions.items.len > 1);
+    try self.session.render.drawRightButton(action_label, self.quick_actions.actions.items.len > 1);
 
     // Draw the name or health of the target entity
-    if (self.target()) |entity| {
+    if (self.target) |entity| {
         if (!entity.eql(self.session.player)) {
             if (self.session.registry.get2(entity, c.Sprite, c.Health)) |tuple| {
                 try self.session.render.drawEnemyHealth(tuple[0].codepoint, tuple[1]);
@@ -241,84 +261,105 @@ fn drawInfoBar(self: *const PlayMode) !void {
     }
 }
 
-fn target(self: PlayMode) ?g.Entity {
-    return if (self.quick_actions.items.len == 0 or self.selected_action_idx > self.quick_actions.items.len - 1)
-        null
-    else if (self.quick_actions.items[self.selected_action_idx].action == .wait)
-        null
-    else
-        self.quick_actions.items[self.selected_action_idx].target;
-}
-
 fn quickAction(self: PlayMode) g.actions.Action {
-    return self.quick_actions.items[self.selected_action_idx].action;
+    if (self.quick_actions.actions.items.len > 0)
+        return self.quick_actions.actions.items[self.quick_actions.selected_idx]
+    else
+        return .wait;
 }
 
-pub fn updateQuickActions(self: *PlayMode, target_entity: ?g.Entity, prev_action: ?g.actions.Action) anyerror!void {
+/// Checks that a target is exists and recalculates a list of available quick actions applicable to the target.
+pub fn updateQuickActions(self: *PlayMode) anyerror!void {
     defer {
         log.debug(
-            "{d} quick actions after update:\n{any}\nThe selected action is {any}\nThe previous was {any}",
+            "{d} quick actions after update:\n{any}\nThe selected action is {any}\nThe target is {any}",
             .{
-                self.quick_actions.items.len,
-                g.utils.toStringWithListOf(self.quick_actions.items),
+                self.quick_actions.actions.items.len,
+                g.utils.toStringWithListOf(self.quick_actions.actions.items),
                 self.quickAction(),
-                prev_action,
+                self.target,
             },
         );
     }
 
-    self.quick_actions.clearRetainingCapacity();
-    self.selected_action_idx = 0;
     const alloc = self.arena.allocator();
+    const selected_action = self.quickAction();
+    log.debug(
+        "Updating selected actions. Current selected action is {any}; target is {any}",
+        .{ selected_action, self.target },
+    );
+    self.quick_actions.reset();
 
-    if (target_entity) |tg| {
-        if (tg.id != self.session.player.id) {
-            // check if quick action is available for target
-            if (g.actions.calculateQuickActionForTarget(self.session, tg)) |qa| {
-                self.selected_action_idx = self.quick_actions.items.len;
-                try self.quick_actions.append(alloc, .{ .target = tg, .action = qa });
-            }
+    // validate the target
+    if (self.target) |target| {
+        if (!self.session.registry.contains(target)) {
+            log.debug("Target entity {d} was removed. Reset target.", .{target.id});
+            self.target = null;
         }
     }
-    const player_position = self.session.level.playerPosition();
-    // Check the nearest entities:
-    // TODO improve:
-    var itr = self.session.registry.query(c.Position);
-    while (itr.next()) |tuple| {
-        const entity: g.Entity, const position: *c.Position = tuple;
-        if (position.place.near4(player_position.place)) {
-            if (entity.eql(self.session.player) or entity.eql(target_entity)) continue;
-            log.debug(
-                "The place {any} near the player {any} with {any}",
-                .{ position.place, player_position.place, entity },
-            );
-            if (g.actions.calculateQuickActionForTarget(self.session, entity)) |qa| {
-                log.debug("Calculated action is {any}", .{qa});
-                if (qa.eql(prev_action)) {
-                    self.selected_action_idx = self.quick_actions.items.len;
-                }
-                try self.quick_actions.append(alloc, .{ .target = entity, .action = qa });
-            } else {
-                log.debug("No quick action for entity {any}", .{entity});
+
+    // actualize and calculate quick actions for the target
+    var itr = TargetsIterator.init(self.target, self.session);
+    while (itr.next()) |target| {
+        self.target = target;
+        log.debug("New target {d}", .{target.id});
+        if (g.actions.calculateQuickActionForTarget(self.session, target)) |qa| {
+            log.debug("Calculated action is {any}", .{qa});
+            try self.quick_actions.actions.append(alloc, qa);
+            if (qa.eql(selected_action)) {
+                self.quick_actions.selected_idx = self.quick_actions.actions.items.len - 1;
             }
+            break;
         }
+        log.debug("No quick action for entity {any}", .{target});
+        self.target = null;
     }
-    // player should always be able to
-    // wait
-    try self.quick_actions.append(alloc, .{ .target = self.session.player, .action = .wait });
-    // manage its inventory
-    try self.quick_actions.append(alloc, .{ .target = self.session.player, .action = .open_inventory });
+    // player should always be able to manage its inventory...
+    try self.quick_actions.actions.append(alloc, .wait);
+    // ...and wait
+    try self.quick_actions.actions.append(alloc, .open_inventory);
 }
 
-fn windowWithQuickActions(
-    self: *PlayMode,
-    variants: []const QuickAction,
-    selected: usize,
-) !w.ModalWindow(w.OptionsArea(void)) {
+const TargetsIterator = struct {
+    curren_target: ?g.Entity,
+    player: g.Entity,
+    player_position: *const c.Position,
+    query: g.ecs.ArraySet(c.Position).Iterator,
+
+    fn init(curren_target: ?g.Entity, session: *g.GameSession) TargetsIterator {
+        return .{
+            .player = session.player,
+            .player_position = session.level.playerPosition(),
+            .curren_target = curren_target,
+            .query = session.registry.query(c.Position),
+        };
+    }
+
+    fn next(self: *TargetsIterator) ?g.Entity {
+        if (self.curren_target) |target| {
+            self.curren_target = null;
+            return target;
+        } else {
+            while (self.query.next()) |tuple| {
+                const entity: g.Entity, const position: *c.Position = tuple;
+                if (position.place.near4(self.player_position.place)) {
+                    if (entity.eql(self.player)) {
+                        continue;
+                    } else {
+                        return entity;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+};
+
+fn windowWithQuickActions(self: *PlayMode) !w.ModalWindow(w.OptionsArea(void)) {
     var window = w.options(void, self);
-    for (variants, 0..) |qa, idx| {
-        try window.area.addOption(self.arena.allocator(), qa.action.toString(), {}, chooseEntity, null);
-        if (idx == selected)
+    for (self.quick_actions.actions.items, 0..) |qa, idx| {
+        try window.area.addOption(self.arena.allocator(), qa.toString(), {}, chooseEntity, null);
+        if (idx == self.quick_actions.selected_idx)
             try window.area.selectLine(idx);
     }
     return window;
@@ -326,6 +367,6 @@ fn windowWithQuickActions(
 
 fn chooseEntity(ptr: *anyopaque, line_idx: usize, _: void) anyerror!void {
     const self: *PlayMode = @ptrCast(@alignCast(ptr));
-    self.selected_action_idx = line_idx;
-    log.debug("Choosen option {d}: {s}", .{ line_idx, @tagName(self.quickAction()) });
+    self.quick_actions.selected_idx = line_idx;
+    log.debug("Choosen option {d}: {t}", .{ line_idx, self.quickAction() });
 }

@@ -3,9 +3,10 @@ const Frame = @import("utils/Frame.zig");
 const TestSession = @import("utils/TestSession.zig");
 
 test {
-    _ = @import("SaveLoadScenarios.zig");
-    _ = @import("InventoryScenarios.zig");
-    _ = @import("DescriptionScenarios.zig");
+    _ = @import("description.zig");
+    _ = @import("inventory.zig");
+    _ = @import("save_load.zig");
+    _ = @import("update_target.zig");
 }
 
 test "Hello world!" {

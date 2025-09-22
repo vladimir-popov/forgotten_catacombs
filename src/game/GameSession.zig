@@ -39,7 +39,7 @@ pub const Mode = union(enum) {
 };
 
 arena: std.heap.ArenaAllocator,
-/// This seed should help to make all levels of the single game session reproducible.
+/// This seed should help to make all levels of a single game session reproducible.
 seed: u64,
 /// The PRNG initialized by the session's seed. This prng is used to make any dynamic decision by AI, or game events,
 /// and should not be used to generate any level objects, to keep the levels reproducible.
@@ -145,7 +145,7 @@ pub fn initNew(
     try self.completeInitialization();
 
     self.mode = .{ .play = undefined };
-    try self.mode.play.init(self.arena.allocator(), self);
+    try self.mode.play.init(self.arena.allocator(), self, null);
     // hack  for the first level only
     self.viewport.region.top_left.moveNTimes(.up, 3);
 }
@@ -162,13 +162,6 @@ pub fn deinit(self: *GameSession) void {
 pub fn setSeed(self: *GameSession, seed: u64) void {
     self.seed = seed;
     self.prng.seed(seed);
-}
-
-fn switchModeToPlay(self: *GameSession) !void {
-    self.mode.deinit();
-    self.mode = .{ .play = undefined };
-    try self.render.redrawFromSceneBuffer();
-    try self.mode.play.init(self.arena.allocator(), self);
 }
 
 pub fn switchModeToLoadingSession(self: *GameSession) !void {
@@ -194,6 +187,14 @@ pub fn continuePlay(self: *GameSession, entity_in_focus: ?g.Entity, action: ?g.a
     try self.events.sendEvent(
         .{ .mode_changed = .{ .to_play = .{ .entity_in_focus = entity_in_focus, .action = action } } },
     );
+}
+
+// should not be invoked outside. `continuePlay` should be used instead
+fn switchModeToPlay(self: *GameSession, entity_in_focus: ?g.Entity) !void {
+    self.mode.deinit();
+    self.mode = .{ .play = undefined };
+    try self.render.redrawFromSceneBuffer();
+    try self.mode.play.init(self.arena.allocator(), self, entity_in_focus);
 }
 
 pub fn explore(self: *GameSession) !void {
@@ -234,12 +235,9 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
     switch (event) {
         .mode_changed => |new_mode| switch (new_mode) {
             .to_play => |args| {
-                try self.switchModeToPlay();
-                if (args.entity_in_focus) |target_entity| {
-                    try self.mode.play.updateQuickActions(target_entity, null);
-                }
+                try self.switchModeToPlay(args.entity_in_focus);
                 if (args.action) |action| {
-                    try self.mode.play.doTurn(self.player, action);
+                    _ = try self.mode.play.doTurn(self.player, action);
                 }
             },
             .to_explore => {
@@ -272,13 +270,9 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
         .entity_moved => |entity_moved| {
             if (entity_moved.entity.id == self.player.id) {
                 try self.level.onPlayerMoved(entity_moved);
-            } else if (entity_moved.targetPlace().near8(self.level.playerPosition().place)) {
-                try self.mode.play.updateQuickActions(entity_moved.entity, null);
-            }
-        },
+            }        },
         .entity_died => |entity| {
             log.debug("The enemy {d} has been died", .{entity.id});
-            try self.mode.play.updateQuickActions(null, null);
         },
     }
 }
@@ -286,7 +280,7 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
 pub fn playerMovedToLevel(self: *GameSession) !void {
     self.max_depth = @max(self.max_depth, self.level.depth);
     self.viewport.centeredAround(self.level.playerPosition().place);
-    try self.switchModeToPlay();
+    try self.switchModeToPlay(null);
     const event = g.events.Event{
         .entity_moved = .{
             .entity = self.player,

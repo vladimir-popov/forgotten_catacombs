@@ -119,7 +119,6 @@ pub fn expectLooksLike(self: Self, str: []const u8) !void {
                     const codepoint = self.sprites[r][c0].codepoint;
                     if (codepoint > 0 and codepoint != ' ') {
                         diff.sprites[r][c0].codepoint = if (codepoint == ' ') '¶' else codepoint;
-                        log.err("Sprite after end of the string {any}", .{self.sprites[r][c0]});
                         has_difference = true;
                     }
                 }
@@ -131,7 +130,6 @@ pub fn expectLooksLike(self: Self, str: []const u8) !void {
         const codepoint = self.sprites[r][c].codepoint;
         if (!isEqual(codepoint, symbol)) {
             diff.sprites[r][c].codepoint = if (codepoint == ' ') '¶' else codepoint;
-            log.err("Sprite {any} != '{u}'", .{ self.sprites[r][c], symbol });
             has_difference = true;
         }
         c += 1;

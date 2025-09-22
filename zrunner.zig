@@ -1,14 +1,90 @@
+//! zrunner - is a simple test runner for zig with detailed report
+//!           and support of selective running tests in modules.
+//!
+//! Usage:
+//!
+//!   If the build step to run tests is named "test":
+//!   zig build test -- [options]
+//!
+//! Options:
+//!
+//!   -m <str>, --modules-only=<str>    Run only tests from modules whose names contain a given substring <str>.
+//!   -t <str>, --tests-only=<str>      Run only tests  whose names contain a given substring <str>.
+//!   --failed-only                     Include in the report only failed tests.
+//!   --no-stack-trace                  Do not print a stack trace of failed tests.
+//!   --colors=<zon>                    Parses <zon> as `FileReporter.Colors` and uses them printing test report.
+//!                                     See the source code of `FileReporter.Colors` for more details.
+//!   --no-colors                       Do not use ascii escape code to make output colorful.
+//!                                     Ignore the '--colors' option.
+//!   --stdout                          Print output to the stdout. Default.
+//!   --stderr                          Print output to the stderr.
+//!   --file=<file path>                Create and open a file <file path> to print an output to it.
+//!
+//! Configuration example:
+//! ```zig
+//!   // Prepare zrunner
+//!   const test_runner = std.Build.Step.Compile.TestRunner{
+//!       .path = b.path("zrunner.zig"),
+//!       .mode = .simple,
+//!   };
+//!   const tests_module = b.addTest(.{
+//!       .name = "my module", // this name is used in the test report
+//!       .root_module = my_module,
+//!       .test_runner = test_runner,
+//!   });
+//!   const run_module_tests = b.addRunArtifact(tests_module);
+//!   // this forces using colors in some cases when they would be omitted otherwise
+//!   run_module_tests.setEnvironmentVariable("CLICOLOR_FORCE", "true");
+//! ```
+//!
+//! Version: 1.0.0
+//!
 const std = @import("std");
 const builtin = @import("builtin");
+const TestFn = std.builtin.TestFn;
 
 pub const std_options: std.Options = .{
-    .log_level = .info,
+    .logFn = writeLog,
+    .log_level = .debug,
     .log_scope_levels = &[_]std.log.ScopeLevel{
         .{ .scope = .default, .level = .debug },
+        .{ .scope = .test_session, .level = .debug },
     },
 };
 
-const TestFn = std.builtin.TestFn;
+var log_buffer: [128]u8 = undefined;
+var log_writer: ?std.fs.File.Writer = null;
+
+pub fn writeLog(
+    comptime message_level: std.log.Level,
+    comptime scope: @TypeOf(.enum_literal),
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    if (log_writer) |*writer| {
+        const colors: [5][]const u8 = .{
+            "\x1b[32m",
+            "\x1b[33m",
+            "\x1b[34m",
+            "\x1b[35m",
+            "\x1b[36m",
+        };
+        const color = comptime colors[std.hash.Murmur2_32.hash(@tagName(scope)) % colors.len];
+        const level_txt = comptime "\x1b[30m " ++ message_level.asText() ++ "\x1b[0m ";
+        writer.interface.print(color ++ @tagName(scope) ++ "\x1b[0m" ++ level_txt ++ ": " ++ format ++ "\n", args) catch {
+            @panic("Error on write log");
+        };
+        writer.interface.flush() catch {
+            @panic("Error on flushing log buffer");
+        };
+    } else {
+        const file = std.fs.cwd().createFile("test.log", .{ .read = false, .truncate = true }) catch {
+            @panic("Error on open log file.");
+        };
+        log_writer = file.writer(&log_buffer);
+        writeLog(message_level, scope, format, args);
+    }
+}
 
 pub fn main() !void {
     var gpa: std.heap.DebugAllocator(.{}) = .{};
@@ -20,34 +96,56 @@ pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(gpa.allocator());
     defer arena.deinit();
 
+    const process_name = args.next() orelse unreachable;
+    const module_name = std.fs.path.basename(process_name);
+
     // Parse arguments and prepare a reporter
-    var buffer: [2048]u8 = undefined;
-    const process_name = args.next() orelse "?";
+    var io_buffer: [2048]u8 = undefined;
     var custom_colors: ?[:0]const u8 = null;
     var custom_out: ?std.fs.File.Writer = null;
+    var module_filter: ?[:0]const u8 = null;
     var test_filter: ?[:0]const u8 = null;
     var failed_only: bool = false;
     var no_colors: bool = false;
+    var no_stack_trace: bool = false;
+
     while (args.next()) |arg| {
-         if (std.mem.eql(u8, arg, "--no-colors")) {
+        if (std.mem.eql(u8, "-t", arg)) {
+            test_filter = args.next();
+        } else if (std.mem.startsWith(u8, arg, "--tests-only=")) {
+            test_filter = arg[13..];
+        } else if (std.mem.eql(u8, "-m", arg)) {
+            module_filter = args.next();
+        } else if (std.mem.startsWith(u8, arg, "--modules-only=")) {
+            module_filter = arg[15..];
+        } else if (std.mem.eql(u8, arg, "--failed-only")) {
+            failed_only = true;
+        } else if (std.mem.eql(u8, arg, "--no-stack-trace")) {
+            no_stack_trace = true;
+        } else if (std.mem.eql(u8, arg, "--no-colors")) {
             no_colors = true;
         } else if (std.mem.startsWith(u8, arg, "--colors=")) {
             custom_colors = arg[9..];
         } else if (std.mem.eql(u8, arg, "--stdout")) {
-            custom_out = std.fs.File.stdout().writer(&buffer);
+            custom_out = std.fs.File.stdout().writer(&io_buffer);
         } else if (std.mem.eql(u8, arg, "--stderr")) {
-            custom_out = std.fs.File.stderr().writer(&buffer);
+            custom_out = std.fs.File.stderr().writer(&io_buffer);
         } else if (std.mem.startsWith(u8, arg, "--file=")) {
             const file = try std.fs.cwd().createFile(arg[7..], .{ .truncate = false });
-            custom_out = std.fs.File.writer(file, &buffer);
-        } else if (std.mem.eql(u8, arg, "--failed-only")) {
-            failed_only = true;
-        } else if (std.mem.startsWith(u8, arg, "--only=")) {
-            test_filter = arg[7..];
-        } else if (test_filter == null) {
-            test_filter = arg;
+            custom_out = std.fs.File.writer(file, &io_buffer);
+        } else {
+            std.debug.print("Unsupported option '{s}'.\n", .{arg});
+            std.process.exit(1);
         }
     }
+
+    if (module_filter) |filter| {
+        if (!std.mem.containsAtLeast(u8, module_name, 1, filter)) {
+            // break the process
+            return;
+        }
+    }
+
     var diag: std.zon.parse.Diagnostics = .{};
     const colors: FileReporter.Colors = if (custom_colors) |str|
         std.zon.parse.fromSlice(FileReporter.Colors, arena.allocator(), str, &diag, .{ .free_on_error = false }) catch |err| {
@@ -59,12 +157,13 @@ pub fn main() !void {
     var reporter: FileReporter = if (custom_out) |out|
         .{ .file_writer = out, .config = std.io.tty.Config.detect(out.file), .colors = colors }
     else
-        .stdout(&buffer, colors);
+        .stdout(&io_buffer, colors);
 
-    if (no_colors)
+    if (no_colors) {
         reporter.config = .no_color;
+    }
 
-    try run(&arena, process_name, test_filter, &reporter, failed_only);
+    try run(&arena, process_name, test_filter, &reporter, failed_only, no_stack_trace);
 }
 
 pub fn run(
@@ -73,13 +172,14 @@ pub fn run(
     test_filter: ?[]const u8,
     reporter: anytype,
     failed_only: bool,
+    no_stack_trace: bool,
 ) !void {
     var arena_alloc = arena.allocator();
     var tests: []const TestFn = builtin.test_functions;
 
     // Filter tests:
     if (test_filter) |filter| {
-        var arr = try arena_alloc.alloc(TestFn, builtin.test_functions.len);
+        var arr = try arena_alloc.alloc(TestFn, tests.len);
         arr.len = 0;
         for (builtin.test_functions) |tst| {
             if (std.mem.containsAtLeast(u8, tst.name, 1, filter)) {
@@ -96,7 +196,7 @@ pub fn run(
     };
 
     try reporter.writeTitle(report.process_name, test_filter, tests.len);
-    try runAllTets(arena, tests, &report);
+    try runTests(arena, tests, &report, no_stack_trace);
     try writeTestResults(arena, reporter, report, failed_only);
     try reporter.writeSummary(
         report.passed_count,
@@ -108,7 +208,7 @@ pub fn run(
     if (report.failed_count != 0 or report.is_mem_leak) std.process.exit(1);
 }
 
-fn runAllTets(arena: *std.heap.ArenaAllocator, tests: []const TestFn, report: *Report) !void {
+fn runTests(arena: *std.heap.ArenaAllocator, tests: []const TestFn, report: *Report, no_stack_trace: bool) !void {
     if (tests.len == 0) return;
 
     var total_timer: std.time.Timer = try std.time.Timer.start();
@@ -117,7 +217,7 @@ fn runAllTets(arena: *std.heap.ArenaAllocator, tests: []const TestFn, report: *R
         const t = Test.wrap(test_fn);
 
         // Run tests:
-        report.test_results[idx] = try t.run(arena, &test_timer);
+        report.test_results[idx] = try t.run(arena, &test_timer, no_stack_trace);
 
         switch (report.test_results[idx]) {
             .passed => {
@@ -135,7 +235,12 @@ fn runAllTets(arena: *std.heap.ArenaAllocator, tests: []const TestFn, report: *R
     report.total_duration = Duration.fromNanos(total_timer.lap());
 }
 
-fn writeTestResults(arena: *std.heap.ArenaAllocator, reporter: anytype, report: Report, failed_only: bool) !void {
+fn writeTestResults(
+    arena: *std.heap.ArenaAllocator,
+    reporter: anytype,
+    report: Report,
+    failed_only: bool,
+) !void {
     const alloc = arena.allocator();
     var grouped_tests: std.StringHashMapUnmanaged(std.ArrayListUnmanaged(TestResult)) = .empty;
     for (report.test_results) |test_result| {
@@ -190,7 +295,7 @@ const Test = struct {
     }
 
     /// Runs the test and builds the result. Marks a test thrown the error.SkipZigTest as skipped.
-    fn run(self: Test, arena: *std.heap.ArenaAllocator, timer: *std.time.Timer) !TestResult {
+    fn run(self: Test, arena: *std.heap.ArenaAllocator, timer: *std.time.Timer, no_stack_trace: bool) !TestResult {
         var test_result: TestResult = undefined;
         timer.reset();
         const result = self.test_fn.func();
@@ -209,16 +314,17 @@ const Test = struct {
             },
             else => {
                 var str: []u8 = &.{};
-                if (@errorReturnTrace()) |stack_trace| {
-                    str = try arena.allocator().alloc(u8, 2048);
-                    var fixed_writer = std.io.Writer.fixed(str);
-                    // skip frame from the testing.zig:
-                    const st = std.builtin.StackTrace{
-                        .index = stack_trace.index - 1,
-                        .instruction_addresses = stack_trace.instruction_addresses[1..],
-                    };
-                    try st.format(&fixed_writer);
-                    try fixed_writer.flush();
+                if (!no_stack_trace) {
+                    if (@errorReturnTrace()) |stack_trace| {
+                        var stack_trace_writer = std.io.Writer.Allocating.init(arena.allocator());
+                        // skip frame from the testing.zig:
+                        const st = std.builtin.StackTrace{
+                            .index = stack_trace.index - 1,
+                            .instruction_addresses = stack_trace.instruction_addresses[1..],
+                        };
+                        try st.format(&stack_trace_writer.writer);
+                        str = stack_trace_writer.written();
+                    }
                 }
                 test_result = TestResult{
                     .failed = .{
@@ -266,7 +372,7 @@ pub const TestResult = union(enum) {
     }
 };
 
-/// A report about run of all tests. 
+/// A report about run of all tests.
 const Report = struct {
     process_name: []const u8,
     test_results: []TestResult,
@@ -313,7 +419,7 @@ const Duration = struct {
             return;
         }
 
-        try writer.print("> 1 ms", .{});
+        try writer.print("< 1 ms", .{});
     }
 
     fn addNs(self: *Duration, count: u64) void {
@@ -347,7 +453,8 @@ const FileReporter = struct {
 
     const Colors = struct {
         title: Color = .cyan,
-        no_tests: Color = .black,
+        process_name: Color = .yellow,
+        no_tests: Color = .dim,
         namespace: Color = .cyan,
         test_name: Color = .cyan,
         filter: Color = .yellow,
@@ -359,6 +466,8 @@ const FileReporter = struct {
 
         pub const default: Colors = .{};
     };
+
+    const border = "=" ** 65;
 
     file_writer: std.fs.File.Writer,
     config: std.io.tty.Config,
@@ -377,18 +486,18 @@ const FileReporter = struct {
     ) anyerror!void {
         // move to the next line and cleanup output settings:
         _ = try self.file_writer.interface.write("\r\n\x1b[0K");
+        try self.colorizeLine(self.colors.title, "{s}", .{border});
 
         if (tests_count == 0) {
             try self.colorizeLine(self.colors.no_tests, "No one test was found in {s}", .{process_name});
             return;
         }
+        try self.colorize(self.colors.title, "Run ", .{});
+        try self.colorizeLine(self.colors.process_name, "{s}", .{process_name});
         if (filter) |f| {
-            try self.colorizeLine(self.colors.title, "{s}", .{process_name});
             try self.colorize(self.colors.no_tests, "Only tests contain ", .{});
             try self.colorize(self.colors.filter, "'{s}'", .{f});
             try self.colorizeLine(self.colors.no_tests, " in the name are running", .{});
-        } else {
-            try self.colorizeLine(self.colors.title, "{s}", .{process_name});
         }
         // to print the title before any output from tests
         try self.file_writer.interface.flush();
@@ -405,26 +514,30 @@ const FileReporter = struct {
     pub fn writeTestResult(self: *FileReporter, test_result: TestResult) anyerror!void {
         switch (test_result) {
             .passed => |result| {
-                try self.colorizeLine(
+                try self.colorize(
                     self.colors.passed,
                     " PASSED in {f}",
                     .{result.duration},
                 );
             },
             .failed => |result| {
-                try self.colorizeLine(
+                try self.colorize(
                     self.colors.failed,
                     " FAILED in {f}: {s}",
                     .{ result.duration, @errorName(result.err) },
                 );
-                try self.file_writer.interface.writeAll(result.stack_trace);
             },
             .skipped => {
-                try self.colorizeLine(self.colors.skipped, " SKIPPED", .{});
+                try self.colorize(self.colors.skipped, " SKIPPED", .{});
             },
         }
         if (test_result.isMemoryLeak()) {
-            try self.colorizeLine(self.colors.memory_leak, "   MEMORY LEAK DETECTED", .{});
+            try self.colorizeLine(self.colors.memory_leak, " MEMORY LEAK", .{});
+        } else {
+            try self.file_writer.interface.writeByte('\n');
+        }
+        if (test_result == .failed) {
+            try self.file_writer.interface.writeAll(test_result.failed.stack_trace);
         }
     }
 
@@ -439,8 +552,6 @@ const FileReporter = struct {
         if (passed + skipped + failed == 0 and !is_mem_leak)
             return;
 
-        // move to the next line and cleanup output settings:
-        const border = "=" ** 60;
         try self.colorize(
             self.colors.summary,
             border ++ "\nTotal {d} tests were run in {f}: ",
@@ -453,7 +564,7 @@ const FileReporter = struct {
         if (skipped > 0)
             try self.colorize(self.colors.skipped, "{d} skipped;", .{skipped});
         if (is_mem_leak)
-            try self.colorize(self.colors.memory_leak, "MEMORY LEAK", .{});
+            try self.colorize(self.colors.memory_leak, " MEMORY LEAK", .{});
 
         // move to the next line and cleanup output settings:
         _ = try self.file_writer.interface.write("\r\n\x1b[0K");

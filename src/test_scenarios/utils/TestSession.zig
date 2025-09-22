@@ -5,6 +5,8 @@ const TestRuntime = @import("TestRuntime.zig");
 const Inventory = @import("Inventory.zig");
 const Player = @import("Player.zig");
 
+const log = std.log.scoped(.test_session);
+
 const Self = @This();
 
 arena: std.heap.ArenaAllocator,
@@ -21,8 +23,8 @@ pub fn initEmpty(self: *Self, gpa: std.mem.Allocator) !void {
     const arena_alloc = self.arena.allocator();
     self.runtime = try TestRuntime.init(arena_alloc, self.tmp_dir.dir);
     try self.render.init(arena_alloc, self.runtime.runtime(), g.DISPLAY_ROWS, g.DISPLAY_COLS);
-    try self.session.initNew(arena_alloc, 0, self.runtime.runtime(), self.render);
-    self.player = .{ .test_session = self, .player = self.session.player };
+    try self.session.initNew(arena_alloc, std.testing.random_seed, self.runtime.runtime(), self.render);
+    self.player = .{ .test_session = self, .player_entity = self.session.player };
     // because for optimization purpose we draw the horizontal line right in init method of the PlayMode
     self.runtime.display.merge(self.runtime.last_frame);
 }
@@ -46,7 +48,7 @@ pub fn deinit(self: *Self) void {
     self.arena.deinit();
 }
 
-/// Creates a new empty last_frame buffer, runs the `session.tick()` method
+/// Creates a new empty last_frame buffer, runs the method `session.tick()`,
 /// and merges the last_frame into the display buffer.
 pub fn tick(self: *Self) !void {
     self.runtime.last_frame = .empty;
@@ -54,7 +56,20 @@ pub fn tick(self: *Self) !void {
     self.runtime.display.merge(self.runtime.last_frame);
 }
 
+pub fn completeRound(self: *Self) !void {
+    std.debug.assert(self.session.mode == .play);
+    while (!self.session.mode.play.is_player_turn) {
+        try self.tick();
+    }
+}
+
+pub fn printDisplay(self: Self) void {
+    std.debug.print("{f}", .{std.fmt.alt(self.runtime.display, .ttyFormat)});
+}
+
+/// Emulates pressing a button and ticks one time.
 pub fn pressButton(self: *Self, button: g.Button.GameButton) !void {
+    log.debug("Emulate pressing button {any}", .{button});
     try self.runtime.pushed_buttons.append(self.arena.allocator(), .{ .game_button = button, .state = .released });
     try self.tick();
 }

@@ -117,30 +117,30 @@ pub fn calculateQuickActionForTarget(
 }
 
 /// Handles intentions to do some actions.
-/// Returns count of used move points.
-/// If returns 0, then it means that action was declined (moving to the wall as example).
-pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action) !g.MovePoints {
+/// Returns an optional happened action and a count of used move points.
+/// If returns null and 0 mp, then it means that action was declined (moving to the wall as example).
+pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action) !struct { ?Action, g.MovePoints } {
     if (std.log.logEnabled(.debug, .actions) and action != .do_nothing) {
-        log.debug("Do action {s} by the entity {d}", .{ @tagName(action), actor.id });
+        log.debug("Do action {any} by the entity {d}", .{ action, actor.id });
     }
     const speed = session.registry.get(actor, c.Speed) orelse {
         log.err("The entity {d} doesn't have speed and can't do action.", .{actor.id});
         return error.NotEnoughComponents;
     };
     switch (action) {
-        .do_nothing => return 0,
+        .do_nothing => return .{ null, 0 },
         .drink => |potion_id| {
-            if (try session.drinkPotion(actor, potion_id)) return 0;
+            if (try session.drinkPotion(actor, potion_id)) return .{ null, 0 };
         },
         .open_inventory => {
             try session.manageInventory();
         },
         .move => |move| {
             if (session.registry.get(actor, c.Position)) |position|
-                return doMove(session, actor, position, move.target, speed.move_points);
+                return doMove(session, actor, position, move, speed.move_points);
         },
         .hit => |target| {
-            return if (try doHit(session, actor, target)) 0 else speed.move_points;
+            return if (try tryHit(session, actor, target)) .{ null, 0 } else .{ action, speed.move_points };
         },
         .open => |door| {
             try session.registry.setComponentsToEntity(door.id, g.entities.openedDoor(door.place));
@@ -192,21 +192,21 @@ pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action) !g.Mov
             );
         },
     }
-    return speed.move_points;
+    return .{ action, speed.move_points };
 }
 
 fn doMove(
     session: *g.GameSession,
     entity: g.Entity,
     from_position: *c.Position,
-    target: Action.Move.Target,
+    move: Action.Move,
     move_speed: g.MovePoints,
-) anyerror!g.MovePoints {
-    const new_place = switch (target) {
+) anyerror!struct { ?Action, g.MovePoints } {
+    const new_place = switch (move.target) {
         .direction => |direction| from_position.place.movedTo(direction),
         .new_place => |place| place,
     };
-    if (from_position.place.eql(new_place)) return 0;
+    if (from_position.place.eql(new_place)) return .{ null, 0 };
 
     if (checkCollision(session, new_place)) |action| {
         log.debug("Collision lead to {s}", .{@tagName(action)});
@@ -217,12 +217,12 @@ fn doMove(
             .entity = entity,
             .is_player = (entity.eql(session.player)),
             .moved_from = from_position.place,
-            .target = target,
+            .target = move.target,
         },
     };
     try session.events.sendEvent(event);
     from_position.place = new_place;
-    return move_speed;
+    return .{ .{ .move = move }, move_speed };
 }
 
 /// Returns an action that should be done because of collision.
@@ -259,7 +259,7 @@ fn checkCollision(session: *g.GameSession, place: p.Point) ?Action {
 }
 
 /// `true` if the actor is dead
-fn doHit(
+fn tryHit(
     session: *g.GameSession,
     actor: g.Entity,
     enemy: g.Entity,

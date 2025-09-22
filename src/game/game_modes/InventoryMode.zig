@@ -96,14 +96,14 @@ pub fn tick(self: *Self) !void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (self.description_window) |*window| {
             if (try window.handleButton(btn)) {
-                std.log.debug("Close description window", .{});
+                log.debug("Close description window", .{});
                 try window.hide(self.session.render, .fill_region);
                 window.deinit(self.alloc);
                 self.description_window = null;
             }
         } else if (self.actions_window) |*window| {
             if (try window.handleButton(btn)) {
-                std.log.debug("Close actions window", .{});
+                log.debug("Close actions window", .{});
                 try window.hide(self.session.render, .fill_region);
                 window.deinit(self.alloc);
                 self.actions_window = null;

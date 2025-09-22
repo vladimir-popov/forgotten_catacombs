@@ -3,6 +3,7 @@ zig-cache/
 zig-out/
 save/
 game.log
+test.log
 **.bkp
 **.dtmp
 **.*~
