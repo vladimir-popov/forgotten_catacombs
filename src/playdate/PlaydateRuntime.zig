@@ -236,13 +236,13 @@ fn closeFile(ptr: *anyopaque, file: *anyopaque) void {
     self.alloc.destroy(file_wrapper);
 }
 
-fn readFile(_: *anyopaque, file: *anyopaque) *std.io.Reader {
+fn readFile(_: *anyopaque, file: *anyopaque) *std.Io.Reader {
     const file_wrapper: *io.FileWrapper = @ptrCast(@alignCast(file));
     log.debug("Prepare a reader to read from the file {*}", .{file_wrapper});
     return &file_wrapper.reader.interface;
 }
 
-fn writeToFile(_: *anyopaque, file: *anyopaque) *std.io.Writer {
+fn writeToFile(_: *anyopaque, file: *anyopaque) *std.Io.Writer {
     const file_wrapper: *io.FileWrapper = @ptrCast(@alignCast(file));
     log.debug("Prepare a writer to write to the file {*}", .{file_wrapper});
     return &file_wrapper.writer.interface;

@@ -25,7 +25,7 @@ pub const Writer = struct {
     registry: *const g.Registry,
     writer: std.json.Stringify,
 
-    pub fn init(registry: *const g.Registry, writer: *std.io.Writer) Self {
+    pub fn init(registry: *const g.Registry, writer: *std.Io.Writer) Self {
         return .{
             .registry = registry,
             .writer = .{ .writer = writer, .options = .{ .emit_null_optional_fields = false } },
@@ -151,7 +151,7 @@ pub const Reader = struct {
     registry: *g.Registry,
     json_reader: std.json.Reader,
 
-    pub fn init(registry: *g.Registry, reader: *std.io.Reader) Self {
+    pub fn init(registry: *g.Registry, reader: *std.Io.Reader) Self {
         return .{
             .registry = registry,
             .json_reader = .init(registry.allocator(), reader),
@@ -425,7 +425,7 @@ test "All components should be serializable" {
     }
 
     var buffer: [4048]u8 = @splat(0);
-    var fixed_writer = std.io.Writer.fixed(&buffer);
+    var fixed_writer = std.Io.Writer.fixed(&buffer);
     var writer = Writer.init(&original_registry, &fixed_writer);
 
     // when:
@@ -436,7 +436,7 @@ test "All components should be serializable" {
     var actual_registry = try g.Registry.init(std.testing.allocator);
     defer actual_registry.deinit();
 
-    var fixed_reader = std.io.Reader.fixed(&buffer);
+    var fixed_reader = std.Io.Reader.fixed(&buffer);
     var reader = Reader.init(&actual_registry, &fixed_reader);
 
     const actual = reader.read(c.Components) catch |err| {

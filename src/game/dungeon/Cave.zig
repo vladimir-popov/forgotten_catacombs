@@ -185,7 +185,7 @@ test "For same seed should return same dungeon" {
 
 fn generateAndWriteDungeon(arena: *std.heap.ArenaAllocator, buf: []u8, seed: ?u64) !struct { u64, []const u8 } {
     var rnd = std.Random.DefaultPrng.init(100500);
-    var bfw = std.io.fixedBufferStream(buf);
+    var bfw = std.Io.fixedBufferStream(buf);
     while (true) {
         const s: u64 = seed orelse rnd.next();
         if (try Self.generateDungeon(arena, .{}, s)) |dunge| {

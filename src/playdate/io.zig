@@ -19,7 +19,7 @@ pub const FileWrapper = union(enum) {
 pub const FileReader = struct {
     playdate: *api.PlaydateAPI,
     file: *api.SDFile,
-    interface: std.io.Reader,
+    interface: std.Io.Reader,
 
     pub fn init(playdate: *api.PlaydateAPI, file: *api.SDFile, buffer: []u8) FileReader {
         return .{
@@ -34,7 +34,7 @@ pub const FileReader = struct {
         };
     }
 
-    pub fn stream(io_r: *std.io.Reader, io_w: *std.io.Writer, limit: std.io.Limit) std.io.Reader.StreamError!usize {
+    pub fn stream(io_r: *std.Io.Reader, io_w: *std.Io.Writer, limit: std.Io.Limit) std.Io.Reader.StreamError!usize {
         const self: *FileReader = @fieldParentPtr("interface", io_r);
         const buffer = limit.slice(try io_w.writableSliceGreedy(1));
         const len = self.playdate.file.read(self.file, buffer.ptr, @intCast(buffer.len));
@@ -50,7 +50,7 @@ pub const FileReader = struct {
 pub const FileWriter = struct {
     playdate: *api.PlaydateAPI,
     file: *api.SDFile,
-    interface: std.io.Writer,
+    interface: std.Io.Writer,
 
     pub fn init(playdate: *api.PlaydateAPI, file: *api.SDFile, buffer: []u8) FileWriter {
         return .{
@@ -60,7 +60,7 @@ pub const FileWriter = struct {
         };
     }
 
-    pub fn drain(io_w: *std.io.Writer, data: []const []const u8, splat: usize) std.io.Writer.Error!usize {
+    pub fn drain(io_w: *std.Io.Writer, data: []const []const u8, splat: usize) std.Io.Writer.Error!usize {
         const self: *FileWriter = @fieldParentPtr("interface", io_w);
         defer {
             if (self.playdate.file.flush(self.file) < 0) {

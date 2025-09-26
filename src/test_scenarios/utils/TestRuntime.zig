@@ -127,12 +127,12 @@ fn closeFile(ptr: *anyopaque, file: *anyopaque) void {
     self.alloc.destroy(file_wrapper);
 }
 
-fn readFile(_: *anyopaque, file_ptr: *anyopaque) *std.io.Reader {
+fn readFile(_: *anyopaque, file_ptr: *anyopaque) *std.Io.Reader {
     const file: *terminal.TtyRuntime.FileWrapper = @ptrCast(@alignCast(file_ptr));
     return &file.reader.interface;
 }
 
-fn writeToFile(_: *anyopaque, file_ptr: *anyopaque) *std.io.Writer {
+fn writeToFile(_: *anyopaque, file_ptr: *anyopaque) *std.Io.Writer {
     const file: *terminal.TtyRuntime.FileWrapper = @ptrCast(@alignCast(file_ptr));
     return &file.writer.interface;
 }

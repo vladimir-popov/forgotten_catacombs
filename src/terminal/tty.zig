@@ -93,7 +93,7 @@ pub const Text = struct {
         }
     }
 
-    pub fn writeSetCursorPosition(wr: *std.io.Writer, row: u16, col: u16) !void {
+    pub fn writeSetCursorPosition(wr: *std.Io.Writer, row: u16, col: u16) !void {
         try wr.print("\x1b[{d};{d}H", .{ row, col });
     }
 };

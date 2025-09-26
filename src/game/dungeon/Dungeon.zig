@@ -132,7 +132,7 @@ pub fn randomPlace(self: Dungeon, rand: std.Random) p.Point {
 pub fn dumpToLog(self: Dungeon) void {
     var buf: [(g.DUNGEON_COLS + 1) * g.DUNGEON_ROWS]u8 = undefined;
     const real_size: usize = @as(usize, @intCast(self.rows)) * (self.cols + 1);
-    var writer = std.io.fixedBufferStream(&buf);
+    var writer = std.Io.fixedBufferStream(&buf);
     _ = self.write(writer.writer().any()) catch unreachable;
     log.debug("Dungeon:\n{s}", .{buf[0..real_size]});
 }

@@ -548,12 +548,12 @@ const SceneBuffer = struct {
 
     fn dumpToLog(self: SceneBuffer) void {
         var buf: [10000]u8 = undefined;
-        var writer = std.io.fixedBufferStream(&buf);
+        var writer = std.Io.fixedBufferStream(&buf);
         self.write(writer.writer().any()) catch unreachable;
         log.debug("\n{s}", .{buf});
     }
 
-    fn write(self: SceneBuffer, writer: std.io.AnyWriter) !void {
+    fn write(self: SceneBuffer, writer: std.Io.AnyWriter) !void {
         var buf: [4]u8 = undefined;
         for (self.rows) |row| {
             for (row) |cell| {

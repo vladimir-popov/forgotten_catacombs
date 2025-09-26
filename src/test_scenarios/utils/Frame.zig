@@ -1,7 +1,7 @@
 const std = @import("std");
 const g = @import("game");
 const tty = @import("terminal").tty;
-const WriterError = std.io.Writer.Error;
+const WriterError = std.Io.Writer.Error;
 
 const log = std.log.scoped(.test_utils);
 
@@ -29,14 +29,14 @@ pub fn merge(self: *Self, other: Self) void {
     }
 }
 
-pub fn format(self: @This(), writer: *std.io.Writer) WriterError!void {
+pub fn format(self: @This(), writer: *std.Io.Writer) WriterError!void {
     for (0..g.DISPLAY_ROWS) |r| {
         try self.formatRow(writer, r);
         try writer.writeByte('\n');
     }
 }
 
-pub fn formatRow(self: @This(), writer: *std.io.Writer, row_idx: usize) WriterError!void {
+pub fn formatRow(self: @This(), writer: *std.Io.Writer, row_idx: usize) WriterError!void {
     var buf: [4]u8 = undefined;
     for (0..g.DISPLAY_COLS) |c| {
         const sprite = self.sprites[row_idx][c];
@@ -54,7 +54,7 @@ pub fn formatRow(self: @This(), writer: *std.io.Writer, row_idx: usize) WriterEr
     }
 }
 
-pub fn ttyFormat(self: @This(), writer: *std.io.Writer) WriterError!void {
+pub fn ttyFormat(self: @This(), writer: *std.Io.Writer) WriterError!void {
     var buf: [4]u8 = undefined;
     for (0..g.DISPLAY_ROWS) |r| {
         var mode: g.DrawingMode = .normal;

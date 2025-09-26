@@ -813,7 +813,7 @@ test "For same seed should return same dungeon" {
 }
 
 fn generateAndWriteDungeon(arena: *std.heap.ArenaAllocator, buf: []u8, seed: u64) ![]const u8 {
-    var bfw = std.io.fixedBufferStream(buf);
+    var bfw = std.Io.fixedBufferStream(buf);
     const dunge = try Self.generateDungeon(arena, .{}, seed);
     const len = try dunge.write(bfw.writer());
     return buf[0..len];

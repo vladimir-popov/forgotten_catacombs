@@ -36,8 +36,8 @@ const VTable = struct {
     // All paths should be relative to a directory with save files
     openFile: *const fn (context: *anyopaque, file_path: []const u8, mode: FileMode, buffer: []u8) anyerror!OpaqueFile,
     closeFile: *const fn (context: *anyopaque, file: OpaqueFile) void,
-    readFile: *const fn (context: *anyopaque, file: OpaqueFile) *std.io.Reader,
-    writeToFile: *const fn (context: *anyopaque, file: OpaqueFile) *std.io.Writer,
+    readFile: *const fn (context: *anyopaque, file: OpaqueFile) *std.Io.Reader,
+    writeToFile: *const fn (context: *anyopaque, file: OpaqueFile) *std.Io.Writer,
     isFileExists: *const fn (context: *anyopaque, path: []const u8) anyerror!bool,
     deleteFileIfExists: *const fn (context: *anyopaque, path: []const u8) anyerror!void,
     //  ----------------------------------
@@ -96,11 +96,11 @@ pub fn closeFile(self: Runtime, file: OpaqueFile) void {
     self.vtable.closeFile(self.context, file);
 }
 
-pub fn readFile(self: Runtime, file: OpaqueFile) *std.io.Reader {
+pub fn readFile(self: Runtime, file: OpaqueFile) *std.Io.Reader {
     return self.vtable.readFile(self.context, file);
 }
 
-pub fn writeToFile(self: Runtime, file: OpaqueFile) *std.io.Writer {
+pub fn writeToFile(self: Runtime, file: OpaqueFile) *std.Io.Writer {
     return self.vtable.writeToFile(self.context, file);
 }
 

@@ -291,12 +291,12 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             self.alloc.destroy(file_wrapper);
         }
 
-        fn readFile(_: *anyopaque, file_ptr: *anyopaque) *std.io.Reader {
+        fn readFile(_: *anyopaque, file_ptr: *anyopaque) *std.Io.Reader {
             const file: *FileWrapper = @ptrCast(@alignCast(file_ptr));
             return &file.reader.interface;
         }
 
-        fn writeToFile(_: *anyopaque, file_ptr: *anyopaque) *std.io.Writer {
+        fn writeToFile(_: *anyopaque, file_ptr: *anyopaque) *std.Io.Writer {
             const file: *FileWrapper = @ptrCast(@alignCast(file_ptr));
             return &file.writer.interface;
         }

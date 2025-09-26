@@ -94,7 +94,7 @@ fn dumpToLog(
     bitmap: *const u.BitMap(rows, cols),
 ) !void {
     var buf: [rows * (cols + 1)]u8 = undefined;
-    var writer = std.io.fixedBufferStream(&buf);
+    var writer = std.Io.fixedBufferStream(&buf);
     try write(rows, cols, bitmap, writer.writer().any());
     log.debug("\n{s}", .{buf});
 }
@@ -103,7 +103,7 @@ fn write(
     comptime rows: u8,
     comptime cols: u8,
     bitmap: *const u.BitMap(rows, cols),
-    writer: std.io.AnyWriter,
+    writer: std.Io.AnyWriter,
 ) !void {
     for (1..rows + 1) |r| {
         for (1..cols + 1) |c| {
