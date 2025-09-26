@@ -61,14 +61,12 @@ pub fn notification(alloc: std.mem.Allocator, message: []const u8) !ModalWindow(
 ///               Entity id only in devmode
 ///                        v
 /// ┌────────────────Club(42)───────────┐
-/// │ A gnarled piece of wood, scarred  │ 
-/// │ from use. Deals blunt damage.     │ 
-/// │ Cheap and easy to use.            │ 
+/// │ A gnarled piece of wood, scarred  │
+/// │ from use. Deals blunt damage.     │
+/// │ Cheap and easy to use.            │
 /// │                                   │---
-/// │ State: sleep                      │ |
-/// │ Health: 10/10                     │ |
-/// │ Weight: 3                         │ | Only for known entity
-/// │ Damage: cutting 2-3               │ |
+/// │ Weight: 3                         │ ^
+/// │ Damage: cutting 2-3               │ | Only for known entity
 /// │ Effect:  burning 5                │ |
 /// │ Radius of light: 5                │ v
 /// └───────────────────────────────────┘---
@@ -81,93 +79,9 @@ pub fn entityDescription(
     entity: g.Entity,
     dev_mode: bool,
 ) !ModalWindow(TextArea) {
-    // TODO: write test for description of every entity
     var text_area: TextArea = .empty;
-    const description = session.registry.get(entity, c.Description);
-    const title: []const u8 = if (description) |d| session.getName(entity, d.preset) else "";
-    if (dev_mode) {
-        var line = try text_area.addEmptyLine(alloc);
-        _ = try std.fmt.bufPrint(line[1..], "Id: {d}", .{entity.id});
-        if (session.registry.get(entity, c.Position)) |position| {
-            line = try text_area.addEmptyLine(alloc);
-            _ = try std.fmt.bufPrint(line[1..], "Position: {any}", .{position.place});
-        }
-        if (session.registry.get(entity, c.EnemyState)) |state| {
-            line = try text_area.addEmptyLine(alloc);
-            _ = try std.fmt.bufPrint(line[1..], "State: is {s}", .{@tagName(state.*)});
-        }
-        if (session.registry.get(entity, c.Health)) |health| {
-            line = try text_area.addEmptyLine(alloc);
-            _ = try std.fmt.bufPrint(line[1..], "Health: {d}/{d}", .{ health.current, health.max });
-        }
-        if (session.registry.get(entity, c.Speed)) |speed| {
-            line = try text_area.addEmptyLine(alloc);
-            _ = try std.fmt.bufPrint(line[1..], "Speed: {d}", .{speed.move_points});
-        }
-        if (session.registry.get(entity, c.Equipment)) |equipment| {
-            if (equipment.weapon) |weapon| {
-                if (session.registry.get2(weapon, c.Description, c.Damage)) |tuple| {
-                    line = try text_area.addEmptyLine(alloc);
-                    const name = session.getName(weapon, tuple[0].preset);
-                    _ = try std.fmt.bufPrint(line[1..], "Weapon: {s}", .{name});
-                    line = try text_area.addEmptyLine(alloc);
-                    _ = try std.fmt.bufPrint(
-                        line[3..],
-                        "Damage: {s} {d}-{d}",
-                        .{ @tagName(tuple[1].damage_type), tuple[1].min, tuple[1].max },
-                    );
-                    if (session.registry.get(weapon, c.Effect)) |effect| {
-                        line = try text_area.addEmptyLine(alloc);
-                        _ = try std.fmt.bufPrint(
-                            line[3..],
-                            "Effect: {t} {d}-{d}",
-                            .{ effect.effect_type, effect.min, effect.max },
-                        );
-                    }
-                }
-            }
-            if (equipment.light) |light| {
-                if (session.registry.get2(light, c.Description, c.SourceOfLight)) |tuple| {
-                    line = try text_area.addEmptyLine(alloc);
-                    const name = session.getName(light, tuple[0].preset);
-                    _ = try std.fmt.bufPrint(line[1..], "Light: {s} radius {d}", .{ name, tuple[1].radius });
-                }
-            }
-        }
-        if (session.registry.get(entity, c.Damage)) |damage| {
-            line = try text_area.addEmptyLine(alloc);
-            _ = try std.fmt.bufPrint(
-                line[1..],
-                "Damage: {t} {d}-{d}",
-                .{ damage.damage_type, damage.min, damage.max },
-            );
-        }
-        if (session.registry.get(entity, c.Effect)) |effect| {
-            line = try text_area.addEmptyLine(alloc);
-            _ = try std.fmt.bufPrint(
-                line[1..],
-                "Effect: {t} {d}-{d}",
-                .{ effect.effect_type, effect.min, effect.max },
-            );
-        }
-        if (session.registry.get(entity, c.SourceOfLight)) |light| {
-            line = try text_area.addEmptyLine(alloc);
-            _ = try std.fmt.bufPrint(line[1..], "Radius of light: {d}", .{light.radius});
-        }
-        if (session.registry.get(entity, c.Weight)) |weight| {
-            line = try text_area.addEmptyLine(alloc);
-            _ = try std.fmt.bufPrint(line[1..], "Weight: {d}", .{weight.value});
-        }
-        line = try text_area.lines.addOne(alloc);
-        line.* = @splat('-');
-    }
-    // A description in form of flat text
-    if (description) |descr| {
-        for (session.getDescription(entity, descr.preset)) |str| {
-            const line = try text_area.addEmptyLine(alloc);
-            std.mem.copyForwards(u8, line, str);
-        }
-    }
+    const title: []const u8 = g.meta.name(session.registry, entity);
+    try g.meta.describe(session.registry, alloc, entity, session.journal.isKnown(entity), dev_mode, &text_area);
     return .{ .area = text_area, .title = title };
 }
 

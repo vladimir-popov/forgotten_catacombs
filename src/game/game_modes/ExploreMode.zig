@@ -99,12 +99,9 @@ fn statusLine(self: ExploreMode, entity: g.Entity, line: []u8) !usize {
     if (self.session.runtime.isDevMode()) {
         len += (try std.fmt.bufPrint(line[len..], "{d}:", .{entity.id})).len;
     }
-    if (self.session.registry.get(entity, c.Description)) |descr| {
-        len += (try std.fmt.bufPrint(line[len..], "{s}", .{self.session.getName(entity, descr.preset)})).len;
-
-        if (self.session.registry.get(entity, c.EnemyState)) |state| {
-            len += (try std.fmt.bufPrint(line[len..], "({s})", .{@tagName(state.*)})).len;
-        }
+    len += (try std.fmt.bufPrint(line[len..], "{s}", .{g.meta.name(self.session.registry, entity)})).len;
+    if (self.session.registry.get(entity, c.EnemyState)) |state| {
+        len += (try std.fmt.bufPrint(line[len..], "({s})", .{@tagName(state.*)})).len;
     }
     return len;
 }
@@ -212,11 +209,9 @@ fn windowWithEntities(
     var window = w.options(g.Entity, self);
     for (variants) |maybe_entity| {
         if (maybe_entity) |entity| {
-            // Every entity has to have description, or handling indexes become complicated
-            const description = self.session.registry.getUnsafe(entity, c.Description);
             try window.area.addOption(
                 self.arena.allocator(),
-                self.session.getName(entity, description.preset),
+                g.meta.name(self.session.registry, entity),
                 entity,
                 showEntityDescription,
                 null,

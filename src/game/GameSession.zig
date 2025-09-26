@@ -53,9 +53,10 @@ viewport: g.Viewport,
 ///
 registry: g.Registry,
 ///
+journal: g.Journal,
+///
 events: g.events.EventBus,
 player: g.Entity,
-known_potions: g.utils.Set(c.Effect.Type),
 /// The current level
 level: g.Level,
 /// The deepest achieved level
@@ -93,7 +94,7 @@ pub fn preInit(
         .max_depth = 0,
         .prng = std.Random.DefaultPrng.init(0),
         .ai = g.AI{ .session = self, .rand = self.prng.random() },
-        .known_potions = try g.utils.Set(c.Effect.Type).init(self.arena.allocator()),
+        .journal = try g.Journal.init(self.arena.allocator(), &self.registry),
         .player = undefined,
         .level = undefined,
         .mode = undefined,
@@ -134,8 +135,8 @@ pub fn initNew(
     var invent: *c.Inventory = self.registry.getUnsafe(self.player, c.Inventory);
     const weapon = try self.registry.addNewEntity(g.entities.Pickaxe);
     const light = try self.registry.addNewEntity(g.entities.Torch);
-    equipment.weapon = weapon;
-    equipment.light = light;
+    equipment.right_hand = weapon;
+    equipment.left_hand = light;
     try invent.items.add(weapon);
     try invent.items.add(light);
 
@@ -270,7 +271,8 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
         .entity_moved => |entity_moved| {
             if (entity_moved.entity.id == self.player.id) {
                 try self.level.onPlayerMoved(entity_moved);
-            }        },
+            }
+        },
         .entity_died => |entity| {
             log.debug("The enemy {d} has been died", .{entity.id});
         },
@@ -308,43 +310,10 @@ pub inline fn tick(self: *GameSession) !void {
     try self.events.notifySubscribers();
 }
 
-pub fn getName(
-    self: *const GameSession,
-    entity: g.Entity,
-    preset: g.descriptions.Presets.Keys,
-) []const u8 {
-    _ = self;
-    _ = entity;
-    return g.descriptions.Presets.get(preset).name;
-}
-
-pub fn getDescription(
-    self: *const GameSession,
-    entity: g.Entity,
-    preset: g.descriptions.Presets.Keys,
-) []const []const u8 {
-    _ = self;
-    _ = entity;
-    return g.descriptions.Presets.get(preset).description;
-}
-
-pub fn isEnemy(self: *const GameSession, entity: g.Entity) bool {
-    return self.registry.has(entity, c.EnemyState);
-}
-
-pub fn isItem(self: *const GameSession, entity: g.Entity) bool {
-    return self.registry.has(entity, c.Weight);
-}
-
-pub fn isEquipment(self: *const GameSession, item: g.Entity) bool {
-    return self.isItem(item) and
-        (self.registry.has(item, c.Damage) or self.registry.has(item, c.SourceOfLight));
-}
-
 /// `true` means that the actor is dead
 pub fn drinkPotion(self: *GameSession, actor: g.Entity, potion_id: g.Entity) !bool {
     if (self.registry.get(potion_id, c.Effect)) |effect| {
-        try self.known_potions.add(effect.effect_type);
+        try self.journal.known_potions.add(effect.effect_type);
         if (try self.applyEffect(actor, effect.*, actor)) return true;
     }
     // try to remove from the inventory

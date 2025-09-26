@@ -179,10 +179,7 @@ const inventory_line_fmt = std.fmt.comptimePrint(
 
 fn formatInventoryLine(self: *Self, line: *w.TextArea.Line, item: g.Entity) ![]const u8 {
     const sprite = self.session.registry.getUnsafe(item, c.Sprite);
-    const name = if (self.session.registry.get(item, c.Description)) |desc|
-        self.session.getName(item, desc.preset)
-    else
-        "?";
+    const name = g.meta.name(self.session.registry, item);
     const using = if (item.eql(self.equipment.weapon))
         "weapon"
     else if (item.eql(self.equipment.light))

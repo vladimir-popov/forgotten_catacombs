@@ -80,10 +80,8 @@ pub fn showInRadiusOfSourceOfLight(level: *const g.Level, place: p.Point) g.Rend
     var radius: f16 = 1.5;
     // fixme: keep pointer to Equipment of the player in the Level
     if (level.registry.get(level.player, c.Equipment)) |equip| {
-        if (equip.light) |light| {
-            if (level.registry.get(light, c.SourceOfLight)) |sol| {
-                radius = sol.radius;
-            }
+        if (g.meta.getSourceOfLight(level.registry.*, equip)) |sol| {
+            radius = sol.radius;
         }
     }
 
