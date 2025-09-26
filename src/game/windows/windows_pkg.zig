@@ -56,22 +56,22 @@ pub fn notification(alloc: std.mem.Allocator, message: []const u8) !ModalWindow(
     return .{ .area = text_area };
 }
 
-/// Example:
+/// Approximate example:
 /// ```
-/// ┌────────────────Club───────────────┐---
-/// │ Id: 12                            │ ^
-/// │ Position: 12                      │ |
+///               Entity id only in devmode
+///                        v
+/// ┌────────────────Club(42)───────────┐
+/// │ A gnarled piece of wood, scarred  │ 
+/// │ from use. Deals blunt damage.     │ 
+/// │ Cheap and easy to use.            │ 
+/// │                                   │---
 /// │ State: sleep                      │ |
 /// │ Health: 10/10                     │ |
-/// │ Speed: 10                         │ | Only in devmode
-/// │ Weight: 3                         │ |
+/// │ Weight: 3                         │ | Only for known entity
 /// │ Damage: cutting 2-3               │ |
 /// │ Effect:  burning 5                │ |
 /// │ Radius of light: 5                │ v
-/// │-----------------------------------│---
-/// │ The same information, but as a    │
-/// │ text with short description.      │
-/// └───────────────────────────────────┘
+/// └───────────────────────────────────┘---
 ///═══════════════════════════════════════
 ///                                Close
 /// ```

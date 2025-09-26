@@ -34,6 +34,8 @@ pub fn Preset(comptime S: type) type {
     return struct {
         pub const Keys = std.meta.FieldEnum(S);
 
+        pub const size: usize = @typeInfo(Keys).@"enum".fields.len;
+
         /// Returns default value for the field appropriate to the passed `key`.
         pub fn get(key: Keys) *const T {
             return stringMap.get(@tagName(key)).?;
