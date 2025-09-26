@@ -155,7 +155,7 @@ pub fn main() !void {
         .default;
 
     var reporter: FileReporter = if (custom_out) |out|
-        .{ .file_writer = out, .config = std.io.tty.Config.detect(out.file), .colors = colors }
+        .{ .file_writer = out, .config = std.Io.tty.Config.detect(out.file), .colors = colors }
     else
         .stdout(&io_buffer, colors);
 
@@ -316,7 +316,7 @@ const Test = struct {
                 var str: []u8 = &.{};
                 if (!no_stack_trace) {
                     if (@errorReturnTrace()) |stack_trace| {
-                        var stack_trace_writer = std.io.Writer.Allocating.init(arena.allocator());
+                        var stack_trace_writer = std.Io.Writer.Allocating.init(arena.allocator());
                         // skip frame from the testing.zig:
                         const st = std.builtin.StackTrace{
                             .index = stack_trace.index - 1,
@@ -449,7 +449,7 @@ const Duration = struct {
 
 /// Writes to a file a tests report as an optionally colored text.
 const FileReporter = struct {
-    const Color = std.io.tty.Color;
+    const Color = std.Io.tty.Color;
 
     const Colors = struct {
         title: Color = .cyan,
@@ -470,12 +470,12 @@ const FileReporter = struct {
     const border = "=" ** 65;
 
     file_writer: std.fs.File.Writer,
-    config: std.io.tty.Config,
+    config: std.Io.tty.Config,
     colors: Colors,
 
     pub fn stdout(buffer: []u8, colors: Colors) FileReporter {
         const file = std.fs.File.stdout();
-        return .{ .file_writer = file.writer(buffer), .config = std.io.tty.Config.detect(file), .colors = colors };
+        return .{ .file_writer = file.writer(buffer), .config = std.Io.tty.Config.detect(file), .colors = colors };
     }
 
     pub fn writeTitle(

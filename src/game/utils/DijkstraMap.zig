@@ -53,15 +53,15 @@ pub fn calculate(
 
 pub fn dumpToLog(map: VectorsMap, region: p.Region) void {
     var buf: [2048]u8 = [_]u8{0} ** 2048;
-    var writer = std.Io.fixedBufferStream(&buf);
-    DijkstraMap.write(map, writer.writer().any(), region) catch unreachable;
-    std.log.debug("Dijkstra Map ({any}):\n{s}", .{ region, std.mem.sliceTo(&buf, 0) });
+    var writer = std.Io.Writer.fixed(&buf);
+    DijkstraMap.write(map, &writer, region) catch unreachable;
+    std.log.debug("Dijkstra Map ({any}):\n{s}", .{ region, writer.buffered() });
 }
 
 /// Iterates over all points inside the passed region and writes a content for them
 /// from the map of vectors. The passed region may differ from the region used to fill the map of
 /// vectors. If the map doesn't contain some point, same result as for unreachable place will be written.
-fn write(map: VectorsMap, writer: std.Io.AnyWriter, region: p.Region) !void {
+fn write(map: VectorsMap, writer: *std.Io.Writer, region: p.Region) !void {
     try writer.print("   |", .{});
     for (0..region.cols) |col_idx| {
         try writer.print("{d:3}|", .{col_idx + 1});
@@ -111,8 +111,8 @@ test "vectors for the middle of the empty region 5x5" {
     try DijkstraMap.calculate(std.testing.allocator, &map, region, obstacles, .{ .row = 3, .col = 3 });
 
     var buf: [512]u8 = [1]u8{0} ** 512;
-    var fbs = std.Io.fixedBufferStream(&buf);
-    try DijkstraMap.write(map, fbs.writer().any(), region);
+    var writer = std.Io.Writer.fixed(&buf);
+    try DijkstraMap.write(map, &writer, region);
     const expected =
         \\   |  1|  2|  3|  4|  5|
         \\  1|> 4|> 3|v 2|v 3|v 4|
@@ -148,8 +148,8 @@ test "vectors for the region with obstacles" {
     try DijkstraMap.calculate(std.testing.allocator, &map, region, obstacles, .{ .row = 3, .col = 3 });
 
     var buf: [512]u8 = [1]u8{0} ** 512;
-    var fbs = std.Io.fixedBufferStream(&buf);
-    try DijkstraMap.write(map, fbs.writer().any(), region);
+    var writer = std.Io.Writer.fixed(&buf);
+    try DijkstraMap.write(map, &writer, region);
     const expected =
         \\   |  1|  2|  3|  4|  5|
         \\  1|v 8|? 0|v 2|v 3|v 4|

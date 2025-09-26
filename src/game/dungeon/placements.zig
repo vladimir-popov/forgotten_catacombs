@@ -8,6 +8,7 @@ const g = @import("../game_pkg.zig");
 const d = g.dungeon;
 const p = g.primitives;
 
+/// Contains pointers to bind placements
 pub const Doorway = struct {
     placement_from: Placement,
     placement_to: Placement,
@@ -114,10 +115,12 @@ pub const Area = struct {
     /// The region of this area including the borders
     region: p.Region,
     doorways: std.AutoHashMapUnmanaged(p.Point, void),
-    inner_rooms: std.SegmentedList(Room, 8),
+    // we need to have stable pointers to these rooms,
+    // or refactor initialization of the FirstLevel
+    inner_rooms: g.utils.SegmentedList(Room, 8),
 
     pub fn init(region: p.Region) Area {
-        return .{ .region = region, .doorways = .empty, .inner_rooms = std.SegmentedList(Room, 8){} };
+        return .{ .region = region, .doorways = .empty, .inner_rooms = g.utils.SegmentedList(Room, 8){} };
     }
 
     pub fn deinit(self: *Area, alloc: std.mem.Allocator) void {

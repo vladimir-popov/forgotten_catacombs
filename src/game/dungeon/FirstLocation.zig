@@ -133,7 +133,7 @@ fn cellAt(ptr: *const anyopaque, place: p.Point) d.Dungeon.Cell {
                 if (room.doorways.get(place)) |_| return .doorway;
                 return floorOrRock(room.region, place);
             } else {
-                return cellForTheTent(room, place);
+                return cellForTheTent(room.*, place);
             }
         }
     }
@@ -150,7 +150,7 @@ fn floorOrRock(region: p.Region, place: p.Point) d.Dungeon.Cell {
     return .floor;
 }
 
-fn cellForTheTent(room: *const d.Room, place: p.Point) d.Dungeon.Cell {
+fn cellForTheTent(room: d.Room, place: p.Point) d.Dungeon.Cell {
     if (room.doorways.get(place)) |_| return .doorway;
 
     if (room.region.top_left.row == place.row) {

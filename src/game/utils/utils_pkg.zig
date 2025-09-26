@@ -5,6 +5,7 @@ pub const DijkstraMap = @import("DijkstraMap.zig");
 pub const EntitiesSet = @import("EntitiesSet.zig");
 pub const Preset = @import("Preset.zig").Preset;
 pub const Set = @import("Set.zig").Set;
+pub const SegmentedList = @import("segmented_list.zig").SegmentedList;
 
 pub inline fn isDebug() bool {
     return switch (@import("builtin").mode) {

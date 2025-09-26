@@ -139,7 +139,7 @@ pub fn dumpToLog(self: Dungeon) void {
 
 pub fn write(
     self: Dungeon,
-    writer: anytype,
+    writer: *std.Io.Writer,
 ) !usize {
     var itr = self.cellsInRegion(.{ .top_left = .{ .row = 1, .col = 1 }, .rows = self.rows, .cols = self.cols });
     var row: usize = 1;

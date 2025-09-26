@@ -183,13 +183,14 @@ test "For same seed should return same dungeon" {
     }
 }
 
+// for tests only
 fn generateAndWriteDungeon(arena: *std.heap.ArenaAllocator, buf: []u8, seed: ?u64) !struct { u64, []const u8 } {
     var rnd = std.Random.DefaultPrng.init(100500);
-    var bfw = std.Io.fixedBufferStream(buf);
+    var bfw = std.Io.Writer.fixed(buf);
     while (true) {
         const s: u64 = seed orelse rnd.next();
         if (try Self.generateDungeon(arena, .{}, s)) |dunge| {
-            const len = try dunge.write(bfw.writer());
+            const len = try dunge.write(&bfw);
             return .{ dunge.seed, buf[0..len] };
         }
     }
