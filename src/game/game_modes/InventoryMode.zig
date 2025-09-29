@@ -179,7 +179,7 @@ const inventory_line_fmt = std.fmt.comptimePrint(
 
 fn formatInventoryLine(self: *Self, line: *w.TextArea.Line, item: g.Entity) ![]const u8 {
     const sprite = self.session.registry.getUnsafe(item, c.Sprite);
-    const name = g.meta.name(self.session.registry, item);
+    const name = g.meta.name(&self.session.registry, item);
     const using = if (item.eql(self.equipment.weapon))
         "weapon"
     else if (item.eql(self.equipment.light))
@@ -197,15 +197,14 @@ fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     if (item.eql(self.equipment.light) or item.eql(self.equipment.weapon)) {
         try window.area.addOption(self.alloc, "Unequip", item, unequipItem, null);
     } else {
-        if (self.session.registry.get(item, c.SourceOfLight)) |_| {
+        if (g.meta.isLight(&self.session.registry, item)) {
             try window.area.addOption(self.alloc, "Use as a light", item, useAsLight, null);
         }
-        if (self.session.registry.get(item, c.Damage)) |_| {
+        if (g.meta.isWeapon(&self.session.registry, item)) {
             try window.area.addOption(self.alloc, "Use as a weapon", item, useAsWeapon, null);
         }
-        if (self.session.registry.get(item, c.Consumable)) |consumable| {
-            const label = if (consumable.consumable_type == .potion) "Drink" else "Eat";
-            try window.area.addOption(self.alloc, label, item, consumeItem, null);
+        if (g.meta.isPotion(&self.session.registry, item)) {
+            try window.area.addOption(self.alloc, "Drink", item, consumeItem, null);
         }
     }
     try window.area.addOption(self.alloc, "Drop", item, dropSelectedItem, null);
@@ -295,10 +294,7 @@ fn updateDropTab(self: *Self, drop: g.Entity) !void {
 fn addDropOption(self: *Self, tab: *w.WindowWithTabs.Tab, item: g.Entity) !void {
     var buffer: w.TextArea.Line = undefined;
     const sprite = self.session.registry.getUnsafe(item, c.Sprite);
-    const name = if (self.session.registry.get(item, c.Description)) |desc|
-        self.session.getName(item, desc.preset)
-    else
-        "?";
+    const name = g.meta.name(&self.session.registry, item);
     const label = try std.fmt.bufPrint(&buffer, "{u} {s}", .{ sprite.codepoint, name });
     try tab.area.addOption(self.alloc, label, item, takeFromPileOrDescribe, describeSelectedItem);
 }

@@ -160,10 +160,10 @@ pub const Wallet = struct {
 };
 
 pub const Equipment = struct {
-    right_hand: ?g.Entity,
-    left_hand: ?g.Entity,
+    weapon: ?g.Entity,
+    light: ?g.Entity,
 
-    pub const nothing: Equipment = .{ .right_hand = null, .left_hand = null };
+    pub const nothing: Equipment = .{ .weapon = null, .light = null };
 };
 
 pub const Damage = struct {

@@ -167,9 +167,9 @@ const product_fmt = std.fmt.comptimePrint(
 );
 
 fn formatProduct(self: *Self, line: *w.TextArea.Line, item: g.Entity, for_buying: bool) ![]const u8 {
-    if (self.session.registry.get3(item, c.Price, c.Description, c.Sprite)) |tuple| {
-        const price, const description, const sprite = tuple;
-        const name = self.session.getName(item, description.preset);
+    if (self.session.registry.get2(item, c.Price, c.Sprite)) |tuple| {
+        const price, const sprite = tuple;
+        const name = g.meta.name(&self.session.registry, item);
         return try std.fmt.bufPrint(
             line,
             product_fmt,

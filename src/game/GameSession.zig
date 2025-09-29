@@ -135,8 +135,8 @@ pub fn initNew(
     var invent: *c.Inventory = self.registry.getUnsafe(self.player, c.Inventory);
     const weapon = try self.registry.addNewEntity(g.entities.Pickaxe);
     const light = try self.registry.addNewEntity(g.entities.Torch);
-    equipment.right_hand = weapon;
-    equipment.left_hand = light;
+    equipment.weapon = weapon;
+    equipment.light = light;
     try invent.items.add(weapon);
     try invent.items.add(light);
 

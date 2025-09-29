@@ -77,13 +77,7 @@ pub fn showTheCurrentPlacement(level: *const g.Level, place: p.Point) g.Render.V
 pub fn showInRadiusOfSourceOfLight(level: *const g.Level, place: p.Point) g.Render.Visibility {
     if (turn_light_on) return .visible;
 
-    var radius: f16 = 1.5;
-    // fixme: keep pointer to Equipment of the player in the Level
-    if (level.registry.get(level.player, c.Equipment)) |equip| {
-        if (g.meta.getSourceOfLight(level.registry.*, equip)) |sol| {
-            radius = sol.radius;
-        }
-    }
+    const radius = g.meta.getRadiusOfLight(level.registry, level.player_equipment);
 
     if (level.playerPosition().place.distanceTo(place) > radius) {
         log.debug("The place {any} is out of the light radius {d:.2}", .{ place, radius });

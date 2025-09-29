@@ -119,5 +119,5 @@ test "Drink healing potion" {
     try std.testing.expect(!test_session.session.registry.contains(potion));
     try std.testing.expect(!test_session.player.inventory().items.contains(potion));
     try std.testing.expect(test_session.player.health().current > 5);
-    try std.testing.expect(test_session.session.known_potions.contains(.healing));
+    try std.testing.expect(test_session.session.journal.known_potions.contains(.healing));
 }

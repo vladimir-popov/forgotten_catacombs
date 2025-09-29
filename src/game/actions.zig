@@ -84,7 +84,7 @@ pub fn calculateQuickActionForTarget(
         session.registry.get(target_entity, c.Position) orelse return null;
 
     if (player_position.place.eql(target_position.place)) {
-        if (g.meta.isItem(session.registry, target_entity)) {
+        if (g.meta.isItem(&session.registry, target_entity)) {
             return .{ .pickup = target_entity };
         }
         if (session.registry.get(target_entity, c.Ladder)) |ladder| {
@@ -96,7 +96,7 @@ pub fn calculateQuickActionForTarget(
     }
 
     if (player_position.place.near4(target_position.place)) {
-        if (g.meta.isEnemy(session.registry, target_entity)) {
+        if (g.meta.isEnemy(&session.registry, target_entity)) {
             return .{ .hit = target_entity };
         }
         if (session.registry.get(target_entity, c.Door)) |door| {
@@ -240,7 +240,7 @@ fn checkCollision(session: *g.GameSession, place: p.Point) ?Action {
                 if (session.registry.get(entity, c.Door)) |_|
                     return .{ .open = .{ .id = entity, .place = place } };
 
-                if (g.meta.isEnemy(session.registry, entity))
+                if (g.meta.isEnemy(&session.registry, entity))
                     return .{ .hit = entity };
 
                 if (session.registry.get(entity, c.Shop)) |shop| {
@@ -264,27 +264,15 @@ fn tryHit(
     actor: g.Entity,
     enemy: g.Entity,
 ) !bool {
-    const maybe_weapon = if (session.registry.get(actor, c.Equipment)) |equipment|
-        g.meta.getWeapon(session.registry, equipment)
-    else
-        null;
-
-    // todo: move this logic to meta
-    const damage = (if (maybe_weapon) |tuple| tuple[1] else null) orelse
-        session.registry.get(actor, c.Damage) orelse {
-        log.err("Actor {d} doesn't have any weapon", .{actor.id});
-        return error.NotEnoughComponents;
-    };
+    const damage, const maybe_effect = try g.meta.getDamage(&session.registry, actor);
 
     // Applying regular damage
     if (try session.doDamage(actor, damage.*, enemy)) return true;
 
     // Applying an effect of the weapon
-    if (maybe_weapon) |tuple| {
-        if (session.registry.get(tuple[0], c.Effect)) |effect| {
-            if (effect.damage()) |dmg|
-                if (try session.doDamage(actor, dmg, enemy)) return true;
-        }
+    if (maybe_effect) |effect| {
+        if (effect.damage()) |dmg|
+            if (try session.doDamage(actor, dmg, enemy)) return true;
     }
     return false;
 }

@@ -56,6 +56,9 @@ pub fn addEmptyLine(self: *Self, alloc: std.mem.Allocator) !*Line {
     return line;
 }
 
+// for compatibility with required interface used by the ModalWindow
+pub fn handleButton(_: *Self, _: g.Button) !void {}
+
 /// Uses the render to draw the text area directly to the screen.
 ///
 /// - `region` - A region of the screen to draw the content of the area.
@@ -72,5 +75,9 @@ pub fn draw(self: *const Self, render: g.Render, region: p.Region, scrolled: usi
     }
 }
 
-/// true means that the button is recognized and handled
-pub fn handleButton(_: *Self, _: g.Button) !void {}
+pub fn write(self: Self, writer: *std.Io.Writer) !void {
+    for (self.lines.items) |line| {
+        try writer.writeAll(&line);
+        try writer.writeByte('\n');
+    }
+}

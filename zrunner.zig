@@ -52,6 +52,7 @@ pub const std_options: std.Options = .{
     },
 };
 
+const log_file = "test.log";
 var log_buffer: [128]u8 = undefined;
 var log_writer: ?std.fs.File.Writer = null;
 
@@ -62,23 +63,16 @@ pub fn writeLog(
     args: anytype,
 ) void {
     if (log_writer) |*writer| {
-        const colors: [5][]const u8 = .{
-            "\x1b[32m",
-            "\x1b[33m",
-            "\x1b[34m",
-            "\x1b[35m",
-            "\x1b[36m",
-        };
-        const color = comptime colors[std.hash.Murmur2_32.hash(@tagName(scope)) % colors.len];
-        const level_txt = comptime "\x1b[30m " ++ message_level.asText() ++ "\x1b[0m ";
-        writer.interface.print(color ++ @tagName(scope) ++ "\x1b[0m" ++ level_txt ++ ": " ++ format ++ "\n", args) catch {
+        const level_txt = comptime message_level.asText();
+        const prefix2 = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
+        writer.interface.print(level_txt ++ prefix2 ++ format ++ "\n", args) catch {
             @panic("Error on write log");
         };
         writer.interface.flush() catch {
             @panic("Error on flushing log buffer");
         };
     } else {
-        const file = std.fs.cwd().createFile("test.log", .{ .read = false, .truncate = true }) catch {
+        const file = std.fs.cwd().createFile(log_file, .{ .read = false, .truncate = true }) catch {
             @panic("Error on open log file.");
         };
         log_writer = file.writer(&log_buffer);
@@ -315,13 +309,13 @@ const Test = struct {
             else => {
                 var str: []u8 = &.{};
                 if (!no_stack_trace) {
-                    if (@errorReturnTrace()) |stack_trace| {
+                    if (@errorReturnTrace()) |st| {
                         var stack_trace_writer = std.Io.Writer.Allocating.init(arena.allocator());
                         // skip frame from the testing.zig:
-                        const st = std.builtin.StackTrace{
-                            .index = stack_trace.index - 1,
-                            .instruction_addresses = stack_trace.instruction_addresses[1..],
-                        };
+                        while (isTestingZig(st.instruction_addresses[0])) {
+                            st.index -= 1;
+                            st.instruction_addresses = st.instruction_addresses[1..];
+                        }
                         try st.format(&stack_trace_writer.writer);
                         str = stack_trace_writer.written();
                     }
@@ -338,6 +332,19 @@ const Test = struct {
             },
         }
         return test_result;
+    }
+
+    /// Returns true only if the address is point on some place inside `testing.zig` file.
+    fn isTestingZig(address: usize) bool {
+        const debug_info = std.debug.getSelfDebugInfo() catch return false;
+        const module = debug_info.getModuleForAddress(address) catch return false;
+        const symbol = module.getSymbolAtAddress(debug_info.allocator, address) catch return false;
+        if (symbol.source_location) |sl| {
+            const result = std.mem.endsWith(u8, sl.file_name, "testing.zig");
+            debug_info.allocator.free(sl.file_name);
+            return result;
+        }
+        return false;
     }
 };
 

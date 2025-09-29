@@ -251,7 +251,7 @@ fn drawInfoBar(self: *const PlayMode) !void {
                 return;
             }
         }
-        try self.session.render.drawInfo(g.meta.name(self.session.registry, entity));
+        try self.session.render.drawInfo(g.meta.name(&self.session.registry, entity));
     } else {
         try self.session.render.cleanInfo();
     }

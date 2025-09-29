@@ -80,8 +80,8 @@ pub fn entityDescription(
     dev_mode: bool,
 ) !ModalWindow(TextArea) {
     var text_area: TextArea = .empty;
-    const title: []const u8 = g.meta.name(session.registry, entity);
-    try g.meta.describe(session.registry, alloc, entity, session.journal.isKnown(entity), dev_mode, &text_area);
+    const title: []const u8 = g.meta.name(&session.registry, entity);
+    try g.meta.describe(&session.registry, alloc, entity, session.journal.isKnown(entity), dev_mode, &text_area);
     return .{ .area = text_area, .title = title };
 }
 

@@ -395,7 +395,7 @@ pub const Region = struct {
         const result = region.croppedHorizontallyAfter(2);
         // then:
         try std.testing.expectEqualDeep(
-            Region{ .top_left = .{ .row = 3, .col = 1 }, .rows = 3, .cols = 3 },
+            Region{ .top_left = .{ .row = 31, .col = 1 }, .rows = 3, .cols = 3 },
             result,
         );
     }

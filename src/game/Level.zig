@@ -23,6 +23,9 @@ pub const DijkstraMapRegion = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .ro
 arena: std.heap.ArenaAllocator,
 registry: *g.Registry,
 player: g.Entity = undefined,
+player_equipment: *c.Equipment = undefined,
+/// The placement where the player right now. It's used for optimization.
+player_placement: d.Placement = undefined,
 /// The list of the entities belong to this level.
 /// Used to cleanup global registry on moving from the level.
 /// The player doesn't belong to any particular level and should not be presented here.
@@ -35,8 +38,6 @@ visibility_strategy: *const fn (level: *const g.Level, place: p.Point) g.Render.
 visited_places: []std.DynamicBitSetUnmanaged = undefined,
 /// All static objects (doors, ladders, items) met previously.
 remembered_objects: std.AutoHashMapUnmanaged(p.Point, g.Entity),
-/// The placement where the player right now. It's used for optimization.
-player_placement: d.Placement = undefined,
 /// Dijkstra Map of direction to the player. Used to find a path to the player.
 dijkstra_map: u.DijkstraMap.VectorsMap,
 
@@ -66,7 +67,7 @@ pub fn reset(self: *Self) void {
     self.dijkstra_map = .empty;
 }
 
-/// Generates with the passed seed and sets up a dungeon to the preinited level.
+/// Generates a dungeon with the passed seed and sets up a dungeon to the preinited level.
 /// This is the first step in loading a level.
 pub fn initWithEmptyDungeon(
     self: *Self,
@@ -98,6 +99,7 @@ fn setupDungeon(
 
     self.depth = depth;
     self.player = player;
+    self.player_equipment = self.registry.getUnsafe(player, c.Equipment);
     self.dungeon = dungeon;
     self.visibility_strategy = switch (dungeon.type) {
         .first_location => g.visibility.showTheCurrentPlacement,
