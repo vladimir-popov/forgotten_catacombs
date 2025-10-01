@@ -313,7 +313,7 @@ pub inline fn tick(self: *GameSession) !void {
 /// `true` means that the actor is dead
 pub fn drinkPotion(self: *GameSession, actor: g.Entity, potion_id: g.Entity) !bool {
     if (self.registry.get(potion_id, c.Effect)) |effect| {
-        try self.journal.known_potions.add(effect.effect_type);
+        try self.journal.markAsKnown(potion_id);
         if (try self.applyEffect(actor, effect.*, actor)) return true;
     }
     // try to remove from the inventory

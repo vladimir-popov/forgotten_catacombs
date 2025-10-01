@@ -16,7 +16,7 @@ test "Saving a game session and go back to the main menu" {
         \\                                        
         \\                                        
         \\                                        
-        \\
+        \\                                        
         \\             Saving   0%
         \\                                        
         \\                                        
@@ -24,32 +24,32 @@ test "Saving a game session and go back to the main menu" {
         \\                                        
         \\                                        
         \\                                        
-    );
+    , .whole_display);
     try std.testing.expectEqual(.session_saved, test_session.session.mode.save_load.process.saving.progress);
     try test_session.tick();
-    try test_session.runtime.last_frame.expectRowLooksLike(5,
+    try test_session.runtime.last_frame.expectLooksLike(
         \\                     20%                
-    );
+    , .{ .line = 6 });
     try std.testing.expectEqual(.level_seed_saved, test_session.session.mode.save_load.process.saving.progress);
     try test_session.tick();
-    try test_session.runtime.last_frame.expectRowLooksLike(5,
+    try test_session.runtime.last_frame.expectLooksLike(
         \\                     30%                
-    );
+    , .{ .line = 6 });
     try std.testing.expectEqual(.entities_saved, test_session.session.mode.save_load.process.saving.progress);
     try test_session.tick();
-    try test_session.runtime.last_frame.expectRowLooksLike(5,
+    try test_session.runtime.last_frame.expectLooksLike(
         \\                     70%                
-    );
+    , .{ .line = 6 });
     try std.testing.expectEqual(.visited_places_saved, test_session.session.mode.save_load.process.saving.progress);
     try test_session.tick();
-    try test_session.runtime.last_frame.expectRowLooksLike(5,
+    try test_session.runtime.last_frame.expectLooksLike(
         \\                     80%                
-    );
+    , .{ .line = 6 });
     try std.testing.expectEqual(.remembered_objects_saved, test_session.session.mode.save_load.process.saving.progress);
     try test_session.tick();
-    try test_session.runtime.last_frame.expectRowLooksLike(5,
+    try test_session.runtime.last_frame.expectLooksLike(
         \\                     95%                
-    );
+    , .{ .line = 6 });
     try std.testing.expectEqual(.completed, test_session.session.mode.save_load.process.saving.progress);
     // the error.GoToMainMenu is used to break the game session loop and go back to the main screen
     try std.testing.expectError(error.GoToMainMenu, test_session.tick());
@@ -83,32 +83,32 @@ test "Loading a game session" {
         \\                                        
         \\
         \\
-    );
+    , .whole_display);
     try std.testing.expectEqual(.session_loaded, test_session.session.mode.save_load.process.loading.progress);
     try test_session.tick();
-    try test_session.runtime.last_frame.expectRowLooksLike(5,
+    try test_session.runtime.last_frame.expectLooksLike(
         \\                      10% 
-    );
+    , .{ .line = 6 });
     try std.testing.expectEqual(.level_inited, test_session.session.mode.save_load.process.loading.progress);
     try test_session.tick();
-    try test_session.runtime.last_frame.expectRowLooksLike(5,
+    try test_session.runtime.last_frame.expectLooksLike(
         \\                      20% 
-    );
+    , .{ .line = 6 });
     try std.testing.expectEqual(.entities_loaded, test_session.session.mode.save_load.process.loading.progress);
     try test_session.tick();
-    try test_session.runtime.last_frame.expectRowLooksLike(5,
+    try test_session.runtime.last_frame.expectLooksLike(
         \\                      70% 
-    );
+    , .{ .line = 6 });
     try std.testing.expectEqual(.visited_places_loaded, test_session.session.mode.save_load.process.loading.progress);
     try test_session.tick();
-    try test_session.runtime.last_frame.expectRowLooksLike(5,
+    try test_session.runtime.last_frame.expectLooksLike(
         \\                      80% 
-    );
+    , .{ .line = 6 });
     try std.testing.expectEqual(.remembered_objects_loaded, test_session.session.mode.save_load.process.loading.progress);
     try test_session.tick();
-    try test_session.runtime.last_frame.expectRowLooksLike(5,
+    try test_session.runtime.last_frame.expectLooksLike(
         \\                      90% 
-    );
+    , .{ .line = 6 });
     try std.testing.expectEqual(.completed, test_session.session.mode.save_load.process.loading.progress);
     try test_session.tick();
     try std.testing.expect(test_session.session.mode == .play);

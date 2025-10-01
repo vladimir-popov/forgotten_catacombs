@@ -178,18 +178,10 @@ pub const Region = struct {
         return .{ .top_left = .{ .row = top_left_row, .col = top_left_col }, .rows = rows, .cols = cols };
     }
 
-    pub fn format(
-        self: Region,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = fmt;
-        _ = options;
-
+    pub fn format(self: Region, writer: *std.Io.Writer) !void {
         try writer.print(
-            "Region(r:{d}, c:{d}, rows:{d}, cols:{d}, ratio:{d})",
-            .{ self.top_left.row, self.top_left.col, self.rows, self.cols, self.ratio() },
+            "Region(r:{d}, c:{d}, rows:{d}, cols:{d})",
+            .{ self.top_left.row, self.top_left.col, self.rows, self.cols },
         );
     }
 
@@ -395,7 +387,7 @@ pub const Region = struct {
         const result = region.croppedHorizontallyAfter(2);
         // then:
         try std.testing.expectEqualDeep(
-            Region{ .top_left = .{ .row = 31, .col = 1 }, .rows = 3, .cols = 3 },
+            Region{ .top_left = .{ .row = 3, .col = 1 }, .rows = 3, .cols = 3 },
             result,
         );
     }

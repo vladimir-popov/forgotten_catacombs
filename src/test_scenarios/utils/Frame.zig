@@ -1,11 +1,15 @@
 const std = @import("std");
 const g = @import("game");
+const p = g.primitives;
 const tty = @import("terminal").tty;
 const WriterError = std.Io.Writer.Error;
 
 const log = std.log.scoped(.test_utils);
 
 const Self = @This();
+
+const zero_symbol = '�';
+const space_symbol = '¶';
 
 sprites: [g.DISPLAY_ROWS][g.DISPLAY_COLS]g.Render.DrawableSymbol,
 
@@ -20,6 +24,74 @@ pub const empty: Self = blk: {
     break :blk frame;
 };
 
+pub const ComparingArea = union(enum) {
+    whole_display,
+    game_area,
+    region: p.Region,
+    line: u8,
+    fn toRegion(self: ComparingArea) p.Region {
+        return switch (self) {
+            .whole_display => p.Region.init(1, 1, g.DISPLAY_ROWS, g.DISPLAY_COLS),
+            .game_area => p.Region.init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS),
+            .region => |reg| reg,
+            .line => |l| p.Region.init(l, 1, 1, g.DISPLAY_COLS),
+        };
+    }
+};
+
+/// Used to format a region of the frame.
+const FormatedArea = struct {
+    const OutputOptions = struct {
+        tty_output: bool = false,
+        zero_symbol: u21 = zero_symbol,
+        space_symbol: u21 = space_symbol,
+
+        const flat = OutputOptions{ .tty_output = false, .zero_symbol = zero_symbol, .space_symbol = ' ' };
+        const actual = OutputOptions{ .tty_output = true, .zero_symbol = zero_symbol, .space_symbol = ' ' };
+        const diff = OutputOptions{ .tty_output = true, .zero_symbol = ' ', .space_symbol = space_symbol };
+    };
+
+    frame: *const Self,
+    area: ComparingArea,
+    opt: OutputOptions = .{},
+
+    pub fn format(
+        self: @This(),
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
+        var mode: g.DrawingMode = .normal;
+        const region = self.area.toRegion();
+        var itr = region.cells();
+        while (itr.next()) |cell| {
+            const sprite = self.frame.sprites[cell.row - 1][cell.col - 1];
+            if (self.opt.tty_output and mode != sprite.mode) {
+                mode = sprite.mode;
+                switch (mode) {
+                    .inverted => _ = try writer.write(tty.Text.SGR_INVERT_COLORS),
+                    else => _ = try writer.write(tty.Text.SGR_RESET),
+                }
+            }
+            const codepoint = if (sprite.codepoint == ' ')
+                self.opt.space_symbol
+            else if (sprite.codepoint == 0)
+                self.opt.zero_symbol
+            else
+                sprite.codepoint;
+            try writer.print("{u}", .{codepoint});
+            if (cell.col - region.top_left.col == region.cols - 1) {
+                if (self.opt.tty_output) {
+                    _ = try writer.write(tty.Text.SGR_RESET);
+                }
+                try writer.writeByte('\n');
+            }
+        }
+    }
+};
+
+fn formatArea(self: *const Self, area: ComparingArea, opt: FormatedArea.OutputOptions) FormatedArea {
+    return .{ .frame = self, .area = area, .opt = opt };
+}
+
 pub fn merge(self: *Self, other: Self) void {
     for (0..g.DISPLAY_ROWS) |r| {
         for (0..g.DISPLAY_COLS) |c| {
@@ -30,117 +102,59 @@ pub fn merge(self: *Self, other: Self) void {
 }
 
 pub fn format(self: @This(), writer: *std.Io.Writer) WriterError!void {
-    for (0..g.DISPLAY_ROWS) |r| {
-        try self.formatRow(writer, r);
-        try writer.writeByte('\n');
-    }
-}
-
-pub fn formatRow(self: @This(), writer: *std.Io.Writer, row_idx: usize) WriterError!void {
-    var buf: [4]u8 = undefined;
-    for (0..g.DISPLAY_COLS) |c| {
-        const sprite = self.sprites[row_idx][c];
-        if (sprite.codepoint == 0) {
-            _ = try writer.writeByte(' ');
-        } else if (sprite.codepoint <= 127) {
-            try writer.writeByte(@truncate(sprite.codepoint));
-        } else {
-            const len = std.unicode.utf8Encode(sprite.codepoint, &buf) catch |err| {
-                log.err("Error {t} on encoding utf8 {any}", .{ err, sprite.codepoint });
-                return error.WriteFailed;
-            };
-            _ = try writer.write(buf[0..len]);
-        }
-    }
+    try self.formatArea(.whole_display, .flat).format(writer);
 }
 
 pub fn ttyFormat(self: @This(), writer: *std.Io.Writer) WriterError!void {
-    var buf: [4]u8 = undefined;
-    for (0..g.DISPLAY_ROWS) |r| {
-        var mode: g.DrawingMode = .normal;
-        for (0..g.DISPLAY_COLS) |c| {
-            const sprite = self.sprites[r][c];
-            if (mode != sprite.mode) {
-                mode = sprite.mode;
-                switch (mode) {
-                    .inverted => _ = try writer.write(tty.Text.SGR_INVERT_COLORS),
-                    else => _ = try writer.write(tty.Text.SGR_RESET),
-                }
-            }
-            if (sprite.codepoint == 0) {
-                _ = try writer.write("�");
-            } else if (sprite.codepoint <= 127) {
-                try writer.writeByte(@truncate(sprite.codepoint));
-            } else {
-                const len = std.unicode.utf8Encode(sprite.codepoint, &buf) catch |err| {
-                    log.err("Error {t} on encoding utf8 {any}", .{ err, sprite.codepoint });
-                    return error.WriteFailed;
-                };
-                _ = try writer.write(buf[0..len]);
-            }
-        }
-        _ = try writer.write(tty.Text.SGR_RESET);
-        try writer.writeByte('\n');
-    }
+    try self.formatArea(.whole_display, .actual).format(writer);
 }
 
-pub fn expectEqual(self: Self, expected: Self) !void {
-    var has_difference = false;
-    var diff: Self = .empty;
-    for (0..g.DISPLAY_ROWS) |r| {
-        for (0..g.DISPLAY_COLS) |c| {
-            const exp = expected.sprites[r][c];
-            const act = self.sprites[r][c];
-            if (!std.meta.eql(exp, act)) {
-                diff.sprites[r][c] = act;
-                has_difference = true;
-            }
-        }
-    }
-    if (has_difference) {
-        std.debug.print("\nExpected frame:\n{f}", .{std.fmt.alt(expected, .ttyFormat)});
-        std.debug.print("\nActual frame:\n{f}", .{std.fmt.alt(self, .ttyFormat)});
-        std.debug.print("\nDifference:\n{f}", .{std.fmt.alt(diff, .ttyFormat)});
+pub fn expectLooksLike(self: Self, expectation: []const u8, area: ComparingArea) !void {
+    if (try self.diffInArea(try parse(expectation, area.toRegion()), area)) |diff| {
+        var buffer: [g.DISPLAY_ROWS * g.DISPLAY_COLS * 4]u8 = @splat(0);
+        _ = std.mem.replace(u8, expectation, "\n", "↩\n", &buffer);
+        std.debug.print("\nExpectation in the {f} (highlighting omitted):\n{s}", .{ area.toRegion(), buffer });
+        std.debug.print("\nActual frame:\n{f}", .{self.formatArea(area, .actual)});
+        std.debug.print("\nDifference (from actual frame):\n{f}", .{diff.formatArea(area, .diff)});
         return error.TestExpectedEqual;
     }
 }
 
-pub fn expectLooksLike(self: Self, str: []const u8) !void {
+fn diffInArea(self: Self, expected_frame: Self, area: ComparingArea) !?Self {
     var has_difference = false;
     var diff: Self = .empty;
-    const symbols = try std.unicode.Utf8View.init(str);
-    var itr = symbols.iterator();
-    var r: usize = 0;
-    var c: usize = 0;
-    while (itr.nextCodepoint()) |symbol| {
-        if (symbol == '\n') {
-            if (c < self.sprites[r].len) {
-                for (c..self.sprites[r].len) |c0| {
-                    const codepoint = self.sprites[r][c0].codepoint;
-                    if (codepoint > 0 and codepoint != ' ') {
-                        diff.sprites[r][c0].codepoint = if (codepoint == ' ') '¶' else codepoint;
-                        has_difference = true;
-                    }
-                }
-            }
-            r += 1;
-            c = 0;
-            continue;
-        }
-        const codepoint = self.sprites[r][c].codepoint;
-        if (!isEqual(codepoint, symbol)) {
-            diff.sprites[r][c].codepoint = if (codepoint == ' ') '¶' else codepoint;
+    const region = area.toRegion();
+    var cells = region.cells();
+    while (cells.next()) |cell| {
+        const r = cell.row - 1;
+        const c = cell.col - 1;
+        const actual_codepoint = self.sprites[r][c].codepoint;
+        const expected_codepoint = expected_frame.sprites[r][c].codepoint;
+        if (!isEqual(actual_codepoint, expected_codepoint)) {
+            diff.sprites[r][c].codepoint = actual_codepoint;
             has_difference = true;
         }
-        c += 1;
     }
-    if (has_difference) {
-        std.debug.print("\nExpected (highlighting omitted):\n{s}", .{str});
-        std.debug.print("\nActual frame:\n{f}", .{std.fmt.alt(self, .ttyFormat)});
-        std.debug.print("\nDifference (from actual frame):\n{f}", .{diff});
-        return error.TestExpectedEqual;
-    }
+    return if (has_difference) diff else null;
 }
+
+fn parse(str: []const u8, region: p.Region) !Self {
+    var frame: Self = .empty;
+    var r: usize = region.top_left.row - 1;
+    var itr = std.mem.splitScalar(u8, str, '\n');
+    while (itr.next()) |line| {
+        var c: usize = region.top_left.col - 1;
+        const view = try std.unicode.Utf8View.init(line);
+        var codepoints = view.iterator();
+        while (codepoints.nextCodepoint()) |codepoint| {
+            frame.sprites[r][c].codepoint = codepoint;
+            c += 1;
+        }
+        r += 1;
+    }
+    return frame;
+}
+
 fn isEqual(codepoint: u21, expected_symbol: u21) bool {
     // special cases for blank symbol
     if (codepoint == 0) {
@@ -151,52 +165,7 @@ fn isEqual(codepoint: u21, expected_symbol: u21) bool {
 
 fn isBlank(codepoint: u21) bool {
     return switch (codepoint) {
-        0, ' ', '�' => true,
+        0, ' ', space_symbol, zero_symbol => true,
         else => false,
     };
-}
-
-pub fn expectRowLooksLike(self: Self, row_idx: usize, expected_row: []const u8) !void {
-    var has_difference = false;
-    var diff: Self = .empty;
-    const symbols = try std.unicode.Utf8View.init(expected_row);
-    var itr = symbols.iterator();
-    var c: usize = 0;
-    while (itr.nextCodepoint()) |symbol| {
-        if (symbol == '\n') {
-            if (c < self.sprites[row_idx].len) {
-                for (c..self.sprites[row_idx].len) |c0| {
-                    const codepoint = self.sprites[row_idx][c0].codepoint;
-                    if (codepoint > 0 and codepoint != ' ') {
-                        diff.sprites[row_idx][c0].codepoint = if (codepoint == ' ') '¶' else codepoint;
-                        has_difference = true;
-                    }
-                }
-            }
-            std.debug.assert(itr.nextCodepoint() == null);
-            break;
-        }
-        const codepoint = self.sprites[row_idx][c].codepoint;
-        if (symbol == ' ' and codepoint == 0) {
-            c += 1;
-            continue;
-        }
-        if (codepoint != symbol) {
-            diff.sprites[row_idx][c].codepoint = if (codepoint == ' ') '¶' else codepoint;
-            has_difference = true;
-        }
-        c += 1;
-    }
-    if (has_difference) {
-        std.debug.print("\nExpected row (highlighting omitted):\n{s}", .{expected_row});
-        var buffer: [64]u8 = undefined;
-        const bw = std.debug.lockStderrWriter(&buffer);
-        defer std.debug.unlockStderrWriter();
-        try bw.writeAll("\nActual row:\n");
-        try self.formatRow(bw, row_idx);
-        try bw.writeAll("\nDifference (from actual frame):\n");
-        try diff.formatRow(bw, row_idx);
-        try bw.writeByte('\n');
-        return error.TestExpectedEqual;
-    }
 }

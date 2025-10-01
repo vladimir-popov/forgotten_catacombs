@@ -16,11 +16,15 @@ const log = std.log.scoped(.windows);
 
 pub fn ModalWindow(comptime Area: type) type {
     return struct {
+
         const Self = @This();
 
         area: Area,
         title: []const u8 = "",
         scrolled_lines: usize = 0,
+        /// A maximal region which can be occupied by the modal window.
+        /// This region includes a space for borders.
+        max_region: p.Region = p.Region.init(1, 2, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS - 2),
 
         pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
             self.area.deinit(alloc);
@@ -32,12 +36,12 @@ pub fn ModalWindow(comptime Area: type) type {
             // Count of rows that should be drawn (including border)
             const rows: usize = self.area.totalLines() + 2; // 2 for border
             return .{
-                .top_left = if (rows < w.MAX_REGION.rows)
-                    w.MAX_REGION.top_left.movedToNTimes(.down, (w.MAX_REGION.rows - rows) / 2)
+                .top_left = if (rows < self.max_region.rows)
+                    self.max_region.top_left.movedToNTimes(.down, (self.max_region.rows - rows) / 2)
                 else
-                    w.MAX_REGION.top_left,
-                .rows = @min(rows, w.MAX_REGION.rows),
-                .cols = w.MAX_REGION.cols,
+                    self.max_region.top_left,
+                .rows = @min(rows, self.max_region.rows),
+                .cols = self.max_region.cols,
             };
         }
 
@@ -70,11 +74,11 @@ pub fn ModalWindow(comptime Area: type) type {
         }
 
         pub fn isScrolled(self: Self) bool {
-            return self.area.totalLines() + 2 > w.MAX_REGION.rows;
+            return self.area.totalLines() + 2 > self.max_region.rows;
         }
 
         inline fn maxScrollingCount(self: Self) usize {
-            return self.area.totalLines() - (w.MAX_REGION.rows - 2); // -2 borders
+            return self.area.totalLines() - (self.max_region.rows - 2); // -2 borders
         }
 
         pub fn draw(self: *const Self, render: g.Render) !void {

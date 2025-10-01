@@ -71,8 +71,8 @@ pub fn describe(
     alloc: std.mem.Allocator,
     entity: g.Entity,
     is_known: bool,
-    dev_mode: bool,
     text_area: *g.windows.TextArea,
+    dev_mode: bool,
 ) !void {
     const description = if (registry.get(entity, c.Description)) |descr|
         g.descriptions.Presets.get(descr.preset).description
@@ -83,12 +83,10 @@ pub fn describe(
         @memmove(line[0..str.len], str);
     }
     _ = try text_area.addEmptyLine(alloc);
-    if (dev_mode or is_known) {
-        if (isItem(registry, entity)) {
-            try describeItem(registry, alloc, entity, text_area);
-        } else if (isEnemy(registry, entity)) {
-            try describeEnemy(registry, alloc, entity, text_area);
-        }
+    if (isItem(registry, entity)) {
+        try describeItem(registry, alloc, entity, is_known, text_area, dev_mode);
+    } else if (isEnemy(registry, entity)) {
+        try describeEnemy(registry, alloc, entity, is_known, text_area, dev_mode);
     }
 }
 
@@ -96,18 +94,22 @@ fn describeItem(
     registry: *const g.Registry,
     alloc: std.mem.Allocator,
     entity: g.Entity,
+    is_known: bool,
     text_area: *g.windows.TextArea,
+    dev_mode: bool,
 ) !void {
+    _ = is_known;
+    _ = dev_mode;
     if (registry.get(entity, c.Damage)) |damage| {
-        try describeWeapon(alloc, damage, registry.get(entity, c.Effect), text_area, 1);
+        try addWeaponDescription(alloc, damage, registry.get(entity, c.Effect), text_area, 0);
     }
     if (registry.get(entity, c.SourceOfLight)) |light| {
-        var line = try text_area.addEmptyLine(alloc);
-        _ = try std.fmt.bufPrint(line[1..], "Radius of light: {d}", .{light.radius});
+        const line = try text_area.addEmptyLine(alloc);
+        _ = try std.fmt.bufPrint(line, "Radius of light: {d}", .{light.radius});
     }
     if (registry.get(entity, c.Weight)) |weight| {
-        var line = try text_area.addEmptyLine(alloc);
-        _ = try std.fmt.bufPrint(line[1..], "Weight: {d}", .{weight.value});
+        const line = try text_area.addEmptyLine(alloc);
+        _ = try std.fmt.bufPrint(line, "Weight: {d}", .{weight.value});
     }
 }
 
@@ -115,8 +117,12 @@ fn describeEnemy(
     registry: *const g.Registry,
     alloc: std.mem.Allocator,
     enemy: g.Entity,
+    is_known: bool,
     text_area: *g.windows.TextArea,
+    dev_mode: bool,
 ) !void {
+    _ = is_known;
+    _ = dev_mode;
     if (registry.get(enemy, c.Health)) |health| {
         var line = try text_area.addEmptyLine(alloc);
         _ = try std.fmt.bufPrint(line[1..], "Health: {d}/{d}", .{ health.current, health.max });
@@ -128,7 +134,7 @@ fn describeEnemy(
     if (registry.get(enemy, c.Equipment)) |equipment| {
         try describeEquipment(registry, alloc, equipment, text_area);
     } else if (registry.get(enemy, c.Damage)) |damage| {
-        try describeWeapon(alloc, damage, registry.get(enemy, c.Effect), text_area, 1);
+        try addWeaponDescription(alloc, damage, registry.get(enemy, c.Effect), text_area, 1);
     }
 }
 
@@ -141,7 +147,7 @@ fn describeEquipment(
     if (equipment.weapon) |weapon| {
         var line = try text_area.addEmptyLine(alloc);
         _ = try std.fmt.bufPrint(line[1..], "Equiped weapon: {s}", .{g.meta.name(registry, weapon)});
-        try describeWeapon(
+        try addWeaponDescription(
             alloc,
             registry.getUnsafe(weapon, c.Damage),
             registry.get(weapon, c.Effect),
@@ -153,7 +159,7 @@ fn describeEquipment(
     _ = try std.fmt.bufPrint(line[1..], "Radius of light: {d}", .{g.meta.getRadiusOfLight(registry, equipment)});
 }
 
-fn describeWeapon(
+fn addWeaponDescription(
     alloc: std.mem.Allocator,
     damage: *const c.Damage,
     maybe_effect: ?*const c.Effect,
@@ -185,7 +191,7 @@ test "Describe torch" {
     defer text_area.deinit(std.testing.allocator);
 
     // when:
-    try describe(&registry, std.testing.allocator, id, true, true, &text_area);
+    try describe(&registry, std.testing.allocator, id, true, &text_area, true);
 
     // then:
     try expectContent(text_area,

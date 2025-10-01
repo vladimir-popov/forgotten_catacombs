@@ -70,7 +70,9 @@ pub fn tick(self: *PlayMode) !void {
                 },
                 else => {},
             }
+            try self.session.journal.onTurnCompleted();
         }
+        // todo move up and add test:
         self.is_player_turn = false;
     } else {
         var itr = self.session.registry.query3(c.EnemyState, c.Initiative, c.Speed);

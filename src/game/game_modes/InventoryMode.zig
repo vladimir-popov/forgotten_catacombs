@@ -209,6 +209,7 @@ fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     }
     try window.area.addOption(self.alloc, "Drop", item, dropSelectedItem, null);
     try window.area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
+    scaleModalWindow(&window);
     self.actions_window = window;
 }
 
@@ -308,6 +309,12 @@ fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         item,
         self.session.runtime.isDevMode(),
     );
+    scaleModalWindow(&self.description_window.?);
+}
+
+fn scaleModalWindow(window: anytype) void {
+    window.max_region.top_left.row += 1;
+    window.max_region.rows -= 2;
 }
 
 /// Moves an item from the inventory to the player's position on the level.

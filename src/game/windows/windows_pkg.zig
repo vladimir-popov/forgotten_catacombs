@@ -9,10 +9,6 @@ const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
-/// A maximal region which can be occupied by the window.
-/// This region includes a space for borders.
-pub const MAX_REGION = p.Region.init(1, 2, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS - 2);
-
 /// To hide a window something should be drawn inside its region.
 /// The easiest way is drawing underlying layer again (for example the whole scene, or a window
 /// under the current),but it's on optimal way. Usually we have to particular options:
@@ -50,7 +46,7 @@ pub fn scrollingProgress(scrolled_lines: usize, area_height: usize, max_scroll_c
 pub fn notification(alloc: std.mem.Allocator, message: []const u8) !ModalWindow(TextArea) {
     var text_area: TextArea = .empty;
     const line = try text_area.addEmptyLine(alloc);
-    const width = MAX_REGION.cols;
+    const width = g.DISPLAY_COLS - 2;
     const pad = p.diff(usize, message.len, width) / 2;
     _ = try std.fmt.bufPrint(line[pad..], "{s}", .{message});
     return .{ .area = text_area };
@@ -58,18 +54,14 @@ pub fn notification(alloc: std.mem.Allocator, message: []const u8) !ModalWindow(
 
 /// Approximate example:
 /// ```
-///               Entity id only in devmode
-///                        v
-/// ┌────────────────Club(42)───────────┐
-/// │ A gnarled piece of wood, scarred  │
-/// │ from use. Deals blunt damage.     │
-/// │ Cheap and easy to use.            │
-/// │                                   │---
-/// │ Weight: 3                         │ ^
-/// │ Damage: cutting 2-3               │ | Only for known entity
-/// │ Effect:  burning 5                │ |
-/// │ Radius of light: 5                │ v
-/// └───────────────────────────────────┘---
+/// ┌─────────────────Club──────────────┐
+/// │A gnarled piece of wood, scarred   │
+/// │from use. Deals blunt damage.      │
+/// │Cheap and easy to use.             │
+/// │                                   │
+/// │Damage: cutting 2-3                │
+/// │Weight: 3                          │
+/// └───────────────────────────────────┘
 ///═══════════════════════════════════════
 ///                                Close
 /// ```
@@ -81,7 +73,7 @@ pub fn entityDescription(
 ) !ModalWindow(TextArea) {
     var text_area: TextArea = .empty;
     const title: []const u8 = g.meta.name(&session.registry, entity);
-    try g.meta.describe(&session.registry, alloc, entity, session.journal.isKnown(entity), dev_mode, &text_area);
+    try g.meta.describe(&session.registry, alloc, entity, session.journal.isKnown(entity), &text_area, dev_mode);
     return .{ .area = text_area, .title = title };
 }
 

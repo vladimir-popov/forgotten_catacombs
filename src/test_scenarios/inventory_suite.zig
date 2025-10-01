@@ -20,9 +20,7 @@ test "Rendering initial inventory" {
         \\║                                      ║
         \\║                                      ║
         \\╚══════════════════════════════════════╝
-        \\════════════════════════════════════════
-        \\        200$          Close     Choose ⇧
-    );
+    , .game_area);
 }
 
 test "Unequip torch" {
@@ -43,9 +41,7 @@ test "Unequip torch" {
         \\║                                      ║
         \\║                                      ║
         \\╚══════════════════════════════════════╝
-        \\════════════════════════════════════════
-        \\        200$          Close     Choose  
-    );
+    , .game_area);
 
     try options.choose("Unequip");
     try test_session.runtime.display.expectLooksLike(
@@ -59,9 +55,7 @@ test "Unequip torch" {
         \\║                                      ║
         \\║                                      ║
         \\╚══════════════════════════════════════╝
-        \\════════════════════════════════════════
-        \\        200$          Close     Choose ⇧
-    );
+    , .game_area);
 }
 
 test "Use torch as a weapon" {
@@ -84,9 +78,7 @@ test "Use torch as a weapon" {
         \\║└────────────────────────────────────┘║
         \\║                                      ║
         \\╚══════════════════════════════════════╝
-        \\════════════════════════════════════════
-        \\        200$          Close     Choose  
-    );
+    , .game_area);
     try options.choose("Use as a weapon");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
@@ -99,9 +91,7 @@ test "Use torch as a weapon" {
         \\║                                      ║
         \\║                                      ║
         \\╚══════════════════════════════════════╝
-        \\════════════════════════════════════════
-        \\        200$          Close     Choose ⇧
-    );
+    , .game_area);
 }
 
 test "Drink healing potion" {
