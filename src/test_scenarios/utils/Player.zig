@@ -7,21 +7,21 @@ const TestSession = @import("TestSession.zig");
 const Self = @This();
 
 test_session: *TestSession,
-player_entity: g.Entity,
+id: g.Entity,
 
 /// Returns a pointer to the Health component of the player
 pub fn health(self: Self) *c.Health {
-    return self.test_session.session.registry.getUnsafe(self.player_entity, c.Health);
+    return self.test_session.session.registry.getUnsafe(self.id, c.Health);
 }
 
 /// Returns a pointer to the Inventory component of the player
 pub fn inventory(self: Self) *c.Inventory {
-    return self.test_session.session.registry.getUnsafe(self.player_entity, c.Inventory);
+    return self.test_session.session.registry.getUnsafe(self.id, c.Inventory);
 }
 
 /// Returns a pointer to the Position component of the player
 pub fn position(self: Self) *c.Position {
-    return self.test_session.session.registry.getUnsafe(self.player_entity, c.Position);
+    return self.test_session.session.registry.getUnsafe(self.id, c.Position);
 }
 
 pub fn target(self: Self) ?g.Entity {

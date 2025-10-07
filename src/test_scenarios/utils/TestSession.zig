@@ -24,7 +24,7 @@ pub fn initEmpty(self: *Self, gpa: std.mem.Allocator) !void {
     self.runtime = try TestRuntime.init(arena_alloc, self.tmp_dir.dir);
     try self.render.init(arena_alloc, self.runtime.runtime(), g.DISPLAY_ROWS, g.DISPLAY_COLS);
     try self.session.initNew(arena_alloc, std.testing.random_seed, self.runtime.runtime(), self.render);
-    self.player = .{ .test_session = self, .player_entity = self.session.player };
+    self.player = .{ .test_session = self, .id = self.session.player };
     // because for optimization purpose we draw the horizontal line right in init method of the PlayMode
     self.runtime.display.merge(self.runtime.last_frame);
 }

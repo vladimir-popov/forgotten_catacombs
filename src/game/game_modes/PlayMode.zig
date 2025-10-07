@@ -71,9 +71,8 @@ pub fn tick(self: *PlayMode) !void {
                 else => {},
             }
             try self.session.journal.onTurnCompleted();
+            self.is_player_turn = false;
         }
-        // todo move up and add test:
-        self.is_player_turn = false;
     } else {
         var itr = self.session.registry.query3(c.EnemyState, c.Initiative, c.Speed);
         while (itr.next()) |tuple| {

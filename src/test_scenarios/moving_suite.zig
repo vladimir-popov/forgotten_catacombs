@@ -1,22 +1,10 @@
 const std = @import("std");
-const Frame = @import("utils/Frame.zig");
+const g = @import("game");
 const TestSession = @import("utils/TestSession.zig");
 
-test {
-    _ = @import("description_suite.zig");
-    _ = @import("inventory_suite.zig");
-    _ = @import("save_load_suite.zig");
-    _ = @import("update_target_suite.zig");
-    _ = @import("moving_suite.zig");
-}
-
-test "Hello world!" {
-    var test_session: TestSession = undefined;
+fn setup(test_session: *TestSession) !void {
     try test_session.initEmpty(std.testing.allocator);
-    defer test_session.deinit();
-
     try test_session.tick();
-
     try test_session.runtime.display.expectLooksLike(
         \\######################################30
         \\#•••••••••••••#     #••••••••••••••••••#
@@ -28,11 +16,33 @@ test "Hello world!" {
         \\#•••└───┘••••••••••••••••••••••••••••••#
         \\~~~~~~~~~~~~~~~~~~~│@│~~~~~~~~~~~~~~~~~~
         \\~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        \\════════════════════════════════════════
-        \\                    ⇧Explore     Wait  ⇧
-    , .whole_display);
+    , .game_area);
+    try std.testing.expect(test_session.session.mode == .play);
+    try std.testing.expect(test_session.session.mode.play.is_player_turn);
 }
 
-test {
-    std.testing.refAllDecls(@This());
+test "player's turn should be completed after moving on empty space" {
+    // given:
+    var test_session: TestSession = undefined;
+    try setup(&test_session);
+    defer test_session.deinit();
+
+    // when:
+    try test_session.pressButton(.up);
+
+    // then:
+    try std.testing.expectEqual(false, test_session.session.mode.play.is_player_turn);
+}
+
+test "player's turn should NOT be completed after moving to a wall" {
+    // given:
+    var test_session: TestSession = undefined;
+    try setup(&test_session);
+    defer test_session.deinit();
+
+    // when:
+    try test_session.pressButton(.right);
+
+    // then:
+    try std.testing.expectEqual(true, test_session.session.mode.play.is_player_turn);
 }

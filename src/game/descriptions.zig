@@ -41,7 +41,6 @@ player: Description = .{ .name = "You" },
 rat: Description = .{
     .name = "Rat",
     .description = &.{
-        "Big nasty rat with vicious eyes.",
         "A big, nasty rat with vicious eyes",
         "that thrives in dark corners and",
         "forgotten cellars.",
