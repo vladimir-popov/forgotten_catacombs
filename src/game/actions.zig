@@ -139,6 +139,10 @@ pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action) !struc
             if (session.registry.get(actor, c.Position)) |position|
                 return doMove(session, actor, position, move, speed.move_points);
         },
+        .move_to_level => |ladder| {
+            try session.movePlayerToLevel(ladder);
+            return .{ action, 0 };
+        },
         .hit => |target| {
             return if (try tryHit(session, actor, target)) .{ null, 0 } else .{ action, speed.move_points };
         },
@@ -157,9 +161,6 @@ pub fn doAction(session: *g.GameSession, actor: g.Entity, action: Action) !struc
                 try session.registry.remove(item, c.Position);
                 try session.level.removeEntity(item);
             }
-        },
-        .move_to_level => |ladder| {
-            try session.movePlayerToLevel(ladder);
         },
         .go_sleep => |target| {
             session.registry.getUnsafe(target, c.EnemyState).* = .sleeping;

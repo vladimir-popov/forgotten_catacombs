@@ -127,7 +127,7 @@ pub fn tick(self: *Self) !void {
                 return err;
             };
             if (!is_continue) {
-                // the einit will be invoked for the whole SaveLoadMode here:
+                // the deinit will be invoked for the whole SaveLoadMode here:
                 try loading.session.playerMovedToLevel();
             }
         },
