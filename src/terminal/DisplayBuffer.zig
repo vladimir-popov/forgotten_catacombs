@@ -87,7 +87,9 @@ pub fn DisplayBuffer(comptime ROWS: u8, comptime COLS: u8) type {
                             else => _ = try writer.write(tty.Text.SGR_RESET),
                         }
                     }
-                    if (cell.symbol <= 127) {
+                    if (cell.symbol == 0) {
+                        try writer.writeByte(' ');
+                    } else if (cell.symbol <= 127) {
                         try writer.writeByte(@truncate(cell.symbol));
                     } else {
                         const len = try std.unicode.utf8Encode(cell.symbol, &buf);
