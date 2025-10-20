@@ -219,14 +219,15 @@ pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
 }
 
 pub fn entityDied(self: *GameSession, entity: g.Entity) !void {
-    try self.registry.removeEntity(entity);
-    try self.level.removeEntity(entity);
     if (entity.eql(self.player)) {
         log.info("Player is dead. Game is over.", .{});
         // return error for break the game loop:
         return error.GameOver;
     } else {
         log.debug("NPC {d} is dead", .{entity.id});
+        try self.journal.markEnemyAsKnown(entity);
+        try self.registry.removeEntity(entity);
+        try self.level.removeEntity(entity);
         try self.events.sendEvent(.{ .entity_died = entity });
     }
 }
@@ -313,7 +314,7 @@ pub inline fn tick(self: *GameSession) !void {
 /// `true` means that the actor is dead
 pub fn drinkPotion(self: *GameSession, actor: g.Entity, potion_id: g.Entity) !bool {
     if (self.registry.get(potion_id, c.Effect)) |effect| {
-        try self.journal.markAsKnown(potion_id);
+        try self.journal.markPotionAsKnown(potion_id);
         if (try self.applyEffect(actor, effect.*, actor)) return true;
     }
     // try to remove from the inventory

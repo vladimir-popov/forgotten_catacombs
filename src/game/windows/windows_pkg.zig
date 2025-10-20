@@ -9,6 +9,8 @@ const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
+const log = std.log.scoped(.windows);
+
 /// To hide a window something should be drawn inside its region.
 /// The easiest way is drawing underlying layer again (for example the whole scene, or a window
 /// under the current),but it's on optimal way. Usually we have to particular options:
@@ -69,10 +71,12 @@ pub fn entityDescription(
     alloc: std.mem.Allocator,
     session: *const g.GameSession,
     entity: g.Entity,
+    is_known_entity: bool,
 ) !ModalWindow(TextArea) {
+    log.debug("Show description of {s} entity {d}", .{ if (is_known_entity) "known" else "unknown", entity.id });
     var text_area: TextArea = .empty;
     const title: []const u8 = g.meta.name(&session.registry, entity);
-    try g.meta.describe(&session.registry, alloc, entity, session.journal.isKnown(entity), &text_area);
+    try g.meta.describe(&session.registry, alloc, entity, is_known_entity, &text_area);
     return .{ .area = text_area, .title = title };
 }
 

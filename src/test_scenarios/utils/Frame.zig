@@ -109,6 +109,8 @@ pub fn ttyFormat(self: @This(), writer: *std.Io.Writer) WriterError!void {
     try self.formatArea(.whole_display, .actual).format(writer);
 }
 
+/// Compares the content of the display in the area for comparing with a passed expectation.
+/// The highlighting is ignored.
 pub fn expectLooksLike(self: Self, expectation: []const u8, area: ComparingArea) !void {
     if (try self.diffInArea(try parse(expectation, area.toRegion()), area)) |diff| {
         var buffer: [g.DISPLAY_ROWS * g.DISPLAY_COLS * 4]u8 = @splat(0);

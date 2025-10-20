@@ -79,3 +79,8 @@ pub fn openInventory(self: *Self) !Inventory {
     try self.tick();
     return .{ .test_session = self };
 }
+
+pub fn exploreMode(self: *Self) !void {
+    try self.session.lookAround();
+    try self.tick();
+}

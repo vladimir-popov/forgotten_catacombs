@@ -25,7 +25,11 @@ pub fn position(self: Self) *c.Position {
 }
 
 pub fn target(self: Self) ?g.Entity {
-    return self.test_session.session.mode.play.target;
+    return switch (self.test_session.session.mode) {
+        .play => |play| play.target,
+        .explore => |explore| explore.entity_in_focus,
+        else => null,
+    };
 }
 
 /// Moves the player emulating pressing a button appropriated to the passed direction `count` times.

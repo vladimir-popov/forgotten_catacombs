@@ -1,5 +1,5 @@
 //! This is the mode in which the player is able to look around,
-//! get the info about entities on the screen, and change the target entity.
+//! get an info about entities on the screen, and change the target entity.
 const std = @import("std");
 const g = @import("../game_pkg.zig");
 const c = g.components;
@@ -235,5 +235,6 @@ fn windowWithDescription(self: *ExploreMode) !w.ModalWindow(w.TextArea) {
         self.arena.allocator(),
         self.session,
         self.entity_in_focus,
+        self.session.journal.isKnown(self.entity_in_focus),
     );
 }

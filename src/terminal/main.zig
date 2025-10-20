@@ -25,11 +25,12 @@ pub const std_options: std.Options = .{
         // .{ .scope = .level, .level = .debug },
         // .{ .scope = .load_level_mode, .level = .debug },
         // .{ .scope = .looking_around_mode, .level = .debug },
-        .{ .scope = .play_mode, .level = .debug },
+        // .{ .scope = .play_mode, .level = .debug },
         // .{ .scope = .render, .level = .warn },
         // .{ .scope = .save_load_mode, .level = .debug },
         // .{ .scope = .visibility, .level = .debug },
-        // .{ .scope = .windows, .level = .debug },
+        .{ .scope = .journal, .level = .debug },
+        .{ .scope = .windows, .level = .debug },
     },
 };
 

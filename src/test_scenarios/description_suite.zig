@@ -24,3 +24,70 @@ test "Describe an item" {
         \\╚══════════════════════════════════════╝
     , .game_area);
 }
+
+test "Describe an unknown enemy" {
+    var test_session: TestSession = undefined;
+    try test_session.initEmpty(std.testing.allocator);
+    defer test_session.deinit();
+    errdefer test_session.printDisplay();
+
+    // Prepare a game session:
+    const pp = test_session.player.position().place.movedTo(.up);
+    const rat = try test_session.session.level.addEnemy(.sleeping, g.entities.rat(pp));
+    try test_session.tick();
+
+    try test_session.exploreMode();
+    try test_session.pressButton(.up);
+    try std.testing.expectEqual(rat, test_session.player.target());
+    try test_session.pressButton(.a);
+
+    try test_session.runtime.display.expectLooksLike(
+        \\######################################30
+        \\#┌────────────────Rat─────────────────┐#
+        \\#│A big, nasty rat with vicious eyes  │#
+        \\#│that thrives in dark corners and    │#
+        \\#│forgotten cellars.                  │#
+        \\#│                                    │#
+        \\#│Who knows what to expect from this  │#
+        \\#│creature?                           │#
+        \\~└────────────────────────────────────┘~
+        \\~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    , .game_area);
+}
+
+test "Describe a known enemy (after killing a similar creature)" {
+    var test_session: TestSession = undefined;
+    try test_session.initEmpty(std.testing.allocator);
+    defer test_session.deinit();
+    errdefer test_session.printDisplay();
+
+    // Prepare a game session:
+    const pp = test_session.player.position().place.movedTo(.up);
+    var rat_to_kick = g.entities.rat(pp);
+    rat_to_kick.health.?.current = 1;
+    _ = try test_session.session.level.addEnemy(.sleeping, rat_to_kick);
+    const rat_to_describe = try test_session.session.level.addEnemy(.sleeping, g.entities.rat(pp.movedToNTimes(.up, 5)));
+    try test_session.tick();
+
+    // kill the rat
+    try test_session.pressButton(.up);
+
+    // Check description of the second rat
+    try test_session.exploreMode();
+    try test_session.pressButton(.up);
+    try std.testing.expectEqual(rat_to_describe, test_session.player.target());
+    try test_session.pressButton(.a);
+
+    try test_session.runtime.display.expectLooksLike(
+        \\#┌────────────────Rat─────────────────┐0
+        \\#│A big, nasty rat with vicious eyes  │#
+        \\#│that thrives in dark corners and    │#
+        \\#│forgotten cellars.                  │#
+        \\#│                                    │#
+        \\#│Health: 10/10                       │#
+        \\#│Damage: thrusting 1-3               │#
+        \\#│                                    │#
+        \\~│Not too fast.                       │~
+        \\~└────────────────────────────────────┘~
+    , .game_area);
+}
