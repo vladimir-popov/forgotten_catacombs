@@ -235,6 +235,5 @@ fn windowWithDescription(self: *ExploreMode) !w.ModalWindow(w.TextArea) {
         self.arena.allocator(),
         self.session,
         self.entity_in_focus,
-        self.session.runtime.isDevMode(),
     );
 }

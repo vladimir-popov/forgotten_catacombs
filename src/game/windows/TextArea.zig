@@ -1,19 +1,5 @@
-//! The area to draw a text with support of line highlighting,
-//! adaptive vertical size, scrolling and optional border:
-//! ╔════════════════════════════════════════╗
-//! ║                                        ║
-//! ║                                        ║
-//! ║ ┌────────────────Title───────────────┐ ║
-//! ║ │Arbitrary lines of a text           │ ║
-//! ║ │with scroll and                     │ ║
-//! ║ │optional░selection░░░░░░░░░░░░░░░░░░│ ║
-//! ║ └────────────────────────────────────┘ ║
-//! ║                                        ║
-//! ║                                        ║
-//! ║                                        ║
-//! ║════════════════════════════════════════║
-//! ║                           Close Choose ║
-//! ╚════════════════════════════════════════╝
+//! The simplest implementation of the `Area` interface. Contains a set of lines with a text
+//! to draw on a window. Do not handle button. Can be drawn in a region with scrolling.
 const std = @import("std");
 const g = @import("../game_pkg.zig");
 const c = g.components;
@@ -63,6 +49,8 @@ pub fn handleButton(_: *Self, _: g.Button) !void {}
 ///
 /// - `region` - A region of the screen to draw the content of the area.
 ///  The first symbol will be drawn at the top left corner of the region.
+///  Scrolled lines and lines out of the region will be skipped. Symbols
+///  of a line outside the region will be cropped.
 ///
 /// - `scrolled` - How many scrolled lines should be skipped.
 pub fn draw(self: *const Self, render: g.Render, region: p.Region, scrolled: usize) !void {

@@ -286,6 +286,5 @@ fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         self.alloc,
         self.session,
         item,
-        self.session.runtime.isDevMode(),
     );
 }

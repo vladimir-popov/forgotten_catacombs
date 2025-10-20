@@ -2,8 +2,12 @@ const std = @import("std");
 const g = @import("game_pkg.zig");
 
 pub const Description = struct {
+    /// A short name of the entity.
     name: []const u8,
-    // a line should have no more 36 symbols
+
+    // A line should have no more 36 symbols
+
+    /// A short description of the entity.
     description: []const []const u8 = &.{},
 };
 

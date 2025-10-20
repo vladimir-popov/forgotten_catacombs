@@ -16,7 +16,6 @@ const log = std.log.scoped(.windows);
 
 pub fn ModalWindow(comptime Area: type) type {
     return struct {
-
         const Self = @This();
 
         area: Area,

@@ -1,3 +1,4 @@
+//! A set of functions to verify a set of components for entities according to their archetype.
 const std = @import("std");
 const builtin = @import("builtin");
 const g = @import("../game_pkg.zig");

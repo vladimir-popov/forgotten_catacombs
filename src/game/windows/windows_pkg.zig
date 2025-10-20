@@ -69,11 +69,10 @@ pub fn entityDescription(
     alloc: std.mem.Allocator,
     session: *const g.GameSession,
     entity: g.Entity,
-    dev_mode: bool,
 ) !ModalWindow(TextArea) {
     var text_area: TextArea = .empty;
     const title: []const u8 = g.meta.name(&session.registry, entity);
-    try g.meta.describe(&session.registry, alloc, entity, session.journal.isKnown(entity), &text_area, dev_mode);
+    try g.meta.describe(&session.registry, alloc, entity, session.journal.isKnown(entity), &text_area);
     return .{ .area = text_area, .title = title };
 }
 
