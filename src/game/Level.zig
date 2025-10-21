@@ -149,16 +149,9 @@ pub fn initAsFirstLevel(
     try self.entities_on_level.append(arena_alloc, entity);
 
     // Add the trader
-    var shop = try c.Shop.empty(self.registry.allocator(), 1.5, 200);
-    try shop.items.add(try self.registry.addNewEntity(g.entities.Club));
-    try shop.items.add(try self.registry.addNewEntity(g.entities.HealingPotion));
-
-    entity = try self.registry.addNewEntity(.{
-        .position = .{ .place = d.FirstLocation.trader_place, .zorder = .obstacle },
-        .sprite = .{ .codepoint = cp.human },
-        .description = .{ .preset = .traider },
-        .shop = shop,
-    });
+    entity = try self.registry.addNewEntity(
+        try g.entities.trader(self.registry, d.FirstLocation.trader_place, 1.5, 200, self.dungeon.seed),
+    );
     try self.entities_on_level.append(arena_alloc, entity);
 
     // Add the scientist

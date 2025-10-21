@@ -7,14 +7,6 @@ pub const Error = error{
     DamageIsNotSpecified,
 };
 
-/// Returns a string with a name of the entity, or the constant 'Unknown'.
-pub fn name(registry: *const g.Registry, entity: g.Entity) []const u8 {
-    return if (registry.get(entity, c.Description)) |description|
-        g.descriptions.Presets.get(description.preset).name
-    else
-        "Unknown";
-}
-
 /// Any entity with a `EnemyState` is enemy.
 pub inline fn isEnemy(registry: *const g.Registry, entity: g.Entity) bool {
     return registry.has(entity, c.EnemyState);
@@ -75,69 +67,100 @@ pub fn getDamage(registry: *const g.Registry, actor: g.Entity) Error!struct { *c
     return error.DamageIsNotSpecified;
 }
 
+/// Writes an actual name of the entity according to its "known" status in the journal
+/// to the `dest` buffer.
+pub fn printName(dest: []u8, journal: g.Journal, entity: g.Entity) ![]u8 {
+    return if (journal.isUnknownPotion(entity)) |color|
+        try std.fmt.bufPrint(dest, "A {t} potion", .{color})
+    else if (journal.registry.get(entity, c.Description)) |description|
+        try std.fmt.bufPrint(dest, "{s}", .{g.descriptions.Presets.get(description.preset).name})
+    else
+        try std.fmt.bufPrint(dest, "Unknown", .{});
+}
+
 /// Builds an actual description of the entity, and writes it to the text_area.
 pub fn describe(
-    registry: *const g.Registry,
+    journal: g.Journal,
     alloc: std.mem.Allocator,
     entity: g.Entity,
-    is_known: bool,
     text_area: *g.windows.TextArea,
 ) !void {
-    const description = if (registry.get(entity, c.Description)) |descr|
-        g.descriptions.Presets.get(descr.preset).description
-    else
-        &.{};
-    for (description) |str| {
-        var line = try text_area.addEmptyLine(alloc);
-        @memmove(line[0..str.len], str);
-    }
+    try writeActualDescription(journal, alloc, entity, text_area);
     _ = try text_area.addEmptyLine(alloc);
-    if (isItem(registry, entity)) {
-        try describeItem(registry, alloc, entity, is_known, text_area);
-    } else if (isEnemy(registry, entity)) {
-        try describeEnemy(registry, alloc, entity, is_known, text_area);
+    if (isItem(journal.registry, entity)) {
+        try describeItem(journal, alloc, entity, text_area);
+    } else if (isEnemy(journal.registry, entity)) {
+        try describeEnemy(journal, alloc, entity, text_area);
+    }
+}
+
+fn writeActualDescription(
+    journal: g.Journal,
+    alloc: std.mem.Allocator,
+    entity: g.Entity,
+    text_area: *g.windows.TextArea,
+) !void {
+    if (journal.isUnknownPotion(entity)) |color| {
+        var line = try text_area.addEmptyLine(alloc);
+        _ = try std.fmt.bufPrint(line, "A swirling liquid of {t} color", .{color});
+        line = try text_area.addEmptyLine(alloc);
+        _ = try std.fmt.bufPrint(line, "rests in a vial.", .{});
+    } else {
+        const description = if (journal.registry.get(entity, c.Description)) |descr|
+            g.descriptions.Presets.get(descr.preset).description
+        else
+            &.{};
+        for (description) |str| {
+            var line = try text_area.addEmptyLine(alloc);
+            @memmove(line[0..str.len], str);
+        }
     }
 }
 
 fn describeItem(
-    registry: *const g.Registry,
+    journal: g.Journal,
     alloc: std.mem.Allocator,
     entity: g.Entity,
-    is_known: bool,
     text_area: *g.windows.TextArea,
 ) !void {
-    _ = is_known;
-    if (registry.get(entity, c.Damage)) |damage| {
-        try addWeaponDescription(alloc, damage, registry.get(entity, c.Effect), text_area, 0);
+    if (journal.registry.get(entity, c.Damage)) |damage| {
+        try describeDamage(alloc, damage, text_area, 0);
     }
-    if (registry.get(entity, c.SourceOfLight)) |light| {
+    if (journal.isKnown(entity)) {
+        if (journal.registry.get(entity, c.Effect)) |effect| {
+            try describeEffect(alloc, effect, text_area, 0);
+        }
+    }
+    if (journal.registry.get(entity, c.SourceOfLight)) |light| {
         const line = try text_area.addEmptyLine(alloc);
         _ = try std.fmt.bufPrint(line, "Radius of light: {d}", .{light.radius});
     }
-    if (registry.get(entity, c.Weight)) |weight| {
+    if (journal.registry.get(entity, c.Weight)) |weight| {
         const line = try text_area.addEmptyLine(alloc);
         _ = try std.fmt.bufPrint(line, "Weight: {d}", .{weight.value});
     }
 }
 
 fn describeEnemy(
-    registry: *const g.Registry,
+    journal: g.Journal,
     alloc: std.mem.Allocator,
     enemy: g.Entity,
-    is_known: bool,
     text_area: *g.windows.TextArea,
 ) !void {
-    if (is_known) {
-        if (registry.get(enemy, c.Health)) |health| {
+    if (journal.isKnown(enemy)) {
+        if (journal.registry.get(enemy, c.Health)) |health| {
             const line = try text_area.addEmptyLine(alloc);
             _ = try std.fmt.bufPrint(line, "Health: {d}/{d}", .{ health.current, health.max });
         }
-        if (registry.get(enemy, c.Equipment)) |equipment| {
-            try describeEquipment(registry, alloc, equipment, text_area);
-        } else if (registry.get(enemy, c.Damage)) |damage| {
-            try addWeaponDescription(alloc, damage, registry.get(enemy, c.Effect), text_area, 0);
+        if (journal.registry.get(enemy, c.Equipment)) |equipment| {
+            try describeEquipment(journal, alloc, equipment, text_area);
+        } else if (journal.registry.get(enemy, c.Damage)) |damage| {
+            try describeDamage(alloc, damage, text_area, 0);
+            if (journal.registry.get(enemy, c.Effect)) |effect| {
+                try describeEffect(alloc, effect, text_area, 0);
+            }
         }
-        if (registry.get(enemy, c.Speed)) |speed| {
+        if (journal.registry.get(enemy, c.Speed)) |speed| {
             _ = try text_area.addEmptyLine(alloc);
             // | Too slow | Slow | Not so fast | Fast | Very fast |
             //            |      |             |      |
@@ -168,14 +191,18 @@ fn describeEnemy(
 
 test "Describe an unknown rat" {
     // given:
+    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
     var registry = try g.Registry.init(std.testing.allocator);
     defer registry.deinit();
+    var journal = try g.Journal.init(std.testing.allocator, &registry, prng.random());
+    defer journal.deinit(std.testing.allocator);
+
     const id = try registry.addNewEntity(g.entities.rat(.{ .row = 1, .col = 1 }));
     var text_area: g.windows.TextArea = .empty;
     defer text_area.deinit(std.testing.allocator);
 
     // when:
-    try describe(&registry, std.testing.allocator, id, false, &text_area);
+    try describe(journal, std.testing.allocator, id, &text_area);
 
     // then:
     try expectContent(text_area,
@@ -190,14 +217,19 @@ test "Describe an unknown rat" {
 
 test "Describe a known rat" {
     // given:
+    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
     var registry = try g.Registry.init(std.testing.allocator);
     defer registry.deinit();
+    var journal = try g.Journal.init(std.testing.allocator, &registry, prng.random());
+    defer journal.deinit(std.testing.allocator);
+
     const id = try registry.addNewEntity(g.entities.rat(.{ .row = 1, .col = 1 }));
+    try journal.markEnemyAsKnown(id);
     var text_area: g.windows.TextArea = .empty;
     defer text_area.deinit(std.testing.allocator);
 
     // when:
-    try describe(&registry, std.testing.allocator, id, true, &text_area);
+    try describe(journal, std.testing.allocator, id, &text_area);
 
     // then:
     try expectContent(text_area,
@@ -213,59 +245,60 @@ test "Describe a known rat" {
 }
 
 fn describeEquipment(
-    registry: *const g.Registry,
+    journal: g.Journal,
     alloc: std.mem.Allocator,
     equipment: *const c.Equipment,
     text_area: *g.windows.TextArea,
 ) !void {
     if (equipment.weapon) |weapon| {
         var line = try text_area.addEmptyLine(alloc);
-        _ = try std.fmt.bufPrint(line[1..], "Equiped weapon: {s}", .{g.meta.name(registry, weapon)});
-        try addWeaponDescription(
-            alloc,
-            registry.getUnsafe(weapon, c.Damage),
-            registry.get(weapon, c.Effect),
-            text_area,
-            3,
-        );
+        @memcpy(line[1..17], "Equiped weapon: ");
+        _ = try printName(line[17..], journal, weapon);
+        if (journal.registry.get(weapon, c.Damage)) |damage| {
+            try describeDamage(alloc, damage, text_area, 3);
+        }
+        if (journal.registry.get(weapon, c.Effect)) |effect| {
+            try describeEffect(alloc, effect, text_area, 3);
+        }
     }
     var line = try text_area.addEmptyLine(alloc);
-    _ = try std.fmt.bufPrint(line[1..], "Radius of light: {d}", .{g.meta.getRadiusOfLight(registry, equipment)});
+    _ = try std.fmt.bufPrint(line[1..], "Radius of light: {d}", .{getRadiusOfLight(journal.registry, equipment)});
 }
 
-fn addWeaponDescription(
+inline fn describeDamage(
     alloc: std.mem.Allocator,
     damage: *const c.Damage,
-    maybe_effect: ?*const c.Effect,
     text_area: *g.windows.TextArea,
     pad: usize,
 ) !void {
     var line = try text_area.addEmptyLine(alloc);
-    _ = try std.fmt.bufPrint(
-        line[pad..],
-        "Damage: {t} {d}-{d}",
-        .{ damage.damage_type, damage.min, damage.max },
-    );
-    if (maybe_effect) |effect| {
-        line = try text_area.addEmptyLine(alloc);
-        _ = try std.fmt.bufPrint(
-            line[pad..],
-            "Effect: {t} {d}-{d}",
-            .{ effect.effect_type, effect.min, effect.max },
-        );
-    }
+    _ = try std.fmt.bufPrint(line[pad..], "Damage: {t} {d}-{d}", .{ damage.damage_type, damage.min, damage.max });
+}
+
+inline fn describeEffect(
+    alloc: std.mem.Allocator,
+    effect: *const c.Effect,
+    text_area: *g.windows.TextArea,
+    pad: usize,
+) !void {
+    var line = try text_area.addEmptyLine(alloc);
+    _ = try std.fmt.bufPrint(line[pad..], "Effect: {t} {d}-{d}", .{ effect.effect_type, effect.min, effect.max });
 }
 
 test "Describe a torch" {
     // given:
+    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
     var registry = try g.Registry.init(std.testing.allocator);
     defer registry.deinit();
-    const id = try registry.addNewEntity(g.entities.Torch);
+    var journal = try g.Journal.init(std.testing.allocator, &registry, prng.random());
+    defer journal.deinit(std.testing.allocator);
+
+    const id = try registry.addNewEntity(g.entities.items.Torch);
     var text_area: g.windows.TextArea = .empty;
     defer text_area.deinit(std.testing.allocator);
 
     // when:
-    try describe(&registry, std.testing.allocator, id, true, &text_area);
+    try describe(journal, std.testing.allocator, id, &text_area);
 
     // then:
     try expectContent(text_area,

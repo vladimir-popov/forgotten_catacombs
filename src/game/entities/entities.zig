@@ -4,6 +4,7 @@ const cp = @import("../codepoints.zig");
 const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
+pub const items = @import("items.zig");
 
 /// Creates components for the player with empty inventory and nothing equipped.
 ///
@@ -20,53 +21,20 @@ pub fn player(alloc: std.mem.Allocator) !c.Components {
     };
 }
 
-pub const Torch = archetype.weapon(.{
-    .description = .{ .preset = .torch },
-    .sprite = .{ .codepoint = cp.source_of_light },
-    .weight = .{ .value = 20 },
-    .source_of_light = .{ .radius = 5 },
-    .price = .{ .value = 5 },
-    .damage = .{ .damage_type = .blunt, .min = 2, .max = 3 },
-    .effect = .{ .effect_type = .burning, .min = 1, .max = 1 },
-});
-
-pub const Pickaxe = archetype.weapon(.{
-    .description = .{ .preset = .pickaxe },
-    .sprite = .{ .codepoint = cp.weapon_melee },
-    .weight = .{ .value = 100 },
-    .damage = .{ .damage_type = .cutting, .min = 3, .max = 5 },
-    .price = .{ .value = 15 },
-});
-
-pub const Club = archetype.weapon(.{
-    .description = .{ .preset = .club },
-    .sprite = .{ .codepoint = cp.weapon_melee },
-    .weight = .{ .value = 80 },
-    .damage = .{ .damage_type = .blunt, .min = 5, .max = 8 },
-    .price = .{ .value = 28 },
-});
-
-// The first effect describes the type of the potion
-pub const HealingPotion = archetype.potion(.{
-    .description = .{ .preset = .healing_potion },
-    .sprite = .{ .codepoint = cp.potion },
-    .effect = .{ .effect_type = .healing, .min = 20, .max = 25 },
-    .weight = .{ .value = 10 },
-    .price = .{ .value = 20 },
-    .consumable = .{ .consumable_type = .potion, .calories = 10 },
+const Rat = archetype.enemy(.{
+    .description = .{ .preset = .rat },
+    .initiative = .empty,
+    .sprite = .{ .codepoint = 'r' },
+    .health = .{ .max = 10, .current = 10 },
+    .damage = .{ .damage_type = .thrusting, .min = 1, .max = 3 },
+    .speed = .{ .move_points = 14 },
+    .state = .sleeping,
 });
 
 pub fn rat(place: p.Point) c.Components {
-    return archetype.enemy(.{
-        .description = .{ .preset = .rat },
-        .initiative = .empty,
-        .sprite = .{ .codepoint = 'r' },
-        .position = .{ .zorder = .obstacle, .place = place },
-        .health = .{ .max = 10, .current = 10 },
-        .damage = .{ .damage_type = .thrusting, .min = 1, .max = 3 },
-        .speed = .{ .move_points = 14 },
-        .state = .sleeping,
-    });
+    var entity = Rat;
+    entity.position = .{ .zorder = .obstacle, .place = place };
+    return entity;
 }
 
 pub fn openedDoor(place: p.Point) c.Components {
@@ -119,4 +87,26 @@ pub fn pile(alloc: std.mem.Allocator, place: p.Point) !c.Components {
         .description = .{ .preset = .pile },
         .pile = try c.Pile.empty(alloc),
     };
+}
+
+pub fn trader(
+    registry: *g.Registry,
+    place: p.Point,
+    price_multiplier: f16,
+    balance: u16,
+    seed: u64,
+) !c.Components {
+    var shop = try c.Shop.empty(registry.allocator(), price_multiplier, balance);
+    try fillShop(&shop, registry, seed);
+    return .{
+        .position = .{ .place = place, .zorder = .obstacle },
+        .sprite = .{ .codepoint = cp.human },
+        .description = .{ .preset = .traider },
+        .shop = shop,
+    };
+}
+
+pub fn fillShop(shop: *c.Shop, registry: *g.Registry, seed: u64) !void {
+    _ = seed;
+    try shop.items.add(try registry.addNewEntity(items.HealingPotion));
 }

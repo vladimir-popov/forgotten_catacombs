@@ -169,7 +169,8 @@ const product_fmt = std.fmt.comptimePrint(
 fn formatProduct(self: *Self, line: *w.TextArea.Line, item: g.Entity, for_buying: bool) ![]const u8 {
     if (self.session.registry.get2(item, c.Price, c.Sprite)) |tuple| {
         const price, const sprite = tuple;
-        const name = g.meta.name(&self.session.registry, item);
+        var buf: [16]u8 = undefined;
+        const name = try g.meta.printName(&buf, self.session.journal, item);
         return try std.fmt.bufPrint(
             line,
             product_fmt,
@@ -286,6 +287,5 @@ fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         self.alloc,
         self.session,
         item,
-        self.session.journal.isKnown(item),
     );
 }

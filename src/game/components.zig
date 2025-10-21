@@ -175,6 +175,7 @@ pub const Damage = struct {
 
 pub const Effect = struct {
     pub const Type = enum { burning, corrosion, healing, poisoninig };
+    pub const TypesCount = @typeInfo(Type).@"enum".fields.len;
     effect_type: Type,
     min: u8,
     max: u8,

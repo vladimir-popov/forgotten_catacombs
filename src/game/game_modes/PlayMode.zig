@@ -180,7 +180,7 @@ fn handleInput(self: *PlayMode) !?g.actions.Action {
                     health.current = hp;
                 }
             },
-            else => if (cheat.toAction(self.session)) |action| {
+            else => if (try cheat.toAction(self.session)) |action| {
                 return action;
             },
         }
@@ -252,7 +252,8 @@ fn drawInfoBar(self: *const PlayMode) !void {
                 return;
             }
         }
-        try self.session.render.drawInfo(g.meta.name(&self.session.registry, entity));
+        var buf: [32]u8 = undefined;
+        try self.session.render.drawInfo(try g.meta.printName(&buf, self.session.journal, entity));
     } else {
         try self.session.render.cleanInfo();
     }

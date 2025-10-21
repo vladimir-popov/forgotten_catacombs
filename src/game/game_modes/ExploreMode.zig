@@ -99,7 +99,7 @@ fn statusLine(self: ExploreMode, entity: g.Entity, line: []u8) !usize {
     if (self.session.runtime.isDevMode()) {
         len += (try std.fmt.bufPrint(line[len..], "{d}:", .{entity.id})).len;
     }
-    len += (try std.fmt.bufPrint(line[len..], "{s}", .{g.meta.name(&self.session.registry, entity)})).len;
+    len += (try g.meta.printName(line[len..], self.session.journal, entity)).len;
     if (self.session.registry.get(entity, c.EnemyState)) |state| {
         len += (try std.fmt.bufPrint(line[len..], "({s})", .{@tagName(state.*)})).len;
     }
@@ -209,9 +209,10 @@ fn windowWithEntities(
     var window = w.options(g.Entity, self);
     for (variants) |maybe_entity| {
         if (maybe_entity) |entity| {
+            var buf: [32]u8 = undefined;
             try window.area.addOption(
                 self.arena.allocator(),
-                g.meta.name(&self.session.registry, entity),
+                try g.meta.printName(&buf, self.session.journal, entity),
                 entity,
                 showEntityDescription,
                 null,
@@ -235,6 +236,5 @@ fn windowWithDescription(self: *ExploreMode) !w.ModalWindow(w.TextArea) {
         self.arena.allocator(),
         self.session,
         self.entity_in_focus,
-        self.session.journal.isKnown(self.entity_in_focus),
     );
 }

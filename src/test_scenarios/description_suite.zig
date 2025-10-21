@@ -25,6 +25,59 @@ test "Describe an item" {
     , .game_area);
 }
 
+test "Describe an unknown potion" {
+    var test_session: TestSession = undefined;
+    try test_session.initEmpty(std.testing.allocator);
+    defer test_session.deinit();
+
+    const inventory = try test_session.openInventory();
+    const potion = try inventory.add(g.entities.items.HealingPotion);
+    const options = try inventory.chooseItemById(potion);
+    try options.choose("Describe");
+
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║┌───────────A black potion───────────┐║
+        \\║│A swirling liquid of black color    │║
+        \\║│rests in a vial.                    │║
+        \\║│                                    │║
+        \\║│Weight: 10                          │║
+        \\║└────────────────────────────────────┘║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+}
+
+test "Describe a known potion (after drinking a similar)" {
+    var test_session: TestSession = undefined;
+    try test_session.initEmpty(std.testing.allocator);
+    defer test_session.deinit();
+
+    var inventory = try test_session.openInventory();
+    const potion_to_drink = try inventory.add(g.entities.items.HealingPotion);
+    var options = try inventory.chooseItemById(potion_to_drink);
+    try options.choose("Drink");
+
+    inventory = try test_session.openInventory();
+    const potion_to_describe = try inventory.add(g.entities.items.HealingPotion);
+    options = try inventory.chooseItemById(potion_to_describe);
+    try options.choose("Describe");
+
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║┌──────────A healing potion──────────┐║
+        \\║│A brew that glows faintly, as if    │║
+        \\║│alive. It warms your veins and mends│║
+        \\║│your wounds instantly.              │║
+        \\║│                                    │║
+        \\║│Effect: healing 20-25               │║
+        \\║│Weight: 10                          │║
+        \\║└────────────────────────────────────┘║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+}
+
 test "Describe an unknown enemy" {
     var test_session: TestSession = undefined;
     try test_session.initEmpty(std.testing.allocator);

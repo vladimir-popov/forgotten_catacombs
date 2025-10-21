@@ -22,7 +22,14 @@ club: Description = .{
         "Cheap and easy to use.",
     },
 },
-healing_potion: Description = .{ .name = "A potion of healing" },
+healing_potion: Description = .{
+    .name = "A healing potion",
+    .description = &.{
+        "A brew that glows faintly, as if ",
+        "alive. It warms your veins and mends",
+        "your wounds instantly.",
+    },
+},
 ladder_down: Description = .{ .name = "Ladder down" },
 ladder_to_caves: Description = .{ .name = "Entrance to caves" },
 ladder_up: Description = .{ .name = "Ladder up" },
@@ -61,14 +68,6 @@ torch: Description = .{
 },
 traider: Description = .{ .name = "Traider" },
 unknown_key: Description = .{ .name = "Unknown" },
-unknown_potion: Description = .{
-    .name = "Unknown potion",
-    .description = &.{
-        "A swirling liquid of indeterminate",
-        "color rests in a vial.",
-        "Effect unknown. Use with caution.",
-    },
-},
 wolf: Description = .{
     .name = "Wolf",
     .description = &.{

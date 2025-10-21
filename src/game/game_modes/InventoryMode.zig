@@ -179,7 +179,8 @@ const inventory_line_fmt = std.fmt.comptimePrint(
 
 fn formatInventoryLine(self: *Self, line: *w.TextArea.Line, item: g.Entity) ![]const u8 {
     const sprite = self.session.registry.getUnsafe(item, c.Sprite);
-    const name = g.meta.name(&self.session.registry, item);
+    var buf: [32]u8 = undefined;
+    const name = try g.meta.printName(&buf, self.session.journal, item);
     const using = if (item.eql(self.equipment.weapon))
         "weapon"
     else if (item.eql(self.equipment.light))
@@ -294,10 +295,9 @@ fn updateDropTab(self: *Self, drop: g.Entity) !void {
 
 fn addDropOption(self: *Self, tab: *w.WindowWithTabs.Tab, item: g.Entity) !void {
     var buffer: w.TextArea.Line = undefined;
-    const sprite = self.session.registry.getUnsafe(item, c.Sprite);
-    const name = g.meta.name(&self.session.registry, item);
-    const label = try std.fmt.bufPrint(&buffer, "{u} {s}", .{ sprite.codepoint, name });
-    try tab.area.addOption(self.alloc, label, item, takeFromPileOrDescribe, describeSelectedItem);
+    var len = (try std.fmt.bufPrint(&buffer, "{u} ", .{self.session.registry.getUnsafe(item, c.Sprite).codepoint})).len;
+    len += (try g.meta.printName(buffer[len..], self.session.journal, item)).len;
+    try tab.area.addOption(self.alloc, buffer[0..len], item, takeFromPileOrDescribe, describeSelectedItem);
 }
 
 fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
@@ -307,7 +307,6 @@ fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         self.alloc,
         self.session,
         item,
-        self.session.journal.isKnown(item),
     );
     scaleModalWindow(&self.description_window.?);
 }

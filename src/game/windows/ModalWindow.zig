@@ -18,8 +18,10 @@ pub fn ModalWindow(comptime Area: type) type {
     return struct {
         const Self = @This();
 
+        pub const empty: Self = .{ .title = @splat(0), .area = .empty };
+
         area: Area,
-        title: []const u8 = "",
+        title: [32]u8 = @splat(0),
         scrolled_lines: usize = 0,
         /// A maximal region which can be occupied by the modal window.
         /// This region includes a space for borders.
@@ -88,9 +90,10 @@ pub fn ModalWindow(comptime Area: type) type {
             // Draw the border
             try render.drawBorder(reg);
             // Draw the title
-            const padding: u8 = @intCast(reg.cols - self.title.len);
+            const title_len = std.mem.len(@as([*c]const u8, self.title[0..]));
+            const padding: u8 = @intCast(reg.cols - title_len);
             var point = reg.top_left.movedToNTimes(.right, padding / 2);
-            for (self.title) |char| {
+            for (self.title[0..title_len]) |char| {
                 try render.runtime.drawSprite(char, point, .normal);
                 point.move(.right);
             }

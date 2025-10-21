@@ -56,7 +56,7 @@ pub fn notification(alloc: std.mem.Allocator, message: []const u8) !ModalWindow(
 
 /// Approximate example:
 /// ```
-/// ┌─────────────────Club──────────────┐
+/// ┌───────────────Club────────────────┐
 /// │A gnarled piece of wood, scarred   │
 /// │from use. Deals blunt damage.      │
 /// │Cheap and easy to use.             │
@@ -71,13 +71,11 @@ pub fn entityDescription(
     alloc: std.mem.Allocator,
     session: *const g.GameSession,
     entity: g.Entity,
-    is_known_entity: bool,
 ) !ModalWindow(TextArea) {
-    log.debug("Show description of {s} entity {d}", .{ if (is_known_entity) "known" else "unknown", entity.id });
-    var text_area: TextArea = .empty;
-    const title: []const u8 = g.meta.name(&session.registry, entity);
-    try g.meta.describe(&session.registry, alloc, entity, is_known_entity, &text_area);
-    return .{ .area = text_area, .title = title };
+    var window: ModalWindow(TextArea) = .empty;
+    _ = try g.meta.printName(&window.title, session.journal, entity);
+    try g.meta.describe(session.journal, alloc, entity, &window.area);
+    return window;
 }
 
 /// Example:

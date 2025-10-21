@@ -2,6 +2,9 @@ const std = @import("std");
 
 const Type = std.builtin.Type;
 
+/// Builds a static string map with constant pointers to constants declared in S.
+/// It makes possible to get a constant value by its name known only in 
+/// runtime.
 pub fn Preset(comptime S: type) type {
     const type_info = @typeInfo(S);
     switch (type_info) {

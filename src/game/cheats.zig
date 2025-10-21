@@ -5,32 +5,55 @@ const c = g.components;
 
 const log = std.log.scoped(.cheats);
 
+var global_debug_shop: ?*c.Shop = null;
+
 pub const Cheat = union(enum) {
+    /// Tag is a name of the cheat.
+    /// For some cheats it's enough, but some cheats have additional arguments.
     pub const Tag = std.meta.Tag(Cheat);
+
+    /// Total count of defined cheats.
     pub const count = std.meta.fields(Tag).len;
 
+    /// Prints to log a Dijkstra map
     dump_vector_field,
+
+    /// Moves the player to a ladder lead to an upper level.
     move_player_to_ladder_up,
+
+    /// Moves the player to a ladder lead to an lower level.
     move_player_to_ladder_down,
+
+    /// Replaces a current visibility strategy to "show all"
     turn_light_on,
+
+    /// Replaces a current visibility strategy to appropriate for a current level.
     turn_light_off,
-    // Moves the player to the point on the screen
+
+    // Moves the player to the point on the screen.
     goto: p.Point,
+
+    /// Sets up a passed count of health point to the player.
     set_health: u8,
+
     /// This cheat works only in trading mode, and sets up the amount of money depending on
     /// the active tab:
     ///  - for Buying tab the balance of the shop will be changed;
     ///  - for Selling tab the player's balance will be changed.
-    set_money: u8,
+    set_money: u16,
+
+    /// Switches the game to the Trading mode with a special debug trader.
+    /// By default the trader has arbitrary number of random items to sell.
+    trade,
 
     pub fn init(tag: Tag, args: []const u8) ?Cheat {
         switch (tag) {
             .goto => {
                 var itr = std.mem.tokenizeScalar(u8, args, ' ');
                 if (itr.next()) |a_str|
-                    if (tryParse(u8, a_str)) |a|
+                    if (tryParseDecimal(u8, a_str)) |a|
                         if (itr.next()) |b_str|
-                            if (tryParse(u8, b_str)) |b| {
+                            if (tryParseDecimal(u8, b_str)) |b| {
                                 return .{ .goto = p.Point.init(a, b) };
                             };
                 log.warn(
@@ -41,7 +64,7 @@ pub const Cheat = union(enum) {
                     .{args},
                 );
             },
-            .set_health => if (tryParse(u8, args)) |hp| {
+            .set_health => if (tryParseDecimal(u8, args)) |hp| {
                 return .{ .set_health = hp };
             } else {
                 log.warn(
@@ -49,7 +72,7 @@ pub const Cheat = union(enum) {
                     .{args},
                 );
             },
-            .set_money => if (tryParse(u8, args)) |money| {
+            .set_money => if (tryParseDecimal(u16, args)) |money| {
                 return .{ .set_money = money };
             } else {
                 log.warn(
@@ -60,13 +83,14 @@ pub const Cheat = union(enum) {
             .dump_vector_field => return .dump_vector_field,
             .move_player_to_ladder_up => return .move_player_to_ladder_up,
             .move_player_to_ladder_down => return .move_player_to_ladder_down,
+            .trade => return .trade,
             .turn_light_on => return .turn_light_on,
             .turn_light_off => return .turn_light_off,
         }
         return null;
     }
 
-    inline fn tryParse(comptime U: type, str: []const u8) ?U {
+    inline fn tryParseDecimal(comptime U: type, str: []const u8) ?U {
         return std.fmt.parseInt(
             U,
             std.mem.trim(u8, str, " \t"),
@@ -74,6 +98,7 @@ pub const Cheat = union(enum) {
         ) catch null;
     }
 
+    /// Returns an array of string representation of all cheats sorted alphabetically.
     pub inline fn allAsStrings() [count][]const u8 {
         var strings: [count][]const u8 = undefined;
         inline for (std.meta.fields(Tag), 0..) |f, i| {
@@ -96,6 +121,7 @@ pub const Cheat = union(enum) {
                 .move_player_to_ladder_up => "up ladder",
                 .set_health => "set health",
                 .set_money => "set money",
+                .trade => "trade",
                 .turn_light_off => "light off",
                 .turn_light_on => "light on",
             };
@@ -113,7 +139,8 @@ pub const Cheat = union(enum) {
         return null;
     }
 
-    pub fn toAction(self: Cheat, session: *g.GameSession) ?g.actions.Action {
+    /// Some cheats can be interpreted as game actions.
+    pub fn toAction(self: Cheat, session: *g.GameSession) !?g.actions.Action {
         switch (self) {
             .move_player_to_ladder_up => {
                 var itr = session.registry.query2(c.Ladder, c.Position);
@@ -137,6 +164,14 @@ pub const Cheat = union(enum) {
                     .row = goto.row + screen_corner.row,
                     .col = goto.col + screen_corner.col,
                 });
+            },
+            .trade => if (global_debug_shop) |shop| {
+                return .{ .trade = shop };
+            } else {
+                global_debug_shop = try session.arena.allocator().create(c.Shop);
+                global_debug_shop.?.* = try c.Shop.empty(session.arena.allocator(), 1.0, 200);
+                try g.entities.fillShop(global_debug_shop.?, &session.registry, 0);
+                return .{ .trade = global_debug_shop.? };
             },
             else => return null,
         }

@@ -94,7 +94,7 @@ pub fn preInit(
         .max_depth = 0,
         .prng = std.Random.DefaultPrng.init(0),
         .ai = g.AI{ .session = self, .rand = self.prng.random() },
-        .journal = try g.Journal.init(self.arena.allocator(), &self.registry),
+        .journal = try g.Journal.init(self.arena.allocator(), &self.registry, self.prng.random()),
         .player = undefined,
         .level = undefined,
         .mode = undefined,
@@ -133,8 +133,8 @@ pub fn initNew(
     self.registry.getUnsafe(self.player, c.Wallet).money += 200;
     var equipment: *c.Equipment = self.registry.getUnsafe(self.player, c.Equipment);
     var invent: *c.Inventory = self.registry.getUnsafe(self.player, c.Inventory);
-    const weapon = try self.registry.addNewEntity(g.entities.Pickaxe);
-    const light = try self.registry.addNewEntity(g.entities.Torch);
+    const weapon = try self.registry.addNewEntity(g.entities.items.Pickaxe);
+    const light = try self.registry.addNewEntity(g.entities.items.Torch);
     equipment.weapon = weapon;
     equipment.light = light;
     try invent.items.add(weapon);
