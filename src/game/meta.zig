@@ -73,7 +73,7 @@ pub fn printName(dest: []u8, journal: g.Journal, entity: g.Entity) ![]u8 {
     return if (journal.isUnknownPotion(entity)) |color|
         try std.fmt.bufPrint(dest, "A {t} potion", .{color})
     else if (journal.registry.get(entity, c.Description)) |description|
-        try std.fmt.bufPrint(dest, "{s}", .{g.descriptions.Presets.get(description.preset).name})
+        try std.fmt.bufPrint(dest, "{s}", .{g.descriptions.get(description.preset).name})
     else
         try std.fmt.bufPrint(dest, "Unknown", .{});
 }
@@ -107,7 +107,7 @@ fn writeActualDescription(
         _ = try std.fmt.bufPrint(line, "rests in a vial.", .{});
     } else {
         const description = if (journal.registry.get(entity, c.Description)) |descr|
-            g.descriptions.Presets.get(descr.preset).description
+            g.descriptions.get(descr.preset).description
         else
             &.{};
         for (description) |str| {
@@ -293,7 +293,7 @@ test "Describe a torch" {
     var journal = try g.Journal.init(std.testing.allocator, &registry, prng.random());
     defer journal.deinit(std.testing.allocator);
 
-    const id = try registry.addNewEntity(g.entities.items.Torch);
+    const id = try registry.addNewEntity(g.entities.items.get(.torch).*);
     var text_area: g.windows.TextArea = .empty;
     defer text_area.deinit(std.testing.allocator);
 

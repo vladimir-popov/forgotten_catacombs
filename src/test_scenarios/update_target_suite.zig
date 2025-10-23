@@ -44,7 +44,7 @@ test "Lose target on moving away" {
     var test_session: TestSession = undefined;
     try test_session.initEmpty(std.testing.allocator);
     defer test_session.deinit();
-    // errdefer test_session.printDisplay();
+    errdefer test_session.printDisplay();
 
     // Prepare a game session:
     try test_session.player.moveTo(.{ .row = 3, .col = 17 });
@@ -63,7 +63,7 @@ test "Lose target on moving away" {
         \\════════════════════════════════════════
         \\    Closed door     ⇧Explore ��  Open  ⇧
     , .whole_display);
-    const door = g.Entity{ .id = 15 };
+    const door = g.Entity{ .id = 24 };
     try std.testing.expectEqual(door, test_session.player.target());
 
     std.log.debug("Move the player away from the door", .{});

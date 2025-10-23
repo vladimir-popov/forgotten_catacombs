@@ -101,7 +101,7 @@ test "Drink healing potion" {
 
     test_session.player.health().current = 5;
     var inventory = try test_session.openInventory();
-    const potion = try inventory.add(g.entities.items.HealingPotion);
+    const potion = try inventory.add(g.entities.items.get(.healing_potion).*);
     const options = try inventory.chooseItemById(potion);
     try options.choose("Drink");
     try std.testing.expect(inventory.isClosed());

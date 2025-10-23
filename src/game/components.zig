@@ -29,7 +29,7 @@ pub const Sprite = struct {
 };
 
 pub const Description = struct {
-    preset: g.descriptions.Presets.Keys,
+    preset: g.descriptions.Tag,
 };
 
 pub const Animation = struct {
@@ -45,7 +45,7 @@ pub const Animation = struct {
         wait: []const g.Codepoint = &[_]g.Codepoint{ 'z', 'Z', 'z', 'Z' },
     });
 
-    preset: FramesPresets.Keys,
+    preset: FramesPresets.Tag,
     current_frame: u8 = 0,
     previous_render_time: c_uint = 0,
     /// true means that input should not be handled until all frames of this animation will be played.
@@ -200,6 +200,50 @@ pub const Consumable = struct {
     calories: u8,
 };
 
+pub const Rarity = enum(u8) {
+    common = 15,
+    rare = 10,
+    very_rare = 5,
+    legendary = 1,
+    unique = 0,
+
+    pub const proportions: [std.meta.fields(Rarity).len]u8 = blk: {
+        var result: [std.meta.fields(Rarity).len]u8 = undefined;
+        for (std.meta.fields(Rarity), 0..) |f, i| {
+            result[i] = f.value;
+        }
+        break :blk result;
+    };
+};
+
+test Rarity {
+    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
+    const rand = prng.random();
+    var result: [std.meta.fields(Rarity).len]u8 = @splat(0);
+    for (0..255) |_| {
+        const i = rand.weightedIndex(u8, &Rarity.proportions);
+        result[i] += 1;
+    }
+    defer std.debug.print(
+        \\Common:       {d}
+        \\Rare:         {d}
+        \\Very rare:    {d}
+        \\Legendary:    {d}
+        \\Unique:       {d}
+        \\
+    , .{
+        result[0],
+        result[1],
+        result[2],
+        result[3],
+        result[4],
+    });
+    for (1..result.len) |i| {
+        try std.testing.expect(result[i - 1] > result[i]);
+    }
+    try std.testing.expectEqual(0, result[result.len - 1]);
+}
+
 pub const Regeneration = struct {
     /// An amount of health point to restore (or decrease in case of poisoning)
     hp: i8,
@@ -242,6 +286,7 @@ pub const Components = struct {
     pile: ?Pile = null,
     position: ?Position = null,
     price: ?Price = null,
+    rarity: ?Rarity = null,
     shop: ?Shop = null,
     source_of_light: ?SourceOfLight = null,
     speed: ?Speed = null,

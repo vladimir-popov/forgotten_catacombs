@@ -45,7 +45,7 @@ const TestFn = std.builtin.TestFn;
 
 pub const std_options: std.Options = .{
     .logFn = writeLog,
-    .log_level = .info,
+    .log_level = .warn,
     .log_scope_levels = &[_]std.log.ScopeLevel{
         .{ .scope = .default, .level = .debug },
         .{ .scope = .test_session, .level = .debug },

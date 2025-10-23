@@ -107,6 +107,16 @@ pub fn trader(
 }
 
 pub fn fillShop(shop: *c.Shop, registry: *g.Registry, seed: u64) !void {
-    _ = seed;
-    try shop.items.add(try registry.addNewEntity(items.HealingPotion));
+    var prng = std.Random.DefaultPrng.init(seed);
+    const rand = prng.random();
+    const count = rand.uintAtMost(usize, 5) + 10;
+    const all_items = g.entities.items.all();
+    var proportions: [all_items.len]u8 = undefined;
+    for (all_items, 0..) |item, i| {
+        proportions[i] = @intFromEnum(item.rarity.?);
+    }
+    for (0..count) |_| {
+        const item = all_items[rand.weightedIndex(u8, &proportions)];
+        try shop.items.add(try registry.addNewEntity(item.*));
+    }
 }

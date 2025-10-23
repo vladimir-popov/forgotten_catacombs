@@ -24,7 +24,7 @@ unknown_equipment: std.AutoHashMapUnmanaged(g.Entity, u8) = .empty,
 known_potions: std.AutoHashMapUnmanaged(c.Effect.Type, void) = .empty,
 
 /// A set of known class of enemies.
-known_enemies: std.AutoHashMapUnmanaged(g.descriptions.Presets.Keys, void) = .empty,
+known_enemies: std.AutoHashMapUnmanaged(g.descriptions.Tag, void) = .empty,
 
 pub fn init(alloc: std.mem.Allocator, registry: *const g.Registry, rand: std.Random) !Self {
     const colors_count = @typeInfo(g.Color).@"enum".fields.len;

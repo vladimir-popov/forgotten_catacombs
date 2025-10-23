@@ -6,7 +6,10 @@ const c = g.components;
 
 inline fn defined(components: c.Components, comptime field: []const u8) void {
     if (@field(components, field) == null)
-        std.debug.panic("Field '{s}' is not defined:\n{any}", .{ field, components });
+        @compileError(std.fmt.comptimePrint(
+            "Field '{s}' is not defined for {t}",
+            .{ field, components.description.?.preset },
+        ));
 }
 
 pub fn enemy(components: c.Components) c.Components {
@@ -27,6 +30,7 @@ pub inline fn item(components: c.Components) c.Components {
         defined(components, "sprite");
         defined(components, "weight");
         defined(components, "price");
+        defined(components, "rarity");
         return components;
     }
 }

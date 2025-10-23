@@ -408,6 +408,7 @@ test "All components should be serializable" {
         .pile = pile,
         .price = .{ .value = 100 },
         .position = c.Position{ .place = p.Point.init(12, 42), .zorder = .item },
+        .rarity = .common,
         .shop = shop,
         .source_of_light = c.SourceOfLight{ .radius = 4 },
         .speed = c.Speed{ .move_points = 12 },
@@ -419,7 +420,7 @@ test "All components should be serializable" {
 
     inline for (@typeInfo(c.Components).@"struct".fields) |field| {
         if (@field(expected, field.name) == null) {
-            log.err("A component {s} is not defined.", .{field.name});
+            log.err("A component {s} is not defined. Please, add it to the expectation.", .{field.name});
             return error.ComponentIsNotDefined;
         }
     }

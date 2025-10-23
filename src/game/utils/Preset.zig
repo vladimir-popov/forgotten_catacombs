@@ -2,9 +2,9 @@ const std = @import("std");
 
 const Type = std.builtin.Type;
 
-/// Builds a static string map with constant pointers to constants declared in S.
-/// It makes possible to get a constant value by its name known only in 
-/// runtime.
+/// Builds a static string map with constant pointers to default values of fields of S.
+/// All fields must have a same type and default value.
+/// It makes possible to get a constant value by its name known only in runtime.
 pub fn Preset(comptime S: type) type {
     const type_info = @typeInfo(S);
     switch (type_info) {
@@ -35,13 +35,21 @@ pub fn Preset(comptime S: type) type {
     const stringMap = std.StaticStringMap(*const T).initComptime(&kvs);
 
     return struct {
-        pub const Keys = std.meta.FieldEnum(S);
+        pub const Tag = std.meta.FieldEnum(S);
 
-        pub const size: usize = @typeInfo(Keys).@"enum".fields.len;
+        pub const size: usize = @typeInfo(Tag).@"enum".fields.len;
 
-        /// Returns default value for the field appropriate to the passed `key`.
-        pub fn get(key: Keys) *const T {
-            return stringMap.get(@tagName(key)).?;
+        /// Returns default value for the field appropriate to the passed `tag`.
+        pub fn get(tag: Tag) *const T {
+            return stringMap.get(@tagName(tag)).?;
+        }
+
+        pub fn all() [size]*const T {
+            var result: [size]*const T = undefined;
+            for (std.meta.tags(Tag), 0..) |tag, i| {
+                result[i] = get(tag);
+            }
+            return result;
         }
     };
 }
