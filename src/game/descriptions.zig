@@ -35,6 +35,15 @@ club: Description = .{
         "Cheap and easy to use.",
     },
 },
+food_ration: Description = .{
+    .name = "Food ration",
+    .description = &.{
+        "A compact bundle of preserved food.",
+        "Bland and meager, yet designed to",
+        "provide steady nourishment over a",
+        "long period.",
+    },
+},
 healing_potion: Description = .{
     .name = "A healing potion",
     .description = &.{
@@ -43,9 +52,40 @@ healing_potion: Description = .{
         "your wounds instantly.",
     },
 },
+poisoning_potion: Description = .{
+    .name = "A poison",
+    .description = &.{
+        "A vial filled with a thick, bitter",
+        "liquid that smells of decay.",
+    },
+},
+oil_potion: Description = .{
+    .name = "Oil",
+    .description = &.{
+        "Glass bottle filled with viscous oil",
+        "Useful as lamp fuel",
+    },
+},
+coctail_molotov: Description = .{
+    .name = "Molotov cocktail",
+    .description = &.{
+        "A dark glass bottle sealed with a",
+        "cloth wad soaked in fuel. When it",
+        "shatters the dark liquid spatters",
+        "and flames leap up",
+    },
+},
 ladder_down: Description = .{ .name = "Ladder down" },
 ladder_to_caves: Description = .{ .name = "Entrance to caves" },
 ladder_up: Description = .{ .name = "Ladder up" },
+oil_lamp: Description = .{
+    .name = "Oil lamp",
+    .description = &.{
+        "A simple metal lamp filled with oil,",
+        "its flickering flame casts light",
+        "into the darkest corners.",
+    },
+},
 opened_door: Description = .{ .name = "Opened door" },
 pickaxe: Description = .{
     .name = "Pickaxe",

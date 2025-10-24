@@ -2,18 +2,21 @@
 const std = @import("std");
 
 // ѽ Ǥ ¿ ¡ Ø ± † ≠ ¥ æ
-pub const closed_container = '≠';
+pub const container_opened = '=';
+pub const container_locked = '≠';
 pub const door_closed = '+';
+pub const door_locked = '±';
 pub const door_opened = '\'';
 pub const floor_known = '·';
 pub const floor_visible = '•';
-pub const food = '%';
+pub const food = '"';
 pub const human = '@';
 pub const ladder_down = '>';
 pub const ladder_up = '<';
 pub const nothing = ' ';
-pub const pile = '=';
+pub const pile = '%';
 pub const potion = '¿';
+pub const range_weapon = '}';
 pub const rock = '#';
 pub const source_of_light = '¡';
 pub const teleport = '_';

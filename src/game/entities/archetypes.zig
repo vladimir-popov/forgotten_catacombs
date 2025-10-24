@@ -35,6 +35,15 @@ pub inline fn item(components: c.Components) c.Components {
     }
 }
 
+pub inline fn food(components: c.Components) c.Components {
+    comptime {
+        _ = item(components);
+        defined(components, "consumable");
+        std.debug.assert(components.consumable.?.consumable_type == .food);
+        return components;
+    }
+}
+
 pub inline fn weapon(components: c.Components) c.Components {
     comptime {
         _ = item(components);
