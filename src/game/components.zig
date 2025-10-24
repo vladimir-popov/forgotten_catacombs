@@ -33,7 +33,7 @@ pub const Description = struct {
 };
 
 pub const Animation = struct {
-    pub const FramesPresets = u.Preset(struct {
+    pub const FramesPresets = u.Preset([]const g.Codepoint, struct {
         empty: []const g.Codepoint = &[_]g.Codepoint{},
         get_angry: []const g.Codepoint = &[_]g.Codepoint{ 0, '!', 0, '!', 0, '!' },
         go_sleep: []const g.Codepoint = &[_]g.Codepoint{ 0, 'z', 0, 'z', 0, 'z' },
@@ -52,7 +52,7 @@ pub const Animation = struct {
     is_blocked: bool = false,
 
     pub fn frame(self: *Animation, now: u32) ?g.Codepoint {
-        const frames = FramesPresets.get(self.preset);
+        const frames = FramesPresets.values.get(self.preset);
         if (now - self.previous_render_time > g.RENDER_DELAY_MS) {
             self.previous_render_time = now;
             self.current_frame += 1;

@@ -5,16 +5,23 @@ const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
-const preset = g.utils.Preset(@This());
+const preset = g.utils.Preset(c.Components, @This());
 
 pub const Tag = preset.Tag;
 
+pub const count = preset.values.values.len;
+
 pub fn get(tag: Tag) *const c.Components {
-    return preset.get(tag);
+    return preset.values.get(tag);
 }
 
-pub fn all() [preset.size]*const c.Components {
-    return preset.all();
+pub fn getByIdx(idx: usize) *const c.Components {
+    std.debug.assert(idx < count);
+    return preset.values.values[idx];
+}
+
+pub fn all() preset.Iterator {
+    return preset.iterator();
 }
 
 torch: c.Components = archetype.weapon(.{
