@@ -11,21 +11,6 @@ pub const Description = struct {
     description: []const []const u8 = &.{},
 };
 
-const preset = g.utils.Preset(Description, @This());
-
-pub const Tag = preset.Tag;
-
-pub const count = preset.values.len;
-
-pub fn get(tag: Tag) *const Description {
-    return preset.values.get(tag);
-}
-
-pub fn getByIdx(idx: usize) *const Description {
-    std.debug.assert(idx < count);
-    return preset.values.values[idx];
-}
-
 closed_door: Description = .{ .name = "Closed door" },
 club: Description = .{
     .name = "Club",
@@ -132,7 +117,8 @@ wolf: Description = .{
 wharf: Description = .{ .name = "Wharf" },
 
 test "All descriptions should have lines less that 37 symbols" {
-    for (preset.values.values) |description| {
+    var itr = g.presets.Descriptions.iterator();
+    while (itr.next()) |description| {
         for (description.description) |line| {
             const len = try std.unicode.utf8CountCodepoints(line);
             std.testing.expect(len < 37) catch |err| {

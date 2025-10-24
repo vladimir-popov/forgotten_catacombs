@@ -29,7 +29,7 @@ pub const Sprite = struct {
 };
 
 pub const Description = struct {
-    preset: g.descriptions.Tag,
+    preset: g.presets.Descriptions.Tag,
 };
 
 pub const Animation = struct {

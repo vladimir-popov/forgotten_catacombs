@@ -133,8 +133,8 @@ pub fn initNew(
     self.registry.getUnsafe(self.player, c.Wallet).money += 200;
     var equipment: *c.Equipment = self.registry.getUnsafe(self.player, c.Equipment);
     var invent: *c.Inventory = self.registry.getUnsafe(self.player, c.Inventory);
-    const weapon = try self.registry.addNewEntity(g.entities.items.get(.pickaxe).*);
-    const light = try self.registry.addNewEntity(g.entities.items.get(.torch).*);
+    const weapon = try self.registry.addNewEntity(g.presets.Items.values.get(.pickaxe).*);
+    const light = try self.registry.addNewEntity(g.presets.Items.values.get(.torch).*);
     equipment.weapon = weapon;
     equipment.light = light;
     try invent.items.add(weapon);

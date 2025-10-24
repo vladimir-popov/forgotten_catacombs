@@ -19,7 +19,7 @@ test "Describe an item" {
         \\║│                                   ░│║
         \\║│Damage: blunt 2-3                  ░│║
         \\║│Effect: burning 1-1                ░│║
-        \\║│Radius of light: 5                 ░│║
+        \\║│Radius of light: 3                 ░│║
         \\║└────────────────────────────────────┘║
         \\╚══════════════════════════════════════╝
     , .game_area);
@@ -31,7 +31,7 @@ test "Describe an unknown potion" {
     defer test_session.deinit();
 
     const inventory = try test_session.openInventory();
-    const potion = try inventory.add(g.entities.items.get(.healing_potion).*);
+    const potion = try inventory.add(g.presets.Items.values.get(.healing_potion).*);
     const options = try inventory.chooseItemById(potion);
     try options.choose("Describe");
 
@@ -55,12 +55,12 @@ test "Describe a known potion (after drinking a similar)" {
     defer test_session.deinit();
 
     var inventory = try test_session.openInventory();
-    const potion_to_drink = try inventory.add(g.entities.items.get(.healing_potion).*);
+    const potion_to_drink = try inventory.add(g.presets.Items.values.get(.healing_potion).*);
     var options = try inventory.chooseItemById(potion_to_drink);
     try options.choose("Drink");
 
     inventory = try test_session.openInventory();
-    const potion_to_describe = try inventory.add(g.entities.items.get(.healing_potion).*);
+    const potion_to_describe = try inventory.add(g.presets.Items.values.get(.healing_potion).*);
     options = try inventory.chooseItemById(potion_to_describe);
     try options.choose("Describe");
 

@@ -110,15 +110,15 @@ pub fn fillShop(shop: *c.Shop, registry: *g.Registry, seed: u64) !void {
     var prng = std.Random.DefaultPrng.init(seed);
     const rand = prng.random();
     const count = rand.uintAtMost(usize, 5) + 10;
-    var proportions: [g.entities.items.count]u8 = undefined;
+    var proportions: [g.presets.Items.values.values.len]u8 = undefined;
     var i: usize = 0;
-    var itr = g.entities.items.all();
+    var itr = g.presets.Items.iterator();
     while (itr.next()) |item| {
         proportions[i] = @intFromEnum(item.rarity.?);
         i += 1;
     }
     for (0..count) |_| {
-        const item = g.entities.items.getByIdx(rand.weightedIndex(u8, &proportions));
+        const item = g.presets.Items.values.values[rand.weightedIndex(u8, &proportions)];
         try shop.items.add(try registry.addNewEntity(item.*));
     }
 }

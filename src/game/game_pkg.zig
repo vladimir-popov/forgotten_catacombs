@@ -33,6 +33,11 @@ pub const Runtime = @import("Runtime.zig");
 pub const TextAlign = Runtime.TextAlign;
 pub const Viewport = @import("Viewport.zig");
 
+pub const presets = struct {
+    pub const Descriptions = utils.Preset(descriptions.Description, descriptions);
+    pub const Items = utils.Preset(components.Components, entities.items);
+};
+
 pub const RENDER_DELAY_MS = 200;
 
 // Playdate display resolution px:
