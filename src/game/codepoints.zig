@@ -1,7 +1,6 @@
 //! Codepoints for the special
 const std = @import("std");
 
-// ѽ Ǥ ¿ ¡ Ø ± † ≠ ¥ æ
 pub const container_opened = '=';
 pub const container_locked = '≠';
 pub const door_closed = '+';
@@ -9,12 +8,13 @@ pub const door_locked = '±';
 pub const door_opened = '\'';
 pub const floor_known = '·';
 pub const floor_visible = '•';
-pub const food = '"';
+pub const food = '%';
 pub const human = '@';
 pub const ladder_down = '>';
 pub const ladder_up = '<';
 pub const nothing = ' ';
-pub const pile = '%';
+pub const noise = '♪';
+pub const pile = '=';
 pub const potion = '¿';
 pub const range_weapon = '}';
 pub const rock = '#';
@@ -26,7 +26,7 @@ pub const wall_known = '░';
 pub const wall_visible = '▒';
 pub const walls = [_]u21{ '│', '┐', '┌', '─', '┘', '└', '├', '┤', '┬', '┴', '┼' };
 pub const water = '~';
-pub const weapon_melee = '\\';
+pub const weapon_melee = '/';
 
 pub fn toArray(comptime codepoint: u21) [utf8CodepointSequenceLength(codepoint)]u8 {
     var buf: [utf8CodepointSequenceLength(codepoint)]u8 = undefined;

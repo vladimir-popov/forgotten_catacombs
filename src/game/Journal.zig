@@ -9,11 +9,13 @@ const log = std.log.scoped(.journal);
 
 const Self = @This();
 
+const potions_count = @typeInfo(g.descriptions.potions.Enum).@"enum".fields.len;
+
 alloc: std.mem.Allocator,
 
 registry: *const g.Registry,
 
-potion_colors: [c.Effect.TypesCount]g.Color,
+potion_colors: [potions_count]g.Color,
 
 /// The key is an id of the entity that is unknown.
 /// The value is a count of turns that should be spent to recognize the entity.
@@ -21,21 +23,21 @@ potion_colors: [c.Effect.TypesCount]g.Color,
 unknown_equipment: std.AutoHashMapUnmanaged(g.Entity, u8) = .empty,
 
 /// A set of known effect of potions.
-known_potions: std.AutoHashMapUnmanaged(c.Effect.Type, void) = .empty,
+known_potions: std.AutoHashMapUnmanaged(g.meta.PotionType, void) = .empty,
 
 /// A set of known class of enemies.
-known_enemies: std.AutoHashMapUnmanaged(g.presets.Descriptions.Tag, void) = .empty,
+known_enemies: std.AutoHashMapUnmanaged(g.meta.EnemyType, void) = .empty,
 
 pub fn init(alloc: std.mem.Allocator, registry: *const g.Registry, rand: std.Random) !Self {
     const colors_count = @typeInfo(g.Color).@"enum".fields.len;
-    std.debug.assert(colors_count >= c.Effect.TypesCount);
+    std.debug.assert(colors_count >= potions_count);
 
     var colors: [colors_count]g.Color = undefined;
     @memcpy(&colors, std.meta.tags(g.Color));
     rand.shuffle(g.Color, &colors);
 
-    var potion_colors: [c.Effect.TypesCount]g.Color = undefined;
-    @memcpy(&potion_colors, colors[0..c.Effect.TypesCount]);
+    var potion_colors: [potions_count]g.Color = undefined;
+    @memcpy(&potion_colors, colors[0..potions_count]);
 
     return .{ .alloc = alloc, .registry = registry, .potion_colors = potion_colors };
 }
@@ -47,40 +49,41 @@ pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
 }
 
 pub fn isKnown(self: Self, entity: g.Entity) bool {
-    if (g.meta.isPotion(self.registry, entity)) {
-        if (self.registry.get(entity, c.Effect)) |effect|
-            return self.known_potions.contains(effect.effect_type);
+    if (self.unknown_equipment.contains(entity)) {
+        return false;
     }
-    if (g.meta.isEnemy(self.registry, entity)) {
-        if (self.registry.get(entity, c.Description)) |description|
-            return self.known_enemies.contains(description.preset);
+    if (g.meta.isPotion(self.registry, entity)) |potion_type| {
+        return self.known_potions.contains(potion_type);
     }
-    if (!self.unknown_equipment.contains(entity)) {
-        return true;
+    if (g.meta.isEnemy(self.registry, entity)) |enemy_type| {
+        return self.known_enemies.contains(enemy_type);
     }
-    return false;
+    return true;
 }
 
 pub fn isUnknownPotion(self: Self, entity: g.Entity) ?g.Color {
-    if (g.meta.isPotion(self.registry, entity)) {
-        if (self.registry.get(entity, c.Effect)) |effect|
-            if (!self.known_potions.contains(effect.effect_type))
-                return self.potion_colors[@intFromEnum(effect.effect_type)];
+    if (g.meta.isPotion(self.registry, entity)) |potion_type| {
+        if (!self.known_potions.contains(potion_type))
+            return self.potion_colors[@intFromEnum(potion_type)];
     }
     return null;
 }
 
-pub fn markPotionAsKnown(self: *Self, entity: g.Entity) !void {
-    if (self.registry.get(entity, c.Effect)) |effect| {
-        log.debug("Mark a potion {d}:{t} as known", .{ entity.id, effect.effect_type });
-        try self.known_potions.put(self.alloc, effect.effect_type, {});
+pub fn markEnemyAsKnown(self: *Self, entity: g.Entity) !void {
+    if (g.meta.isEnemy(self.registry, entity)) |enemy_type| {
+        log.debug("Mark a creature {d}:{t} as known", .{ entity.id, enemy_type });
+        try self.known_enemies.put(self.alloc, enemy_type, {});
+    } else {
+        std.debug.panic("Entity {d} is not an enemy", .{entity.id});
     }
 }
 
-pub fn markEnemyAsKnown(self: *Self, entity: g.Entity) !void {
-    if (self.registry.get(entity, c.Description)) |description| {
-        log.debug("Mark a creature {d}:{t} as known", .{ entity.id, description.preset });
-        try self.known_enemies.put(self.alloc, description.preset, {});
+pub fn markPotionAsKnown(self: *Self, entity: g.Entity) !void {
+    if (g.meta.isPotion(self.registry, entity)) |potion_type| {
+        log.debug("Mark a potion {d}:{t} as known", .{ entity.id, potion_type });
+        try self.known_potions.put(self.alloc, potion_type, {});
+    } else {
+        std.debug.panic("Entity {d} is not a potion", .{entity.id});
     }
 }
 

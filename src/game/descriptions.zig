@@ -1,3 +1,9 @@
+//! A full set of descriptions for all entities in the game.
+//!
+//! It also used as a tricky system of meta types.
+//! Because of all entities must have a description, the easies way
+//! to get a type for some entity is match its description `preset`
+//! to a more precise enum that represents a type of the entity.
 const std = @import("std");
 const g = @import("game_pkg.zig");
 
@@ -9,6 +15,58 @@ pub const Description = struct {
 
     /// A short description of the entity.
     description: []const []const u8 = &.{},
+};
+
+// All descriptions for potions MUST be declared here
+pub const potions = struct {
+    /// Enum of all potion types
+    pub const Enum = std.meta.FieldEnum(potions);
+
+    healing_potion: Description = .{
+        .name = "A healing potion",
+        .description = &.{
+            "A brew that glows faintly, as if ",
+            "alive. It warms your veins and mends",
+            "your wounds instantly.",
+        },
+    },
+    poisoning_potion: Description = .{
+        .name = "A poison",
+        .description = &.{
+            "A vial filled with a thick, bitter",
+            "liquid that smells of decay.",
+        },
+    },
+    oil_potion: Description = .{
+        .name = "Oil",
+        .description = &.{
+            "Glass bottle filled with viscous oil",
+            "Useful as lamp fuel",
+        },
+    },
+};
+
+// All descriptions for enemies MUST be declared here
+pub const enemies = struct {
+    /// Enum of all enemies types
+    pub const Enum = std.meta.FieldEnum(enemies);
+
+    rat: Description = .{
+        .name = "Rat",
+        .description = &.{
+            "A big, nasty rat with vicious eyes",
+            "that thrives in dark corners and",
+            "forgotten cellars.",
+        },
+    },
+    wolf: Description = .{
+        .name = "Wolf",
+        .description = &.{
+            "Wild predator. Its fur is smeared",
+            "with blood, eyes glinting with",
+            "hunger.",
+        },
+    },
 };
 
 closed_door: Description = .{ .name = "Closed door" },
@@ -27,28 +85,6 @@ food_ration: Description = .{
         "Bland and meager, yet designed to",
         "provide steady nourishment over a",
         "long period.",
-    },
-},
-healing_potion: Description = .{
-    .name = "A healing potion",
-    .description = &.{
-        "A brew that glows faintly, as if ",
-        "alive. It warms your veins and mends",
-        "your wounds instantly.",
-    },
-},
-poisoning_potion: Description = .{
-    .name = "A poison",
-    .description = &.{
-        "A vial filled with a thick, bitter",
-        "liquid that smells of decay.",
-    },
-},
-oil_potion: Description = .{
-    .name = "Oil",
-    .description = &.{
-        "Glass bottle filled with viscous oil",
-        "Useful as lamp fuel",
     },
 },
 coctail_molotov: Description = .{
@@ -87,14 +123,6 @@ pile: Description = .{
     },
 },
 player: Description = .{ .name = "You" },
-rat: Description = .{
-    .name = "Rat",
-    .description = &.{
-        "A big, nasty rat with vicious eyes",
-        "that thrives in dark corners and",
-        "forgotten cellars.",
-    },
-},
 scientist: Description = .{ .name = "Scientist" },
 teleport: Description = .{ .name = "Teleport" },
 torch: Description = .{
@@ -106,14 +134,6 @@ torch: Description = .{
 },
 traider: Description = .{ .name = "Traider" },
 unknown_key: Description = .{ .name = "Unknown" },
-wolf: Description = .{
-    .name = "Wolf",
-    .description = &.{
-        "Wild predator. Its fur is smeared",
-        "with blood, eyes glinting with",
-        "hunger.",
-    },
-},
 wharf: Description = .{ .name = "Wharf" },
 
 test "All descriptions should have lines less that 37 symbols" {

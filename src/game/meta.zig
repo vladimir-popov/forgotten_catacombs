@@ -7,10 +7,8 @@ pub const Error = error{
     DamageIsNotSpecified,
 };
 
-/// Any entity with a `EnemyState` is enemy.
-pub inline fn isEnemy(registry: *const g.Registry, entity: g.Entity) bool {
-    return registry.has(entity, c.EnemyState);
-}
+pub const PotionType = g.descriptions.potions.Enum;
+pub const EnemyType = g.descriptions.enemies.Enum;
 
 /// Any entity with weight is item.
 pub inline fn isItem(registry: *const g.Registry, entity: g.Entity) bool {
@@ -27,17 +25,25 @@ pub inline fn isLight(registry: *const g.Registry, entity: g.Entity) bool {
     return registry.has(entity, c.SourceOfLight);
 }
 
-/// Any consumable entity with `consumable_type` == `.potion` is a potion.
-pub inline fn isPotion(registry: *const g.Registry, entity: g.Entity) bool {
-    return if (registry.get(entity, c.Consumable)) |consumable|
-        consumable.consumable_type == .potion
+/// Returns a type of a potion if it has description preset from appropriate namespace.
+pub inline fn isPotion(registry: *const g.Registry, entity: g.Entity) ?PotionType {
+    return if (registry.get(entity, c.Description)) |descr|
+        std.meta.stringToEnum(PotionType, @tagName(descr.preset))
     else
-        false;
+        null;
+}
+
+/// Returns a type of an enemy if it has description preset from appropriate namespace.
+pub inline fn isEnemy(registry: *const g.Registry, entity: g.Entity) ?EnemyType {
+    return if (registry.get(entity, c.Description)) |descr|
+        std.meta.stringToEnum(EnemyType, @tagName(descr.preset))
+    else
+        null;
 }
 
 /// Only weapon and source of light can be equipped.
 pub fn canEquip(registry: *const g.Registry, item: g.Entity) bool {
-    return (registry.has(item, c.Damage) or registry.has(item, c.SourceOfLight));
+    return isWeapon(registry, item) or isLight(registry, item);
 }
 
 /// Returns the radius of the light as a maximal radius of all equipped sources of the light.
@@ -89,8 +95,8 @@ pub fn describe(
     _ = try text_area.addEmptyLine(alloc);
     if (isItem(journal.registry, entity)) {
         try describeItem(journal, alloc, entity, text_area);
-    } else if (isEnemy(journal.registry, entity)) {
-        try describeEnemy(journal, alloc, entity, text_area);
+    } else if (isEnemy(journal.registry, entity)) |enemy_type| {
+        try describeEnemy(journal, alloc, entity, enemy_type, text_area);
     }
 }
 
@@ -145,9 +151,10 @@ fn describeEnemy(
     journal: g.Journal,
     alloc: std.mem.Allocator,
     enemy: g.Entity,
+    enemy_type: g.meta.EnemyType,
     text_area: *g.windows.TextArea,
 ) !void {
-    if (journal.isKnown(enemy)) {
+    if (journal.known_enemies.contains(enemy_type)) {
         if (journal.registry.get(enemy, c.Health)) |health| {
             const line = try text_area.addEmptyLine(alloc);
             _ = try std.fmt.bufPrint(line, "Health: {d}/{d}", .{ health.current, health.max });

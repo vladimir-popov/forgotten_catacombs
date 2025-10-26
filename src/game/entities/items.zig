@@ -53,8 +53,6 @@ torch: c.Components = archetype.weapon(.{
 }),
 
 pub const potions = struct {
-    pub const Enum = std.meta.FieldEnum(potions);
-
     healing_potion: c.Components = archetype.potion(.{
         .description = .{ .preset = .healing_potion },
         .rarity = .rare,

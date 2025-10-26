@@ -12,6 +12,15 @@ inline fn defined(components: c.Components, comptime field: []const u8) void {
         ));
 }
 
+inline fn hasType(comptime E: type, components: c.Components) void {
+    if (std.meta.stringToEnum(E, @tagName(components.description.?.preset)) == null) {
+        @compileError(std.fmt.comptimePrint(
+            "{s} doesn't have expected type {s}",
+            .{ @tagName(components.description.?.preset), @typeName(E) },
+        ));
+    }
+}
+
 pub fn enemy(components: c.Components) c.Components {
     comptime {
         defined(components, "description");
@@ -20,6 +29,7 @@ pub fn enemy(components: c.Components) c.Components {
         defined(components, "speed");
         defined(components, "initiative");
         defined(components, "state");
+        hasType(g.meta.EnemyType, components);
         return components;
     }
 }
@@ -55,6 +65,7 @@ pub inline fn weapon(components: c.Components) c.Components {
 pub inline fn potion(components: c.Components) c.Components {
     comptime {
         _ = item(components);
+        hasType(g.meta.PotionType, components);
         defined(components, "consumable");
         std.debug.assert(components.consumable.?.consumable_type == .potion);
         return components;

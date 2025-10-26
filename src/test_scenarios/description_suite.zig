@@ -38,8 +38,8 @@ test "Describe an unknown potion" {
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
-        \\║┌───────────A black potion───────────┐║
-        \\║│A swirling liquid of black color    │║
+        \\║┌───────────A green potion───────────┐║
+        \\║│A swirling liquid of green color    │║
         \\║│rests in a vial.                    │║
         \\║│                                    │║
         \\║│Weight: 10                          │║

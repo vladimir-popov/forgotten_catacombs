@@ -204,7 +204,7 @@ fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         if (g.meta.isWeapon(&self.session.registry, item)) {
             try window.area.addOption(self.alloc, "Use as a weapon", item, useAsWeapon, null);
         }
-        if (g.meta.isPotion(&self.session.registry, item)) {
+        if (g.meta.isPotion(&self.session.registry, item)) |_| {
             try window.area.addOption(self.alloc, "Drink", item, consumeItem, null);
         }
     }

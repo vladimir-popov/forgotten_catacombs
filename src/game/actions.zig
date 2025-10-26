@@ -96,7 +96,7 @@ pub fn calculateQuickActionForTarget(
     }
 
     if (player_position.place.near4(target_position.place)) {
-        if (g.meta.isEnemy(&session.registry, target_entity)) {
+        if (g.meta.isEnemy(&session.registry, target_entity)) |_| {
             return .{ .hit = target_entity };
         }
         if (session.registry.get(target_entity, c.Door)) |door| {
@@ -241,7 +241,7 @@ fn checkCollision(session: *g.GameSession, place: p.Point) ?Action {
                 if (session.registry.get(entity, c.Door)) |_|
                     return .{ .open = .{ .id = entity, .place = place } };
 
-                if (g.meta.isEnemy(&session.registry, entity))
+                if (g.meta.isEnemy(&session.registry, entity)) |_|
                     return .{ .hit = entity };
 
                 if (session.registry.get(entity, c.Shop)) |shop| {
