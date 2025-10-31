@@ -22,11 +22,13 @@ pub fn player(alloc: std.mem.Allocator) !c.Components {
 }
 
 const Rat = archetype.enemy(.{
+    .armor = .init(.{ .physical = 1 }),
     .description = .{ .preset = .rat },
     .initiative = .empty,
     .sprite = .{ .codepoint = 'r' },
     .health = .{ .max = 10, .current = 10 },
-    .damage = .{ .damage_type = .thrusting, .min = 1, .max = 3 },
+    .damage = .{ .damage_type = .physical, .min = 1, .max = 3 },
+    .reward = .{ .experience = 5 },
     .speed = .{ .move_points = 14 },
     .state = .sleeping,
 });

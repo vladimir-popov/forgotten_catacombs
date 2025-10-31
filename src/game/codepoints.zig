@@ -1,6 +1,7 @@
 //! Codepoints for the special
 const std = @import("std");
 
+pub const armor = ']';
 pub const container_opened = '=';
 pub const container_locked = '≠';
 pub const door_closed = '+';

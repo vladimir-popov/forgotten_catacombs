@@ -165,10 +165,12 @@ pub const Cheat = union(enum) {
                     .col = goto.col + screen_corner.col,
                 });
             },
-            .trade => if (global_debug_shop) |shop| {
-                return .{ .trade = shop };
-            } else {
-                global_debug_shop = try session.arena.allocator().create(c.Shop);
+            .trade => {
+                if (global_debug_shop) |shop| {
+                    shop.deinit();
+                } else {
+                    global_debug_shop = try session.arena.allocator().create(c.Shop);
+                }
                 global_debug_shop.?.* = try c.Shop.empty(session.arena.allocator(), 1.0, 200);
                 try g.entities.fillShop(global_debug_shop.?, &session.registry, 0);
                 return .{ .trade = global_debug_shop.? };

@@ -5,15 +5,6 @@ const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
-club: c.Components = archetype.weapon(.{
-    .description = .{ .preset = .club },
-    .rarity = .common,
-    .sprite = .{ .codepoint = cp.weapon_melee },
-    .weight = .{ .value = 80 },
-    .damage = .{ .damage_type = .blunt, .min = 5, .max = 8 },
-    .price = .{ .value = 28 },
-}),
-
 food_ration: c.Components = archetype.food(.{
     .description = .{ .preset = .food_ration },
     .rarity = .common,
@@ -32,25 +23,16 @@ oil_lamp: c.Components = archetype.item(.{
     .price = .{ .value = 50 },
 }),
 
-pickaxe: c.Components = archetype.weapon(.{
-    .description = .{ .preset = .pickaxe },
-    .rarity = .common,
-    .sprite = .{ .codepoint = cp.weapon_melee },
-    .weight = .{ .value = 100 },
-    .damage = .{ .damage_type = .cutting, .min = 3, .max = 5 },
-    .price = .{ .value = 15 },
-}),
-
-torch: c.Components = archetype.weapon(.{
-    .description = .{ .preset = .torch },
-    .rarity = .common,
-    .sprite = .{ .codepoint = cp.source_of_light },
-    .weight = .{ .value = 20 },
-    .source_of_light = .{ .radius = 3 },
-    .price = .{ .value = 5 },
-    .damage = .{ .damage_type = .blunt, .min = 2, .max = 3 },
-    .effect = .{ .effect_type = .burning, .min = 1, .max = 1 },
-}),
+pub const armor = struct {
+    jacket: c.Components = archetype.armor(.{
+        .armor = .init(.{ .physical = 5, .fire = 2 }),
+        .description = .{ .preset = .jacket },
+        .rarity = .common,
+        .sprite = .{ .codepoint = cp.armor },
+        .weight = .{ .value = 10 },
+        .price = .{ .value = 35 },
+    }),
+};
 
 pub const potions = struct {
     healing_potion: c.Components = archetype.potion(.{
@@ -81,5 +63,39 @@ pub const potions = struct {
         .weight = .{ .value = 10 },
         .price = .{ .value = 30 },
         .consumable = .{ .consumable_type = .potion, .calories = 0 },
+    }),
+};
+
+pub const weapons = struct {
+    club: c.Components = archetype.weapon(.{
+        .description = .{ .preset = .club },
+        .rarity = .common,
+        .sprite = .{ .codepoint = cp.weapon_melee },
+        .weight = .{ .value = 80 },
+        .damage = .{ .damage_type = .physical, .min = 5, .max = 8 },
+        .price = .{ .value = 28 },
+        .weapon_class = .primitive,
+    }),
+
+    pickaxe: c.Components = archetype.weapon(.{
+        .description = .{ .preset = .pickaxe },
+        .rarity = .common,
+        .sprite = .{ .codepoint = cp.weapon_melee },
+        .weight = .{ .value = 100 },
+        .damage = .{ .damage_type = .physical, .min = 3, .max = 5 },
+        .price = .{ .value = 15 },
+        .weapon_class = .primitive,
+    }),
+
+    torch: c.Components = archetype.weapon(.{
+        .description = .{ .preset = .torch },
+        .rarity = .common,
+        .sprite = .{ .codepoint = cp.source_of_light },
+        .weight = .{ .value = 20 },
+        .source_of_light = .{ .radius = 3 },
+        .price = .{ .value = 5 },
+        .damage = .{ .damage_type = .physical, .min = 2, .max = 3 },
+        .effect = .{ .effect_type = .burning, .min = 1, .max = 1 },
+        .weapon_class = .primitive,
     }),
 };

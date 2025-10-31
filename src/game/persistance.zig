@@ -394,9 +394,10 @@ test "All components should be serializable" {
 
     // Random components to check serialization:
     const expected = c.Components{
+        .armor = .init(.{ .physical = 1, .poison = 2, .fire = 3 }),
         .animation = c.Animation{ .preset = .hit },
         .consumable = .{ .calories = 12, .consumable_type = .food },
-        .damage = .{ .damage_type = .cutting, .min = 1, .max = 2 },
+        .damage = .{ .damage_type = .physical, .min = 1, .max = 2 },
         .description = c.Description{ .preset = .player },
         .door = c.Door{ .state = .opened },
         .effect = .{ .min = 1, .max = 3, .effect_type = .burning },
@@ -407,14 +408,19 @@ test "All components should be serializable" {
         .ladder = c.Ladder{ .id = .{ .id = 2 }, .direction = .down, .target_ladder = .{ .id = 3 } },
         .pile = pile,
         .price = .{ .value = 100 },
+        .progression = .{ .level = 1, .experience = 42 },
         .position = c.Position{ .place = p.Point.init(12, 42), .zorder = .item },
         .rarity = .common,
+        .reward = .{ .experience = 34 },
         .shop = shop,
         .source_of_light = c.SourceOfLight{ .radius = 4 },
         .speed = c.Speed{ .move_points = 12 },
         .sprite = c.Sprite{ .codepoint = g.codepoints.human },
+        .skills = .init(1, 2, 3, 4),
         .state = .walking,
+        .stats = .init(1, 2, 3, 4, 5),
         .wallet = .{ .money = 321 },
+        .weapon_class = .tricky,
         .weight = .{ .value = 55 },
     };
 

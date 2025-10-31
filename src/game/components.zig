@@ -3,6 +3,14 @@ const g = @import("game_pkg.zig");
 const p = g.primitives;
 const u = g.utils;
 
+pub const Armor = struct {
+    resistance: std.EnumArray(Damage.Type, u8),
+
+    pub fn init(resistances: std.enums.EnumFieldStruct(Damage.Type, u8, 0)) Armor {
+        return .{ .resistance = .initDefault(0, resistances) };
+    }
+};
+
 /// A place in the dungeon where an entity is, and its z-order.
 /// A place with zero row and zero column is undefined.
 /// **NOTE:** do not replace the whole position. Only the place should be changed during the game,
@@ -167,7 +175,7 @@ pub const Equipment = struct {
 };
 
 pub const Damage = struct {
-    pub const Type = enum { cutting, blunt, thrusting, poison, fire, acid };
+    pub const Type = enum { physical, poison, fire, acid };
     damage_type: Type,
     min: u8,
     max: u8,
@@ -185,7 +193,7 @@ pub const Effect = struct {
             .burning => .fire,
             .corrosion => .acid,
             .poisoninig => .poison,
-            else => null,
+            .healing => null,
         };
         return if (damage_type) |dt|
             .{ .damage_type = dt, .min = self.min, .max = self.max }
@@ -244,13 +252,6 @@ test Rarity {
     try std.testing.expectEqual(0, result[result.len - 1]);
 }
 
-pub const Regeneration = struct {
-    /// An amount of health point to restore (or decrease in case of poisoning)
-    hp: i8,
-    /// A number of move points on each hp should be recovered
-    mp: u8,
-};
-
 pub const Initiative = struct {
     move_points: g.MovePoints,
 
@@ -263,16 +264,82 @@ pub const EnemyState = enum {
     aggressive,
 };
 
+pub const Progression = struct {
+    /// A numbers of required exp point for level up.
+    /// The 0 element is a required amount of exp point to get the
+    /// second level.
+    pub const Levels: [3]u16 = .{ 500, 1000, 15000 };
+    experience: u16,
+    level: u8,
+};
+
+pub const Reward = struct {
+    /// A number of exp point for killing an enemy first time.
+    experience: u16,
+};
+
 pub const SourceOfLight = struct {
     radius: f16,
+};
+
+pub const Skills = struct {
+    weapon_mastery: u8,
+    mechanics: u8,
+    stealth: u8,
+    echo_of_knowledge: u8,
+
+    pub fn init(
+        weapon_mastery: u8,
+        mechanics: u8,
+        stealth: u8,
+        echo_of_knowledge: u8,
+    ) Skills {
+        return .{
+            .weapon_mastery = weapon_mastery,
+            .mechanics = mechanics,
+            .stealth = stealth,
+            .echo_of_knowledge = echo_of_knowledge,
+        };
+    }
+};
+
+pub const Stats = struct {
+    strength: u8,
+    dexterity: u8,
+    preception: u8,
+    intelligence: u8,
+    constitution: u8,
+
+    pub fn init(
+        strength: u8,
+        dexterity: u8,
+        preception: u8,
+        intelligence: u8,
+        constitution: u8,
+    ) Stats {
+        return .{
+            .strength = strength,
+            .dexterity = dexterity,
+            .preception = preception,
+            .intelligence = intelligence,
+            .constitution = constitution,
+        };
+    }
 };
 
 pub const Weight = struct {
     value: u8,
 };
 
+pub const WeaponClass = enum {
+    primitive,
+    tricky,
+    ancient,
+};
+
 pub const Components = struct {
     animation: ?Animation = null,
+    armor: ?Armor = null,
     consumable: ?Consumable = null,
     damage: ?Damage = null,
     description: ?Description, // must be provided for every entity
@@ -286,12 +353,17 @@ pub const Components = struct {
     pile: ?Pile = null,
     position: ?Position = null,
     price: ?Price = null,
+    progression: ?Progression = null,
     rarity: ?Rarity = null,
+    reward: ?Reward = null,
     shop: ?Shop = null,
+    skills: ?Skills = null,
+    stats: ?Stats = null,
     source_of_light: ?SourceOfLight = null,
     speed: ?Speed = null,
     sprite: ?Sprite, // must be provided for every entity
     state: ?EnemyState = null,
     wallet: ?Wallet = null,
     weight: ?Weight = null,
+    weapon_class: ?WeaponClass = null,
 };

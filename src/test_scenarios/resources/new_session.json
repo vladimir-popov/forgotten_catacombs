@@ -25,7 +25,7 @@
           {
             "2": {
               "damage": {
-                "damage_type": "cutting",
+                "damage_type": "physical",
                 "min": 3,
                 "max": 5
               },
@@ -46,7 +46,7 @@
           {
             "3": {
               "damage": {
-                "damage_type": "blunt",
+                "damage_type": "physical",
                 "min": 2,
                 "max": 3
               },

@@ -96,6 +96,16 @@ coctail_molotov: Description = .{
         "and flames leap up",
     },
 },
+jacket: Description = .{
+    .name = "Jacket",
+    .description = &.{
+        "A sturdy, time-worn leather jacket.",
+        "Despite its worn look, the jacket",
+        "offers surprising resilience against",
+        "scrapes and gives minor resistance",
+        "to fire and heat.",
+    },
+},
 ladder_down: Description = .{ .name = "Ladder down" },
 ladder_to_caves: Description = .{ .name = "Entrance to caves" },
 ladder_up: Description = .{ .name = "Ladder up" },

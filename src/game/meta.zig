@@ -245,7 +245,7 @@ test "Describe a known rat" {
         \\forgotten cellars.
         \\
         \\Health: 10/10
-        \\Damage: thrusting 1-3
+        \\Damage: physical 1-3
         \\
         \\Not too fast.
     );
@@ -312,7 +312,7 @@ test "Describe a torch" {
         \\Wooden handle, cloth wrap, burning
         \\flame. Lasts until the fire dies.
         \\
-        \\Damage: blunt 2-3
+        \\Damage: physical 2-3
         \\Effect: burning 1-1
         \\Radius of light: 3
         \\Weight: 20

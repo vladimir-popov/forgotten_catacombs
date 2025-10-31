@@ -12,6 +12,7 @@ inline fn defined(components: c.Components, comptime field: []const u8) void {
         ));
 }
 
+/// Checks that components have a relevant to `E` preset of description.
 inline fn hasType(comptime E: type, components: c.Components) void {
     if (std.meta.stringToEnum(E, @tagName(components.description.?.preset)) == null) {
         @compileError(std.fmt.comptimePrint(
@@ -23,11 +24,13 @@ inline fn hasType(comptime E: type, components: c.Components) void {
 
 pub fn enemy(components: c.Components) c.Components {
     comptime {
+        defined(components, "armor");
         defined(components, "description");
-        defined(components, "sprite");
         defined(components, "health");
-        defined(components, "speed");
         defined(components, "initiative");
+        defined(components, "reward");
+        defined(components, "speed");
+        defined(components, "sprite");
         defined(components, "state");
         hasType(g.meta.EnemyType, components);
         return components;
@@ -37,10 +40,10 @@ pub fn enemy(components: c.Components) c.Components {
 pub inline fn item(components: c.Components) c.Components {
     comptime {
         defined(components, "description");
-        defined(components, "sprite");
-        defined(components, "weight");
         defined(components, "price");
         defined(components, "rarity");
+        defined(components, "sprite");
+        defined(components, "weight");
         return components;
     }
 }
@@ -54,10 +57,19 @@ pub inline fn food(components: c.Components) c.Components {
     }
 }
 
+pub inline fn armor(components: c.Components) c.Components {
+    comptime {
+        _ = item(components);
+        defined(components, "armor");
+        return components;
+    }
+}
+
 pub inline fn weapon(components: c.Components) c.Components {
     comptime {
         _ = item(components);
         defined(components, "damage");
+        defined(components, "weapon_class");
         return components;
     }
 }
