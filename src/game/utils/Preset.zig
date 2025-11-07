@@ -64,6 +64,11 @@ pub fn Preset(comptime T: type, S: type) type {
             }
             break :blk map;
         };
+
+        /// Gets an enum item, cast it to the string and then casts the string to the `T`.
+        pub inline fn castByNameAndGet(item: anytype) *const T {
+            return values.get(std.meta.stringToEnum(Tag, @tagName(item)).?);
+        }
     };
 }
 

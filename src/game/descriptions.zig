@@ -17,6 +17,42 @@ pub const Description = struct {
     description: []const []const u8 = &.{},
 };
 
+pub const player_archetypes = struct {
+    pub const Enum = std.meta.FieldEnum(player_archetypes);
+
+    adventurer: Description = .{
+        .name = "Adventurer",
+        .description = &.{
+            "You are forever in search of new",
+            "sensations. Your main desire is to",
+            "test your strength and feel the taste",
+            "of adventure. You have no pronounced",
+            "talents, but no serious flaws either.",
+            "Flexibility and curiosity make you a",
+            "versatile explorer of the forgotten",
+            "catacombs.",
+        },
+    },
+    archeologist: Description = .{
+        .name = "Archeologist",
+        .description = &.{
+            "",
+        },
+    },
+    vandal: Description = .{
+        .name = "Vandal",
+        .description = &.{
+            "",
+        },
+    },
+    rogue: Description = .{
+        .name = "Rogue",
+        .description = &.{
+            "",
+        },
+    },
+};
+
 // All descriptions for potions MUST be declared here
 pub const potions = struct {
     /// Enum of all potion types
@@ -65,6 +101,37 @@ pub const enemies = struct {
             "Wild predator. Its fur is smeared",
             "with blood, eyes glinting with",
             "hunger.",
+        },
+    },
+};
+
+pub const skills = struct {
+    pub const Enum = std.meta.FieldEnum(skills);
+    weapon_mastery: Description = .{
+        .name = "Weapon Mastery",
+        .description = &.{
+            "Possessing this skill allows you",
+            "to use any weapon more effectively",
+            "and miss less often.",
+        },
+    },
+    mechanics: Description = .{
+        .name = "Mechanics",
+        .description = &.{
+            "Knowledge in the field of mechanics",
+            "helps you pick locks and disarm traps",
+        },
+    },
+    stealth: Description = .{
+        .name = "Stealth",
+        .description = &.{
+            "",
+        },
+    },
+    echo_of_knowledge: Description = .{
+        .name = "Echo of knowledge",
+        .description = &.{
+            "",
         },
     },
 };

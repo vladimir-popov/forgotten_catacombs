@@ -1,14 +1,3 @@
-//! This is an area with a list of options.
-//! Options with items and right button handlers can be added. An appropriate handler will be
-//! invoked inside the `handleButton` method. The owner, index of the current line and appropriate item
-//! will be passed to the handler.
-//! ```
-//!  ┌────────────────────────────────────┐
-//!  │             option 1               │
-//!  │░░░░░░░░░░░░░option░2░░░░░░░░░░░░░░░│
-//!  │             option 3               │
-//!  └────────────────────────────────────┘
-//! ```
 const std = @import("std");
 const g = @import("../game_pkg.zig");
 const c = g.components;
@@ -19,6 +8,17 @@ const log = std.log.scoped(.windows);
 
 const LINE_BUFFER_SIZE = g.DISPLAY_COLS;
 
+/// This is an area with a list of options.
+/// Options with items and right button handlers can be added. An appropriate handler will be
+/// invoked inside the `handleButton` method. The owner, index of the current line and appropriate item
+/// will be passed to the handler.
+/// ```
+///  ┌────────────────────────────────────┐
+///  │             option 1               │
+///  │░░░░░░░░░░░░░option░2░░░░░░░░░░░░░░░│
+///  │             option 3               │
+///  └────────────────────────────────────┘
+/// ```
 pub fn OptionsArea(comptime Item: type) type {
     return struct {
         const Self = @This();
@@ -37,11 +37,14 @@ pub fn OptionsArea(comptime Item: type) type {
 
         pub const Option = struct {
             item: Item,
+            /// A buffer for a label content
             label_buffer: [LINE_BUFFER_SIZE]u8,
+            /// An actual length of a label content
             label_len: usize,
             onReleaseButtonFn: OnReleaseButton,
             onHoldButtonFn: ?OnHoldButton,
 
+            /// Returns a slice with a text of the label (no additional spaces).
             pub fn label(self: *const @This()) []const u8 {
                 return self.label_buffer[0..self.label_len];
             }
@@ -78,6 +81,7 @@ pub fn OptionsArea(comptime Item: type) type {
             return self.options.items.len;
         }
 
+        /// Returns a button to choose the selected option
         pub fn button(self: Self) ?struct { []const u8, bool } {
             if (self.options.items.len > 0) {
                 const option = self.options.items[self.selected_line];
@@ -108,6 +112,24 @@ pub fn OptionsArea(comptime Item: type) type {
             @memmove(line.label_buffer[0..line.label_len], label);
         }
 
+        pub fn addEmptyOption(
+            self: *Self,
+            alloc: std.mem.Allocator,
+            item: Item,
+        ) !*Option {
+            const line = try self.options.addOne(alloc);
+            line.* = .{
+                .item = item,
+                .label_len = 0,
+                .label_buffer = @splat(' '),
+                .onReleaseButtonFn = doNothing,
+                .onHoldButtonFn = null,
+            };
+            return line;
+        }
+
+        fn doNothing(_: *anyopaque, _: usize, _: Item) anyerror!void {}
+
         pub fn selectLine(self: *Self, idx: usize) !void {
             std.debug.assert(idx < self.options.items.len);
             self.selected_line = idx;
@@ -125,6 +147,14 @@ pub fn OptionsArea(comptime Item: type) type {
                 self.selected_line += 1
             else
                 self.selected_line = 0;
+        }
+
+        pub fn selectedOption(self: Self) *Option {
+            return &self.options.items[self.selected_line];
+        }
+
+        pub fn selectedItem(self: Self) Item {
+            return self.options.items[self.selected_line].item;
         }
 
         pub fn handleButton(self: *Self, btn: g.Button) !void {

@@ -17,6 +17,7 @@ pub const windows = @import("windows/windows_pkg.zig");
 
 pub const AI = @import("AI.zig");
 pub const Button = @import("Button.zig");
+pub const CharacterBuilder = @import("CharacterBuilder.zig");
 pub const Cheat = @import("cheats.zig").Cheat;
 pub const Codepoint = u21;
 pub const Color = enum { red, green, blue, black, white };

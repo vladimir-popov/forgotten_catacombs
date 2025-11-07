@@ -9,7 +9,7 @@ pub const items = @import("items.zig");
 /// Creates components for the player with empty inventory and nothing equipped.
 ///
 /// - `alloc` the ecs.Registry allocator.
-pub fn player(alloc: std.mem.Allocator) !c.Components {
+pub fn player(alloc: std.mem.Allocator, stats: c.Stats, skills: c.Skills) !c.Components {
     return .{
         .sprite = .{ .codepoint = cp.human },
         .description = .{ .preset = .player },
@@ -17,6 +17,8 @@ pub fn player(alloc: std.mem.Allocator) !c.Components {
         .speed = .{ .move_points = 10 },
         .equipment = .nothing,
         .inventory = try c.Inventory.empty(alloc),
+        .skills = skills,
+        .stats = stats,
         .wallet = .{ .money = 0 },
     };
 }

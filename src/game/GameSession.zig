@@ -123,11 +123,15 @@ pub fn initNew(
     seed: u64,
     runtime: g.Runtime,
     render: g.Render,
+    stats: c.Stats,
+    skills: c.Skills,
 ) !void {
     log.debug("Begin a new game session with seed {d}", .{seed});
     try self.preInit(gpa, runtime, render);
     self.setSeed(seed);
-    self.player = try self.registry.addNewEntity(try g.entities.player(self.registry.allocator()));
+    self.player = try self.registry.addNewEntity(
+        try g.entities.player(self.registry.allocator(), stats, skills),
+    );
 
     // Creates the initial equipment of the player
     self.registry.getUnsafe(self.player, c.Wallet).money += 200;

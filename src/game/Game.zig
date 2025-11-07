@@ -1,5 +1,6 @@
 const std = @import("std");
 const g = @import("game_pkg.zig");
+const c = g.components;
 const p = g.primitives;
 const w = g.windows;
 
@@ -27,6 +28,7 @@ const WelcomeScreen = struct {
 
 pub const State = union(enum) {
     welcome: WelcomeScreen,
+    create_character: g.CharacterBuilder,
     /// The current game session
     game_session: g.GameSession,
     game_over,
@@ -60,6 +62,7 @@ pub fn deinit(self: *Self) void {
     self.render.deinit();
     switch (self.state) {
         .welcome => self.state.welcome.menu.deinit(self.gpa),
+        .create_character => self.state.create_character.deinit(),
         .game_session => self.state.game_session.deinit(),
         .game_over => {},
     }
@@ -76,6 +79,13 @@ pub fn tick(self: *Self) !void {
             switch (btn.game_button) {
                 .a => if (btn.state == .released) try self.welcome(),
                 else => {},
+            }
+        },
+        .create_character => if (try self.runtime.readPushedButtons()) |btn| {
+            if (try self.state.create_character.handleButton(btn, self.render)) |statsAndSkills| {
+                try self.startGameSession(statsAndSkills[0], statsAndSkills[1]);
+            } else {
+                try self.state.create_character.draw(self.render);
             }
         },
         .game_session => |*session| {
@@ -119,14 +129,25 @@ fn newGame(ptr: *anyopaque, _: usize, _: void) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     std.debug.assert(self.state == .welcome);
     self.state.welcome.menu.deinit(self.gpa);
+    try self.render.clearDisplay();
+    self.state = .{ .create_character = undefined };
+    try self.state.create_character.init(self.gpa);
+    try self.state.create_character.draw(self.render);
+}
+
+fn startGameSession(self: *Self, stats: c.Stats, skills: c.Skills) !void {
+    std.debug.assert(self.state == .create_character);
+    self.state.create_character.deinit();
     try self.deleteSessionFileIfExists();
-    self.initMainMenu();
+    self.initSideMenu();
     self.state = .{ .game_session = undefined };
     try self.state.game_session.initNew(
         self.gpa,
         self.seed,
         self.runtime,
         self.render,
+        stats,
+        skills,
     );
 }
 
@@ -134,7 +155,7 @@ fn continueGame(ptr: *anyopaque, _: usize, _: void) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     std.debug.assert(self.state == .welcome);
     self.state.welcome.menu.deinit(self.gpa);
-    self.initMainMenu();
+    self.initSideMenu();
     self.state = .{ .game_session = undefined };
     try self.state.game_session.preInit(
         self.gpa,
@@ -146,7 +167,7 @@ fn continueGame(ptr: *anyopaque, _: usize, _: void) !void {
 
 fn showAbout(_: *anyopaque, _: usize, _: void) !void {}
 
-fn initMainMenu(self: *Self) void {
+fn initSideMenu(self: *Self) void {
     _ = self.runtime.addMenuItem("Inventory", self, openInventory);
     _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
 }

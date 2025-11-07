@@ -82,6 +82,9 @@ pub fn ModalWindow(comptime Area: type) type {
             return self.area.totalLines() - (self.max_region.rows - 2); // -2 borders
         }
 
+        /// Draws the window with a scrollbar and buttons if they are required.
+        /// The `Close` button is drawn on the right if the area doesn't provide
+        /// an additional button, and on the left otherwise.
         pub fn draw(self: *const Self, render: g.Render) !void {
             const reg = self.region();
             const total_lines = self.area.totalLines();
@@ -126,8 +129,9 @@ pub fn ModalWindow(comptime Area: type) type {
             }
         }
 
+        /// Fills the region of the window or from the buffer, or just fill it with spaces.
         pub fn hide(self: *Self, render: g.Render, hide_mode: w.HideMode) !void {
-            log.debug("Hide modal window", .{});
+            log.debug("Hide a modal window", .{});
             switch (hide_mode) {
                 .from_buffer => try render.redrawRegionFromSceneBuffer(self.region()),
                 .fill_region => try render.fillRegion(' ', .normal, self.region()),

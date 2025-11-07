@@ -1,5 +1,5 @@
 //! The simplest implementation of the `Area` interface. Contains a set of lines with a text
-//! to draw on a window. Do not handle button. Can be drawn in a region with scrolling.
+//! to draw in a window. Do not handle any button. Can be drawn in a region with scrolling.
 const std = @import("std");
 const g = @import("../game_pkg.zig");
 const c = g.components;

@@ -269,8 +269,12 @@ pub const Progression = struct {
     /// The 0 element is a required amount of exp point to get the
     /// second level.
     pub const Levels: [3]u16 = .{ 500, 1000, 15000 };
-    experience: u16,
-    level: u8,
+    experience: u16 = 0,
+    level: u8 = 1,
+
+    pub fn experienceToNextLevel(self: Progression) u16 {
+        return Levels[self.level - 1];
+    }
 };
 
 pub const Reward = struct {
@@ -283,44 +287,47 @@ pub const SourceOfLight = struct {
 };
 
 pub const Skills = struct {
-    weapon_mastery: u8,
-    mechanics: u8,
-    stealth: u8,
-    echo_of_knowledge: u8,
+    pub const empty: Skills = .init(0, 0, 0, 0);
+
+    values: std.enums.EnumArray(g.descriptions.skills.Enum, i4),
 
     pub fn init(
-        weapon_mastery: u8,
-        mechanics: u8,
-        stealth: u8,
-        echo_of_knowledge: u8,
+        weapon_mastery: i4,
+        mechanics: i4,
+        stealth: i4,
+        echo_of_knowledge: i4,
     ) Skills {
         return .{
-            .weapon_mastery = weapon_mastery,
-            .mechanics = mechanics,
-            .stealth = stealth,
-            .echo_of_knowledge = echo_of_knowledge,
+            .values = .init(.{
+                .weapon_mastery = weapon_mastery,
+                .mechanics = mechanics,
+                .stealth = stealth,
+                .echo_of_knowledge = echo_of_knowledge,
+            }),
         };
     }
 };
 
 pub const Stats = struct {
-    strength: u8,
-    dexterity: u8,
-    preception: u8,
-    intelligence: u8,
-    constitution: u8,
+    pub const empty: Stats = .init(0, 0, 0, 0, 0);
+
+    strength: i4,
+    dexterity: i4,
+    perception: i4,
+    intelligence: i4,
+    constitution: i4,
 
     pub fn init(
-        strength: u8,
-        dexterity: u8,
-        preception: u8,
-        intelligence: u8,
-        constitution: u8,
+        strength: i4,
+        dexterity: i4,
+        perception: i4,
+        intelligence: i4,
+        constitution: i4,
     ) Stats {
         return .{
             .strength = strength,
             .dexterity = dexterity,
-            .preception = preception,
+            .perception = perception,
             .intelligence = intelligence,
             .constitution = constitution,
         };

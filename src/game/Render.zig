@@ -286,6 +286,7 @@ pub fn drawEnemyHealth(self: Render, codepoint: g.Codepoint, health: *const cm.H
     try self.drawInfo(buf[0..len]);
 }
 
+/// Draws aligned text in the Info field no longer than `INFO_ZONE_LENGTH`
 pub fn drawInfo(self: Render, text: []const u8) !void {
     const pos = p.Point{ .row = g.DISPLAY_ROWS, .col = 1 };
     try self.drawTextWithAlign(INFO_ZONE_LENGTH, text, pos, .normal, .center);

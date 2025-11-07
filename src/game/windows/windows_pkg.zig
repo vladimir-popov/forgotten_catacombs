@@ -1,8 +1,9 @@
 //! This is a very simple system of windows. Two key concepts exist:
 //! areas and windows. The areas are about managing and drawing a content.
-//! The windows are about placing the areas somewhere on screen. Both windows
+//! The windows are about placing the areas somewhere on the screen. Both windows
 //! and areas can have a special handlers for buttons. Additionally, windows
 //! should handle closing, returning `true` from the button handler.
+//! You have to manage state of both windows and areas in their container manually.
 //!
 const std = @import("std");
 const g = @import("../game_pkg.zig");
