@@ -14,12 +14,12 @@ test "Describe an item" {
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║┌───────────────Torch────────────────┐║
-        \\║│Wooden handle, cloth wrap, burning ▒│║
-        \\║│flame. Lasts until the fire dies.  ░│║
+        \\║│ Wooden handle, cloth wrap, burning▒│║
+        \\║│ flame. Lasts until the fire dies. ░│║
         \\║│                                   ░│║
-        \\║│Damage: physical 2-3               ░│║
-        \\║│Effect: burning 1-1                ░│║
-        \\║│Radius of light: 3                 ░│║
+        \\║│ Damage: physical 2-3              ░│║
+        \\║│ Effect: burning 1-1               ░│║
+        \\║│ Radius of light: 3                ░│║
         \\║└────────────────────────────────────┘║
         \\╚══════════════════════════════════════╝
     , .game_area);
@@ -39,10 +39,10 @@ test "Describe an unknown potion" {
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
         \\║┌───────────A green potion───────────┐║
-        \\║│A swirling liquid of green color    │║
-        \\║│rests in a vial.                    │║
+        \\║│ A swirling liquid of green color   │║
+        \\║│ rests in a vial.                   │║
         \\║│                                    │║
-        \\║│Weight: 10                          │║
+        \\║│ Weight: 10                         │║
         \\║└────────────────────────────────────┘║
         \\║                                      ║
         \\╚══════════════════════════════════════╝
@@ -67,12 +67,12 @@ test "Describe a known potion (after drinking a similar)" {
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║┌──────────A healing potion──────────┐║
-        \\║│A brew that glows faintly, as if    │║
-        \\║│alive. It warms your veins and mends│║
-        \\║│your wounds instantly.              │║
+        \\║│ A brew that glows faintly, as if   │║
+        \\║│ mends alive. It warms your veins   │║
+        \\║│ and your wounds instantly.         │║
         \\║│                                    │║
-        \\║│Effect: healing 20-25               │║
-        \\║│Weight: 10                          │║
+        \\║│ Effect: healing 20-25              │║
+        \\║│ Weight: 10                         │║
         \\║└────────────────────────────────────┘║
         \\╚══════════════════════════════════════╝
     , .game_area);
@@ -96,14 +96,14 @@ test "Describe an unknown enemy" {
 
     try test_session.runtime.display.expectLooksLike(
         \\######################################30
-        \\#┌────────────────Rat─────────────────┐#
-        \\#│A big, nasty rat with vicious eyes  │#
-        \\#│that thrives in dark corners and    │#
-        \\#│forgotten cellars.                  │#
-        \\#│                                    │#
-        \\#│Who knows what to expect from this  │#
-        \\#│creature?                           │#
-        \\~└────────────────────────────────────┘~
+        \\┌─────────────────Rat──────────────────┐
+        \\│ A big, nasty rat with vicious eyes   │
+        \\│ that thrives in dark corners and     │
+        \\│ forgotten cellars.                   │
+        \\│                                      │
+        \\│ Who knows what to expect from this   │
+        \\│ creature?                            │
+        \\└──────────────────────────────────────┘
         \\~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     , .game_area);
 }
@@ -132,15 +132,15 @@ test "Describe a known enemy (after killing a similar creature)" {
     try test_session.pressButton(.a);
 
     try test_session.runtime.display.expectLooksLike(
-        \\#┌────────────────Rat─────────────────┐0
-        \\#│A big, nasty rat with vicious eyes  │#
-        \\#│that thrives in dark corners and    │#
-        \\#│forgotten cellars.                  │#
-        \\#│                                    │#
-        \\#│Health: 10/10                       │#
-        \\#│Damage: physical 1-3                │#
-        \\#│                                    │#
-        \\~│Not too fast.                       │~
-        \\~└────────────────────────────────────┘~
+        \\┌─────────────────Rat──────────────────┐
+        \\│ A big, nasty rat with vicious eyes   │
+        \\│ that thrives in dark corners and     │
+        \\│ forgotten cellars.                   │
+        \\│                                      │
+        \\│ Health: 10/10                        │
+        \\│ Damage: physical 1-3                 │
+        \\│                                      │
+        \\│ Not too fast.                        │
+        \\└──────────────────────────────────────┘
     , .game_area);
 }

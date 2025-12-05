@@ -16,7 +16,7 @@ const log = std.log.scoped(.windows);
 
 /// A maximal region which can be occupied by the modal window.
 /// This region includes a space for borders.
-const DEFAULT_MAX_REGION: p.Region = p.Region.init(1, 2, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS - 2);
+const DEFAULT_MAX_REGION: p.Region = p.Region.init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS);
 
 pub fn ModalWindow(comptime Area: type) type {
     return struct {
@@ -77,6 +77,8 @@ pub fn ModalWindow(comptime Area: type) type {
         /// an additional button, and on the left otherwise.
         pub fn draw(self: *const Self, render: g.Render) !void {
             log.debug("Drawing modal window in the region {any}", .{self.region});
+            // Clear the region
+            try render.fillRegion(g.Render.default_filler, .normal, self.region);
             // Draw the border
             try render.drawBorder(self.region);
             // Draw the title

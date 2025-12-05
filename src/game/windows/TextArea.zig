@@ -55,11 +55,11 @@ pub fn handleButton(_: *Self, _: g.Button) !void {}
 /// - `scrolled` - How many scrolled lines should be skipped.
 pub fn draw(self: *const Self, render: g.Render, region: p.Region, scrolled: usize) !void {
     log.debug("Drawing a text area inside {any}", .{region});
-    var point = region.top_left;
+    var cursor = region.top_left.movedTo(.right);
     for (0..region.rows) |row_idx| {
         const line_idx = scrolled + row_idx;
-        try render.drawTextWithAlign(region.cols, &self.lines.items[line_idx], point, .normal, .left);
-        point.move(.down);
+        try render.drawTextWithAlign(region.cols - 1, &self.lines.items[line_idx], cursor, .normal, .left);
+        cursor.move(.down);
     }
 }
 
