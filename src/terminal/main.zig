@@ -48,7 +48,10 @@ pub fn handlePanic(
 
 pub fn main() !void {
     const seed = try Args.int(u64, "seed") orelse std.crypto.random.int(u64);
-    log.info("========================================\nSeed of the game is {d}\n========================================", .{seed});
+    log.info(
+        "========================================\nSeed of the game is {d}\n========================================",
+        .{seed},
+    );
 
     var gpa = std.heap.DebugAllocator(.{}){};
     defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK DETECTED!");
@@ -56,10 +59,12 @@ pub fn main() !void {
 
     const use_cheats = Args.flag("devmode");
     const use_mouse = Args.flag("mouse");
+    const preset = if (Args.str("preset")) |preset| parsePreset(preset) else null;
 
     var runtime = try TtyRuntime.TtyRuntime(g.DISPLAY_ROWS + 2, g.DISPLAY_COLS + 2)
         .init(alloc, true, true, use_cheats, use_mouse);
     defer runtime.deinit();
+
     if (use_cheats) {
         log.warn("The Developer is in the room!", .{});
         if (Args.str("cheat")) |value| {
@@ -69,8 +74,87 @@ pub fn main() !void {
     var game = try alloc.create(g.Game);
     defer alloc.destroy(game);
 
-    try game.init(alloc, runtime.runtime(), seed);
+    if (preset) |tuple| {
+        try game.initNewPreset(alloc, runtime.runtime(), seed, tuple[0], tuple[1]);
+    } else {
+        try game.init(alloc, runtime.runtime(), seed);
+    }
     defer game.deinit();
 
     try runtime.run(game);
+}
+
+fn parsePreset(
+    preset_str: []const u8,
+) ?struct { g.meta.PlayerArchetype, g.components.Skills } {
+    var itr = std.mem.splitScalar(u8, preset_str, ':');
+    if (itr.next()) |archetype_str| {
+        if (itr.next()) |skills_str| {
+            if (parseArchetype(archetype_str)) |archetype| {
+                if (parseSkills(skills_str)) |skills| {
+                    return .{ archetype, skills };
+                }
+            }
+        }
+    }
+    log.err(
+        \\Wrong argument. The value from `--preset=<value>` should follow format: <archetype>:<skills>
+        \\Where <archetype> is one of possible character archetype:
+        \\
+        \\  (adv)enturer
+        \\  (arc)heologist
+        \\  (van)dal
+        \\  (rog)ue
+        \\
+        \\and <skills> is a list of skill with 2 spent point in follow order:
+        \\
+        \\`weapon_mastery`,`mechanics`,`stealth`,`echo_of_knowledge`
+        \\
+        \\The tail zero skills can be omitted. For example: "1,1" is equal to "1,1,0,0".
+        \\
+    ,
+        .{},
+    );
+    return null;
+}
+
+fn parseArchetype(str: []const u8) ?g.meta.PlayerArchetype {
+    if (std.meta.stringToEnum(g.meta.PlayerArchetype, str)) |archetype| {
+        return archetype;
+    }
+    if (std.mem.eql(u8, "adv", str))
+        return .adventurer;
+    if (std.mem.eql(u8, "arc", str))
+        return .archeologist;
+    if (std.mem.eql(u8, "van", str))
+        return .vandal;
+    if (std.mem.eql(u8, "rog", str))
+        return .rogue;
+
+    return null;
+}
+
+fn parseSkills(str: []const u8) ?g.components.Skills {
+    var result: g.components.Skills = .empty;
+    var i: usize = 0;
+    var spent_points: i4 = 0;
+    var itr = std.mem.splitScalar(u8, str, ',');
+    while (itr.next()) |number| {
+        result.values.values[i] = std.fmt.parseInt(i4, number, 10) catch {
+            log.err("Invalid number: {s}", .{number});
+            return null;
+        };
+        spent_points += result.values.values[i];
+        i += 1;
+    }
+    if (spent_points < 2) {
+        log.err("Not enought skill points. Spent {d}, but should be spent 2.", .{spent_points});
+        return null;
+    }
+    if (spent_points > 2) {
+        log.err("Too many skill points spent in total: {d}. You should spent only 2.", .{spent_points});
+        return null;
+    }
+
+    return result;
 }

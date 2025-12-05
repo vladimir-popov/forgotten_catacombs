@@ -290,6 +290,5 @@ fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         .alloc = self.alloc,
         .session = self.session,
         .entity = item,
-        .max_region = MODAL_WINDOW_REGION,
     });
 }

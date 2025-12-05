@@ -16,6 +16,7 @@ const log = std.log.scoped(.explore_level_mode);
 const Self = @This();
 
 const MAX_REMAINING_POINTS = 2;
+
 const ARCHETYPE_AREA_REGION: p.Region = .{
     .top_left = .{ .row = 4, .col = 12 },
     .rows = g.DISPLAY_ROWS - 2 - 4,

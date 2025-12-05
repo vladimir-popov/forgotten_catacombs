@@ -58,6 +58,26 @@ pub fn init(self: *Self, gpa: std.mem.Allocator, runtime: g.Runtime, seed: u64) 
     try self.welcome();
 }
 
+pub fn initNewPreset(
+    self: *Self,
+    gpa: std.mem.Allocator,
+    runtime: g.Runtime,
+    seed: u64,
+    archetype: g.meta.PlayerArchetype,
+    skills: g.components.Skills,
+) !void {
+    self.* = .{
+        .gpa = gpa,
+        .runtime = runtime,
+        .render = undefined,
+        .seed = seed,
+        .state = undefined,
+    };
+    try self.render.init(gpa, runtime, g.DISPLAY_ROWS, g.DISPLAY_COLS);
+    try self.runtime.clearDisplay();
+    try self.startGameSession(g.meta.statsFromArchetype(archetype), skills);
+}
+
 pub fn deinit(self: *Self) void {
     self.render.deinit();
     switch (self.state) {
@@ -83,6 +103,7 @@ pub fn tick(self: *Self) !void {
         },
         .create_character => if (try self.runtime.readPushedButtons()) |btn| {
             if (try self.state.create_character.handleButton(btn, self.render)) |statsAndSkills| {
+                self.state.create_character.deinit();
                 try self.startGameSession(statsAndSkills[0], statsAndSkills[1]);
             } else {
                 try self.state.create_character.draw(self.render);
@@ -136,8 +157,6 @@ fn newGame(ptr: *anyopaque, _: usize, _: void) !void {
 }
 
 fn startGameSession(self: *Self, stats: c.Stats, skills: c.Skills) !void {
-    std.debug.assert(self.state == .create_character);
-    self.state.create_character.deinit();
     try self.deleteSessionFileIfExists();
     self.initSideMenu();
     self.state = .{ .game_session = undefined };
@@ -197,7 +216,6 @@ fn deleteSessionFileIfExists(self: Self) !void {
 }
 
 fn drawWelcomeScreen(self: Self) !void {
-    try self.runtime.clearDisplay();
     try self.render.drawTextWithAlign(
         g.DISPLAY_COLS,
         "Welcome ",
