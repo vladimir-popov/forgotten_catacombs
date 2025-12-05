@@ -206,11 +206,11 @@ fn windowWithEntities(
     self: *ExploreMode,
     variants: [3]?g.Entity,
 ) !w.ModalWindow(w.OptionsArea(g.Entity)) {
-    var window = w.options(g.Entity, self);
+    var area = w.OptionsArea(g.Entity).center(self);
     for (variants) |maybe_entity| {
         if (maybe_entity) |entity| {
             var buf: [32]u8 = undefined;
-            try window.area.addOption(
+            try area.addOption(
                 self.arena.allocator(),
                 try g.meta.printName(&buf, self.session.journal, entity),
                 entity,
@@ -219,10 +219,10 @@ fn windowWithEntities(
             );
             if (entity.eql(self.entity_in_focus))
                 // the variants array has to have at least one (focused) entity
-                try window.area.selectLine(window.area.options.items.len - 1);
+                try area.selectLine(area.options.items.len - 1);
         }
     }
-    return window;
+    return .default(area);
 }
 
 fn showEntityDescription(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!void {
@@ -232,9 +232,9 @@ fn showEntityDescription(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!v
 }
 
 fn windowWithDescription(self: *ExploreMode) !w.ModalWindow(w.TextArea) {
-    return try w.entityDescription(
-        self.arena.allocator(),
-        self.session,
-        self.entity_in_focus,
-    );
+    return try w.entityDescription(.{
+        .alloc = self.arena.allocator(),
+        .session = self.session,
+        .entity = self.entity_in_focus,
+    });
 }

@@ -41,6 +41,9 @@ const w = g.windows;
 
 const log = std.log.scoped(.trading_mode);
 
+/// The biggest region that can be occupied by a modal window with description
+const MODAL_WINDOW_REGION: p.Region = p.Region.init(2, 2, g.DISPLAY_ROWS - 4, g.DISPLAY_COLS - 2);
+
 const Self = @This();
 
 alloc: std.mem.Allocator,
@@ -191,11 +194,11 @@ fn actualPrice(self: Self, price: *const c.Price, for_buying: bool) u16 {
 
 fn updateBuyingTab(self: *Self) !void {
     const tab = self.buyingTab();
-    tab.area.clearRetainingCapacity();
+    tab.area.content.clearRetainingCapacity();
     var itr = self.shop.items.iterator();
     while (itr.next()) |item_ptr| {
         var buffer: w.TextArea.Line = undefined;
-        try tab.area.addOption(
+        try tab.area.content.addOption(
             self.alloc,
             try self.formatProduct(&buffer, item_ptr.*, true),
             item_ptr.*,
@@ -203,21 +206,21 @@ fn updateBuyingTab(self: *Self) !void {
             describeSelectedItem,
         );
     }
-    if (tab.area.options.items.len > 0) {
-        try tab.area.selectLine(if (tab.area.selected_line < tab.area.options.items.len)
-            tab.area.selected_line
+    if (tab.area.content.options.items.len > 0) {
+        try tab.area.content.selectLine(if (tab.area.content.selected_line < tab.area.content.options.items.len)
+            tab.area.content.selected_line
         else
-            tab.area.options.items.len - 1);
+            tab.area.content.options.items.len - 1);
     }
 }
 
 fn updateSellingTab(self: *Self) !void {
     const tab = self.sellingTab();
-    tab.area.clearRetainingCapacity();
+    tab.area.content.clearRetainingCapacity();
     var itr = self.inventory.items.iterator();
     while (itr.next()) |item_ptr| {
         var buffer: w.TextArea.Line = undefined;
-        try tab.area.addOption(
+        try tab.area.content.addOption(
             self.alloc,
             try self.formatProduct(&buffer, item_ptr.*, false),
             item_ptr.*,
@@ -225,29 +228,29 @@ fn updateSellingTab(self: *Self) !void {
             describeSelectedItem,
         );
     }
-    if (tab.area.options.items.len > 0) {
-        try tab.area.selectLine(if (tab.area.selected_line < tab.area.options.items.len)
-            tab.area.selected_line
+    if (tab.area.content.options.items.len > 0) {
+        try tab.area.content.selectLine(if (tab.area.content.selected_line < tab.area.content.options.items.len)
+            tab.area.content.selected_line
         else
-            tab.area.options.items.len - 1);
+            tab.area.content.options.items.len - 1);
     }
 }
 
 fn buyOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Buttons is helt. Show modal window for {any}", .{item});
-    var window = w.options(g.Entity, self);
-    try window.area.addOption(self.alloc, "Buy", item, buySelectedItem, null);
-    try window.area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
-    self.actions_window = window;
+    var area = w.OptionsArea(g.Entity).center(self);
+    try area.addOption(self.alloc, "Buy", item, buySelectedItem, null);
+    try area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
+    self.actions_window = .default(area);
 }
 
 fn sellOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    var window = w.options(g.Entity, self);
-    try window.area.addOption(self.alloc, "Sell", item, sellSelectedItem, null);
-    try window.area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
-    self.actions_window = window;
+    var area = w.OptionsArea(g.Entity).center(self);
+    try area.addOption(self.alloc, "Sell", item, sellSelectedItem, null);
+    try area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
+    self.actions_window = .default(area);
 }
 
 fn buySelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
@@ -283,9 +286,10 @@ fn sellSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
 fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Show info about item {d}", .{item.id});
-    self.modal_window = try w.entityDescription(
-        self.alloc,
-        self.session,
-        item,
-    );
+    self.modal_window = try w.entityDescription(.{
+        .alloc = self.alloc,
+        .session = self.session,
+        .entity = item,
+        .max_region = MODAL_WINDOW_REGION,
+    });
 }

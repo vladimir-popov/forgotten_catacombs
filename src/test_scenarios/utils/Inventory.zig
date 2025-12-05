@@ -21,20 +21,26 @@ pub fn isClosed(self: Self) bool {
 /// If the item was found, the button is pressed and Options available for the item is returned.
 pub fn chooseItemByName(self: Self, name: []const u8) !Options {
     const options = Options{
-        .options_area = &self.inventoryMode().main_window.activeTab().area,
+        .options_area = &self.inventoryMode().main_window.activeTab().area.content,
         .test_session = self.test_session,
     };
     try options.choose(name);
-    return .{ .test_session = self.test_session, .options_area = &self.inventoryMode().actions_window.?.area };
+    return .{
+        .test_session = self.test_session,
+        .options_area = &self.inventoryMode().actions_window.?.content.content,
+    };
 }
 
 pub fn chooseItemById(self: Self, item: g.Entity) !Options {
     const options = Options{
-        .options_area = &self.inventoryMode().main_window.activeTab().area,
+        .options_area = &self.inventoryMode().main_window.activeTab().area.content,
         .test_session = self.test_session,
     };
     try options.chooseById(item);
-    return .{ .test_session = self.test_session, .options_area = &self.inventoryMode().actions_window.?.area };
+    return .{
+        .test_session = self.test_session,
+        .options_area = &self.inventoryMode().actions_window.?.content.content,
+    };
 }
 
 pub fn contains(self: Self, item: g.Entity) bool {

@@ -76,7 +76,7 @@ pub fn getDamage(registry: *const g.Registry, actor: g.Entity) Error!struct { *c
 }
 
 /// Writes an actual name of the entity according to its "known" status in the journal
-/// to the `dest` buffer.
+/// to the `dest` buffer and returns a slice with result.
 pub fn printName(dest: []u8, journal: g.Journal, entity: g.Entity) ![]u8 {
     return if (journal.isUnknownPotion(entity)) |color|
         try std.fmt.bufPrint(dest, "A {t} potion", .{color})
@@ -157,15 +157,15 @@ pub fn describePlayer(
     line = try text_area.addEmptyLine(alloc);
     _ = try std.fmt.bufPrint(line, "Stats:", .{});
     line = try text_area.addEmptyLine(alloc);
-    _ = try std.fmt.bufPrint(line, "  Strength:     {d}", .{stats.strength});
+    _ = try std.fmt.bufPrint(line, "  Strength:           {d}", .{stats.strength});
     line = try text_area.addEmptyLine(alloc);
-    _ = try std.fmt.bufPrint(line, "  Dexterity:    {d}", .{stats.dexterity});
+    _ = try std.fmt.bufPrint(line, "  Dexterity:          {d}", .{stats.dexterity});
     line = try text_area.addEmptyLine(alloc);
-    _ = try std.fmt.bufPrint(line, "  Perception:   {d}", .{stats.perception});
+    _ = try std.fmt.bufPrint(line, "  Perception:         {d}", .{stats.perception});
     line = try text_area.addEmptyLine(alloc);
-    _ = try std.fmt.bufPrint(line, "  Intelligence: {d}", .{stats.intelligence});
+    _ = try std.fmt.bufPrint(line, "  Intelligence:       {d}", .{stats.intelligence});
     line = try text_area.addEmptyLine(alloc);
-    _ = try std.fmt.bufPrint(line, "  Constitution: {d}", .{stats.constitution});
+    _ = try std.fmt.bufPrint(line, "  Constitution:       {d}", .{stats.constitution});
 }
 
 /// Writes the known description of an entity.

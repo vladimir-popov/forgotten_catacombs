@@ -57,15 +57,12 @@ pub fn OptionsArea(comptime Item: type) type {
         /// The absolute index of the selected line (includes the lines out of scroll)
         selected_line: usize = 0,
 
-        pub fn init(
-            owner: *anyopaque,
-            text_align: g.TextAlign,
-        ) Self {
-            return .{
-                .owner = owner,
-                .text_align = text_align,
-                .options = .empty,
-            };
+        pub fn center(owner: *anyopaque) Self {
+            return .init(owner, .center);
+        }
+
+        pub fn init(owner: *anyopaque, text_align: g.TextAlign) Self {
+            return .{ .owner = owner, .text_align = text_align, .options = .empty };
         }
 
         pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
@@ -137,16 +134,12 @@ pub fn OptionsArea(comptime Item: type) type {
 
         pub fn selectPreviousLine(self: *Self) void {
             if (self.selected_line > 0)
-                self.selected_line -= 1
-            else
-                self.selected_line = self.options.items.len - 1;
+                self.selected_line -= 1;
         }
 
         pub fn selectNextLine(self: *Self) void {
             if (self.selected_line < self.options.items.len - 1)
-                self.selected_line += 1
-            else
-                self.selected_line = 0;
+                self.selected_line += 1;
         }
 
         pub fn selectedOption(self: Self) *Option {

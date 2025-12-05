@@ -1,6 +1,6 @@
 //! A pop up window placed in the middle of the screen above info bar.
-//! It has fixed width and dynamic hight that depends on number of lines
-//! in the aria with content.
+//! It has fixed width and dynamic hight that depends on a number of lines
+//! in the content aria.
 //!
 //! The Modal window always has 'Close' button, and may have an optional button
 //! provided by the area.
@@ -14,113 +14,82 @@ const w = g.windows;
 
 const log = std.log.scoped(.windows);
 
+/// A maximal region which can be occupied by the modal window.
+/// This region includes a space for borders.
+const DEFAULT_MAX_REGION: p.Region = p.Region.init(1, 2, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS - 2);
+
 pub fn ModalWindow(comptime Area: type) type {
     return struct {
         const Self = @This();
 
-        pub const empty: Self = .{ .title = @splat(0), .area = .empty };
+        title_buffer: [32]u8 = undefined,
+        title_len: usize = 0,
+        content: w.ScrollableAre(Area),
+        /// An actual region occupied by this window (including borders)
+        region: p.Region,
 
-        area: Area,
-        title: [32]u8 = @splat(0),
-        scrolled_lines: usize = 0,
-        /// A maximal region which can be occupied by the modal window.
-        /// This region includes a space for borders.
-        max_region: p.Region = p.Region.init(1, 2, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS - 2),
-
-        pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
-            self.area.deinit(alloc);
+        pub inline fn default(content: Area) Self {
+            return init(content, DEFAULT_MAX_REGION);
         }
 
-        /// Returns the region that should be occupied (including borders)
-        /// according to the number of actual rows in the area.
-        fn region(self: Self) p.Region {
+        pub fn init(content: Area, max_region: p.Region) Self {
+            const region = calculateOccupiedRegion(content, max_region);
+            return .{ .content = .init(content, region.innerRegion(1, 1, 1, 1)), .region = region };
+        }
+
+        fn calculateOccupiedRegion(content: Area, max_region: p.Region) p.Region {
             // Count of rows that should be drawn (including border)
-            const rows: usize = self.area.totalLines() + 2; // 2 for border
+            const rows: usize = content.totalLines() + 2; // 2 for border
             return .{
-                .top_left = if (rows < self.max_region.rows)
-                    self.max_region.top_left.movedToNTimes(.down, (self.max_region.rows - rows) / 2)
+                .top_left = if (rows < max_region.rows)
+                    max_region.top_left.movedToNTimes(.down, (max_region.rows - rows) / 2)
                 else
-                    self.max_region.top_left,
-                .rows = @min(rows, self.max_region.rows),
-                .cols = self.max_region.cols,
+                    max_region.top_left,
+                .rows = @min(rows, max_region.rows),
+                .cols = max_region.cols,
             };
+        }
+
+        pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
+            self.content.deinit(alloc);
+        }
+
+        inline fn title(self: Self) []const u8 {
+            return self.title_buffer[0..self.title_len];
         }
 
         /// Returns true if the 'close' button was pressed.
         pub fn handleButton(self: *Self, btn: g.Button) !bool {
-            try self.area.handleButton(btn);
+            try self.content.handleButton(btn);
             switch (btn.game_button) {
                 // pressing the right button is always lead to closing the window
                 .a => return true,
                 // if the aria has a special handler for the right button, then
                 // the left is 'Close' button
-                .b => return self.area.button() != null,
-                .up, .down => self.scrollingUpOrDown(btn.game_button == .up),
+                .b => return self.content.button() != null,
                 else => {},
             }
             return false;
-        }
-
-        fn scrollingUpOrDown(self: *Self, scrolling_up: bool) void {
-            if (!self.isScrolled()) return;
-
-            // this doesn't work with OptionsArea, but combination of the ModalWindow
-            // and an OptionsArea never have many lines.
-            if (scrolling_up) {
-                if (self.scrolled_lines > 0)
-                    self.scrolled_lines -= 1;
-            } else if (self.scrolled_lines < self.maxScrollingCount()) {
-                self.scrolled_lines += 1;
-            }
-        }
-
-        pub fn isScrolled(self: Self) bool {
-            return self.area.totalLines() + 2 > self.max_region.rows;
-        }
-
-        inline fn maxScrollingCount(self: Self) usize {
-            return self.area.totalLines() - (self.max_region.rows - 2); // -2 borders
         }
 
         /// Draws the window with a scrollbar and buttons if they are required.
         /// The `Close` button is drawn on the right if the area doesn't provide
         /// an additional button, and on the left otherwise.
         pub fn draw(self: *const Self, render: g.Render) !void {
-            const reg = self.region();
-            const total_lines = self.area.totalLines();
-
-            log.debug("Drawing modal window in region {any}", .{reg});
+            log.debug("Drawing modal window in the region {any}", .{self.region});
             // Draw the border
-            try render.drawBorder(reg);
+            try render.drawBorder(self.region);
             // Draw the title
-            const title_len = std.mem.len(@as([*c]const u8, self.title[0..]));
-            const padding: u8 = @intCast(reg.cols - title_len);
-            var point = reg.top_left.movedToNTimes(.right, padding / 2);
-            for (self.title[0..title_len]) |char| {
+            const padding: u8 = @intCast(self.region.cols - self.title_len);
+            var point = self.region.top_left.movedToNTimes(.right, padding / 2);
+            for (self.title()) |char| {
                 try render.runtime.drawSprite(char, point, .normal);
                 point.move(.right);
             }
-            // Draw the scrollbar
-            if (self.isScrolled()) {
-                const progress = w.scrollingProgress(self.scrolled_lines, reg.rows - 2, self.maxScrollingCount());
-                log.debug(
-                    "Drawing the scroll bar. Scrolled lines {d}; progress {d}; total lines {d}",
-                    .{ self.scrolled_lines, progress, total_lines },
-                );
-                point = reg.topRight().movedTo(.left);
-                for (0..reg.rows - 2) |i| {
-                    point.move(.down);
-                    if (i == progress)
-                        try render.runtime.drawSprite('▒', point, .normal)
-                    else
-                        try render.runtime.drawSprite('░', point, .normal);
-                }
-            }
-            // Draw the content inside the region excluding borders and space for scrollbar
-            const right_pad: u8 = if (self.isScrolled()) 2 else 1;
-            try self.area.draw(render, reg.innerRegion(1, right_pad, 1, 1), self.scrolled_lines);
+            // Draw the content
+            try self.content.draw(render);
             // Draw buttons
-            if (self.area.button()) |button| {
+            if (self.content.button()) |button| {
                 try render.drawRightButton(button[0], button[1]);
                 try render.drawLeftButton("Close", false);
             } else {
@@ -133,8 +102,8 @@ pub fn ModalWindow(comptime Area: type) type {
         pub fn hide(self: *Self, render: g.Render, hide_mode: w.HideMode) !void {
             log.debug("Hide a modal window", .{});
             switch (hide_mode) {
-                .from_buffer => try render.redrawRegionFromSceneBuffer(self.region()),
-                .fill_region => try render.fillRegion(' ', .normal, self.region()),
+                .from_buffer => try render.redrawRegionFromSceneBuffer(self.region),
+                .fill_region => try render.fillRegion(' ', .normal, self.region),
             }
         }
     };

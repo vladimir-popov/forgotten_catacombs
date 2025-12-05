@@ -41,6 +41,8 @@ const w = g.windows;
 
 const log = std.log.scoped(.inventory_mode);
 
+const MODAL_WINDOW_REGION: p.Region = p.Region.init(2, 2, g.DISPLAY_ROWS - 4, g.DISPLAY_COLS - 2);
+
 const Self = @This();
 
 alloc: std.mem.Allocator,
@@ -152,11 +154,11 @@ fn tabWithDrop(self: *Self) ?*w.WindowWithTabs.Tab {
 
 pub fn updateInventoryTab(self: *Self) !void {
     const tab = self.tabWithInventory();
-    tab.area.clearRetainingCapacity();
+    tab.area.content.clearRetainingCapacity();
     var itr = self.inventory.items.iterator();
     while (itr.next()) |item_ptr| {
         var buffer: w.TextArea.Line = undefined;
-        try tab.area.addOption(
+        try tab.area.content.addOption(
             self.alloc,
             try self.formatInventoryLine(&buffer, item_ptr.*),
             item_ptr.*,
@@ -164,11 +166,11 @@ pub fn updateInventoryTab(self: *Self) !void {
             describeSelectedItem,
         );
     }
-    if (tab.area.options.items.len > 0) {
-        try tab.area.selectLine(if (tab.area.selected_line < tab.area.options.items.len)
-            tab.area.selected_line
+    if (tab.area.content.options.items.len > 0) {
+        try tab.area.content.selectLine(if (tab.area.content.selected_line < tab.area.content.options.items.len)
+            tab.area.content.selected_line
         else
-            tab.area.options.items.len - 1);
+            tab.area.content.options.items.len - 1);
     }
 }
 
@@ -194,24 +196,23 @@ fn formatInventoryLine(self: *Self, line: *w.TextArea.Line, item: g.Entity) ![]c
 fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Buttons is helt. Show modal window for {any}", .{item});
-    var window = w.options(g.Entity, self);
+    var area = w.OptionsArea(g.Entity).center(self);
     if (item.eql(self.equipment.light) or item.eql(self.equipment.weapon)) {
-        try window.area.addOption(self.alloc, "Unequip", item, unequipItem, null);
+        try area.addOption(self.alloc, "Unequip", item, unequipItem, null);
     } else {
         if (g.meta.isLight(&self.session.registry, item)) {
-            try window.area.addOption(self.alloc, "Use as a light", item, useAsLight, null);
+            try area.addOption(self.alloc, "Use as a light", item, useAsLight, null);
         }
         if (g.meta.isWeapon(&self.session.registry, item)) {
-            try window.area.addOption(self.alloc, "Use as a weapon", item, useAsWeapon, null);
+            try area.addOption(self.alloc, "Use as a weapon", item, useAsWeapon, null);
         }
         if (g.meta.isPotion(&self.session.registry, item)) |_| {
-            try window.area.addOption(self.alloc, "Drink", item, consumeItem, null);
+            try area.addOption(self.alloc, "Drink", item, consumeItem, null);
         }
     }
-    try window.area.addOption(self.alloc, "Drop", item, dropSelectedItem, null);
-    try window.area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
-    scaleModalWindow(&window);
-    self.actions_window = window;
+    try area.addOption(self.alloc, "Drop", item, dropSelectedItem, null);
+    try area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
+    self.actions_window = .init(area, MODAL_WINDOW_REGION);
 }
 
 fn unequipItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
@@ -259,10 +260,10 @@ fn consumeItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
 
 fn takeFromPileOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    var window = w.options(g.Entity, self);
-    try window.area.addOption(self.alloc, "Take", item, takeSelectedItem, null);
-    try window.area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
-    self.actions_window = window;
+    var area = w.OptionsArea(g.Entity).center(self);
+    try area.addOption(self.alloc, "Take", item, takeSelectedItem, null);
+    try area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
+    self.actions_window = .init(area, MODAL_WINDOW_REGION);
 }
 
 fn addDropTab(self: *Self, drop: g.Entity) !void {
@@ -276,7 +277,7 @@ fn addDropTab(self: *Self, drop: g.Entity) !void {
 fn updateDropTab(self: *Self, drop: g.Entity) !void {
     self.drop = drop;
     const tab = &self.main_window.tabs[1];
-    tab.area.clearRetainingCapacity();
+    tab.area.content.clearRetainingCapacity();
     if (self.session.registry.get(drop, c.Pile)) |pile| {
         var itr = pile.items.iterator();
         while (itr.next()) |item_ptr| {
@@ -285,11 +286,11 @@ fn updateDropTab(self: *Self, drop: g.Entity) !void {
     } else {
         try self.addDropOption(tab, drop);
     }
-    if (tab.area.options.items.len > 0) {
-        try tab.area.selectLine(if (tab.area.selected_line < tab.area.options.items.len)
-            tab.area.selected_line
+    if (tab.area.content.options.items.len > 0) {
+        try tab.area.content.selectLine(if (tab.area.content.selected_line < tab.area.content.options.items.len)
+            tab.area.content.selected_line
         else
-            tab.area.options.items.len - 1);
+            tab.area.content.options.items.len - 1);
     }
 }
 
@@ -297,23 +298,18 @@ fn addDropOption(self: *Self, tab: *w.WindowWithTabs.Tab, item: g.Entity) !void 
     var buffer: w.TextArea.Line = undefined;
     var len = (try std.fmt.bufPrint(&buffer, "{u} ", .{self.session.registry.getUnsafe(item, c.Sprite).codepoint})).len;
     len += (try g.meta.printName(buffer[len..], self.session.journal, item)).len;
-    try tab.area.addOption(self.alloc, buffer[0..len], item, takeFromPileOrDescribe, describeSelectedItem);
+    try tab.area.content.addOption(self.alloc, buffer[0..len], item, takeFromPileOrDescribe, describeSelectedItem);
 }
 
 fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Show info about item {d}", .{item.id});
-    self.description_window = try w.entityDescription(
-        self.alloc,
-        self.session,
-        item,
-    );
-    scaleModalWindow(&self.description_window.?);
-}
-
-fn scaleModalWindow(window: anytype) void {
-    window.max_region.top_left.row += 1;
-    window.max_region.rows -= 2;
+    self.description_window = try w.entityDescription(.{
+        .alloc = self.alloc,
+        .session = self.session,
+        .entity = item,
+        .max_region = MODAL_WINDOW_REGION,
+    });
 }
 
 /// Moves an item from the inventory to the player's position on the level.

@@ -39,7 +39,7 @@ pub const INFO_ZONE_LENGTH = g.DISPLAY_COLS - (BUTTON_ZONE_LENGTH + 1) * 2 - 2;
 pub const Visibility = enum { visible, known, invisible };
 
 // this should be used to erase a symbol
-const filler = ' ';
+pub const default_filler = ' ';
 
 const Render = @This();
 
@@ -219,7 +219,7 @@ pub fn drawSymbol(self: Render, symbol: u21, position_on_display: p.Point, mode:
     try self.runtime.drawSprite(symbol, position_on_display, mode);
 }
 
-/// Draws a one line border of the region directly on the screen.
+/// Draws a one-line border of the region directly on the screen.
 pub fn drawBorder(self: Render, region: p.Region) !void {
     var itr = region.cells();
     while (itr.next()) |point| {
@@ -235,13 +235,16 @@ pub fn drawBorder(self: Render, region: p.Region) !void {
     try self.runtime.drawSprite('┘', region.bottomRight(), .normal);
 }
 
-pub fn drawDoubledBorder(self: Render, region: p.Region) !void {
+/// Draws a two-lines border of the region directly on the screen.
+pub fn drawDoubledBorder(self: Render, region: p.Region, filler: ?u8) !void {
     var itr = region.cells();
     while (itr.next()) |point| {
         if (point.row == region.top_left.row or point.row == region.bottomRightRow()) {
             try self.runtime.drawSprite('═', point, .normal);
         } else if (point.col == region.top_left.col or point.col == region.bottomRightCol()) {
             try self.runtime.drawSprite('║', point, .normal);
+        } else if (filler) |f| {
+            try self.runtime.drawSprite(f, point, .normal);
         }
     }
     try self.runtime.drawSprite('╔', region.top_left, .normal);
@@ -270,7 +273,7 @@ pub fn drawPlayerHp(self: Render, health: *const cm.Health) !void {
 
 pub fn drawEnemyHealth(self: Render, codepoint: g.Codepoint, health: *const cm.Health) !void {
     var buf: [INFO_ZONE_LENGTH]u8 = undefined;
-    inline for (0..INFO_ZONE_LENGTH) |i| buf[i] = filler;
+    inline for (0..INFO_ZONE_LENGTH) |i| buf[i] = default_filler;
     // +1 for padding between the right zone
     var len: u8 = try std.unicode.utf8Encode(codepoint, buf[1..]) + 1;
 
@@ -559,7 +562,7 @@ const SceneBuffer = struct {
         for (self.rows) |row| {
             for (row) |cell| {
                 if (!cell.is_changed) {
-                    try writer.writeByte(filler);
+                    try writer.writeByte(default_filler);
                     continue;
                 }
 

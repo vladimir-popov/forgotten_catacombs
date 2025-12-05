@@ -9,6 +9,7 @@ const std = @import("std");
 const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
+const w = g.windows;
 
 const log = std.log.scoped(.windows);
 
@@ -23,6 +24,7 @@ pub const HideMode = enum { from_buffer, fill_region };
 
 pub const ModalWindow = @import("ModalWindow.zig").ModalWindow;
 pub const OptionsArea = @import("OptionsArea.zig").OptionsArea;
+pub const ScrollableAre = @import("ScrollableAre.zig").ScrollableAre;
 pub const TextArea = @import("TextArea.zig");
 pub const WindowWithTabs = @import("WindowWithTabs.zig");
 
@@ -52,7 +54,7 @@ pub fn notification(alloc: std.mem.Allocator, message: []const u8) !ModalWindow(
     const width = g.DISPLAY_COLS - 2;
     const pad = p.diff(usize, message.len, width) / 2;
     _ = try std.fmt.bufPrint(line[pad..], "{s}", .{message});
-    return .{ .area = text_area };
+    return .default(text_area);
 }
 
 /// Approximate example:
@@ -68,14 +70,19 @@ pub fn notification(alloc: std.mem.Allocator, message: []const u8) !ModalWindow(
 ///═══════════════════════════════════════
 ///                                Close
 /// ```
-pub fn entityDescription(
+pub fn entityDescription(args: struct {
     alloc: std.mem.Allocator,
     session: *const g.GameSession,
     entity: g.Entity,
-) !ModalWindow(TextArea) {
-    var window: ModalWindow(TextArea) = .empty;
-    _ = try g.meta.printName(&window.title, session.journal, entity);
-    try g.meta.describe(session.journal, alloc, entity, &window.area);
+    max_region: ?p.Region = null,
+}) !ModalWindow(TextArea) {
+    var area: TextArea = .empty;
+    try g.meta.describe(args.session.journal, args.alloc, args.entity, &area);
+    var window = if (args.max_region) |mr|
+        w.ModalWindow(TextArea).init(area, mr)
+    else
+        w.ModalWindow(TextArea).default(area);
+    window.title_len = (try g.meta.printName(&window.title_buffer, args.session.journal, args.entity)).len;
     return window;
 }
 
@@ -93,5 +100,5 @@ pub fn options(
     comptime Item: type,
     owner: *anyopaque,
 ) ModalWindow(OptionsArea(Item)) {
-    return .{ .area = OptionsArea(Item).init(owner, .center) };
+    return .{ .content = OptionsArea(Item).init(owner, .center) };
 }

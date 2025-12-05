@@ -354,13 +354,13 @@ const TargetsIterator = struct {
 };
 
 fn windowWithQuickActions(self: *PlayMode) !w.ModalWindow(w.OptionsArea(void)) {
-    var window = w.options(void, self);
+    var area = w.OptionsArea(void).center(self);
     for (self.quick_actions.actions.items, 0..) |qa, idx| {
-        try window.area.addOption(self.arena.allocator(), qa.toString(), {}, chooseEntity, null);
+        try area.addOption(self.arena.allocator(), qa.toString(), {}, chooseEntity, null);
         if (idx == self.quick_actions.selected_idx)
-            try window.area.selectLine(idx);
+            try area.selectLine(idx);
     }
-    return window;
+    return .default(area);
 }
 
 fn chooseEntity(ptr: *anyopaque, line_idx: usize, _: void) anyerror!void {

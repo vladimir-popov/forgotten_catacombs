@@ -26,49 +26,24 @@ pub const MAX_TABS = 2;
 pub const BORDERED_REGION = p.Region.init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS); // -2 rows for infoBar
 pub const CONTENT_AREA_REGION: p.Region = .{
     .top_left = .{
-        // reserve one line for the title, separator and one line for upper border
+        // 1 + reserved lines for the title, separator and one line for upper border
         .row = 4,
-        // reserve  for border
+        // 1 + reserved line for the border
         .col = 2,
     },
-    // -2 rows for infoBar -4 for title, separator and borders
+    // -2 rows for infoBar -4 for title, separator and up and down borders
     .rows = g.DISPLAY_ROWS - 2 - 4,
-    // -2 for border
     .cols = g.DISPLAY_COLS - 2,
 };
 
 pub const Tab = struct {
     title: []const u8,
-    area: w.OptionsArea(g.Entity),
+    area: w.ScrollableAre(w.OptionsArea(g.Entity)),
     scrolled_lines: usize = 0,
 
     fn deinit(self: *Tab, alloc: std.mem.Allocator) void {
         self.area.deinit(alloc);
         self.title = undefined;
-    }
-
-    fn isScrolled(self: Tab) bool {
-        return self.area.totalLines() > CONTENT_AREA_REGION.rows;
-    }
-
-    fn scrollingUpOrDown(self: *Tab, scrolling_up: bool) void {
-        if (!self.isScrolled()) return;
-
-        if (scrolling_up) {
-            if (self.scrolled_lines > 0 and self.area.selected_line == self.scrolled_lines)
-                self.scrolled_lines -= 1;
-        } else if (self.scrolled_lines < self.maxScrollingCount() and
-            self.area.selected_line == self.scrolled_lines + CONTENT_AREA_REGION.rows - 1)
-        {
-            self.scrolled_lines += 1;
-        }
-    }
-
-    fn maxScrollingCount(self: Tab) usize {
-        return if (self.isScrolled())
-            self.area.totalLines() - CONTENT_AREA_REGION.rows
-        else
-            0;
     }
 };
 
@@ -93,7 +68,7 @@ pub fn addTab(self: *Self, title: []const u8) void {
     std.debug.assert(self.tabs_count < MAX_TABS);
     self.tabs[self.tabs_count] = .{
         .title = title,
-        .area = w.OptionsArea(g.Entity).init(self.owner, .left),
+        .area = .init(w.OptionsArea(g.Entity).init(self.owner, .left), CONTENT_AREA_REGION),
     };
     self.tabs_count += 1;
 }
@@ -113,8 +88,9 @@ pub fn activeTab(self: *Self) *Tab {
 
 /// true means the window should be closed
 pub fn handleButton(self: *Self, btn: g.Button) !bool {
+    const tab = &self.tabs[self.active_tab_idx];
+    try tab.area.handleButton(btn);
     switch (btn.game_button) {
-        .a => try self.tabs[self.active_tab_idx].area.handleButton(btn),
         .b => return true,
         .left => if (self.active_tab_idx > 0) {
             self.active_tab_idx -= 1;
@@ -122,32 +98,7 @@ pub fn handleButton(self: *Self, btn: g.Button) !bool {
         .right => if (self.active_tab_idx < self.tabs_count - 1) {
             self.active_tab_idx += 1;
         },
-        .up => {
-            const tab = &self.tabs[self.active_tab_idx];
-            if (tab.area.selected_line > 0) {
-                if (tab.scrolled_lines > 0 and tab.area.selected_line == tab.scrolled_lines)
-                    tab.scrolled_lines -= 1;
-
-                tab.area.selected_line -= 1;
-            } else {
-                tab.scrolled_lines = tab.maxScrollingCount();
-                tab.area.selected_line = tab.area.totalLines() - 1;
-            }
-        },
-        .down => {
-            const tab = &self.tabs[self.active_tab_idx];
-            if (tab.area.selected_line == tab.area.totalLines() - 1) {
-                tab.scrolled_lines = 0;
-                tab.area.selected_line = 0;
-            } else {
-                if (tab.scrolled_lines < tab.maxScrollingCount() and
-                    tab.area.selected_line == tab.scrolled_lines + CONTENT_AREA_REGION.rows - 1)
-                {
-                    tab.scrolled_lines += 1;
-                }
-                tab.area.selected_line += 1;
-            }
-        },
+        else => {},
     }
     return false;
 }
@@ -157,8 +108,9 @@ pub fn draw(self: Self, render: g.Render) !void {
         "Drawing window with tabs in {any}. Tab {d}/{d}",
         .{ BORDERED_REGION, self.active_tab_idx, self.tabs_count },
     );
+    // Draw the tab titles
     const tab_title_width: u8 = @intCast((BORDERED_REGION.cols - 2) / self.tabs_count);
-    try render.drawDoubledBorder(BORDERED_REGION);
+    try render.drawDoubledBorder(BORDERED_REGION, g.Render.default_filler);
     try render.drawHorizontalLine(
         '═',
         BORDERED_REGION.top_left.movedToNTimes(.down, 2).movedTo(.right),
@@ -176,7 +128,7 @@ pub fn draw(self: Self, render: g.Render) !void {
             .center,
         );
     }
-    // Draw a border around the active tab
+    // Draw the border around the active tab
     const cursor = BORDERED_REGION.top_left
         .movedTo(.down)
         .movedToNTimes(.right, @intCast(self.active_tab_idx * tab_title_width));
@@ -199,30 +151,9 @@ pub fn draw(self: Self, render: g.Render) !void {
         underline_cursor.movedToNTimes(.right, tab_title_width + 1),
         .normal,
     );
-    const tab = &self.tabs[self.active_tab_idx];
-    var reg = CONTENT_AREA_REGION;
 
     // Draw the content
-    try tab.area.draw(render, reg, tab.scrolled_lines);
-
-    // Draw the scrollbar
-    if (tab.isScrolled()) {
-        const progress = w.scrollingProgress(tab.scrolled_lines, reg.rows, tab.maxScrollingCount());
-        log.debug(
-            "Drawing the scroll bar for tab {d}. Scrolled lines {d}; progress {d}; total lines {d}",
-            .{ self.active_tab_idx, tab.scrolled_lines, progress, tab.area.totalLines() },
-        );
-        var point = reg.topRight();
-        reg.cols -= 1;
-        for (0..reg.rows) |i| {
-            if (i == progress)
-                try render.runtime.drawSprite('▒', point, .normal)
-            else
-                try render.runtime.drawSprite('░', point, .normal);
-
-            point.move(.down);
-        }
-    }
+    try self.tabs[self.active_tab_idx].area.draw(render);
 
     // Draw buttons
     if (self.tabs[self.active_tab_idx].area.button()) |button| {

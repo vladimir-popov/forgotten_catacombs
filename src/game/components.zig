@@ -272,6 +272,8 @@ pub const Progression = struct {
     experience: u16 = 0,
     level: u8 = 1,
 
+    pub const first_level: Progression = .{};
+
     pub fn experienceToNextLevel(self: Progression) u16 {
         return Levels[self.level - 1];
     }

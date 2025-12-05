@@ -1,50 +1,8 @@
 //! This is a mode to choose a character archetype and set up skills at the start of the game.
 //! ```
 //! Archetype Step:
-//! ╔════════════════════════════════════════╗
-//! ║                                        ║
-//! ║         Choose your archetype:         ║
-//! ║                                        ║
-//! ║               Adventurer               ║
-//! ║              Archeologist              ║
-//! ║                 Vandal                 ║
-//! ║                 Rogue                  ║
-//! ║                                        ║
-//! ║                                        ║
-//! ║                                        ║
-//! ║                                        ║
-//! ║                       Describe  Choose ║
-//! ╚════════════════════════════════════════╝
 //! Skills Step:
-//! ╔════════════════════════════════════════╗
-//! ║                                        ║
-//! ║                 Skill:                 ║
-//! ║                                        ║
-//! ║Weapon Mastery                       0  ║
-//! ║Mechanics                            0  ║
-//! ║Stealth                              0  ║
-//! ║Echo of knowledge                    0  ║
-//! ║                                        ║
-//! ║                                        ║
-//! ║                                        ║
-//! ║                                        ║
-//! ║    2 points remain    Back   Describe  ║
-//! ╚════════════════════════════════════════╝
 //! Confirm Step:
-//! ╔════════════════════════════════════════╗
-//! ║                                        ║
-//! ║       Start with this character?       ║
-//! ║                                        ║
-//! ║ Level: {d}                            ▒║
-//! ║ Experience: {d}/{d}                   ░║
-//! ║                                       ░║
-//! ║ Skills:                               ░║
-//! ║   Weapon Mastery                    0 ░║
-//! ║   Mechanics                         0 ░║
-//! ║   Stealth                           0 ░║
-//! ║                                        ║
-//! ║                       Back    Play     ║
-//! ╚════════════════════════════════════════╝
 //! ```
 const std = @import("std");
 const g = @import("game_pkg.zig");
@@ -58,19 +16,57 @@ const log = std.log.scoped(.explore_level_mode);
 const Self = @This();
 
 const MAX_REMAINING_POINTS = 2;
-const CONTENT_AREA_REGION: p.Region = .{
-    .top_left = .{
-        .row = 4, // <- padding and a line for a title
-        .col = 1,
-    },
-    // -2 rows for infoBar;
+const ARCHETYPE_AREA_REGION: p.Region = .{
+    .top_left = .{ .row = 4, .col = 12 },
     .rows = g.DISPLAY_ROWS - 2 - 4,
-    .cols = g.DISPLAY_COLS,
+    .cols = g.DISPLAY_COLS - 24,
+};
+const SKILLS_AREA_REGION: p.Region = .{
+    .top_left = .{ .row = 4, .col = 2 },
+    .rows = g.DISPLAY_ROWS - 2 - 4,
+    .cols = g.DISPLAY_COLS - 2,
+};
+const CONFIRM_AREA_REGION: p.Region = .{
+    .top_left = .{ .row = 3, .col = 8 },
+    .rows = g.DISPLAY_ROWS - 2 - 2,
+    .cols = g.DISPLAY_COLS - 8,
 };
 
 /// A steps to setup the character
 const BuildingStep = union(enum) {
+    /// ```
+    /// ╔════════════════════════════════════════╗
+    /// ║         Choose your archetype:         ║
+    /// ║                                        ║
+    /// ║             ┌                          ║
+    /// ║               Adventurer               ║
+    /// ║              Archeologist              ║
+    /// ║                 Vandal                 ║
+    /// ║                 Rogue                  ║
+    /// ║                          ┘             ║
+    /// ║                                        ║
+    /// ║                                        ║
+    /// ║════════════════════════════════════════║
+    /// ║                       Describe  Choose ║
+    /// ╚════════════════════════════════════════╝
+    /// ```
     archetype: w.OptionsArea(g.meta.PlayerArchetype),
+    /// ```
+    /// ╔════════════════════════════════════════╗
+    /// ║                 Skill:                 ║
+    /// ║                                        ║
+    /// ║ ┌                                      ║
+    /// ║  Weapon Mastery                      0 ║
+    /// ║  Mechanics                           0 ║
+    /// ║  Stealth                             0 ║
+    /// ║  Echo of knowledge                   0 ║
+    /// ║                                       ┘║
+    /// ║                                        ║
+    /// ║                                        ║
+    /// ║════════════════════════════════════════║
+    /// ║    2 points remain    Back   Describe  ║
+    /// ╚════════════════════════════════════════╝
+    /// ```
     skills: struct {
         stats: c.Stats,
         skills: c.Skills,
@@ -97,10 +93,30 @@ const BuildingStep = union(enum) {
             }
         }
     },
+    /// ```
+    /// ╔════════════════════════════════════════╗
+    /// ║       Start with this character?       ║
+    /// ║       ┌                                ║
+    /// ║        Level: {d}                     ▒║
+    /// ║        Experience: {d}/{d}            ░║
+    /// ║                                       ░║
+    /// ║        Skills:                        ░║
+    /// ║          Weapon Mastery:     2        ░║
+    /// ║          Mechanics           0        ░║
+    /// ║          Stealth             0        ░║
+    /// ║          Echo of knowledge   0        ░║
+    /// ║════════════════════════════════════════║
+    /// ║                       Back    Play     ║
+    /// ╚════════════════════════════════════════╝
+    /// ```
     confirm: struct {
         stats: c.Stats,
         skills: c.Skills,
-        description: w.TextArea,
+        description: w.ScrollableAre(w.TextArea),
+
+        fn init(description: w.TextArea, stats: c.Stats, skills: c.Skills) @This() {
+            return .{ .description = .init(description, CONFIRM_AREA_REGION), .stats = stats, .skills = skills };
+        }
 
         fn deinit(self: *@This(), alloc: std.mem.Allocator) void {
             self.description.deinit(alloc);
@@ -146,7 +162,7 @@ fn initSkillsStep(self: *Self, stats: c.Stats, skills: c.Skills, remaining_point
             self.arena.allocator(),
             skill,
         );
-        option.label_len = CONTENT_AREA_REGION.cols;
+        option.label_len = SKILLS_AREA_REGION.cols;
         _ = try std.fmt.bufPrint(
             &option.label_buffer,
             "{s}",
@@ -165,7 +181,7 @@ fn initSkillsStep(self: *Self, stats: c.Stats, skills: c.Skills, remaining_point
 fn initConfirmStep(self: *Self, stats: c.Stats, skills: c.Skills) !void {
     var area: w.TextArea = .empty;
     try g.meta.describePlayer(self.arena.allocator(), &c.Progression{}, &stats, &skills, &area);
-    self.step = .{ .confirm = .{ .stats = stats, .skills = skills, .description = area } };
+    self.step = .{ .confirm = .init(area, stats, skills) };
 }
 
 /// Handles the button and return chosen stats and skills on null if they are not selected yet.
@@ -185,7 +201,9 @@ pub fn handleButton(self: *Self, btn: g.Button, render: g.Render) anyerror!?stru
                 .skills => |*skill_step| {
                     try skill_step.options.handleButton(btn);
                 },
-                .confirm => {},
+                .confirm => |*confirm_step| {
+                    try confirm_step.description.handleButton(btn);
+                },
             },
             .left, .right => if (self.step == .skills) {
                 const option = self.step.skills.options.selectedOption();
@@ -204,10 +222,12 @@ pub fn handleButton(self: *Self, btn: g.Button, render: g.Render) anyerror!?stru
                     try self.showDescription(description);
                 },
                 .skills => {
+                    // back to archetype selection
                     self.step.skills.deinit(self.arena.allocator());
                     try self.initArchetypeStep();
                 },
                 .confirm => |confirm_step| {
+                    // back to skills selection
                     const stats = confirm_step.stats;
                     const skills = confirm_step.skills;
                     self.step.confirm.deinit(self.arena.allocator());
@@ -246,12 +266,13 @@ pub fn handleButton(self: *Self, btn: g.Button, render: g.Render) anyerror!?stru
 }
 
 fn showDescription(self: *Self, description: *const g.descriptions.Description) !void {
-    var window: w.ModalWindow(w.TextArea) = .empty;
-    _ = try std.fmt.bufPrint(&window.title, "{s}", .{description.name});
+    var area: w.TextArea = .empty;
     for (description.description) |descr_line| {
-        const line = try window.area.addEmptyLine(self.arena.allocator());
+        const line = try area.addEmptyLine(self.arena.allocator());
         _ = try std.fmt.bufPrint(line, "{s}", .{descr_line});
     }
+    var window = w.ModalWindow(w.TextArea).default(area);
+    window.title_len = (try std.fmt.bufPrint(&window.title_buffer, "{s}", .{description.name})).len;
     self.description = window;
 }
 
@@ -259,29 +280,33 @@ pub fn draw(self: Self, render: g.Render) !void {
     if (self.description) |description| {
         try description.draw(render);
     } else {
+        try render.clearDisplay();
+        const title_point = p.Point.init(1, 1);
+        try render.drawHorizontalLine('═', title_point.movedTo(.down), g.DISPLAY_COLS);
+        try render.drawHorizontalLine('═', p.Point.init(g.DISPLAY_ROWS - 1, 1), g.DISPLAY_COLS);
         switch (self.step) {
             .archetype => |archetype| {
                 try render.drawTextWithAlign(
-                    CONTENT_AREA_REGION.cols,
+                    g.DISPLAY_COLS,
                     "Choose your archetype:",
-                    p.Point.init(2, 1),
+                    title_point,
                     .normal,
                     .center,
                 );
-                try archetype.draw(render, CONTENT_AREA_REGION, 0);
+                try archetype.draw(render, ARCHETYPE_AREA_REGION, 0);
                 try render.cleanInfo();
                 try render.drawLeftButton("Describe", false);
                 try render.drawRightButton("Choose", false);
             },
             .skills => |skills| {
                 try render.drawTextWithAlign(
-                    CONTENT_AREA_REGION.cols,
+                    g.DISPLAY_COLS,
                     "Skills:",
-                    p.Point.init(2, 1),
+                    title_point,
                     .normal,
                     .center,
                 );
-                try skills.options.draw(render, CONTENT_AREA_REGION, 0);
+                try skills.options.draw(render, SKILLS_AREA_REGION, 0);
                 var buf: [15]u8 = undefined;
                 try render.drawInfo(
                     try std.fmt.bufPrint(&buf, "{d} points remain", .{skills.remaining_points}),
@@ -294,13 +319,14 @@ pub fn draw(self: Self, render: g.Render) !void {
             },
             .confirm => |confirm| {
                 try render.drawTextWithAlign(
-                    CONTENT_AREA_REGION.cols,
+                    CONFIRM_AREA_REGION.cols,
                     "Start with this character?",
-                    p.Point.init(2, 1),
+                    title_point,
                     .normal,
                     .center,
                 );
-                try confirm.description.draw(render, CONTENT_AREA_REGION, 0);
+                try confirm.description.draw(render);
+                try render.cleanInfo();
                 try render.drawLeftButton("Back", false);
                 try render.drawRightButton("Play", false);
             },
