@@ -48,14 +48,20 @@ pub fn canEquip(registry: *const g.Registry, item: g.Entity) bool {
     return isWeapon(registry, item) or isLight(registry, item);
 }
 
-/// Returns the radius of the light as a maximal radius of all equipped sources of the light.
-pub fn getRadiusOfLight(registry: *const g.Registry, equipment: *const c.Equipment) f16 {
+/// Returns the id of the item with maximal radius of light through all equipped sources of the light,
+/// or null and default value.
+pub fn getLight(registry: *const g.Registry, equipment: *const c.Equipment) struct { ?g.Entity, f16 } {
     if (equipment.light) |id| {
         if (registry.get(id, c.SourceOfLight)) |sol| {
-            return sol.radius;
+            return .{ id, sol.radius };
         }
     }
-    return 1.5;
+    if (equipment.weapon) |id| {
+        if (registry.get(id, c.SourceOfLight)) |sol| {
+            return .{ id, sol.radius };
+        }
+    }
+    return .{ null, 1.5 };
 }
 
 /// Returns a `Damage` component and optional `Effect` of the currently used weapon.

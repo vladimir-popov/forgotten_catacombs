@@ -244,8 +244,8 @@ pub fn printName(dest: []u8, journal: g.Journal, entity: g.Entity) ![]u8 {
 
 /// Builds an actual description of the entity, and writes it to the text_area.
 pub fn describe(
-    journal: g.Journal,
     alloc: std.mem.Allocator,
+    journal: g.Journal,
     entity: g.Entity,
     text_area: *g.windows.TextArea,
 ) !void {
@@ -254,13 +254,13 @@ pub fn describe(
         return;
     }
     // Write the text of description at first:
-    try writeActualDescription(journal, alloc, entity, text_area);
+    try writeActualDescription(alloc, journal, entity, text_area);
     _ = try text_area.addEmptyLine(alloc);
     // Then write properties:
     if (g.meta.isItem(journal.registry, entity)) {
-        try describeItem(journal, alloc, entity, text_area);
+        try describeItem(alloc, journal, entity, text_area);
     } else if (g.meta.isEnemy(journal.registry, entity)) |enemy_type| {
-        try describeEnemy(journal, alloc, entity, enemy_type, text_area);
+        try describeEnemy(alloc, journal, entity, enemy_type, text_area);
     }
 }
 
@@ -273,7 +273,6 @@ fn describePlayer(
     equipment: *const c.Equipment,
     text_area: *g.windows.TextArea,
 ) !void {
-    _ = try text_area.addEmptyLine(alloc);
     try g.descriptions.describeProgression(alloc, progression.*, text_area);
     _ = try text_area.addEmptyLine(alloc);
     try describeEquipment(alloc, journal, equipment, text_area);
@@ -326,7 +325,6 @@ pub fn describeSkills(
     _ = try std.fmt.bufPrint(line, "  Stealth:            {d}", .{skills.values.get(.stealth)});
     line = try text_area.addEmptyLine(alloc);
     _ = try std.fmt.bufPrint(line, "  Echo of knowledge:  {d}", .{skills.values.get(.echo_of_knowledge)});
-    _ = try text_area.addEmptyLine(alloc);
 }
 
 /// Writes stats to a text area.
@@ -360,8 +358,8 @@ pub fn describeStats(
 /// Writes the known description of an entity.
 /// Known and unknown items and enemies have different descriptions.
 fn writeActualDescription(
-    journal: g.Journal,
     alloc: std.mem.Allocator,
+    journal: g.Journal,
     entity: g.Entity,
     text_area: *g.windows.TextArea,
 ) !void {
@@ -383,8 +381,8 @@ fn writeActualDescription(
 }
 
 pub fn describeItem(
-    journal: g.Journal,
     alloc: std.mem.Allocator,
+    journal: g.Journal,
     entity: g.Entity,
     text_area: *g.windows.TextArea,
 ) !void {
@@ -407,8 +405,8 @@ pub fn describeItem(
 }
 
 pub fn describeEnemy(
-    journal: g.Journal,
     alloc: std.mem.Allocator,
+    journal: g.Journal,
     enemy: g.Entity,
     enemy_type: g.meta.EnemyType,
     text_area: *g.windows.TextArea,
@@ -461,23 +459,28 @@ pub fn describeEquipment(
     equipment: *const c.Equipment,
     text_area: *g.windows.TextArea,
 ) !void {
+    var line = try text_area.addEmptyLine(alloc);
     if (equipment.weapon) |weapon| {
-        var line = try text_area.addEmptyLine(alloc);
-        @memcpy(line[1..17], "Equiped weapon: ");
-        _ = try printName(line[17..], journal, weapon);
+        @memcpy(line[0..16], "Equiped weapon: ");
+        _ = try printName(line[16..], journal, weapon);
         if (journal.registry.get(weapon, c.Damage)) |damage| {
-            try describeDamage(alloc, damage, text_area, 3);
+            try describeDamage(alloc, damage, text_area, 2);
         }
         if (journal.registry.get(weapon, c.Effect)) |effect| {
-            try describeEffect(alloc, effect, text_area, 3);
+            try describeEffect(alloc, effect, text_area, 2);
         }
+    } else {
+        _ = try std.fmt.bufPrint(line, "Equiped weapon: none", .{});
     }
-    var line = try text_area.addEmptyLine(alloc);
-    _ = try std.fmt.bufPrint(
-        line[1..],
-        "Radius of light: {d}",
-        .{g.meta.getRadiusOfLight(journal.registry, equipment)},
-    );
+    const light_id, const light_radius = g.meta.getLight(journal.registry, equipment);
+    if (light_id) |id| {
+        _ = try text_area.addEmptyLine(alloc);
+        line = try text_area.addEmptyLine(alloc);
+        @memcpy(line[0..17], "Source of light: ");
+        _ = try g.descriptions.printName(line[17..], journal, id);
+        line = try text_area.addEmptyLine(alloc);
+        _ = try std.fmt.bufPrint(line, "       distance: {d}", .{light_radius});
+    }
 }
 
 fn describeDamage(
@@ -500,6 +503,50 @@ fn describeEffect(
     _ = try std.fmt.bufPrint(line[pad..], "Effect: {t} {d}-{d}", .{ effect.effect_type, effect.min, effect.max });
 }
 
+test "Describe player" {
+    // given:
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const alloc = arena.allocator();
+    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
+    var registry = try g.Registry.init(alloc);
+    const journal = try g.Journal.init(alloc, &registry, prng.random());
+    var text_area: g.windows.TextArea = .empty;
+
+    const player = try registry.addNewEntity(try g.entities.player(alloc, .empty, .empty));
+    const equipmen = registry.getUnsafe(player, c.Equipment);
+    equipmen.weapon = try registry.addNewEntity(g.presets.Items.values.get(.torch).*);
+
+    // when:
+    try describe(alloc, journal, player, &text_area);
+
+    // then:
+    try expectContent(text_area,
+        \\Level: 1
+        \\Experience: 0/500
+        \\
+        \\Equiped weapon: Torch
+        \\  Damage: physical 2-3
+        \\  Effect: burning 1-1
+        \\
+        \\Source of light: Torch
+        \\       distance: 3
+        \\
+        \\Skills:
+        \\  Weapon Mastery:     0
+        \\  Mechanics:          0
+        \\  Stealth:            0
+        \\  Echo of knowledge:  0
+        \\
+        \\Stats:
+        \\  Strength:           0
+        \\  Dexterity:          0
+        \\  Perception:         0
+        \\  Intelligence:       0
+        \\  Constitution:       0
+    );
+}
+
 test "Describe an unknown rat" {
     // given:
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
@@ -513,7 +560,7 @@ test "Describe an unknown rat" {
     defer text_area.deinit(std.testing.allocator);
 
     // when:
-    try describe(journal, std.testing.allocator, id, &text_area);
+    try describe(std.testing.allocator, journal, id, &text_area);
 
     // then:
     try expectContent(text_area,
@@ -540,7 +587,7 @@ test "Describe a known rat" {
     defer text_area.deinit(std.testing.allocator);
 
     // when:
-    try describe(journal, std.testing.allocator, id, &text_area);
+    try describe(std.testing.allocator, journal, id, &text_area);
 
     // then:
     try expectContent(text_area,
@@ -568,7 +615,7 @@ test "Describe a torch" {
     defer text_area.deinit(std.testing.allocator);
 
     // when:
-    try describe(journal, std.testing.allocator, id, &text_area);
+    try describe(std.testing.allocator, journal, id, &text_area);
 
     // then:
     try expectContent(text_area,
@@ -584,7 +631,7 @@ test "Describe a torch" {
 
 fn expectContent(actual: g.windows.TextArea, comptime expectation: []const u8) !void {
     errdefer {
-        var buffer: [1024]u8 = undefined;
+        var buffer: [4096]u8 = undefined;
         var writer = std.Io.Writer.fixed(&buffer);
         actual.write(&writer) catch unreachable;
         std.debug.print("\nThe actual content was:\n--------------\n{s}\n--------------", .{buffer});
@@ -595,4 +642,6 @@ fn expectContent(actual: g.windows.TextArea, comptime expectation: []const u8) !
         try std.testing.expectEqualStrings(line, std.mem.trimEnd(u8, &actual.lines.items[i], " \n"));
         i += 1;
     }
+    if (i != actual.lines.items.len)
+        return error.ActualLinesCountIsNotEqualToExpected;
 }

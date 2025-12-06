@@ -28,9 +28,9 @@ const SKILLS_AREA_REGION: p.Region = .{
     .cols = g.DISPLAY_COLS - 2,
 };
 const CONFIRM_AREA_REGION: p.Region = .{
-    .top_left = .{ .row = 3, .col = 8 },
+    .top_left = .{ .row = 3, .col = 2 },
     .rows = g.DISPLAY_ROWS - 2 - 2,
-    .cols = g.DISPLAY_COLS - 8,
+    .cols = g.DISPLAY_COLS - 1,
 };
 
 /// A steps to setup the character
@@ -97,15 +97,15 @@ const BuildingStep = union(enum) {
     /// ```
     /// ╔════════════════════════════════════════╗
     /// ║       Start with this character?       ║
-    /// ║       ┌                                ║
-    /// ║        Level: {d}                     ▒║
-    /// ║        Experience: {d}/{d}            ░║
+    /// ║  ┌                                     ║
+    /// ║   Level: {d}                          ▒║
+    /// ║   Experience: {d}/{d}                 ░║
     /// ║                                       ░║
-    /// ║        Skills:                        ░║
-    /// ║          Weapon Mastery:     2        ░║
-    /// ║          Mechanics           0        ░║
-    /// ║          Stealth             0        ░║
-    /// ║          Echo of knowledge   0        ░║
+    /// ║   Skills:                             ░║
+    /// ║     Weapon Mastery:     2             ░║
+    /// ║     Mechanics           0             ░║
+    /// ║     Stealth             0             ░║
+    /// ║     Echo of knowledge   0             ░║
     /// ║════════════════════════════════════════║
     /// ║                       Back    Play     ║
     /// ╚════════════════════════════════════════╝
@@ -185,6 +185,7 @@ fn initConfirmStep(self: *Self, stats: c.Stats, skills: c.Skills) !void {
     try g.descriptions.describeProgression(alloc, c.Progression{}, &text_area);
     _ = try text_area.addEmptyLine(alloc);
     try g.descriptions.describeSkills(alloc, &skills, &text_area);
+    _ = try text_area.addEmptyLine(alloc);
     try g.descriptions.describeStats(alloc, &stats, &text_area);
     self.step = .{ .confirm = .init(text_area, stats, skills) };
 }
