@@ -4,7 +4,7 @@ const cp = @import("../codepoints.zig");
 const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
-pub const items = @import("items.zig");
+pub const Items = @import("items.zig");
 
 /// Creates components for the player with empty inventory and nothing equipped.
 ///

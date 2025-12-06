@@ -253,7 +253,7 @@ fn drawInfoBar(self: *const PlayMode) !void {
             }
         }
         var buf: [32]u8 = undefined;
-        try self.session.render.drawInfo(try g.meta.printName(&buf, self.session.journal, entity));
+        try self.session.render.drawInfo(try g.descriptions.printName(&buf, self.session.journal, entity));
     } else {
         try self.session.render.cleanInfo();
     }

@@ -291,7 +291,7 @@ pub const SourceOfLight = struct {
 pub const Skills = struct {
     pub const empty: Skills = .init(0, 0, 0, 0);
 
-    values: std.enums.EnumArray(g.descriptions.skills.Enum, i4),
+    values: std.enums.EnumArray(g.descriptions.Skills.Enum, i4),
 
     pub fn init(
         weapon_mastery: i4,

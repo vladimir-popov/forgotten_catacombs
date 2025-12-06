@@ -82,6 +82,9 @@ fn fieldsCount(comptime S: type, T: type) usize {
             result += 1;
     }
     for (type_info.@"struct".decls) |decl| {
+        if (std.meta.hasFn(S, decl.name)) {
+            continue;
+        }
         result += fieldsCount(@field(S, decl.name), T);
     }
     return result;
@@ -98,6 +101,9 @@ fn collectFields(comptime all_fields: []Type.StructField, comptime S: type, T: t
         }
     }
     for (type_info.@"struct".decls) |decl| {
+        if (std.meta.hasFn(S, decl.name)) {
+            continue;
+        }
         result += collectFields(all_fields[result..], @field(S, decl.name), T);
     }
     return result;

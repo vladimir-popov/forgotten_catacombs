@@ -180,9 +180,13 @@ fn initSkillsStep(self: *Self, stats: c.Stats, skills: c.Skills, remaining_point
 }
 
 fn initConfirmStep(self: *Self, stats: c.Stats, skills: c.Skills) !void {
-    var area: w.TextArea = .empty;
-    try g.meta.describePlayer(self.arena.allocator(), &c.Progression{}, &stats, &skills, &area);
-    self.step = .{ .confirm = .init(area, stats, skills) };
+    const alloc = self.arena.allocator();
+    var text_area: w.TextArea = .empty;
+    try g.descriptions.describeProgression(alloc, c.Progression{}, &text_area);
+    _ = try text_area.addEmptyLine(alloc);
+    try g.descriptions.describeSkills(alloc, &skills, &text_area);
+    try g.descriptions.describeStats(alloc, &stats, &text_area);
+    self.step = .{ .confirm = .init(text_area, stats, skills) };
 }
 
 /// Handles the button and return chosen stats and skills on null if they are not selected yet.

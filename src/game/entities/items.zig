@@ -23,7 +23,7 @@ oil_lamp: c.Components = archetype.item(.{
     .price = .{ .value = 50 },
 }),
 
-pub const armor = struct {
+pub const Armor = struct {
     jacket: c.Components = archetype.armor(.{
         .armor = .init(.{ .physical = 5, .fire = 2 }),
         .description = .{ .preset = .jacket },
@@ -34,7 +34,7 @@ pub const armor = struct {
     }),
 };
 
-pub const potions = struct {
+pub const Potions = struct {
     healing_potion: c.Components = archetype.potion(.{
         .description = .{ .preset = .healing_potion },
         .rarity = .rare,
@@ -66,7 +66,7 @@ pub const potions = struct {
     }),
 };
 
-pub const weapons = struct {
+pub const Weapons = struct {
     club: c.Components = archetype.weapon(.{
         .description = .{ .preset = .club },
         .rarity = .common,

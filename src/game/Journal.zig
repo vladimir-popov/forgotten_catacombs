@@ -9,7 +9,7 @@ const log = std.log.scoped(.journal);
 
 const Self = @This();
 
-const potions_count = @typeInfo(g.descriptions.potions.Enum).@"enum".fields.len;
+const potions_count = @typeInfo(g.descriptions.Potions.Enum).@"enum".fields.len;
 
 alloc: std.mem.Allocator,
 

@@ -36,7 +36,7 @@ pub const Viewport = @import("Viewport.zig");
 
 pub const presets = struct {
     pub const Descriptions = utils.Preset(descriptions.Description, descriptions);
-    pub const Items = utils.Preset(components.Components, entities.items);
+    pub const Items = utils.Preset(components.Components, entities.Items);
 };
 
 pub const RENDER_DELAY_MS = 200;
