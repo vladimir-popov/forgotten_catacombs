@@ -26,9 +26,11 @@ pub fn enemy(components: c.Components) c.Components {
     comptime {
         defined(components, "armor");
         defined(components, "description");
+        defined(components, "experience");
+        defined(components, "stats");
+        defined(components, "skills");
         defined(components, "health");
         defined(components, "initiative");
-        defined(components, "reward");
         defined(components, "speed");
         defined(components, "sprite");
         defined(components, "state");
@@ -68,7 +70,7 @@ pub inline fn armor(components: c.Components) c.Components {
 pub inline fn weapon(components: c.Components) c.Components {
     comptime {
         _ = item(components);
-        defined(components, "damage");
+        defined(components, "effects");
         defined(components, "weapon_class");
         return components;
     }

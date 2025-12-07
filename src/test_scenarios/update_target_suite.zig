@@ -14,6 +14,7 @@ test "Change a target to an atacked enemy" {
     const rat_top = try test_session.session.level.addEnemy(.sleeping, g.entities.rat(pp.movedTo(.up)));
     errdefer std.debug.print("Left rat {d}; Top rat {d}\n", .{ rat_left.id, rat_top.id });
 
+    // The initial game state:
     try test_session.tick();
     try test_session.runtime.display.expectLooksLike(
         \\######################################30

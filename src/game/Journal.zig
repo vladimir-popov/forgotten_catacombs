@@ -28,13 +28,14 @@ known_potions: std.AutoHashMapUnmanaged(g.meta.PotionType, void) = .empty,
 /// A set of known class of enemies.
 known_enemies: std.AutoHashMapUnmanaged(g.meta.EnemyType, void) = .empty,
 
-pub fn init(alloc: std.mem.Allocator, registry: *const g.Registry, rand: std.Random) !Self {
+pub fn init(alloc: std.mem.Allocator, registry: *const g.Registry, seed: u64) !Self {
+    var prng = std.Random.DefaultPrng.init(seed);
     const colors_count = @typeInfo(g.Color).@"enum".fields.len;
     std.debug.assert(colors_count >= potions_count);
 
     var colors: [colors_count]g.Color = undefined;
     @memcpy(&colors, std.meta.tags(g.Color));
-    rand.shuffle(g.Color, &colors);
+    prng.random().shuffle(g.Color, &colors);
 
     var potion_colors: [potions_count]g.Color = undefined;
     @memcpy(&potion_colors, colors[0..potions_count]);
@@ -61,7 +62,8 @@ pub fn isKnown(self: Self, entity: g.Entity) bool {
     return true;
 }
 
-pub fn isUnknownPotion(self: Self, entity: g.Entity) ?g.Color {
+/// Returns a color for an unknown potion, or null if the potion is known.
+pub fn unknownPotionColor(self: Self, entity: g.Entity) ?g.Color {
     if (g.meta.isPotion(self.registry, entity)) |potion_type| {
         if (!self.known_potions.contains(potion_type))
             return self.potion_colors[@intFromEnum(potion_type)];

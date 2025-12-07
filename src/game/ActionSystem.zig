@@ -67,7 +67,7 @@ pub fn doAction(self: *Self, actor: g.Entity, action: g.Action) !struct { ?g.Act
     switch (action) {
         .do_nothing => return .{ null, 0 },
         .drink => |potion_id| {
-            if (try self.drinkPotion(actor, potion_id)) return .{ null, 0 };
+            try self.drinkPotion(actor, potion_id);
         },
         .open_inventory => {
             try self.session().manageInventory();
@@ -80,8 +80,10 @@ pub fn doAction(self: *Self, actor: g.Entity, action: g.Action) !struct { ?g.Act
             try self.session().movePlayerToLevel(ladder);
             return .{ action, 0 };
         },
-        .hit => |target| {
-            return if (try tryToHit(self, actor, target)) .{ null, 0 } else .{ action, speed.move_points };
+        .hit => |target| if (self.session().registry.get(target, c.Health)) |target_health| {
+            try self.tryToHit(actor, target, target_health);
+        } else {
+            return .{ null, 0 };
         },
         .open => |door| {
             try self.session().registry.setComponentsToEntity(door.id, g.entities.openedDoor(door.place));
@@ -196,71 +198,159 @@ fn checkCollision(self: *Self, place: p.Point) ?g.Action {
     return .do_nothing;
 }
 
-/// `true` if the actor is dead
 fn tryToHit(
     self: *Self,
     actor: g.Entity,
-    enemy: g.Entity,
+    target: g.Entity,
+    target_health: *c.Health,
+) !void {
+    const actor_weapon_skill: i16 = if (self.session().registry.get(actor, c.Skills)) |skills|
+        skills.values.get(.weapon_mastery)
+    else
+        0;
+    const target_dexterity: i16, const target_perception: i16 =
+        if (self.session().registry.get(target, c.Stats)) |stats|
+            .{ stats.dexterity, stats.perception }
+        else
+            .{ 0, 0 };
+
+    const evation: i16 = 45 + 6 * target_dexterity + 3 * target_perception - 2 * (10 - actor_weapon_skill);
+    const rand = self.session().prng.random().intRangeLessThan(i16, 0, 100);
+    if (rand < evation) {
+        // Miss
+        log.debug(
+            "Actor {d} missed by the enemy {d} with evation {d} and rand {d}",
+            .{ actor.id, target.id, evation, rand },
+        );
+        return;
+    }
+
+    const target_armor = self.session().registry.get(target, c.Armor) orelse &c.Armor.zeros;
+    const weapon_id = g.meta.getWeapon(&self.session().registry, actor);
+    if (self.session().registry.get(weapon_id, c.Effects)) |effects| {
+        for (effects.items()) |effect| {
+            const is_target_dead = try self.applyEffect(actor, weapon_id, effect, target, target_armor, target_health);
+            if (is_target_dead) {
+                if (self.session().registry.get(actor, c.Experience)) |actor_experience| {
+                    if (self.session().registry.get(target, c.Experience)) |enemy_experience| {
+                        const level_before = actor_experience.level;
+                        actor_experience.add(enemy_experience.asReward());
+                        if (actor_experience.level > level_before) {
+                            @panic("TODO: HANDLE LEVEL UP");
+                        }
+                    }
+                }
+                return;
+            }
+        }
+    }
+}
+
+/// Applies the effect to the target. Calculates and applies the damage, or increase the target health for the
+/// `healing` effect.
+///
+/// Returns `true` if the target is dead.
+fn applyEffect(
+    self: *Self,
+    actor: g.Entity,
+    source: g.Entity,
+    effect: c.Effect,
+    target: g.Entity,
+    target_armor: *const c.Armor,
+    target_health: *c.Health,
 ) !bool {
-    const damage, const maybe_effect = try g.meta.getDamage(&self.session().registry, actor);
+    std.debug.assert(effect.min <= effect.max);
 
-    // Applying regular damage
-    if (try self.doDamage(actor, damage.*, enemy)) return true;
+    const target_defence = target_armor.resistance.get(effect.effect_type);
+    std.debug.assert(target_defence.min <= target_defence.max);
 
-    // Applying an effect of the weapon
-    if (maybe_effect) |effect| {
-        if (effect.damage()) |dmg|
-            if (try self.doDamage(actor, dmg, enemy)) return true;
+    switch (effect.effect_type) {
+        .physical => {
+            const weapon_class = if (self.session().registry.get(source, c.WeaponClass)) |wc| wc.* else .primitive;
+            const actor_stats = if (self.session().registry.get(actor, c.Stats)) |st| st.* else c.Stats.zeros;
+            const base_damage: f32 = @floatFromInt(self.session().prng.random().intRangeAtMost(u8, effect.min, effect.max));
+            const character_factor: f32 = (0.4 * statBonus(actor_stats, weapon_class) + 4) / 4;
+            const damage: u8 = @intFromFloat(@round(base_damage * character_factor));
+            const absorbed_damage: u8 = self.session().prng.random().intRangeAtMost(
+                u8,
+                target_defence.min,
+                target_defence.max,
+            );
+            const damage_value: u8 = @max(1, damage - absorbed_damage);
+            log.debug(
+                "Base damage {d}; Character factor {d}; Damage {d}; Absorbed damage {d};",
+                .{ base_damage, character_factor, damage, absorbed_damage },
+            );
+            return self.applyDamage(actor, target, target_health, damage_value, effect.effect_type);
+        },
+        .burning, .corrosion, .poisoning => {
+            const base_damage = self.session().prng.random().intRangeAtMost(u8, effect.min, effect.max);
+            const absorbed_damage: u8 = self.session().prng.random().intRangeAtMost(
+                u8,
+                target_defence.min,
+                target_defence.max,
+            );
+            return self.applyDamage(actor, target, target_health, base_damage -| absorbed_damage, effect.effect_type);
+        },
+        .healing => {
+            const value = self.session().prng.random().intRangeAtMost(u8, effect.min, effect.max);
+            target_health.current += value;
+            target_health.current = @min(target_health.max, target_health.current);
+            const is_blocked_animation = actor.eql(self.session().player) or target.eql(self.session().player);
+            try self.session().registry.set(target, c.Animation{ .preset = .healing, .is_blocked = is_blocked_animation });
+            log.debug("Entity {d} recovered up to {d} hp", .{ target.id, value });
+        },
     }
     return false;
 }
 
-/// `true` means that entity is dead
-fn doDamage(self: *Self, actor: g.Entity, damage: c.Damage, target: g.Entity) !bool {
-    const target_health = self.session().registry.get(target, c.Health) orelse {
-        log.err("Actor {d} doesn't have a Health component", .{target.id});
-        return error.NotEnoughComponents;
-    };
-    std.debug.assert(damage.min <= damage.max);
-    const value = self.session().prng.random().intRangeAtMost(u8, damage.min, damage.max);
+inline fn statBonus(actor_stats: c.Stats, weapon_class: c.WeaponClass) f32 {
+    return @floatFromInt(switch (weapon_class) {
+        .primitive => actor_stats.strength,
+        .tricky => actor_stats.dexterity,
+        .ancient => actor_stats.intelligence,
+    });
+}
+
+/// Applies precalculated damage. Adds a blocked animation if needed, and invokes `onEntityDied`
+/// if the target health becomes 0.
+///
+/// `true` means that the target is dead
+fn applyDamage(
+    self: *Self,
+    actor: g.Entity,
+    target: g.Entity,
+    target_health: *c.Health,
+    damage_value: u8,
+    effect_type: c.Effect.Type, // just for log
+) !bool {
     const orig_health = target_health.current;
-    target_health.current -|= value;
+    target_health.current -|= damage_value;
     log.debug(
         "Entity {d} received {s} damage {d}. HP: {d} -> {d}",
-        .{ target.id, @tagName(damage.damage_type), value, orig_health, target_health.current },
+        .{ target.id, @tagName(effect_type), damage_value, orig_health, target_health.current },
     );
     if (target_health.current == 0) {
         try self.session().onEntityDied(target);
         return true;
     } else {
-        // a special case to give to player a chance to notice what happened
+        // a special case to give to the player a chance to notice what happened
         const is_blocked_animation = actor.eql(self.session().player) or target.eql(self.session().player);
         try self.session().registry.set(target, c.Animation{ .preset = .hit, .is_blocked = is_blocked_animation });
         return false;
     }
 }
 
-/// `true` means that the target is dead
-fn applyEffect(self: *Self, actor: g.Entity, effect: c.Effect, target: g.Entity) !bool {
-    if (effect.damage()) |damage| {
-        if (try self.doDamage(actor, damage, target)) return true;
-    } else if (effect.effect_type == .healing) {
-        const health = self.session().registry.getUnsafe(target, c.Health);
-        const value = self.session().prng.random().intRangeAtMost(u8, effect.min, effect.max);
-        health.current += value;
-        health.current = @min(health.max, health.current);
-        const is_blocked_animation = actor.eql(self.session().player) or target.eql(self.session().player);
-        try self.session().registry.set(target, c.Animation{ .preset = .healing, .is_blocked = is_blocked_animation });
-        log.debug("Entity {d} recovered up to {d} hp", .{ target.id, value });
-    }
-    return false;
-}
-
-/// `true` means that the actor is dead
-fn drinkPotion(self: *Self, actor: g.Entity, potion_id: g.Entity) !bool {
-    if (self.session().registry.get(potion_id, c.Effect)) |effect| {
-        try self.session().journal.markPotionAsKnown(potion_id);
-        if (try self.applyEffect(actor, effect.*, actor)) return true;
+fn drinkPotion(self: *Self, actor: g.Entity, potion_id: g.Entity) !void {
+    if (self.session().registry.get(potion_id, c.Effects)) |effects| {
+        for (effects.items()) |effect| {
+            if (self.session().registry.get(actor, c.Health)) |health| {
+                const armor = self.session().registry.get(actor, c.Armor) orelse &c.Armor.zeros;
+                try self.session().journal.markPotionAsKnown(potion_id);
+                const is_actor_dead = try self.applyEffect(actor, potion_id, effect, actor, armor, health);
+                if (is_actor_dead) break;
+            }
+        }
     }
     // try to remove from the inventory
     if (self.session().registry.get(actor, c.Inventory)) |inventory| {
@@ -268,5 +358,4 @@ fn drinkPotion(self: *Self, actor: g.Entity, potion_id: g.Entity) !bool {
     }
     // remove the potion
     try self.session().registry.removeEntity(potion_id);
-    return false;
 }

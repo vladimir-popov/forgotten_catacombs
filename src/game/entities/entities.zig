@@ -17,7 +17,7 @@ pub fn player(alloc: std.mem.Allocator, stats: c.Stats, skills: c.Skills) !c.Com
         .speed = .{ .move_points = 10 },
         .equipment = .nothing,
         .inventory = try c.Inventory.empty(alloc),
-        .progression = .first_level,
+        .experience = .zero,
         .skills = skills,
         .stats = stats,
         .wallet = .{ .money = 0 },
@@ -25,13 +25,15 @@ pub fn player(alloc: std.mem.Allocator, stats: c.Stats, skills: c.Skills) !c.Com
 }
 
 const Rat = archetype.enemy(.{
-    .armor = .init(.{ .physical = 1 }),
+    .armor = .init(&.{.physical(0, 1)}),
     .description = .{ .preset = .rat },
+    .experience = .reward(10),
+    .stats = .zeros,
+    .skills = .zeros,
     .initiative = .empty,
     .sprite = .{ .codepoint = 'r' },
     .health = .{ .max = 10, .current = 10 },
-    .damage = .{ .damage_type = .physical, .min = 1, .max = 3 },
-    .reward = .{ .experience = 5 },
+    .effects = .init(&.{.physical(1, 3)}),
     .speed = .{ .move_points = 14 },
     .state = .sleeping,
 });

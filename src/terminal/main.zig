@@ -135,7 +135,7 @@ fn parseArchetype(str: []const u8) ?g.meta.PlayerArchetype {
 }
 
 fn parseSkills(str: []const u8) ?g.components.Skills {
-    var result: g.components.Skills = .empty;
+    var result: g.components.Skills = .zeros;
     var i: usize = 0;
     var spent_points: i4 = 0;
     var itr = std.mem.splitScalar(u8, str, ',');

@@ -3,14 +3,19 @@ const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
 
-pub const Error = error{
-    DamageIsNotSpecified,
-};
-
 pub const PotionType = g.descriptions.Potions.Enum;
 pub const EnemyType = g.descriptions.Enemies.Enum;
 pub const PlayerArchetype = g.descriptions.Archetypes.Enum;
 pub const Skill = g.descriptions.Skills.Enum;
+
+/// A numbers of required exp point for level up.
+/// The 0 element is a required amount of exp point to get the
+/// second level.
+pub const Levels = [_]u16{ 500, 1000, 15000, std.math.maxInt(u16) };
+
+pub inline fn experienceToNextLevel(current_level: u4) u16 {
+    return Levels[current_level - 1];
+}
 
 /// Any entity with weight is item.
 pub inline fn isItem(registry: *const g.Registry, entity: g.Entity) bool {
@@ -19,7 +24,7 @@ pub inline fn isItem(registry: *const g.Registry, entity: g.Entity) bool {
 
 /// Any entity with damage is weapon.
 pub inline fn isWeapon(registry: *const g.Registry, entity: g.Entity) bool {
-    return registry.has(entity, c.Damage);
+    return registry.has(entity, c.WeaponClass);
 }
 
 /// Any entity with a `SourceOfLight` is a light.
@@ -64,21 +69,16 @@ pub fn getLight(registry: *const g.Registry, equipment: *const c.Equipment) stru
     return .{ null, 1.5 };
 }
 
-/// Returns a `Damage` component and optional `Effect` of the currently used weapon.
-/// The `actor` must be a player or an enemy,  otherwise the `DamageIsNotSpecified` will be returned.
-pub fn getDamage(registry: *const g.Registry, actor: g.Entity) Error!struct { *c.Damage, ?*c.Effect } {
-    // creatures can damage directly (rat's tooth as example)
-    if (registry.get(actor, c.Damage)) |damage| {
-        return .{ damage, registry.get(actor, c.Effect) };
-    }
+/// Returns an id of the equipped weapon, or the `actor`, because any enemy must be able to provide
+/// a damage without weapon. The player and humanoid enemies should be able to damage by hands,
+/// animal should bite (but hands and tooth are not equipped as a weapon).
+pub fn getWeapon(registry: *const g.Registry, actor: g.Entity) g.Entity {
     if (registry.get(actor, c.Equipment)) |equipment| {
         if (equipment.weapon) |weapon| {
-            if (registry.get(weapon, c.Damage)) |damage| {
-                return .{ damage, registry.get(weapon, c.Effect) };
-            }
+            return weapon;
         }
     }
-    return error.DamageIsNotSpecified;
+    return actor;
 }
 
 pub fn statsFromArchetype(archetype: PlayerArchetype) c.Stats {

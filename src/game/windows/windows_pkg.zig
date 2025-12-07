@@ -77,7 +77,11 @@ pub fn entityDescription(args: struct {
     max_region: ?p.Region = null,
 }) !ModalWindow(TextArea) {
     var area: TextArea = .empty;
-    try g.descriptions.describe(args.alloc, args.session.journal, args.entity, &area);
+    if (args.session.player.id == args.entity.id) {
+        try g.descriptions.describePlayer(args.alloc, args.session.journal, args.entity, &area);
+    } else {
+        try g.descriptions.describeEntity(args.alloc, args.session.journal, args.entity, &area);
+    }
     var window = if (args.max_region) |mr|
         w.ModalWindow(TextArea).init(area, mr)
     else

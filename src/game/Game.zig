@@ -102,9 +102,9 @@ pub fn tick(self: *Self) !void {
             }
         },
         .create_character => if (try self.runtime.readPushedButtons()) |btn| {
-            if (try self.state.create_character.handleButton(btn, self.render)) |statsAndSkills| {
+            if (try self.state.create_character.handleButton(btn, self.render)) |tuple| {
                 self.state.create_character.deinit();
-                try self.startGameSession(statsAndSkills[0], statsAndSkills[1]);
+                try self.startGameSession(tuple[0], tuple[1]);
             } else {
                 try self.state.create_character.draw(self.render);
             }

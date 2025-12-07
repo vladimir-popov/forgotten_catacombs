@@ -17,9 +17,9 @@ test "Describe an item" {
         \\║│ Wooden handle, cloth wrap, burning▒│║
         \\║│ flame. Lasts until the fire dies. ░│║
         \\║│                                   ░│║
-        \\║│ Damage: physical 2-3              ░│║
-        \\║│ Effect: burning 1-1               ░│║
-        \\║│ Radius of light: 3                ░│║
+        \\║│ Damage:                           ░│║
+        \\║│   physical 2-3                    ░│║
+        \\║│   burning 1-1                     ░│║
         \\║└────────────────────────────────────┘║
         \\╚══════════════════════════════════════╝
     , .game_area);
@@ -54,11 +54,13 @@ test "Describe a known potion (after drinking a similar)" {
     try test_session.initEmpty(std.testing.allocator);
     defer test_session.deinit();
 
+    // Drink a potion:
     var inventory = try test_session.openInventory();
     const potion_to_drink = try inventory.add(g.presets.Items.values.get(.healing_potion).*);
     var options = try inventory.chooseItemById(potion_to_drink);
     try options.choose("Drink");
 
+    // Check the description:
     inventory = try test_session.openInventory();
     const potion_to_describe = try inventory.add(g.presets.Items.values.get(.healing_potion).*);
     options = try inventory.chooseItemById(potion_to_describe);
@@ -67,12 +69,12 @@ test "Describe a known potion (after drinking a similar)" {
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║┌──────────A healing potion──────────┐║
-        \\║│ A brew that glows faintly, as if   │║
-        \\║│ mends alive. It warms your veins   │║
-        \\║│ and your wounds instantly.         │║
-        \\║│                                    │║
-        \\║│ Effect: healing 20-25              │║
-        \\║│ Weight: 10                         │║
+        \\║│ A brew that glows faintly, as if  ▒│║
+        \\║│ mends alive. It warms your veins  ░│║
+        \\║│ and your wounds instantly.        ░│║
+        \\║│                                   ░│║
+        \\║│ Effects:                          ░│║
+        \\║│   healing 20-25                   ░│║
         \\║└────────────────────────────────────┘║
         \\╚══════════════════════════════════════╝
     , .game_area);
@@ -116,14 +118,22 @@ test "Describe a known enemy (after killing a similar creature)" {
 
     // Prepare a game session:
     const pp = test_session.player.position().place.movedTo(.up);
-    var rat_to_kick = g.entities.rat(pp);
-    rat_to_kick.health.?.current = 1;
-    _ = try test_session.session.level.addEnemy(.sleeping, rat_to_kick);
+    var rat_to_kick_components = g.entities.rat(pp);
+    rat_to_kick_components.health.?.current = 1;
+    const rat_to_kick_id = try test_session.session.level.addEnemy(.sleeping, rat_to_kick_components);
     const rat_to_describe = try test_session.session.level.addEnemy(.sleeping, g.entities.rat(pp.movedToNTimes(.up, 5)));
     try test_session.tick();
 
     // kill the rat
-    try test_session.pressButton(.up);
+    var attempt: usize = 0;
+    while (test_session.session.registry.get(rat_to_kick_id, g.components.Health)) |health| {
+        if (health.current == 0) break;
+
+        try test_session.pressButton(.up);
+
+        if (attempt > 15) return error.ToManyAttemptsToKick;
+        attempt += 1;
+    }
 
     // Check description of the second rat
     try test_session.exploreMode();
@@ -133,14 +143,14 @@ test "Describe a known enemy (after killing a similar creature)" {
 
     try test_session.runtime.display.expectLooksLike(
         \\┌─────────────────Rat──────────────────┐
-        \\│ A big, nasty rat with vicious eyes   │
-        \\│ that thrives in dark corners and     │
-        \\│ forgotten cellars.                   │
-        \\│                                      │
-        \\│ Health: 10/10                        │
-        \\│ Damage: physical 1-3                 │
-        \\│                                      │
-        \\│ Not too fast.                        │
+        \\│ A big, nasty rat with vicious eyes  ▒│
+        \\│ that thrives in dark corners and    ░│
+        \\│ forgotten cellars.                  ░│
+        \\│                                     ░│
+        \\│ Health: 10/10                       ░│
+        \\│ Damage:                             ░│
+        \\│   physical 1-3                      ░│
+        \\│                                     ░│
         \\└──────────────────────────────────────┘
     , .game_area);
 }

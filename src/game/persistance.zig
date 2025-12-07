@@ -1,6 +1,16 @@
 //! The persistence layer currently implemented with Json format.
 //! Note, that this implementation is order sensitive. It means that fields of every persisted
 //! structures must follow the same order on reading in which they were written.
+//!
+//! Most of simple types can be persisted without additional methods, but to make a complicated
+//! custom type persistable two methods should be implemented:
+//! ```
+//! /// - `writer` - as example: `*persistance.Writer(Runtime.FileWriter.Writer)`
+//! pub fn save(self: Self, writer: anytype) !void
+//!
+//! /// - `reader` - as example: `*persistance.Reader(Runtime.FileReader.Reader)`
+//! pub fn load(reader: anytype) !Self
+//! ```
 const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
@@ -394,24 +404,22 @@ test "All components should be serializable" {
 
     // Random components to check serialization:
     const expected = c.Components{
-        .armor = .init(.{ .physical = 1, .poison = 2, .fire = 3 }),
+        .armor = .init(&.{ .physical(0, 1), .poisoning(2, 2), .burning(1, 3) }),
         .animation = c.Animation{ .preset = .hit },
         .consumable = .{ .calories = 12, .consumable_type = .food },
-        .damage = .{ .damage_type = .physical, .min = 1, .max = 2 },
+        .effects = .init(&.{.physical(1, 2)}),
         .description = c.Description{ .preset = .player },
         .door = c.Door{ .state = .opened },
-        .effect = .{ .min = 1, .max = 3, .effect_type = .burning },
         .equipment = c.Equipment{ .weapon = null, .light = .{ .id = 12 } },
+        .experience = .zero,
         .health = c.Health{ .current = 42, .max = 100 },
         .initiative = c.Initiative{ .move_points = 5 },
         .inventory = inventory,
         .ladder = c.Ladder{ .id = .{ .id = 2 }, .direction = .down, .target_ladder = .{ .id = 3 } },
         .pile = pile,
         .price = .{ .value = 100 },
-        .progression = .{ .level = 1, .experience = 42 },
         .position = c.Position{ .place = p.Point.init(12, 42), .zorder = .item },
         .rarity = .common,
-        .reward = .{ .experience = 34 },
         .shop = shop,
         .source_of_light = c.SourceOfLight{ .radius = 4 },
         .speed = c.Speed{ .move_points = 12 },

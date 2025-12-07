@@ -156,7 +156,12 @@ fn initArchetypeStep(self: *Self) !void {
     }
 }
 
-fn initSkillsStep(self: *Self, stats: c.Stats, skills: c.Skills, remaining_points: u2) !void {
+fn initSkillsStep(
+    self: *Self,
+    stats: c.Stats,
+    skills: c.Skills,
+    remaining_points: u2,
+) !void {
     var options = w.OptionsArea(g.meta.Skill).init(self, .left);
     for (std.enums.values(g.meta.Skill)) |skill| {
         const option = try options.addEmptyOption(
@@ -182,7 +187,7 @@ fn initSkillsStep(self: *Self, stats: c.Stats, skills: c.Skills, remaining_point
 fn initConfirmStep(self: *Self, stats: c.Stats, skills: c.Skills) !void {
     const alloc = self.arena.allocator();
     var text_area: w.TextArea = .empty;
-    try g.descriptions.describeProgression(alloc, c.Progression{}, &text_area);
+    try g.descriptions.describeProgression(alloc, 1, 0, &text_area);
     _ = try text_area.addEmptyLine(alloc);
     try g.descriptions.describeSkills(alloc, &skills, &text_area);
     _ = try text_area.addEmptyLine(alloc);
@@ -246,7 +251,7 @@ pub fn handleButton(self: *Self, btn: g.Button, render: g.Render) anyerror!?stru
                     .archetype => |archetype_step| {
                         try self.initSkillsStep(
                             g.meta.statsFromArchetype(archetype_step.selectedItem()),
-                            .empty,
+                            .zeros,
                             MAX_REMAINING_POINTS,
                         );
                     },

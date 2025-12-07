@@ -12,6 +12,7 @@ const Entity = @import("Entity.zig");
 pub fn ArraySet(comptime C: anytype) type {
     return struct {
         const Self = @This();
+        const type_info = @typeInfo(C);
 
         components: std.ArrayListUnmanaged(struct { Entity, C }),
         entity_index: std.AutoHashMapUnmanaged(Entity, usize),
@@ -120,7 +121,7 @@ pub fn ArraySet(comptime C: anytype) type {
         }
 
         inline fn deinitComponent(self: *Self, alloc: std.mem.Allocator, idx: usize) void {
-            if (@hasDecl(C, "deinit")) {
+            if (type_info != .array and @hasDecl(C, "deinit")) {
                 switch (@typeInfo(@TypeOf(C.deinit))) {
                     .@"fn" => |f| {
                         if (f.params.len > 1)

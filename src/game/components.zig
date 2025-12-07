@@ -4,10 +4,25 @@ const p = g.primitives;
 const u = g.utils;
 
 pub const Armor = struct {
-    resistance: std.EnumArray(Damage.Type, u8),
+    pub const zeros: Armor = .{ .resistance = .initFill(.zero) };
 
-    pub fn init(resistances: std.enums.EnumFieldStruct(Damage.Type, u8, 0)) Armor {
-        return .{ .resistance = .initDefault(0, resistances) };
+    // The min and max inclusive values of absorbed damage
+    pub const Defence = struct {
+        pub const zero: Defence = .{ .min = 0, .max = 0 };
+        min: u8,
+        max: u8,
+        pub fn init(min: u8, max: u8) Defence {
+            return .{ .min = min, .max = max };
+        }
+    };
+    resistance: std.EnumArray(Effect.Type, Defence),
+
+    pub fn init(effs: []const Effect) Armor {
+        var self: Armor = zeros;
+        for (effs) |effect| {
+            self.resistance.set(effect.effect_type, .init(effect.min, effect.max));
+        }
+        return self;
     }
 };
 
@@ -174,31 +189,68 @@ pub const Equipment = struct {
     pub const nothing: Equipment = .{ .weapon = null, .light = null };
 };
 
-pub const Damage = struct {
-    pub const Type = enum { physical, poison, fire, acid };
-    damage_type: Type,
-    min: u8,
-    max: u8,
-};
-
 pub const Effect = struct {
-    pub const Type = enum { burning, corrosion, healing, poisoninig };
+    pub const Type = enum { physical, burning, corrosion, poisoning, healing };
     pub const TypesCount = @typeInfo(Type).@"enum".fields.len;
     effect_type: Type,
     min: u8,
     max: u8,
 
-    pub fn damage(self: Effect) ?Damage {
-        const damage_type: ?Damage.Type = switch (self.effect_type) {
-            .burning => .fire,
-            .corrosion => .acid,
-            .poisoninig => .poison,
-            .healing => null,
-        };
-        return if (damage_type) |dt|
-            .{ .damage_type = dt, .min = self.min, .max = self.max }
-        else
-            null;
+    pub fn physical(min: u8, max: u8) Effect {
+        return .{ .effect_type = .physical, .min = min, .max = max };
+    }
+
+    pub fn burning(min: u8, max: u8) Effect {
+        return .{ .effect_type = .burning, .min = min, .max = max };
+    }
+
+    pub fn corrosion(min: u8, max: u8) Effect {
+        return .{ .effect_type = .corrosion, .min = min, .max = max };
+    }
+
+    pub fn poisoning(min: u8, max: u8) Effect {
+        return .{ .effect_type = .poisoning, .min = min, .max = max };
+    }
+
+    pub fn healing(min: u8, max: u8) Effect {
+        return .{ .effect_type = .healing, .min = min, .max = max };
+    }
+};
+
+pub const Effects = struct {
+    buffer: [3]Effect = undefined,
+    len: usize = 0,
+
+    pub fn init(effs: []const Effect) Effects {
+        var self: Effects = .{};
+        self.len = effs.len;
+        @memcpy(self.buffer[0..self.len], effs);
+        return self;
+    }
+
+    pub inline fn items(self: Effects) []const Effect {
+        return self.buffer[0..self.len];
+    }
+
+    /// - `writer` - as example: `*persistance.Writer(Runtime.FileWriter.Writer)`
+    pub fn save(self: Effects, writer: anytype) !void {
+        try writer.beginCollection();
+        for (self.items()) |effect| {
+            try writer.write(effect);
+        }
+        try writer.endCollection();
+    }
+
+    /// - `reader` - as example: `*persistance.Reader(Runtime.FileReader.Reader)`
+    pub fn load(reader: anytype) !Effects {
+        var self = Effects{};
+        try reader.beginCollection();
+        while (!try reader.isCollectionEnd()) {
+            self.buffer[self.len] = try reader.read(Effect);
+            self.len += 1;
+        }
+        try reader.endCollection();
+        return self;
     }
 };
 
@@ -264,24 +316,40 @@ pub const EnemyState = enum {
     aggressive,
 };
 
-pub const Progression = struct {
-    /// A numbers of required exp point for level up.
-    /// The 0 element is a required amount of exp point to get the
-    /// second level.
-    pub const Levels: [3]u16 = .{ 500, 1000, 15000 };
-    experience: u16 = 0,
-    level: u8 = 1,
+/// The information about the current amount of experience points, the current level,
+/// and the reward for a victor.
+pub const Experience = struct {
+    const reward_denominator = 10;
 
-    pub const first_level: Progression = .{};
+    pub const zero: Experience = .{ .experience = 0, .level = 1 };
 
-    pub fn experienceToNextLevel(self: Progression) u16 {
-        return Levels[self.level - 1];
-    }
-};
-
-pub const Reward = struct {
-    /// A number of exp point for killing an enemy first time.
+    level: u4,
     experience: u16,
+
+    pub fn init(experience: u16) Experience {
+        return .{ .level = actualLevel(1, experience), .experience = experience };
+    }
+
+    pub inline fn reward(reward_exp: u16) Experience {
+        return .init(reward_exp * reward_denominator);
+    }
+
+    pub fn asReward(self: Experience) u16 {
+        return self.experience / reward_denominator;
+    }
+
+    pub fn add(self: *Experience, exp: u16) void {
+        self.experience +|= exp;
+        self.level = actualLevel(self.level, self.experience);
+    }
+
+    fn actualLevel(current_level: u4, total_experience: u16) u4 {
+        var level = current_level;
+        while (g.meta.Levels[level - 1] < total_experience) {
+            level += 1;
+        }
+        return level;
+    }
 };
 
 pub const SourceOfLight = struct {
@@ -289,7 +357,7 @@ pub const SourceOfLight = struct {
 };
 
 pub const Skills = struct {
-    pub const empty: Skills = .init(0, 0, 0, 0);
+    pub const zeros: Skills = .init(0, 0, 0, 0);
 
     values: std.enums.EnumArray(g.descriptions.Skills.Enum, i4),
 
@@ -311,7 +379,7 @@ pub const Skills = struct {
 };
 
 pub const Stats = struct {
-    pub const empty: Stats = .init(0, 0, 0, 0, 0);
+    pub const zeros: Stats = .init(0, 0, 0, 0, 0);
 
     strength: i4,
     dexterity: i4,
@@ -350,11 +418,11 @@ pub const Components = struct {
     animation: ?Animation = null,
     armor: ?Armor = null,
     consumable: ?Consumable = null,
-    damage: ?Damage = null,
     description: ?Description, // must be provided for every entity
     door: ?Door = null,
-    effect: ?Effect = null,
+    effects: ?Effects = null,
     equipment: ?Equipment = null,
+    experience: ?Experience = null,
     health: ?Health = null,
     initiative: ?Initiative = null,
     inventory: ?Inventory = null,
@@ -362,17 +430,15 @@ pub const Components = struct {
     pile: ?Pile = null,
     position: ?Position = null,
     price: ?Price = null,
-    progression: ?Progression = null,
     rarity: ?Rarity = null,
-    reward: ?Reward = null,
     shop: ?Shop = null,
     skills: ?Skills = null,
-    stats: ?Stats = null,
     source_of_light: ?SourceOfLight = null,
     speed: ?Speed = null,
     sprite: ?Sprite, // must be provided for every entity
     state: ?EnemyState = null,
+    stats: ?Stats = null,
     wallet: ?Wallet = null,
-    weight: ?Weight = null,
     weapon_class: ?WeaponClass = null,
+    weight: ?Weight = null,
 };

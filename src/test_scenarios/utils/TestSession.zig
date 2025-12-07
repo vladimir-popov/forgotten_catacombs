@@ -5,7 +5,7 @@ const TestRuntime = @import("TestRuntime.zig");
 const Inventory = @import("Inventory.zig");
 const Player = @import("Player.zig");
 
-const log = std.log.scoped(.test_session);
+pub const log = std.log.scoped(.test_session);
 
 const Self = @This();
 
@@ -21,6 +21,7 @@ pub fn initEmpty(self: *Self, gpa: std.mem.Allocator) !void {
     self.tmp_dir = std.testing.tmpDir(.{});
     self.arena = std.heap.ArenaAllocator.init(gpa);
     const arena_alloc = self.arena.allocator();
+    log.info("Test directory is {s}", .{try self.tmp_dir.dir.realpathAlloc(arena_alloc, ".")});
     self.runtime = try TestRuntime.init(arena_alloc, self.tmp_dir.dir);
     try self.render.init(arena_alloc, self.runtime.runtime(), g.DISPLAY_ROWS, g.DISPLAY_COLS);
     try self.session.initNew(
@@ -28,8 +29,8 @@ pub fn initEmpty(self: *Self, gpa: std.mem.Allocator) !void {
         std.testing.random_seed,
         self.runtime.runtime(),
         self.render,
-        .empty,
-        .empty,
+        .zeros,
+        .zeros,
     );
     self.player = .{ .test_session = self, .id = self.session.player };
     // because for optimization purpose we draw the horizontal line right in init method of the PlayMode

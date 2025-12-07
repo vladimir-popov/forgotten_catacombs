@@ -271,7 +271,7 @@ const Loading = struct {
 
                 try self.state.reading.beginObject();
                 _ = try self.state.reading.readKey("seed");
-                self.session.setSeed(try self.state.reading.read(u64));
+                self.session.seed = try self.state.reading.read(u64);
                 log.debug("A seed is {d}", .{self.session.seed});
 
                 _ = try self.state.reading.readKey("next_entity");

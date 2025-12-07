@@ -234,7 +234,7 @@ test "All descriptions should have lines with no more than 35 symbols" {
 /// Writes an actual name of the entity according to its "known" status in the journal
 /// to the `dest` buffer and returns a slice with result.
 pub fn printName(dest: []u8, journal: g.Journal, entity: g.Entity) ![]u8 {
-    return if (journal.isUnknownPotion(entity)) |color|
+    return if (journal.unknownPotionColor(entity)) |color|
         try std.fmt.bufPrint(dest, "A {t} potion", .{color})
     else if (journal.registry.get(entity, c.Description)) |description|
         try std.fmt.bufPrint(dest, "{s}", .{g.presets.Descriptions.values.get(description.preset).name})
@@ -242,44 +242,24 @@ pub fn printName(dest: []u8, journal: g.Journal, entity: g.Entity) ![]u8 {
         try std.fmt.bufPrint(dest, "Unknown", .{});
 }
 
-/// Builds an actual description of the entity, and writes it to the text_area.
-pub fn describe(
+pub fn describePlayer(
     alloc: std.mem.Allocator,
     journal: g.Journal,
-    entity: g.Entity,
+    player: g.Entity,
     text_area: *g.windows.TextArea,
 ) !void {
-    if (journal.registry.get4(entity, c.Progression, c.Skills, c.Stats, c.Equipment)) |tuple| {
-        try describePlayer(alloc, journal, tuple[0], tuple[1], tuple[2], tuple[3], text_area);
-        return;
+    if (journal.registry.get5(player, c.Experience, c.Health, c.Stats, c.Skills, c.Equipment)) |tuple| {
+        const experience, const health, const stats, const skills, const equipment = tuple;
+        try describeProgression(alloc, experience.level, experience.experience, text_area);
+        _ = try text_area.addEmptyLine(alloc);
+        try describeHealth(alloc, health, text_area);
+        _ = try text_area.addEmptyLine(alloc);
+        try describeEquipment(alloc, journal, equipment, text_area);
+        _ = try text_area.addEmptyLine(alloc);
+        try describeSkills(alloc, skills, text_area);
+        _ = try text_area.addEmptyLine(alloc);
+        try describeStats(alloc, stats, text_area);
     }
-    // Write the text of description at first:
-    try writeActualDescription(alloc, journal, entity, text_area);
-    _ = try text_area.addEmptyLine(alloc);
-    // Then write properties:
-    if (g.meta.isItem(journal.registry, entity)) {
-        try describeItem(alloc, journal, entity, text_area);
-    } else if (g.meta.isEnemy(journal.registry, entity)) |enemy_type| {
-        try describeEnemy(alloc, journal, entity, enemy_type, text_area);
-    }
-}
-
-fn describePlayer(
-    alloc: std.mem.Allocator,
-    journal: g.Journal,
-    progression: *const c.Progression,
-    skills: *const c.Skills,
-    stats: *const c.Stats,
-    equipment: *const c.Equipment,
-    text_area: *g.windows.TextArea,
-) !void {
-    try g.descriptions.describeProgression(alloc, progression.*, text_area);
-    _ = try text_area.addEmptyLine(alloc);
-    try describeEquipment(alloc, journal, equipment, text_area);
-    _ = try text_area.addEmptyLine(alloc);
-    try g.descriptions.describeSkills(alloc, skills, text_area);
-    _ = try text_area.addEmptyLine(alloc);
-    try g.descriptions.describeStats(alloc, stats, text_area);
 }
 
 /// Writes progression to a text area.
@@ -289,17 +269,31 @@ fn describePlayer(
 /// ```
 pub fn describeProgression(
     alloc: std.mem.Allocator,
-    progression: c.Progression,
+    level: u4,
+    experience: u16,
     text_area: *g.windows.TextArea,
 ) !void {
     var line = try text_area.addEmptyLine(alloc);
-    _ = try std.fmt.bufPrint(line, "Level: {d}", .{progression.level});
+    _ = try std.fmt.bufPrint(line, "Level: {d}", .{level});
     line = try text_area.addEmptyLine(alloc);
     _ = try std.fmt.bufPrint(
         line,
         "Experience: {d}/{d}",
-        .{ progression.experience, progression.experienceToNextLevel() },
+        .{ experience, g.meta.experienceToNextLevel(level) },
     );
+}
+
+/// Writes the current and maximal amount of health points to a text area.
+/// ```
+/// HP: {d}/{d}
+/// ```
+pub fn describeHealth(
+    alloc: std.mem.Allocator,
+    health: *const c.Health,
+    text_area: *g.windows.TextArea,
+) !void {
+    const line = try text_area.addEmptyLine(alloc);
+    _ = try std.fmt.bufPrint(line, "Health: {d}/{d}", .{ health.current, health.max });
 }
 
 /// Writes skills to a text area:
@@ -355,6 +349,25 @@ pub fn describeStats(
     _ = try std.fmt.bufPrint(line, "  Constitution:       {d}", .{stats.constitution});
 }
 
+/// Builds an actual description of the entity, and writes it to the text_area.
+/// **Note**, that to describe the player the `describePlayer` method should be used.
+pub fn describeEntity(
+    alloc: std.mem.Allocator,
+    journal: g.Journal,
+    entity: g.Entity,
+    text_area: *g.windows.TextArea,
+) !void {
+    // Write the text of description at first:
+    try writeActualDescription(alloc, journal, entity, text_area);
+    _ = try text_area.addEmptyLine(alloc);
+    // Then write properties:
+    if (g.meta.isItem(journal.registry, entity)) {
+        try describeItem(alloc, journal, entity, text_area);
+    } else if (g.meta.isEnemy(journal.registry, entity)) |enemy_type| {
+        try describeEnemy(alloc, journal, entity, enemy_type, text_area);
+    }
+}
+
 /// Writes the known description of an entity.
 /// Known and unknown items and enemies have different descriptions.
 fn writeActualDescription(
@@ -363,7 +376,7 @@ fn writeActualDescription(
     entity: g.Entity,
     text_area: *g.windows.TextArea,
 ) !void {
-    if (journal.isUnknownPotion(entity)) |color| {
+    if (journal.unknownPotionColor(entity)) |color| {
         var line = try text_area.addEmptyLine(alloc);
         _ = try std.fmt.bufPrint(line, "A swirling liquid of {t} color", .{color});
         line = try text_area.addEmptyLine(alloc);
@@ -386,14 +399,14 @@ pub fn describeItem(
     entity: g.Entity,
     text_area: *g.windows.TextArea,
 ) !void {
-    if (journal.registry.get(entity, c.Damage)) |damage| {
-        try describeDamage(alloc, damage, text_area, 0);
-    }
-    if (journal.isKnown(entity)) {
-        if (journal.registry.get(entity, c.Effect)) |effect| {
-            try describeEffect(alloc, effect, text_area, 0);
-        }
-    }
+    try describeEffects(
+        alloc,
+        journal,
+        entity,
+        if (g.meta.isWeapon(journal.registry, entity)) "Damage" else "Effects",
+        text_area,
+    );
+
     if (journal.registry.get(entity, c.SourceOfLight)) |light| {
         const line = try text_area.addEmptyLine(alloc);
         _ = try std.fmt.bufPrint(line, "Radius of light: {d}", .{light.radius});
@@ -401,6 +414,66 @@ pub fn describeItem(
     if (journal.registry.get(entity, c.Weight)) |weight| {
         const line = try text_area.addEmptyLine(alloc);
         _ = try std.fmt.bufPrint(line, "Weight: {d}", .{weight.value});
+    }
+}
+
+pub fn describeEquipment(
+    alloc: std.mem.Allocator,
+    journal: g.Journal,
+    equipment: *const c.Equipment,
+    text_area: *g.windows.TextArea,
+) !void {
+    var line = try text_area.addEmptyLine(alloc);
+    if (equipment.weapon) |weapon| {
+        @memcpy(line[0..16], "Equiped weapon: ");
+        _ = try printName(line[16..], journal, weapon);
+        try describeEffects(alloc, journal, weapon, "Damage", text_area);
+    } else {
+        _ = try std.fmt.bufPrint(line, "Equiped weapon: none", .{});
+    }
+    const light_id, const light_radius = g.meta.getLight(journal.registry, equipment);
+    if (light_id) |id| {
+        _ = try text_area.addEmptyLine(alloc);
+        line = try text_area.addEmptyLine(alloc);
+        @memcpy(line[0..17], "Source of light: ");
+        _ = try g.descriptions.printName(line[17..], journal, id);
+        line = try text_area.addEmptyLine(alloc);
+        _ = try std.fmt.bufPrint(line, "       distance: {d}", .{light_radius});
+    }
+}
+
+/// Example for known source or physical damage:
+/// ```
+/// <title>:
+/// <pad><effect_type> <min>-<max>
+/// ```
+/// Example for unknown source:
+/// ```
+/// <title>:
+/// <pad>?
+/// ```
+fn describeEffects(
+    alloc: std.mem.Allocator,
+    journal: g.Journal,
+    source: g.Entity,
+    title: []const u8, // Damage|Effects
+    text_area: *g.windows.TextArea,
+) !void {
+    if (journal.registry.get(source, c.Effects)) |effects| {
+        if (effects.len == 0 or journal.unknownPotionColor(source) != null) return;
+
+        const is_known_source = journal.isKnown(source);
+        var line = try text_area.addEmptyLine(alloc);
+        @memcpy(line[0..title.len], title);
+        line[title.len] = ':';
+
+        for (effects.items()) |effect| {
+            line = try text_area.addEmptyLine(alloc);
+            if (is_known_source or effect.effect_type == .physical)
+                _ = try std.fmt.bufPrint(line[2..], "{t} {d}-{d}", .{ effect.effect_type, effect.min, effect.max })
+            else
+                line[4] = '?';
+        }
     }
 }
 
@@ -413,16 +486,12 @@ pub fn describeEnemy(
 ) !void {
     if (journal.known_enemies.contains(enemy_type)) {
         if (journal.registry.get(enemy, c.Health)) |health| {
-            const line = try text_area.addEmptyLine(alloc);
-            _ = try std.fmt.bufPrint(line, "Health: {d}/{d}", .{ health.current, health.max });
+            try describeHealth(alloc, health, text_area);
         }
         if (journal.registry.get(enemy, c.Equipment)) |equipment| {
             try describeEquipment(alloc, journal, equipment, text_area);
-        } else if (journal.registry.get(enemy, c.Damage)) |damage| {
-            try describeDamage(alloc, damage, text_area, 0);
-            if (journal.registry.get(enemy, c.Effect)) |effect| {
-                try describeEffect(alloc, effect, text_area, 0);
-            }
+        } else {
+            try describeEffects(alloc, journal, enemy, "Damage", text_area);
         }
         if (journal.registry.get(enemy, c.Speed)) |speed| {
             _ = try text_area.addEmptyLine(alloc);
@@ -453,81 +522,33 @@ pub fn describeEnemy(
     }
 }
 
-pub fn describeEquipment(
-    alloc: std.mem.Allocator,
-    journal: g.Journal,
-    equipment: *const c.Equipment,
-    text_area: *g.windows.TextArea,
-) !void {
-    var line = try text_area.addEmptyLine(alloc);
-    if (equipment.weapon) |weapon| {
-        @memcpy(line[0..16], "Equiped weapon: ");
-        _ = try printName(line[16..], journal, weapon);
-        if (journal.registry.get(weapon, c.Damage)) |damage| {
-            try describeDamage(alloc, damage, text_area, 2);
-        }
-        if (journal.registry.get(weapon, c.Effect)) |effect| {
-            try describeEffect(alloc, effect, text_area, 2);
-        }
-    } else {
-        _ = try std.fmt.bufPrint(line, "Equiped weapon: none", .{});
-    }
-    const light_id, const light_radius = g.meta.getLight(journal.registry, equipment);
-    if (light_id) |id| {
-        _ = try text_area.addEmptyLine(alloc);
-        line = try text_area.addEmptyLine(alloc);
-        @memcpy(line[0..17], "Source of light: ");
-        _ = try g.descriptions.printName(line[17..], journal, id);
-        line = try text_area.addEmptyLine(alloc);
-        _ = try std.fmt.bufPrint(line, "       distance: {d}", .{light_radius});
-    }
-}
-
-fn describeDamage(
-    alloc: std.mem.Allocator,
-    damage: *const c.Damage,
-    text_area: *g.windows.TextArea,
-    pad: usize,
-) !void {
-    var line = try text_area.addEmptyLine(alloc);
-    _ = try std.fmt.bufPrint(line[pad..], "Damage: {t} {d}-{d}", .{ damage.damage_type, damage.min, damage.max });
-}
-
-fn describeEffect(
-    alloc: std.mem.Allocator,
-    effect: *const c.Effect,
-    text_area: *g.windows.TextArea,
-    pad: usize,
-) !void {
-    var line = try text_area.addEmptyLine(alloc);
-    _ = try std.fmt.bufPrint(line[pad..], "Effect: {t} {d}-{d}", .{ effect.effect_type, effect.min, effect.max });
-}
-
 test "Describe player" {
     // given:
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const alloc = arena.allocator();
-    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
     var registry = try g.Registry.init(alloc);
-    const journal = try g.Journal.init(alloc, &registry, prng.random());
+    const journal = try g.Journal.init(alloc, &registry, std.testing.random_seed);
     var text_area: g.windows.TextArea = .empty;
 
-    const player = try registry.addNewEntity(try g.entities.player(alloc, .empty, .empty));
+    const player = try registry.addNewEntity(try g.entities.player(alloc, .zeros, .zeros));
     const equipmen = registry.getUnsafe(player, c.Equipment);
     equipmen.weapon = try registry.addNewEntity(g.presets.Items.values.get(.torch).*);
 
     // when:
-    try describe(alloc, journal, player, &text_area);
+    try describePlayer(alloc, journal, player, &text_area);
 
     // then:
     try expectContent(text_area,
         \\Level: 1
         \\Experience: 0/500
         \\
+        \\Health: 30/30
+        \\
         \\Equiped weapon: Torch
-        \\  Damage: physical 2-3
-        \\  Effect: burning 1-1
+        \\Damage:
+        \\  physical 2-3
+        \\  burning 1-1
         \\
         \\Source of light: Torch
         \\       distance: 3
@@ -549,10 +570,9 @@ test "Describe player" {
 
 test "Describe an unknown rat" {
     // given:
-    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
     var registry = try g.Registry.init(std.testing.allocator);
     defer registry.deinit();
-    var journal = try g.Journal.init(std.testing.allocator, &registry, prng.random());
+    var journal = try g.Journal.init(std.testing.allocator, &registry, std.testing.random_seed);
     defer journal.deinit(std.testing.allocator);
 
     const id = try registry.addNewEntity(g.entities.rat(.{ .row = 1, .col = 1 }));
@@ -560,7 +580,7 @@ test "Describe an unknown rat" {
     defer text_area.deinit(std.testing.allocator);
 
     // when:
-    try describe(std.testing.allocator, journal, id, &text_area);
+    try describeEntity(std.testing.allocator, journal, id, &text_area);
 
     // then:
     try expectContent(text_area,
@@ -575,10 +595,9 @@ test "Describe an unknown rat" {
 
 test "Describe a known rat" {
     // given:
-    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
     var registry = try g.Registry.init(std.testing.allocator);
     defer registry.deinit();
-    var journal = try g.Journal.init(std.testing.allocator, &registry, prng.random());
+    var journal = try g.Journal.init(std.testing.allocator, &registry, std.testing.random_seed);
     defer journal.deinit(std.testing.allocator);
 
     const id = try registry.addNewEntity(g.entities.rat(.{ .row = 1, .col = 1 }));
@@ -587,7 +606,7 @@ test "Describe a known rat" {
     defer text_area.deinit(std.testing.allocator);
 
     // when:
-    try describe(std.testing.allocator, journal, id, &text_area);
+    try describeEntity(std.testing.allocator, journal, id, &text_area);
 
     // then:
     try expectContent(text_area,
@@ -596,7 +615,8 @@ test "Describe a known rat" {
         \\forgotten cellars.
         \\
         \\Health: 10/10
-        \\Damage: physical 1-3
+        \\Damage:
+        \\  physical 1-3
         \\
         \\Not too fast.
     );
@@ -604,10 +624,9 @@ test "Describe a known rat" {
 
 test "Describe a torch" {
     // given:
-    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
     var registry = try g.Registry.init(std.testing.allocator);
     defer registry.deinit();
-    var journal = try g.Journal.init(std.testing.allocator, &registry, prng.random());
+    var journal = try g.Journal.init(std.testing.allocator, &registry, std.testing.random_seed);
     defer journal.deinit(std.testing.allocator);
 
     const id = try registry.addNewEntity(g.presets.Items.values.get(.torch).*);
@@ -615,15 +634,16 @@ test "Describe a torch" {
     defer text_area.deinit(std.testing.allocator);
 
     // when:
-    try describe(std.testing.allocator, journal, id, &text_area);
+    try describeEntity(std.testing.allocator, journal, id, &text_area);
 
     // then:
     try expectContent(text_area,
         \\Wooden handle, cloth wrap, burning
         \\flame. Lasts until the fire dies.
         \\
-        \\Damage: physical 2-3
-        \\Effect: burning 1-1
+        \\Damage:
+        \\  physical 2-3
+        \\  burning 1-1
         \\Radius of light: 3
         \\Weight: 20
     );

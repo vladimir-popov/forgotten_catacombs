@@ -42,7 +42,8 @@ pub const Mode = union(enum) {
 arena: std.heap.ArenaAllocator,
 /// This seed should help to make all levels of a single game session reproducible.
 seed: u64,
-/// The PRNG initialized by the session's seed. This prng is used to make any dynamic decision by AI, or game events,
+/// The PRNG initialized with the current time.
+/// This prng should be used to make any dynamic decision by AI, or game events,
 /// and should not be used to generate any level objects, to keep the levels reproducible.
 prng: std.Random.DefaultPrng,
 ai: g.AI,
@@ -96,9 +97,9 @@ pub fn preInit(
         .events = g.events.EventBus.init(&self.arena),
         .seed = 0,
         .max_depth = 0,
-        .prng = std.Random.DefaultPrng.init(0),
+        .prng = std.Random.DefaultPrng.init(runtime.currentMillis()),
         .ai = g.AI{ .session = self, .rand = self.prng.random() },
-        .journal = try g.Journal.init(self.arena.allocator(), &self.registry, self.prng.random()),
+        .journal = undefined,
         .player = undefined,
         .level = undefined,
         .mode = undefined,
@@ -107,10 +108,12 @@ pub fn preInit(
 }
 
 /// This method is idempotent. It does the following:
+///  - initializes a journal;
 ///  - subscribes event handlers;
 ///  - puts the viewport around the player;
 ///  - switches the game session to the `play` mode.
 pub fn completeInitialization(self: *GameSession) !void {
+    self.journal = try g.Journal.init(self.arena.allocator(), &self.registry, self.seed);
     try self.events.subscribe(self.viewport.subscriber());
     try self.events.subscribe(self.subscriber());
     self.viewport.centeredAround(self.level.playerPosition().place);
@@ -132,7 +135,7 @@ pub fn initNew(
 ) !void {
     log.debug("Begin a new game session with seed {d}", .{seed});
     try self.preInit(gpa, runtime, render);
-    self.setSeed(seed);
+    self.seed = seed;
     self.player = try self.registry.addNewEntity(
         try g.entities.player(self.registry.allocator(), stats, skills),
     );
@@ -166,11 +169,6 @@ pub fn deinit(self: *GameSession) void {
     self.arena.deinit();
     self.* = undefined;
     log.debug("The game session is deinited", .{});
-}
-
-pub fn setSeed(self: *GameSession, seed: u64) void {
-    self.seed = seed;
-    self.prng.seed(seed);
 }
 
 pub fn switchModeToLoadingSession(self: *GameSession) !void {
