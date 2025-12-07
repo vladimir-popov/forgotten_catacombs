@@ -99,7 +99,7 @@ pub fn doTurn(self: *PlayMode, actor: g.Entity, action: g.actions.Action) !?g.ac
     defer log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
 
     // Do Actions
-    const actual_action, const mp = try g.actions.doAction(self.session, actor, action);
+    const actual_action, const mp = try self.session.actions.doAction(actor, action);
     log.info("Entity {d} spent {d} move points", .{ actor.id, mp });
     if (mp == 0) return actual_action;
 
@@ -301,7 +301,7 @@ pub fn updateQuickActions(self: *PlayMode) anyerror!void {
     while (itr.next()) |target| {
         self.target = target;
         log.debug("New target {d}", .{target.id});
-        if (g.actions.calculateQuickActionForTarget(self.session, target)) |qa| {
+        if (self.session.actions.calculateQuickActionForTarget(target)) |qa| {
             log.debug("Calculated action is {any}", .{qa});
             try self.quick_actions.actions.append(alloc, qa);
             if (qa.eql(selected_action)) {

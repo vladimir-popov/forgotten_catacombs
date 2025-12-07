@@ -7,6 +7,7 @@ const c = g.components;
 const p = g.primitives;
 const ecs = g.ecs;
 
+const ActionSystem = @import("ActionSystem.zig");
 pub const ExploreLevelMode = @import("game_modes/ExploreLevelMode.zig");
 pub const ExploreMode = @import("game_modes/ExploreMode.zig");
 pub const InventoryMode = @import("game_modes/InventoryMode.zig");
@@ -63,6 +64,8 @@ level: g.Level,
 max_depth: u8,
 /// The current mode of the game
 mode: Mode,
+///
+actions: ActionSystem,
 
 /// Two cases of initialization exists:
 ///  1. Creating a new Game Session;
@@ -84,6 +87,7 @@ pub fn preInit(
     render: g.Render,
 ) !void {
     self.* = .{
+        .actions = .{},
         .arena = std.heap.ArenaAllocator.init(game_arena_allocator),
         .runtime = runtime,
         .render = render,
@@ -222,7 +226,7 @@ pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
     try self.events.sendEvent(.{ .level_changed = .{ .by_ladder = by_ladder } });
 }
 
-pub fn entityDied(self: *GameSession, entity: g.Entity) !void {
+pub fn onEntityDied(self: *GameSession, entity: g.Entity) !void {
     if (entity.eql(self.player)) {
         log.info("Player is dead. Game is over.", .{});
         // return error for break the game loop:
@@ -236,6 +240,7 @@ pub fn entityDied(self: *GameSession, entity: g.Entity) !void {
     }
 }
 
+/// Handles events on the end of the `tick`
 fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
     const self: *GameSession = @ptrCast(@alignCast(ptr));
     switch (event) {
@@ -313,60 +318,4 @@ pub inline fn tick(self: *GameSession) !void {
         .trading => try self.mode.trading.tick(),
     }
     try self.events.notifySubscribers();
-}
-
-/// `true` means that the actor is dead
-pub fn drinkPotion(self: *GameSession, actor: g.Entity, potion_id: g.Entity) !bool {
-    if (self.registry.get(potion_id, c.Effect)) |effect| {
-        try self.journal.markPotionAsKnown(potion_id);
-        if (try self.applyEffect(actor, effect.*, actor)) return true;
-    }
-    // try to remove from the inventory
-    if (self.registry.get(actor, c.Inventory)) |inventory| {
-        _ = inventory.items.remove(potion_id);
-    }
-    // remove the potion
-    try self.registry.removeEntity(potion_id);
-    return false;
-}
-
-/// `true` means that entity is dead
-pub fn applyEffect(self: *GameSession, actor: g.Entity, effect: c.Effect, target: g.Entity) !bool {
-    if (effect.damage()) |damage| {
-        if (try self.doDamage(actor, damage, target)) return true;
-    } else if (effect.effect_type == .healing) {
-        const health = self.registry.getUnsafe(target, c.Health);
-        const value = self.prng.random().intRangeAtMost(u8, effect.min, effect.max);
-        health.current += value;
-        health.current = @min(health.max, health.current);
-        const is_blocked_animation = actor.eql(self.player) or target.eql(self.player);
-        try self.registry.set(target, c.Animation{ .preset = .healing, .is_blocked = is_blocked_animation });
-        log.debug("Entity {d} recovered up to {d} hp", .{ target.id, value });
-    }
-    return false;
-}
-
-/// `true` means that entity is dead
-pub fn doDamage(self: *GameSession, actor: g.Entity, damage: c.Damage, target: g.Entity) !bool {
-    const target_health = self.registry.get(target, c.Health) orelse {
-        log.err("Actor {d} doesn't have a Health component", .{target.id});
-        return error.NotEnoughComponents;
-    };
-    std.debug.assert(damage.min <= damage.max);
-    const value = self.prng.random().intRangeAtMost(u8, damage.min, damage.max);
-    const orig_health = target_health.current;
-    target_health.current -|= value;
-    log.debug(
-        "Entity {d} received {s} damage {d}. HP: {d} -> {d}",
-        .{ target.id, @tagName(damage.damage_type), value, orig_health, target_health.current },
-    );
-    if (target_health.current == 0) {
-        try self.entityDied(target);
-        return true;
-    } else {
-        // a special case to give to player a chance to notice what happened
-        const is_blocked_animation = actor.eql(self.player) or target.eql(self.player);
-        try self.registry.set(target, c.Animation{ .preset = .hit, .is_blocked = is_blocked_animation });
-        return false;
-    }
 }

@@ -15,6 +15,7 @@ pub const utils = @import("utils/utils_pkg.zig");
 pub const visibility = @import("visibility_strategies.zig");
 pub const windows = @import("windows/windows_pkg.zig");
 
+pub const Action = actions.Action;
 pub const AI = @import("AI.zig");
 pub const Button = @import("Button.zig");
 pub const CharacterBuilder = @import("CharacterBuilder.zig");
