@@ -89,3 +89,8 @@ pub fn statsFromArchetype(archetype: PlayerArchetype) c.Stats {
         .rogue => .init(-1, 2, 1, 0, -1),
     };
 }
+
+pub fn initialHealth(constitution: i4) c.Health {
+    const constitution_factor = (@as(f32, @floatFromInt(constitution)) * 0.6 + 4.4) / 4.0;
+    return .init(@intFromFloat(@round(constitution_factor * 20)));
+}

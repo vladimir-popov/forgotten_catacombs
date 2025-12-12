@@ -574,7 +574,7 @@ test "Describe player" {
     const journal = try g.Journal.init(alloc, &registry, std.testing.random_seed);
     var text_area: g.windows.TextArea = .empty;
 
-    const player = try registry.addNewEntity(try g.entities.player(alloc, .zeros, .zeros));
+    const player = try registry.addNewEntity(try g.entities.player(alloc, .zeros, .zeros, .init(30)));
     const equipmen = registry.getUnsafe(player, c.Equipment);
     equipmen.weapon = try registry.addNewEntity(g.presets.Items.values.get(.torch).*);
 

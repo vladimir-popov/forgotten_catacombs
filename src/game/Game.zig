@@ -75,7 +75,8 @@ pub fn initNewPreset(
     };
     try self.render.init(gpa, runtime, g.DISPLAY_ROWS, g.DISPLAY_COLS);
     try self.runtime.clearDisplay();
-    try self.startGameSession(g.meta.statsFromArchetype(archetype), skills);
+    const stats = g.meta.statsFromArchetype(archetype);
+    try self.startGameSession(stats, skills, g.meta.initialHealth(stats.constitution));
 }
 
 pub fn deinit(self: *Self) void {
@@ -104,7 +105,8 @@ pub fn tick(self: *Self) !void {
         .create_character => if (try self.runtime.readPushedButtons()) |btn| {
             if (try self.state.create_character.handleButton(btn, self.render)) |tuple| {
                 self.state.create_character.deinit();
-                try self.startGameSession(tuple[0], tuple[1]);
+                const stats, const skills, const health = tuple;
+                try self.startGameSession(stats, skills, health);
             } else {
                 try self.state.create_character.draw(self.render);
             }
@@ -156,7 +158,7 @@ fn newGame(ptr: *anyopaque, _: usize, _: void) !void {
     try self.state.create_character.draw(self.render);
 }
 
-fn startGameSession(self: *Self, stats: c.Stats, skills: c.Skills) !void {
+fn startGameSession(self: *Self, stats: c.Stats, skills: c.Skills, health: c.Health) !void {
     try self.deleteSessionFileIfExists();
     self.initSideMenu();
     self.state = .{ .game_session = undefined };
@@ -167,6 +169,7 @@ fn startGameSession(self: *Self, stats: c.Stats, skills: c.Skills) !void {
         self.render,
         stats,
         skills,
+        health,
     );
 }
 

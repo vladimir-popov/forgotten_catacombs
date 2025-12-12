@@ -118,6 +118,10 @@ pub const Health = struct {
     // The count of the current hp
     current: u8,
 
+    pub fn init(max: u8) Health {
+        return .{ .current = max, .max = max };
+    }
+
     pub fn add(self: *Health, value: u8) void {
         self.current += value;
         self.current = @min(self.current, self.max);

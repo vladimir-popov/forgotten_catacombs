@@ -31,6 +31,7 @@ pub fn initEmpty(self: *Self, gpa: std.mem.Allocator) !void {
         self.render,
         .zeros,
         .zeros,
+        .init(30),
     );
     self.player = .{ .test_session = self, .id = self.session.player };
     // because for optimization purpose we draw the horizontal line right in init method of the PlayMode

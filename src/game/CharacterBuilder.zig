@@ -101,11 +101,11 @@ const BuildingStep = union(enum) {
     /// ║   Level: {d}                          ▒║
     /// ║   Experience: {d}/{d}                 ░║
     /// ║                                       ░║
+    /// ║   Health: 30/30                       ░║
+    /// ║                                       ░║
     /// ║   Skills:                             ░║
     /// ║     Weapon Mastery:     2             ░║
     /// ║     Mechanics           0             ░║
-    /// ║     Stealth             0             ░║
-    /// ║     Echo of knowledge   0             ░║
     /// ║════════════════════════════════════════║
     /// ║                       Back    Play     ║
     /// ╚════════════════════════════════════════╝
@@ -113,10 +113,16 @@ const BuildingStep = union(enum) {
     confirm: struct {
         stats: c.Stats,
         skills: c.Skills,
+        health: c.Health,
         description: w.ScrollableAre(w.TextArea),
 
-        fn init(description: w.TextArea, stats: c.Stats, skills: c.Skills) @This() {
-            return .{ .description = .init(description, CONFIRM_AREA_REGION), .stats = stats, .skills = skills };
+        fn init(description: w.TextArea, stats: c.Stats, skills: c.Skills, health: c.Health) @This() {
+            return .{
+                .description = .init(description, CONFIRM_AREA_REGION),
+                .stats = stats,
+                .skills = skills,
+                .health = health,
+            };
         }
 
         fn deinit(self: *@This(), alloc: std.mem.Allocator) void {
@@ -185,18 +191,21 @@ fn initSkillsStep(
 }
 
 fn initConfirmStep(self: *Self, stats: c.Stats, skills: c.Skills) !void {
+    const health: c.Health = g.meta.initialHealth(stats.constitution);
     const alloc = self.arena.allocator();
     var text_area: w.TextArea = .empty;
     try g.descriptions.describeProgression(alloc, 1, 0, &text_area);
     _ = try text_area.addEmptyLine(alloc);
+    try g.descriptions.describeHealth(alloc, &health, &text_area);
+    _ = try text_area.addEmptyLine(alloc);
     try g.descriptions.describeSkills(alloc, &skills, &text_area);
     _ = try text_area.addEmptyLine(alloc);
     try g.descriptions.describeStats(alloc, &stats, &text_area);
-    self.step = .{ .confirm = .init(text_area, stats, skills) };
+    self.step = .{ .confirm = .init(text_area, stats, skills, health) };
 }
 
 /// Handles the button and return chosen stats and skills on null if they are not selected yet.
-pub fn handleButton(self: *Self, btn: g.Button, render: g.Render) anyerror!?struct { c.Stats, c.Skills } {
+pub fn handleButton(self: *Self, btn: g.Button, render: g.Render) anyerror!?struct { c.Stats, c.Skills, c.Health } {
     if (self.description) |*window| {
         if (try window.handleButton(btn)) {
             try window.hide(render, .fill_region);
@@ -267,7 +276,7 @@ pub fn handleButton(self: *Self, btn: g.Button, render: g.Render) anyerror!?stru
                         }
                     },
                     .confirm => |confirm_step| {
-                        return .{ confirm_step.stats, confirm_step.skills };
+                        return .{ confirm_step.stats, confirm_step.skills, confirm_step.health };
                     },
                 }
             },

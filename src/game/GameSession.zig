@@ -132,12 +132,13 @@ pub fn initNew(
     render: g.Render,
     stats: c.Stats,
     skills: c.Skills,
+    health: c.Health,
 ) !void {
     log.debug("Begin a new game session with seed {d}", .{seed});
     try self.preInit(gpa, runtime, render);
     self.seed = seed;
     self.player = try self.registry.addNewEntity(
-        try g.entities.player(self.registry.allocator(), stats, skills),
+        try g.entities.player(self.registry.allocator(), stats, skills, health),
     );
 
     // Creates the initial equipment of the player
