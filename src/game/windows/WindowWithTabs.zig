@@ -39,7 +39,6 @@ pub const CONTENT_AREA_REGION: p.Region = .{
 pub const Tab = struct {
     title: []const u8,
     area: w.ScrollableAre(w.OptionsArea(g.Entity)),
-    scrolled_lines: usize = 0,
 
     fn deinit(self: *Tab, alloc: std.mem.Allocator) void {
         self.area.deinit(alloc);

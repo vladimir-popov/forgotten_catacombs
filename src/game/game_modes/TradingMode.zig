@@ -194,6 +194,7 @@ fn actualPrice(self: Self, price: *const c.Price, for_buying: bool) u16 {
 
 fn updateBuyingTab(self: *Self) !void {
     const tab = self.buyingTab();
+    const selected_line = tab.area.content.selected_line;
     tab.area.content.clearRetainingCapacity();
     var itr = self.shop.items.iterator();
     while (itr.next()) |item_ptr| {
@@ -207,8 +208,8 @@ fn updateBuyingTab(self: *Self) !void {
         );
     }
     if (tab.area.content.options.items.len > 0) {
-        try tab.area.content.selectLine(if (tab.area.content.selected_line < tab.area.content.options.items.len)
-            tab.area.content.selected_line
+        try tab.area.content.selectLine(if (selected_line < tab.area.content.options.items.len)
+            selected_line
         else
             tab.area.content.options.items.len - 1);
     }
@@ -216,6 +217,7 @@ fn updateBuyingTab(self: *Self) !void {
 
 fn updateSellingTab(self: *Self) !void {
     const tab = self.sellingTab();
+    const selected_line = tab.area.content.selected_line;
     tab.area.content.clearRetainingCapacity();
     var itr = self.inventory.items.iterator();
     while (itr.next()) |item_ptr| {
@@ -229,8 +231,8 @@ fn updateSellingTab(self: *Self) !void {
         );
     }
     if (tab.area.content.options.items.len > 0) {
-        try tab.area.content.selectLine(if (tab.area.content.selected_line < tab.area.content.options.items.len)
-            tab.area.content.selected_line
+        try tab.area.content.selectLine(if (selected_line < tab.area.content.options.items.len)
+            selected_line
         else
             tab.area.content.options.items.len - 1);
     }

@@ -154,6 +154,7 @@ fn tabWithDrop(self: *Self) ?*w.WindowWithTabs.Tab {
 
 pub fn updateInventoryTab(self: *Self) !void {
     const tab = self.tabWithInventory();
+    const selected_line = tab.area.content.selected_line;
     tab.area.content.clearRetainingCapacity();
     var itr = self.inventory.items.iterator();
     while (itr.next()) |item_ptr| {
@@ -167,8 +168,8 @@ pub fn updateInventoryTab(self: *Self) !void {
         );
     }
     if (tab.area.content.options.items.len > 0) {
-        try tab.area.content.selectLine(if (tab.area.content.selected_line < tab.area.content.options.items.len)
-            tab.area.content.selected_line
+        try tab.area.content.selectLine(if (selected_line < tab.area.content.options.items.len)
+            selected_line
         else
             tab.area.content.options.items.len - 1);
     }
@@ -277,6 +278,7 @@ fn addDropTab(self: *Self, drop: g.Entity) !void {
 fn updateDropTab(self: *Self, drop: g.Entity) !void {
     self.drop = drop;
     const tab = &self.main_window.tabs[1];
+    const selected_line = tab.area.content.selected_line;
     tab.area.content.clearRetainingCapacity();
     if (self.session.registry.get(drop, c.Pile)) |pile| {
         var itr = pile.items.iterator();
@@ -287,8 +289,8 @@ fn updateDropTab(self: *Self, drop: g.Entity) !void {
         try self.addDropOption(tab, drop);
     }
     if (tab.area.content.options.items.len > 0) {
-        try tab.area.content.selectLine(if (tab.area.content.selected_line < tab.area.content.options.items.len)
-            tab.area.content.selected_line
+        try tab.area.content.selectLine(if (selected_line < tab.area.content.options.items.len)
+            selected_line
         else
             tab.area.content.options.items.len - 1);
     }
