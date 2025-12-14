@@ -148,9 +148,9 @@ test "Describe a known enemy (after killing a similar creature)" {
         \\│ forgotten cellars.                  ░│
         \\│                                     ░│
         \\│ Health: 10/10                       ░│
+        \\│                                     ░│
         \\│ Damage:                             ░│
         \\│   physical 1-3                      ░│
-        \\│                                     ░│
         \\└──────────────────────────────────────┘
     , .game_area);
 }

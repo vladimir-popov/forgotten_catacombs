@@ -104,28 +104,11 @@ pub fn trader(
     seed: u64,
 ) !c.Components {
     var shop = try c.Shop.empty(registry.allocator(), price_multiplier, balance);
-    try fillShop(&shop, registry, seed);
+    try g.meta.fillShop(&shop, registry, seed);
     return .{
         .position = .{ .place = place, .zorder = .obstacle },
         .sprite = .{ .codepoint = cp.human },
         .description = .{ .preset = .traider },
         .shop = shop,
     };
-}
-
-pub fn fillShop(shop: *c.Shop, registry: *g.Registry, seed: u64) !void {
-    var prng = std.Random.DefaultPrng.init(seed);
-    const rand = prng.random();
-    const count = rand.uintAtMost(usize, 5) + 10;
-    var proportions: [g.presets.Items.values.values.len]u8 = undefined;
-    var i: usize = 0;
-    var itr = g.presets.Items.iterator();
-    while (itr.next()) |item| {
-        proportions[i] = @intFromEnum(item.rarity.?);
-        i += 1;
-    }
-    for (0..count) |_| {
-        const item = g.presets.Items.values.values[rand.weightedIndex(u8, &proportions)];
-        try shop.items.add(try registry.addNewEntity(item.*));
-    }
 }

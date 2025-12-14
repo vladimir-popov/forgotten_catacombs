@@ -94,7 +94,7 @@ test "Use torch as a weapon" {
     , .game_area);
 }
 
-test "Drink healing potion" {
+test "Drink a healing potion" {
     var test_session: TestSession = undefined;
     try test_session.initEmpty(std.testing.allocator);
     defer test_session.deinit();

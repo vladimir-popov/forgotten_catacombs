@@ -63,6 +63,8 @@ player: g.Entity,
 level: g.Level,
 /// The deepest achieved level
 max_depth: u8,
+/// How many turns have passed
+spent_turns: u32,
 /// The current mode of the game
 mode: Mode,
 ///
@@ -97,6 +99,7 @@ pub fn preInit(
         .events = g.events.EventBus.init(&self.arena),
         .seed = 0,
         .max_depth = 0,
+        .spent_turns = 0,
         .prng = std.Random.DefaultPrng.init(runtime.currentMillis()),
         .ai = g.AI{ .session = self, .rand = self.prng.random() },
         .journal = undefined,
@@ -230,9 +233,9 @@ pub fn onEntityDied(self: *GameSession, entity: g.Entity) !void {
         log.info("Player is dead. Game is over.", .{});
         // return error for break the game loop:
         return error.GameOver;
-    } else {
+    } else if (g.meta.isEnemy(&self.registry, entity)) |enemy_type| {
         log.debug("NPC {d} is dead", .{entity.id});
-        try self.journal.markEnemyAsKnown(entity);
+        try self.journal.markEnemyAsKnown(enemy_type);
         try self.registry.removeEntity(entity);
         try self.level.removeEntity(entity);
         try self.events.sendEvent(.{ .entity_died = entity });
@@ -243,6 +246,12 @@ pub fn onEntityDied(self: *GameSession, entity: g.Entity) !void {
 fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
     const self: *GameSession = @ptrCast(@alignCast(ptr));
     switch (event) {
+        .player_turn_completed => {
+            self.spent_turns += event.player_turn_completed.spent_move_points;
+            if (self.spent_turns % 10 == 0) {
+                try self.journal.onTurnCompleted();
+            }
+        },
         .mode_changed => |new_mode| switch (new_mode) {
             .to_play => |args| {
                 try self.switchModeToPlay(args.entity_in_focus);

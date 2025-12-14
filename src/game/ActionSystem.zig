@@ -66,8 +66,8 @@ pub fn doAction(self: *Self, actor: g.Entity, action: g.Action) !struct { ?g.Act
     };
     switch (action) {
         .do_nothing => return .{ null, 0 },
-        .drink => |potion_id| {
-            try self.drinkPotion(actor, potion_id);
+        .drink => |potion_id| if (g.meta.isPotion(&self.session().registry, potion_id)) |potion_type| {
+            try self.drinkPotion(actor, potion_id, potion_type);
         },
         .open_inventory => {
             try self.session().manageInventory();
@@ -341,12 +341,12 @@ fn applyDamage(
     }
 }
 
-fn drinkPotion(self: *Self, actor: g.Entity, potion_id: g.Entity) !void {
+fn drinkPotion(self: *Self, actor: g.Entity, potion_id: g.Entity, potion_type: g.meta.PotionType) !void {
     if (self.session().registry.get(potion_id, c.Effects)) |effects| {
         for (effects.items()) |effect| {
             if (self.session().registry.get(actor, c.Health)) |health| {
                 const armor = self.session().registry.get(actor, c.Armor) orelse &c.Armor.zeros;
-                try self.session().journal.markPotionAsKnown(potion_id);
+                try self.session().journal.markPotionAsKnown(potion_type);
                 const is_actor_dead = try self.applyEffect(actor, potion_id, effect, actor, armor, health);
                 if (is_actor_dead) break;
             }

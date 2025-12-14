@@ -33,6 +33,10 @@ pub const ModeChanged = union(enum) {
     to_play: struct { entity_in_focus: ?g.Entity, action: ?g.actions.Action },
 };
 
+pub const PlayerTurnCompleted = struct {
+    spent_move_points: u8,
+};
+
 pub const Event = union(enum) {
     const Tag = @typeInfo(Event).@"union".tag_type.?;
 
@@ -40,6 +44,7 @@ pub const Event = union(enum) {
     entity_moved: EntityMoved,
     entity_died: g.Entity,
     mode_changed: ModeChanged,
+    player_turn_completed: PlayerTurnCompleted,
 
     pub fn get(self: Event, comptime tag: Tag) ?std.meta.TagPayload(Event, tag) {
         switch (self) {

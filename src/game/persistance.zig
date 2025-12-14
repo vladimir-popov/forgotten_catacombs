@@ -416,6 +416,7 @@ test "All components should be serializable" {
         .initiative = c.Initiative{ .move_points = 5 },
         .inventory = inventory,
         .ladder = c.Ladder{ .id = .{ .id = 2 }, .direction = .down, .target_ladder = .{ .id = 3 } },
+        .modification = c.Modification.init(.{ .burning = -3 }),
         .pile = pile,
         .price = .{ .value = 100 },
         .position = c.Position{ .place = p.Point.init(12, 42), .zorder = .item },

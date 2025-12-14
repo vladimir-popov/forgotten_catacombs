@@ -219,6 +219,11 @@ pub const Effect = struct {
     pub fn healing(min: u8, max: u8) Effect {
         return .{ .effect_type = .healing, .min = min, .max = max };
     }
+
+    pub fn modify(self: *Effect, modificator: i8) void {
+        self.min = @max(0, modificator + @as(i8, @intCast(self.min)));
+        self.max = @max(0, modificator + @as(i8, @intCast(self.max)));
+    }
 };
 
 pub const Effects = struct {
@@ -255,6 +260,36 @@ pub const Effects = struct {
         }
         try reader.endCollection();
         return self;
+    }
+};
+
+pub const Modification = struct {
+    modificators: std.EnumMap(Effect.Type, i8),
+
+    /// Example:
+    /// ```
+    /// .init(.{ .burning = -3 }, true);
+    /// ```
+    pub fn init(modificators: std.enums.EnumFieldStruct(Effect.Type, i8, 0)) Modification {
+        return .{ .modificators = .initFullWithDefault(0, modificators) };
+    }
+
+    pub fn applyTo(self: Modification, effects: *Effects) void {
+        for (0..effects.len) |i| {
+            if (self.modificators.get(effects.buffer[i].effect_type)) |modificator| {
+                if (modificator != 0)
+                    effects.buffer[i].modify(modificator);
+            }
+        }
+    }
+
+    pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
+        _ = try writer.write("Modificators{ ");
+        const effect_types = std.enums.values(Effect.Type);
+        for (effect_types) |effect_type| {
+            try writer.print(" {t}={d} ", .{ effect_type, self.modificators.get(effect_type) orelse 0 });
+        }
+        _ = try writer.write(" }");
     }
 };
 
@@ -431,6 +466,7 @@ pub const Components = struct {
     initiative: ?Initiative = null,
     inventory: ?Inventory = null,
     ladder: ?Ladder = null,
+    modification: ?Modification = null,
     pile: ?Pile = null,
     position: ?Position = null,
     price: ?Price = null,

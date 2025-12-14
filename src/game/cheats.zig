@@ -18,20 +18,17 @@ pub const Cheat = union(enum) {
     /// Prints to log a Dijkstra map
     dump_vector_field,
 
+    // Moves the player to the point on the screen.
+    goto: p.Point,
+
     /// Moves the player to a ladder lead to an upper level.
     move_player_to_ladder_up,
 
     /// Moves the player to a ladder lead to an lower level.
     move_player_to_ladder_down,
 
-    /// Replaces a current visibility strategy to "show all"
-    turn_light_on,
-
-    /// Replaces a current visibility strategy to appropriate for a current level.
-    turn_light_off,
-
-    // Moves the player to the point on the screen.
-    goto: p.Point,
+    /// Adds entity id to the journal
+    recognize: g.Entity,
 
     /// Sets up a passed count of health point to the player.
     set_health: u8,
@@ -45,6 +42,12 @@ pub const Cheat = union(enum) {
     /// Switches the game to the Trading mode with a special debug trader.
     /// By default the trader has arbitrary number of random items to sell.
     trade,
+
+    /// Replaces a current visibility strategy to "show all"
+    turn_light_on,
+
+    /// Replaces a current visibility strategy to appropriate for a current level.
+    turn_light_off,
 
     pub fn init(tag: Tag, args: []const u8) ?Cheat {
         switch (tag) {
@@ -61,6 +64,14 @@ pub const Cheat = union(enum) {
                     \\It expects a number of the target row and a number of the target column
                     \\in the dungeon's coordinates.
                 ,
+                    .{args},
+                );
+            },
+            .recognize => if (tryParseDecimal(u32, args)) |entity_id| {
+                return .{ .recognize = .{ .id = entity_id } };
+            } else {
+                log.warn(
+                    "Wrong arguments '{s}' for 'recognize' command. It expects an entity id.",
                     .{args},
                 );
             },
@@ -119,6 +130,7 @@ pub const Cheat = union(enum) {
                 .goto => "goto",
                 .move_player_to_ladder_down => "down ladder",
                 .move_player_to_ladder_up => "up ladder",
+                .recognize => "recognize",
                 .set_health => "set health",
                 .set_money => "set money",
                 .trade => "trade",
@@ -172,7 +184,7 @@ pub const Cheat = union(enum) {
                     global_debug_shop = try session.arena.allocator().create(c.Shop);
                 }
                 global_debug_shop.?.* = try c.Shop.empty(session.arena.allocator(), 1.0, 200);
-                try g.entities.fillShop(global_debug_shop.?, &session.registry, 0);
+                try g.meta.fillShop(global_debug_shop.?, &session.registry, session.prng.next());
                 return .{ .trade = global_debug_shop.? };
             },
             else => return null,

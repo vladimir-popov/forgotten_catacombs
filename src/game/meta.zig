@@ -3,6 +3,8 @@ const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
 
+const log = std.log.scoped(.meta);
+
 pub const PotionType = g.descriptions.Potions.Enum;
 pub const EnemyType = g.descriptions.Enemies.Enum;
 pub const PlayerArchetype = g.descriptions.Archetypes.Enum;
@@ -93,4 +95,49 @@ pub fn statsFromArchetype(archetype: PlayerArchetype) c.Stats {
 pub fn initialHealth(constitution: i4) c.Health {
     const constitution_factor = (@as(f32, @floatFromInt(constitution)) * 0.6 + 4.4) / 4.0;
     return .init(@intFromFloat(@round(constitution_factor * 20)));
+}
+
+/// Algorithm of filling a shop:
+/// 1. Build a weighted index for all defined in `g.entities.Items` items according to their rarity;
+/// 2. Randomly choose a count of items in the shop: [10, 15]
+/// 3. Randomly get items
+///    3.1. If the item is a weapon, add a random modification with 20% chance.
+pub fn fillShop(shop: *c.Shop, registry: *g.Registry, seed: u64) !void {
+    var prng = std.Random.DefaultPrng.init(seed);
+    const rand = prng.random();
+    const count = rand.uintAtMost(usize, 5) + 10;
+    // Build a weighted index for all items according to their rarity:
+    var proportions: [g.presets.Items.values.values.len]u8 = undefined;
+    var i: usize = 0;
+    var itr = g.presets.Items.iterator();
+    while (itr.next()) |item| {
+        proportions[i] = @intFromEnum(item.rarity.?);
+        i += 1;
+    }
+    for (0..count) |_| {
+        // Choose an item for the shop using the weighted index:
+        const item = g.presets.Items.values.values[rand.weightedIndex(u8, &proportions)];
+        const entity = try registry.addNewEntity(item.*);
+        // Randomly modify a weapon:
+        if (item.weapon_class != null and rand.uintAtMost(u8, 100) < 15) {
+            try modifyWeapon(registry, rand, entity);
+        }
+        try shop.items.add(entity);
+    }
+}
+
+fn modifyWeapon(registry: *g.Registry, rand: std.Random, weapon: g.Entity) !void {
+    try registry.set(weapon, c.Sprite{ .codepoint = g.codepoints.weapon_melee_unknown });
+    var modification: c.Modification = .{ .modificators = .initFull(0) };
+    var weighted_index: [c.Effect.TypesCount]u8 = undefined;
+    @memset(&weighted_index, 0);
+    weighted_index[@intFromEnum(c.Effect.Type.physical)] = 20;
+    weighted_index[@intFromEnum(c.Effect.Type.burning)] = 8;
+    weighted_index[@intFromEnum(c.Effect.Type.poisoning)] = 10;
+    weighted_index[@intFromEnum(c.Effect.Type.corrosion)] = 5;
+    const effect_type = rand.weightedIndex(u8, &weighted_index);
+    const value = rand.intRangeAtMost(i8, -5, 5);
+    modification.modificators.values[effect_type] = if (value == 0) -5 else value;
+    log.debug("{f} for {d}", .{ modification, weapon.id });
+    try registry.set(weapon, modification);
 }

@@ -97,4 +97,14 @@ pub const Weapons = struct {
         .effects = .init(&.{ .physical(2, 3), .burning(1, 1) }),
         .weapon_class = .primitive,
     }),
+
+    poisoned_dagger: c.Components = archetype.weapon(.{
+        .description = .{ .preset = .dagger },
+        .rarity = .rare,
+        .sprite = .{ .codepoint = cp.weapon_melee },
+        .weight = .{ .value = 50 },
+        .price = .{ .value = 50 },
+        .effects = .init(&.{ .physical(2, 3), .poisoning(1, 3) }),
+        .weapon_class = .tricky,
+    }),
 };

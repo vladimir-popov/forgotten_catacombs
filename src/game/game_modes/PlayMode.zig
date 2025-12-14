@@ -105,6 +105,7 @@ pub fn doTurn(self: *PlayMode, actor: g.Entity, action: g.actions.Action) !?g.ac
 
     // Handle Initiative
     if (self.is_player_turn) {
+        try self.session.events.sendEvent(.{ .player_turn_completed = .{ .spent_move_points = mp } });
         var itr = self.session.registry.query(c.Initiative);
         while (itr.next()) |tuple| {
             tuple[1].move_points += mp;
@@ -178,6 +179,15 @@ fn handleInput(self: *PlayMode) !?g.actions.Action {
             .set_health => |hp| {
                 if (self.session.registry.get(self.session.player, c.Health)) |health| {
                     health.current = hp;
+                }
+            },
+            .recognize => |entity| {
+                if (g.meta.isEnemy(&self.session.registry, entity)) |enemy_type| {
+                    try self.session.journal.markEnemyAsKnown(enemy_type);
+                } else if (g.meta.isPotion(&self.session.registry, entity)) |potion_type| {
+                    try self.session.journal.markPotionAsKnown(potion_type);
+                } else {
+                    try self.session.journal.markWeaponAsKnown(entity);
                 }
             },
             else => if (try cheat.toAction(self.session)) |action| {

@@ -29,8 +29,9 @@ pub const std_options: std.Options = .{
         // .{ .scope = .render, .level = .warn },
         // .{ .scope = .save_load_mode, .level = .debug },
         // .{ .scope = .visibility, .level = .debug },
+        .{ .scope = .meta, .level = .debug },
         .{ .scope = .journal, .level = .debug },
-        .{ .scope = .windows, .level = .debug },
+        // .{ .scope = .windows, .level = .debug },
     },
 };
 
