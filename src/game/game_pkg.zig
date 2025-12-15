@@ -40,6 +40,10 @@ pub const presets = struct {
     pub const Items = utils.Preset(components.Components, entities.Items);
 };
 
+/// How many move points should spent player to increase a turns counter
+pub const MOVE_POINTS_IN_TURN = 10;
+
+/// A delay between frames of animation
 pub const RENDER_DELAY_MS = 200;
 
 // Playdate display resolution px:

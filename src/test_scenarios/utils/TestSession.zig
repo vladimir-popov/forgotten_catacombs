@@ -77,6 +77,8 @@ pub fn printDisplay(self: Self) void {
 }
 
 /// Emulates pressing a button and ticks one time.
+/// Note, this method do not ticks until the next player's turn.
+/// Invoke explicitly `completeRound` between pressing buttons more than once.
 pub fn pressButton(self: *Self, button: g.Button.GameButton) !void {
     log.debug("Emulate pressing button {any}", .{button});
     try self.runtime.pushed_buttons.append(self.arena.allocator(), .{ .game_button = button, .state = .released });

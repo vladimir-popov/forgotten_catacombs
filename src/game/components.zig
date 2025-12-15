@@ -132,7 +132,7 @@ pub const Speed = struct {
     /// How many move points are needed for moving on the neighbor position
     move_points: u8,
 
-    pub const default: Speed = .{ .move_points = 10 };
+    pub const default: Speed = .{ .move_points = g.MOVE_POINTS_IN_TURN };
 };
 
 pub const Pile = struct {

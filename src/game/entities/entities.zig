@@ -14,7 +14,7 @@ pub fn player(alloc: std.mem.Allocator, stats: c.Stats, skills: c.Skills, health
         .sprite = .{ .codepoint = cp.human },
         .description = .{ .preset = .player },
         .health = health,
-        .speed = .{ .move_points = 10 },
+        .speed = .{ .move_points = g.MOVE_POINTS_IN_TURN },
         .equipment = .nothing,
         .inventory = try c.Inventory.empty(alloc),
         .experience = .zero,
