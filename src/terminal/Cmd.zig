@@ -12,7 +12,7 @@ pub fn Cmd(comptime cols: u8) type {
     return struct {
         const Self = @This();
 
-        buffer: DisplayBuffer(1, cols),
+        display_buffer: DisplayBuffer(1, cols),
         /// The position of the cursor in the **buffer**.
         /// 0 means the position of the prompt ':'.
         /// The command line should be hidden if this index is 0.
@@ -24,26 +24,28 @@ pub fn Cmd(comptime cols: u8) type {
         suggestion_idx: u8 = 0,
 
         pub fn init(alloc: std.mem.Allocator) !Self {
-            return .{ .buffer = try DisplayBuffer(1, cols).init(alloc) };
+            return .{ .display_buffer = try DisplayBuffer(1, cols).init(alloc) };
         }
 
         pub fn deinit(self: Self) void {
-            self.buffer.deinit();
+            self.display_buffer.deinit();
         }
 
         pub fn cleanCmd(self: *Self) void {
             self.cursor_idx = 1;
-            self.buffer.setSymbol(prompt, 0, 0, .normal);
+            self.display_buffer.setSymbol(prompt, 0, 0, .normal);
             self.cleanBufferAfterCursor();
         }
 
         inline fn cleanBufferAfterCursor(self: *Self) void {
-            for (self.cursor_idx..self.buffer.cols) |col| {
-                self.buffer.setSymbol(' ', 0, col, .normal);
+            for (self.cursor_idx..self.display_buffer.cols) |col| {
+                self.display_buffer.setSymbol(' ', 0, col, .normal);
             }
-            self.buffer.setSymbol(' ', 0, self.cursor_idx, .inverted);
+            self.display_buffer.setSymbol(' ', 0, self.cursor_idx, .inverted);
         }
 
+        /// Returns either a parsed cheat, or null.
+        /// Reading will be continued until the `cursor_idx` become 0.
         pub fn readCheat(self: *Self) !?g.Cheat {
             if (tty.KeyboardAndMouse.readPressedButton()) |key| {
                 switch (key) {
@@ -56,7 +58,7 @@ pub fn Cmd(comptime cols: u8) type {
                         .BACKSPACE => if (self.cursor_idx > 0) {
                             self.cursor_idx -= 1;
                             self.suggestion_idx = 0;
-                            self.buffer.setSymbol(' ', 0, self.cursor_idx, .inverted);
+                            self.display_buffer.setSymbol(' ', 0, self.cursor_idx, .inverted);
                         },
                         .TAB => {
                             if (self.suggestion_idx < self.suggestions.len - 1)
@@ -68,12 +70,13 @@ pub fn Cmd(comptime cols: u8) type {
                             // read entered part
                             var buf: [cols]u8 = undefined;
                             for (0..self.cursor_idx) |col| {
-                                buf[col] = @truncate(self.buffer.lines[0][col + 1].symbol);
+                                buf[col] = @truncate(self.display_buffer.lines[0][col + 1].symbol);
                             }
                             var buf_len = self.cursor_idx - 1;
                             // read suggested part
-                            while (buf_len + 1 < cols and self.buffer.lines[0][buf_len + 1].mode == .inverted) {
-                                buf[buf_len] = @truncate(self.buffer.lines[0][buf_len + 1].symbol);
+                            while (buf_len + 1 < cols and self.display_buffer.lines[0][buf_len + 1].mode == .inverted) {
+                                // only ascii symbols can be read
+                                buf[buf_len] = @truncate(self.display_buffer.lines[0][buf_len + 1].symbol);
                                 buf_len += 1;
                             }
                             if (g.Cheat.parse(buf[0..buf_len])) |cheat| {
@@ -84,15 +87,16 @@ pub fn Cmd(comptime cols: u8) type {
                                 self.cursor_idx = 0;
                                 self.suggestion_idx = 0;
                                 return cheat;
-                            } else if (self.buffer.lines[0][self.cursor_idx].mode == .inverted) {
-                                // just apply suggestion and continue entering the args for the cheat
-                                while (self.buffer.lines[0][self.cursor_idx].mode == .inverted) {
-                                    self.buffer.lines[0][self.cursor_idx].mode = .normal;
+                            } else if (self.display_buffer.lines[0][self.cursor_idx].mode == .inverted) {
+                                // just apply suggestion (change highlighting) 
+                                // and continue entering the args for the cheat
+                                while (self.display_buffer.lines[0][self.cursor_idx].mode == .inverted) {
+                                    self.display_buffer.lines[0][self.cursor_idx].mode = .normal;
                                     self.cursor_idx += 1;
                                 }
-                                self.buffer.setSymbol(' ', 0, self.cursor_idx, .normal);
+                                self.display_buffer.setSymbol(' ', 0, self.cursor_idx, .normal);
                                 self.cursor_idx += 1;
-                                self.buffer.setSymbol(' ', 0, self.cursor_idx, .inverted);
+                                self.display_buffer.setSymbol(' ', 0, self.cursor_idx, .inverted);
                                 return null;
                             } else {
                                 self.cursor_idx = 0;
@@ -102,11 +106,11 @@ pub fn Cmd(comptime cols: u8) type {
                         },
                         else => {},
                     },
-                    .char => |ch| if (self.cursor_idx < self.buffer.cols - 1) {
-                        self.buffer.setSymbol(ch.char, 0, self.cursor_idx, .normal);
+                    .char => |ch| if (self.cursor_idx < self.display_buffer.cols - 1) {
+                        self.display_buffer.setSymbol(ch.char, 0, self.cursor_idx, .normal);
                         self.cursor_idx += 1;
-                        if (self.cursor_idx < self.buffer.cols - 1)
-                            self.buffer.setSymbol(' ', 0, self.cursor_idx, .inverted);
+                        if (self.cursor_idx < self.display_buffer.cols - 1)
+                            self.display_buffer.setSymbol(' ', 0, self.cursor_idx, .inverted);
                     },
                     else => {},
                 }
@@ -123,7 +127,7 @@ pub fn Cmd(comptime cols: u8) type {
         fn findSuggestion(self: Self, idx: usize) ?u8 {
             var buf: [cols]u8 = undefined;
             for (0..self.cursor_idx) |col| {
-                buf[col] = @truncate(self.buffer.lines[0][col + 1].symbol);
+                buf[col] = @truncate(self.display_buffer.lines[0][col + 1].symbol);
             }
             var i: usize = idx;
             while (true) {
@@ -150,9 +154,9 @@ pub fn Cmd(comptime cols: u8) type {
         fn showSuggestion(self: Self, suggestion: []const u8) void {
             for (self.cursor_idx..cols) |i| {
                 if (i <= suggestion.len) {
-                    self.buffer.setSymbol(suggestion[i - 1], 0, i, .inverted);
+                    self.display_buffer.setSymbol(suggestion[i - 1], 0, i, .inverted);
                 } else {
-                    self.buffer.setSymbol(' ', 0, i, .normal);
+                    self.display_buffer.setSymbol(' ', 0, i, .normal);
                 }
             }
         }

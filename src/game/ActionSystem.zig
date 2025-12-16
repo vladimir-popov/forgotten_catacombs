@@ -70,7 +70,7 @@ pub fn onTurnCompleted(self: *Self) !void {
         const entity, const hunger = tuple;
         hunger.turns_after_eating +|= 1;
         const turns_to_damage: u8 = switch (hunger.level()) {
-            .mild_exhaustion => 0,
+            .well_fed => 0,
             .hunger => 8,
             .severe_hunger => 5,
             .critical_starvation => 3,

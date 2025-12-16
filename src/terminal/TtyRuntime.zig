@@ -124,13 +124,21 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             handleWindowResize(0);
             while (!self.is_exit) {
                 if (self.menu.is_shown) {
-                    try self.menu.buffer.writeBuffer(&stdout.interface, rows_pad, cols_pad + (display_cols - menu_cols));
+                    try self.menu.buffer.writeBuffer(
+                        &stdout.interface,
+                        rows_pad,
+                        cols_pad + (display_cols - menu_cols),
+                    );
                     if (try readPushedButtons(self)) |btn| {
                         try self.menu.handleKeyboardButton(btn);
                     }
                 } else if (self.cmd.cursor_idx > 0) {
                     self.cheat = try self.cmd.readCheat();
-                    try self.cmd.buffer.writeBuffer(&stdout.interface, rows_pad + display_rows - 2, cols_pad + 1);
+                    try self.cmd.display_buffer.writeBuffer(
+                        &stdout.interface,
+                        rows_pad + display_rows - 2,
+                        cols_pad + 1,
+                    );
                 } else {
                     try game.tick();
                     try self.buffer.writeBuffer(&stdout.interface, rows_pad, cols_pad);

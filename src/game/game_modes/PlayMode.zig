@@ -170,6 +170,10 @@ fn handleInput(self: *PlayMode) !?g.actions.Action {
     if (self.session.runtime.popCheat()) |cheat| {
         log.info("Run cheat {any}", .{cheat});
         switch (cheat) {
+            .dump_entity => |entity| {
+                const components = try self.session.registry.entityToStruct(entity);
+                log.info("Components of the entity {d}:\n{f}", .{ entity.id, components });
+            },
             .dump_vector_field => g.utils.DijkstraMap.dumpToLog(
                 self.session.level.dijkstra_map,
                 self.session.viewport.region,

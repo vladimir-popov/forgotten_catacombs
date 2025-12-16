@@ -104,7 +104,7 @@ pub const Ladder = struct {
         };
     }
 
-    pub fn format(self: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+    pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
         try writer.print(
             "Ladder(id: {d}; direction: {s}; target: {d})",
             .{ self.id.id, @tagName(self.direction), self.target_ladder.id },
@@ -163,6 +163,10 @@ pub const Inventory = struct {
 
     pub fn deinit(self: *Inventory) void {
         self.items.deinit();
+    }
+
+    pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
+        try writer.print(".{{ .items = {f} }}", .{self.items});
     }
 };
 
@@ -275,7 +279,7 @@ pub const Modification = struct {
 
     /// Example:
     /// ```
-    /// .init(.{ .burning = -3 }, true);
+    /// .init(.{ .burning = -3 });
     /// ```
     pub fn init(modificators: std.enums.EnumFieldStruct(Effect.Type, i8, 0)) Modification {
         return .{ .modificators = .initFullWithDefault(0, modificators) };
@@ -308,14 +312,14 @@ pub const Consumable = struct {
 
 pub const Hunger = struct {
     pub const Level = enum {
-        mild_exhaustion,
+        well_fed,
         hunger,
         severe_hunger,
         critical_starvation,
 
         pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
             _ = switch (self) {
-                .mild_exhaustion => try writer.write(""),
+                .well_fed => try writer.write(""),
                 .hunger => try writer.write("Hungry"),
                 .severe_hunger => try writer.write("Severely hungry"),
                 .critical_starvation => try writer.write("Critically starved"),
@@ -329,11 +333,18 @@ pub const Hunger = struct {
 
     pub fn level(self: Hunger) Level {
         return switch (self.turns_after_eating) {
-            0...49 => .mild_exhaustion,
+            0...49 => .well_fed,
             50...100 => .hunger,
             101...170 => .severe_hunger,
             else => .critical_starvation,
         };
+    }
+
+    pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
+        try writer.print(
+            ".{{ .turns_after_eating = {d}, .level() = {t} }}",
+            .{ self.turns_after_eating, self.level() },
+        );
     }
 };
 
@@ -521,4 +532,19 @@ pub const Components = struct {
     wallet: ?Wallet = null,
     weapon_class: ?WeaponClass = null,
     weight: ?Weight = null,
+
+    pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
+        _ = try writer.write("Components {\n");
+        const fields = std.meta.fields(Components);
+        inline for (fields) |field| {
+            if (@field(self, field.name)) |value| {
+                if (@hasDecl(@TypeOf(value), "format")) {
+                    try writer.print("    {s}: {f}\n", .{ field.name, value });
+                } else {
+                    try writer.print("    {s}: {any}\n", .{ field.name, value });
+                }
+            }
+        }
+        try writer.writeByte('}');
+    }
 };

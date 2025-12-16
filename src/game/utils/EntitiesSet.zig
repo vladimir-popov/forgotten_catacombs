@@ -81,3 +81,14 @@ pub fn eql(self: Self, other: Self) bool {
     }
     return true;
 }
+
+pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
+    _ = try writer.write("[ ");
+    var itr = self.underlying_map.keyIterator();
+    while (itr.next()) |entity| {
+        try writer.print("{d}", .{entity.id});
+        if (itr.len > 1)
+            _ = try writer.write(", ");
+    }
+    _ = try writer.write(" ]");
+}

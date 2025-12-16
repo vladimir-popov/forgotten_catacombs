@@ -15,6 +15,9 @@ pub const Cheat = union(enum) {
     /// Total count of defined cheats.
     pub const count = std.meta.fields(Tag).len;
 
+    /// Prints to log all components of the entity
+    dump_entity: g.Entity,
+
     /// Prints to log a Dijkstra map
     dump_vector_field,
 
@@ -91,6 +94,14 @@ pub const Cheat = union(enum) {
                     .{args},
                 );
             },
+            .dump_entity => if (tryParseDecimal(u32, args)) |entity_id| {
+                return .{ .dump_entity = .{ .id = entity_id } };
+            } else {
+                log.warn(
+                    "Wrong arguments '{s}' for 'dump entity' command. It expects an entity id.",
+                    .{args},
+                );
+            },
             .dump_vector_field => return .dump_vector_field,
             .move_player_to_ladder_up => return .move_player_to_ladder_up,
             .move_player_to_ladder_down => return .move_player_to_ladder_down,
@@ -126,6 +137,7 @@ pub const Cheat = union(enum) {
     pub inline fn toString(comptime self: Cheat.Tag) []const u8 {
         comptime {
             return switch (self) {
+                .dump_entity => "dump entity",
                 .dump_vector_field => "dump vectors",
                 .goto => "goto",
                 .move_player_to_ladder_down => "down ladder",
