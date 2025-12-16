@@ -53,6 +53,37 @@ pub fn calculateQuickActionForTarget(
     return null;
 }
 
+pub fn onTurnCompleted(self: *Self) !void {
+    var regen_itr = self.session().registry.query(c.Regeneration);
+    while (regen_itr.next()) |tuple| {
+        const entity, const regeneration = tuple;
+        regeneration.accumulated_turns += 1;
+        if (regeneration.accumulated_turns > regeneration.turns_to_increase) {
+            regeneration.accumulated_turns = 0;
+            const health = self.session().registry.get(entity, c.Health) orelse
+                std.debug.panic("Entity {d} has Regeneration, but doesn't have a Health component", .{entity.id});
+            health.add(1);
+        }
+    }
+    var hunger_itr = self.session().registry.query(c.Hunger);
+    while (hunger_itr.next()) |tuple| {
+        const entity, const hunger = tuple;
+        hunger.turns_after_eating +|= 1;
+        const turns_to_damage: u8 = switch (hunger.level()) {
+            .mild_exhaustion => 0,
+            .hunger => 8,
+            .severe_hunger => 5,
+            .critical_starvation => 3,
+        };
+
+        if (turns_to_damage == 0 or hunger.turns_after_eating % turns_to_damage != 0) continue;
+
+        const health = self.session().registry.get(entity, c.Health) orelse
+            std.debug.panic("Entity {d} has Hunger, but doesn't have a Health component", .{entity.id});
+        _ = try self.applyDamage(entity, entity, health, 1, "hunger");
+    }
+}
+
 /// Handles intentions to do some actions.
 /// Returns an optional happened action and a count of used move points.
 /// Returned null and 0 mp mean that action was declined (moving to the wall as example).
@@ -281,7 +312,7 @@ fn applyEffect(
                 "Base damage {d}; Character factor {d}; Damage {d}; Absorbed damage {d};",
                 .{ base_damage, character_factor, damage, absorbed_damage },
             );
-            return self.applyDamage(actor, target, target_health, damage_value, effect.effect_type);
+            return self.applyDamage(actor, target, target_health, damage_value, @tagName(effect.effect_type));
         },
         .burning, .corrosion, .poisoning => {
             const base_damage = self.session().prng.random().intRangeAtMost(u8, effect.min, effect.max);
@@ -290,7 +321,13 @@ fn applyEffect(
                 target_defence.min,
                 target_defence.max,
             );
-            return self.applyDamage(actor, target, target_health, base_damage -| absorbed_damage, effect.effect_type);
+            return self.applyDamage(
+                actor,
+                target,
+                target_health,
+                base_damage -| absorbed_damage,
+                @tagName(effect.effect_type),
+            );
         },
         .healing => {
             const value = self.session().prng.random().intRangeAtMost(u8, effect.min, effect.max);
@@ -322,13 +359,14 @@ fn applyDamage(
     target: g.Entity,
     target_health: *c.Health,
     damage_value: u8,
-    effect_type: c.Effect.Type, // just for log
+    effect_type: []const u8, // just for log
 ) !bool {
+    if (damage_value == 0) return false;
     const orig_health = target_health.current;
     target_health.current -|= damage_value;
     log.debug(
         "Entity {d} received {s} damage {d}. HP: {d} -> {d}",
-        .{ target.id, @tagName(effect_type), damage_value, orig_health, target_health.current },
+        .{ target.id, effect_type, damage_value, orig_health, target_health.current },
     );
     if (target_health.current == 0) {
         try self.session().onEntityDied(target);

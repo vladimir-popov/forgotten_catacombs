@@ -173,6 +173,32 @@ pub fn Registry(comptime ComponentsStruct: type) type {
             return null;
         }
 
+        pub fn get6(
+            self: Self,
+            entity: Entity,
+            comptime C1: type,
+            comptime C2: type,
+            comptime C3: type,
+            comptime C4: type,
+            comptime C5: type,
+            comptime C6: type,
+        ) ?struct { *C1, *C2, *C3, *C4, *C5, *C6 } {
+            if (self.get(entity, C1)) |c1| {
+                if (self.get(entity, C2)) |c2| {
+                    if (self.get(entity, C3)) |c3| {
+                        if (self.get(entity, C4)) |c4| {
+                            if (self.get(entity, C5)) |c5| {
+                                if (self.get(entity, C6)) |c6| {
+                                    return .{ c1, c2, c3, c4, c5, c6 };
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
         pub fn query(self: Self, comptime C: type) ArraySet(C).Iterator {
             return @field(self.components_map, @typeName(C)).iterator();
         }

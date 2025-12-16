@@ -255,6 +255,7 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
             self.spent_move_points = self.spent_move_points % g.MOVE_POINTS_IN_TURN;
             for (0..turns) |_| {
                 self.spent_turns += 1;
+                try self.actions.onTurnCompleted();
                 try self.journal.onTurnCompleted();
             }
         },

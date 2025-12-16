@@ -1,11 +1,11 @@
 //! This is a very simple system of windows. Two key concepts exist:
-//! areas and windows. 
+//! areas and windows.
 //!
 //! The areas are about managing and drawing a content.
 //!
-//! The windows are about placing the areas somewhere on the screen. 
+//! The windows are about placing the areas somewhere on the screen.
 //!
-//! Both windows and areas can have a special handlers for buttons. You have 
+//! Both windows and areas can have a special handlers for buttons. You have
 //! to manage the state of both windows and areas in their container manually.
 //!
 //! The interface of areas is:
@@ -17,10 +17,10 @@
 //! fn button(self: Self) ?struct { []const u8, bool }
 //!
 //! /// Returns the total lines of this are content.
-//! fn totalLines(self: Self) usize 
+//! fn totalLines(self: Self) usize
 //!
 //! /// Returns the zero-based index of the currently selected line or null.
-//! fn selectedLine(self: Self) ?usize 
+//! fn selectedLine(self: Self) ?usize
 //!
 //! /// A method to handle a pressed button
 //! fn handleButton(self: *Self, btn: g.Button) !void

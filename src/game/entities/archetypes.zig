@@ -31,6 +31,7 @@ pub fn enemy(components: c.Components) c.Components {
         defined(components, "skills");
         defined(components, "health");
         defined(components, "initiative");
+        defined(components, "regeneration");
         defined(components, "speed");
         defined(components, "sprite");
         defined(components, "state");

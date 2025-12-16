@@ -128,6 +128,13 @@ pub const Health = struct {
     }
 };
 
+pub const Regeneration = struct {
+    pub const regular: Regeneration = .{ .turns_to_increase = 10 };
+
+    turns_to_increase: u8,
+    accumulated_turns: u8 = 0,
+};
+
 pub const Speed = struct {
     /// How many move points are needed for moving on the neighbor position
     move_points: u8,
@@ -299,6 +306,37 @@ pub const Consumable = struct {
     calories: u8,
 };
 
+pub const Hunger = struct {
+    pub const Level = enum {
+        mild_exhaustion,
+        hunger,
+        severe_hunger,
+        critical_starvation,
+
+        pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
+            _ = switch (self) {
+                .mild_exhaustion => try writer.write(""),
+                .hunger => try writer.write("Hungry"),
+                .severe_hunger => try writer.write("Severely hungry"),
+                .critical_starvation => try writer.write("Critically starved"),
+            };
+        }
+    };
+
+    pub const well_fed: Hunger = .{ .turns_after_eating = 0 };
+
+    turns_after_eating: u8,
+
+    pub fn level(self: Hunger) Level {
+        return switch (self.turns_after_eating) {
+            0...49 => .mild_exhaustion,
+            50...100 => .hunger,
+            101...170 => .severe_hunger,
+            else => .critical_starvation,
+        };
+    }
+};
+
 pub const Rarity = enum(u8) {
     common = 15,
     rare = 10,
@@ -463,6 +501,7 @@ pub const Components = struct {
     equipment: ?Equipment = null,
     experience: ?Experience = null,
     health: ?Health = null,
+    hunger: ?Hunger = null,
     initiative: ?Initiative = null,
     inventory: ?Inventory = null,
     ladder: ?Ladder = null,
@@ -471,6 +510,7 @@ pub const Components = struct {
     position: ?Position = null,
     price: ?Price = null,
     rarity: ?Rarity = null,
+    regeneration: ?Regeneration = null,
     shop: ?Shop = null,
     skills: ?Skills = null,
     source_of_light: ?SourceOfLight = null,

@@ -18,7 +18,7 @@ test "Describe an item" {
         \\║│ flame. Lasts until the fire dies. ░│║
         \\║│                                   ░│║
         \\║│ Damage:                           ░│║
-        \\║│   physical 2-3                    ░│║
+        \\║│   physical 1-1                    ░│║
         \\║│   burning 1-1                     ░│║
         \\║└────────────────────────────────────┘║
         \\╚══════════════════════════════════════╝

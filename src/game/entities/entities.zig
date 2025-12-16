@@ -11,14 +11,16 @@ pub const Items = @import("items.zig");
 /// - `alloc` the ecs.Registry allocator.
 pub fn player(alloc: std.mem.Allocator, stats: c.Stats, skills: c.Skills, health: c.Health) !c.Components {
     return .{
-        .sprite = .{ .codepoint = cp.human },
         .description = .{ .preset = .player },
-        .health = health,
-        .speed = .{ .move_points = g.MOVE_POINTS_IN_TURN },
         .equipment = .nothing,
-        .inventory = try c.Inventory.empty(alloc),
         .experience = .zero,
+        .health = health,
+        .hunger = .well_fed,
+        .inventory = try c.Inventory.empty(alloc),
+        .regeneration = .regular,
         .skills = skills,
+        .speed = .{ .move_points = g.MOVE_POINTS_IN_TURN },
+        .sprite = .{ .codepoint = cp.human },
         .stats = stats,
         .wallet = .{ .money = 0 },
     };
@@ -34,6 +36,7 @@ const Rat = archetype.enemy(.{
     .sprite = .{ .codepoint = 'r' },
     .health = .{ .max = 10, .current = 10 },
     .effects = .init(&.{.physical(1, 3)}),
+    .regeneration = .regular,
     .speed = .{ .move_points = 14 },
     .state = .sleeping,
 });

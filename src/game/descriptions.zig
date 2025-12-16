@@ -304,12 +304,17 @@ pub fn describePlayer(
     player: g.Entity,
     text_area: *g.windows.TextArea,
 ) !void {
-    if (journal.registry.get5(player, c.Experience, c.Health, c.Stats, c.Skills, c.Equipment)) |tuple| {
-        const experience, const health, const stats, const skills, const equipment = tuple;
+    if (journal.registry.get6(player, c.Experience, c.Health, c.Hunger, c.Stats, c.Skills, c.Equipment)) |tuple| {
+        const experience, const health, const hunger, const stats, const skills, const equipment = tuple;
         try describeProgression(alloc, experience.level, experience.experience, text_area);
         _ = try text_area.addEmptyLine(alloc);
         try describeHealth(alloc, health, text_area);
         _ = try text_area.addEmptyLine(alloc);
+        if (@intFromEnum(hunger.level()) > 0) {
+            const line = try text_area.addEmptyLine(alloc);
+            _ = try std.fmt.bufPrint(line, "{f}", .{hunger.level()});
+            _ = try text_area.addEmptyLine(alloc);
+        }
         try describeEquipedItems(alloc, journal, equipment, text_area);
         _ = try text_area.addEmptyLine(alloc);
         try describeSkills(alloc, skills, text_area);
@@ -658,7 +663,7 @@ test "Describe player" {
         \\
         \\Equiped weapon: Torch
         \\Damage:
-        \\  physical 2-3
+        \\  physical 1-1
         \\  burning 1-1
         \\
         \\Source of light: Torch
@@ -754,7 +759,7 @@ test "Describe a torch" {
         \\flame. Lasts until the fire dies.
         \\
         \\Damage:
-        \\  physical 2-3
+        \\  physical 1-1
         \\  burning 1-1
         \\
         \\Radius of light: 3
