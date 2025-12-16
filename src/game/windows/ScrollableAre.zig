@@ -23,7 +23,7 @@ pub fn ScrollableAre(comptime Area: type) type {
             self.content.deinit(alloc);
         }
 
-        pub fn isScrolled(self: Self) bool {
+        pub fn isScrollRequired(self: Self) bool {
             return self.content.totalLines() > self.region.rows;
         }
 
@@ -37,7 +37,11 @@ pub fn ScrollableAre(comptime Area: type) type {
 
         pub fn handleButton(self: *Self, btn: g.Button) !void {
             try self.content.handleButton(btn);
-            if (!self.isScrolled()) return;
+            if (!self.isScrollRequired()) return;
+            if (self.content.selectedLine()) |selected_line| {
+                if (self.region.rows + self.scrolled_lines > selected_line and selected_line >= self.scrolled_lines)
+                    return;
+            }
 
             switch (btn.game_button) {
                 .up => {
@@ -54,7 +58,7 @@ pub fn ScrollableAre(comptime Area: type) type {
 
         pub fn draw(self: *const Self, render: g.Render) !void {
             // Draw the scrollbar
-            if (self.isScrolled()) {
+            if (self.isScrollRequired()) {
                 const progress = w.scrollingProgress(self.scrolled_lines, self.region.rows, self.maxScrollingCount());
                 log.debug(
                     "Drawing the scroll bar. Scrolled lines {d}; progress {d}; total lines {d}",
@@ -70,7 +74,7 @@ pub fn ScrollableAre(comptime Area: type) type {
                 }
             }
             // Draw the content inside the region excluding a space for the scrollbar
-            const right_pad: u8 = if (self.isScrolled()) 1 else 0;
+            const right_pad: u8 = if (self.isScrollRequired()) 1 else 0;
             try self.content.draw(render, self.region.innerRegion(0, right_pad, 0, 0), self.scrolled_lines);
         }
     };

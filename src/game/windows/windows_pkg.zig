@@ -1,10 +1,40 @@
 //! This is a very simple system of windows. Two key concepts exist:
-//! areas and windows. The areas are about managing and drawing a content.
-//! The windows are about placing the areas somewhere on the screen. Both windows
-//! and areas can have a special handlers for buttons. Additionally, windows
-//! should handle closing, returning `true` from the button handler.
-//! You have to manage state of both windows and areas in their container manually.
+//! areas and windows. 
 //!
+//! The areas are about managing and drawing a content.
+//!
+//! The windows are about placing the areas somewhere on the screen. 
+//!
+//! Both windows and areas can have a special handlers for buttons. You have 
+//! to manage the state of both windows and areas in their container manually.
+//!
+//! The interface of areas is:
+//! ```zig
+//! /// Should return a label of the `B` (right) button
+//! /// if the area has a handler of it. The secon boolean parameter
+//! /// means should be handler invoked on release (false), or hold (true)
+//! // the button.
+//! fn button(self: Self) ?struct { []const u8, bool }
+//!
+//! /// Returns the total lines of this are content.
+//! fn totalLines(self: Self) usize 
+//!
+//! /// Returns the zero-based index of the currently selected line or null.
+//! fn selectedLine(self: Self) ?usize 
+//!
+//! /// A method to handle a pressed button
+//! fn handleButton(self: *Self, btn: g.Button) !void
+//!
+//! /// Uses the render to draw the area directly to the screen.
+//! ///
+//! /// - `region` - A region of the screen to draw the content of the area.
+//! ///  The first symbol will be drawn at the top left corner of the region.
+//! ///  Scrolled lines and lines out of the region will be skipped. Symbols
+//! ///  of a line outside the region will be cropped.
+//! ///
+//! /// - `scrolled` - How many scrolled lines should be skipped.
+//! fn draw(self: *const Self, render: g.Render, region: p.Region, scrolled: usize) !void
+//! ```
 const std = @import("std");
 const g = @import("../game_pkg.zig");
 const c = g.components;

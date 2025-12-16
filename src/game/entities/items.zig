@@ -94,7 +94,7 @@ pub const Weapons = struct {
         .weight = .{ .value = 20 },
         .source_of_light = .{ .radius = 3 },
         .price = .{ .value = 5 },
-        .effects = .init(&.{ .physical(2, 3), .burning(1, 1) }),
+        .effects = .init(&.{ .physical(1, 1), .burning(1, 1) }),
         .weapon_class = .primitive,
     }),
 

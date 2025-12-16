@@ -78,7 +78,12 @@ pub fn OptionsArea(comptime Item: type) type {
             return self.options.items.len;
         }
 
-        /// Returns a button to choose the selected option
+        pub fn selectedLine(self: Self) ?usize {
+            return self.selected_line;
+        }
+
+        /// Returns a button to choose the selected option.
+        /// Returned button is used to draw its label.
         pub fn button(self: Self) ?struct { []const u8, bool } {
             if (self.options.items.len > 0) {
                 const option = self.options.items[self.selected_line];

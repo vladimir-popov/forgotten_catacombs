@@ -31,6 +31,10 @@ pub fn totalLines(self: Self) usize {
     return self.lines.items.len;
 }
 
+pub fn selectedLine(_: Self) ?usize {
+    return null;
+}
+
 pub fn button(_: Self) ?struct { []const u8, bool } {
     return null;
 }
