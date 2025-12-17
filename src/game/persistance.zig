@@ -405,12 +405,13 @@ test "All components should be serializable" {
     // Random components to check serialization:
     const expected = c.Components{
         .armor = .init(&.{ .physical(0, 1), .poisoning(2, 2), .burning(1, 3) }),
+        .ammunition = .{ .amount = 42, .ammunition_type = .arrows },
         .animation = c.Animation{ .preset = .hit },
         .consumable = .{ .calories = 12, .consumable_type = .food },
         .effects = .init(&.{.physical(1, 2)}),
         .description = c.Description{ .preset = .player },
         .door = c.Door{ .state = .opened },
-        .equipment = c.Equipment{ .weapon = null, .light = .{ .id = 12 } },
+        .equipment = c.Equipment{ .weapon = null, .light = .{ .id = 12 }, .quiver = .{ .id = 21 } },
         .experience = .zero,
         .health = c.Health{ .current = 42, .max = 100 },
         .hunger = .well_fed,
@@ -431,7 +432,7 @@ test "All components should be serializable" {
         .state = .walking,
         .stats = .init(1, 2, 3, 4, 5),
         .wallet = .{ .money = 321 },
-        .weapon_class = .tricky,
+        .weapon = .ranged(5, .arrows, .tricky),
         .weight = .{ .value = 55 },
     };
 

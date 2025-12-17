@@ -129,7 +129,7 @@ pub const Health = struct {
 };
 
 pub const Regeneration = struct {
-    pub const regular: Regeneration = .{ .turns_to_increase = 10 };
+    pub const regular: Regeneration = .{ .turns_to_increase = 20 };
 
     turns_to_increase: u8,
     accumulated_turns: u8 = 0,
@@ -200,8 +200,35 @@ pub const Wallet = struct {
 pub const Equipment = struct {
     weapon: ?g.Entity,
     light: ?g.Entity,
+    quiver: ?g.Entity,
 
-    pub const nothing: Equipment = .{ .weapon = null, .light = null };
+    pub const nothing: Equipment = .{ .weapon = null, .light = null, .quiver = null };
+};
+
+pub const Ammunition = struct {
+    pub const Type = enum { arrows, bolts };
+    amount: u8,
+    ammunition_type: Type,
+};
+
+pub const Weapon = struct {
+    pub const Class = enum {
+        primitive,
+        tricky,
+        ancient,
+    };
+    max_distance: u8,
+    ammunition_type: ?Ammunition.Type,
+    class: Class,
+
+    pub fn melee(class: Class) Weapon {
+        return .{ .max_distance = 1, .ammunition_type = null, .class = class };
+    }
+
+    pub fn ranged(max_distance: u8, ammunition_type: Ammunition.Type, class: Class) Weapon {
+        std.debug.assert(max_distance > 1);
+        return .{ .max_distance = max_distance, .ammunition_type = ammunition_type, .class = class };
+    }
 };
 
 pub const Effect = struct {
@@ -496,13 +523,8 @@ pub const Weight = struct {
     value: u8,
 };
 
-pub const WeaponClass = enum {
-    primitive,
-    tricky,
-    ancient,
-};
-
 pub const Components = struct {
+    ammunition: ?Ammunition = null,
     animation: ?Animation = null,
     armor: ?Armor = null,
     consumable: ?Consumable = null,
@@ -530,7 +552,7 @@ pub const Components = struct {
     state: ?EnemyState = null,
     stats: ?Stats = null,
     wallet: ?Wallet = null,
-    weapon_class: ?WeaponClass = null,
+    weapon: ?Weapon = null,
     weight: ?Weight = null,
 
     pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {

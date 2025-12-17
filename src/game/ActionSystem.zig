@@ -235,6 +235,7 @@ fn tryToHit(
     target: g.Entity,
     target_health: *c.Health,
 ) !void {
+    // Calculate and handle evasion
     const actor_weapon_skill: i16 = if (self.session().registry.get(actor, c.Skills)) |skills|
         skills.values.get(.weapon_mastery)
     else
@@ -256,6 +257,7 @@ fn tryToHit(
         return;
     }
 
+    // Calculate and apply the damage
     const target_armor = self.session().registry.get(target, c.Armor) orelse &c.Armor.zeros;
     const weapon_id = g.meta.getWeapon(&self.session().registry, actor);
     if (self.session().registry.get(weapon_id, c.Effects)) |effects| {
@@ -297,9 +299,11 @@ fn applyEffect(
 
     switch (effect.effect_type) {
         .physical => {
-            const weapon_class = if (self.session().registry.get(source, c.WeaponClass)) |wc| wc.* else .primitive;
+            const weapon_class =
+                if (self.session().registry.get(source, c.Weapon)) |weapon| weapon.class else .primitive;
             const actor_stats = if (self.session().registry.get(actor, c.Stats)) |st| st.* else c.Stats.zeros;
-            const base_damage: f32 = @floatFromInt(self.session().prng.random().intRangeAtMost(u8, effect.min, effect.max));
+            const base_damage: f32 =
+                @floatFromInt(self.session().prng.random().intRangeAtMost(u8, effect.min, effect.max));
             const character_factor: f32 = (0.4 * statBonus(actor_stats, weapon_class) + 4) / 4;
             const damage: u8 = @intFromFloat(@round(base_damage * character_factor));
             const absorbed_damage: u8 = self.session().prng.random().intRangeAtMost(
@@ -341,7 +345,7 @@ fn applyEffect(
     return false;
 }
 
-inline fn statBonus(actor_stats: c.Stats, weapon_class: c.WeaponClass) f32 {
+inline fn statBonus(actor_stats: c.Stats, weapon_class: c.Weapon.Class) f32 {
     return @floatFromInt(switch (weapon_class) {
         .primitive => actor_stats.strength,
         .tricky => actor_stats.dexterity,

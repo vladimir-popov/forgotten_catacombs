@@ -88,7 +88,7 @@ pub fn Cmd(comptime cols: u8) type {
                                 self.suggestion_idx = 0;
                                 return cheat;
                             } else if (self.display_buffer.lines[0][self.cursor_idx].mode == .inverted) {
-                                // just apply suggestion (change highlighting) 
+                                // just apply suggestion (change highlighting)
                                 // and continue entering the args for the cheat
                                 while (self.display_buffer.lines[0][self.cursor_idx].mode == .inverted) {
                                     self.display_buffer.lines[0][self.cursor_idx].mode = .normal;

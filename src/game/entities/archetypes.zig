@@ -72,7 +72,11 @@ pub inline fn weapon(components: c.Components) c.Components {
     comptime {
         _ = item(components);
         defined(components, "effects");
-        defined(components, "weapon_class");
+        defined(components, "weapon");
+        if (components.weapon) |wpn| {
+            std.debug.assert(wpn.max_distance > 0);
+            std.debug.assert(wpn.max_distance == 1 or wpn.ammunition_type != null);
+        }
         return components;
     }
 }

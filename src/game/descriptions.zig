@@ -186,16 +186,23 @@ pub const Weapon = struct {
         .name = "Club",
         .description = &.{
             "A gnarled piece of wood, scarred",
-            "from use. Deals blunt damage.",
+            "from use.  Deals  blunt  damage.",
             "Cheap and easy to use.",
         },
     },
     dagger: Description = .{
         .name = "Dagger",
         .description = &.{
-            "A light, sharp blade. Fast,",
+            "A light,  sharp  blade.  Fast,",
             "concealable, and effective up",
             "close.",
+        },
+    },
+    light_crossbow: Description = .{
+        .name = "Light crossbow",
+        .description = &.{
+            "Compact crossbow for steady and",
+            "accurate targeting.",
         },
     },
     pickaxe: Description = .{
@@ -209,7 +216,17 @@ pub const Weapon = struct {
         .name = "Torch",
         .description = &.{
             "Wooden handle, cloth wrap, burning",
-            "flame. Lasts until the fire dies.",
+            "flame. Lasts until the  fire dies.",
+            "It can be  used as a weapon out of",
+            "despair.",
+        },
+    },
+    short_bow: Description = .{
+        .name = "Short bow",
+        .description = &.{
+            "A compact bow. Quick to draw,",
+            "quiet, and effective at short",
+            "range.",
         },
     },
 };
@@ -219,8 +236,8 @@ food_ration: Description = .{
     .name = "Food ration",
     .description = &.{
         "A compact bundle of preserved food.",
-        "Bland and meager, yet designed to",
-        "provide steady nourishment over a",
+        "Bland and meager, yet  designed to",
+        "provide  steady nourishment over a",
         "long period.",
     },
 },
@@ -237,9 +254,9 @@ jacket: Description = .{
     .name = "Jacket",
     .description = &.{
         "A sturdy, time-worn leather jacket.",
-        "Despite its worn look, the jacket",
-        "offers surprising resilience",
-        "against scrapes and gives minor",
+        "Despite its worn  look, the  jacket",
+        "offers     surprising    resilience",
+        "against  scrapes   and  gives minor",
         "resistance to fire and heat.",
     },
 },
@@ -474,9 +491,9 @@ pub fn describeItem(
             }
         }
     }
-    if (g.meta.isWeapon(journal.registry, entity)) {
+    if (journal.registry.get(entity, c.Weapon)) |weapon| {
         _ = try text_area.addEmptyLine(alloc);
-        try describeWeapon(alloc, journal, entity, text_area);
+        try describeWeapon(alloc, journal, entity, weapon, text_area);
     }
 
     if (journal.registry.get(entity, c.SourceOfLight)) |light| {
@@ -496,37 +513,53 @@ pub fn describeItem(
 ///
 /// Example of a known weapon:
 /// ```
+/// Primitive weapon.
 /// Damage:
 ///   physical 1-3
-///   burning 1-1
+/// ...
 /// ```
 /// Example of unknown weapon:
 /// ```
 /// It looks unusual(!)
+///
+/// Primitive weapon.
 /// Damage:
 ///   physical 2-5
-///   burning 1-1
+/// ...
 /// ```
 fn describeWeapon(
     alloc: std.mem.Allocator,
     journal: g.Journal,
-    weapon: g.Entity,
+    entity: g.Entity,
+    weapon: *const c.Weapon,
     text_area: *g.windows.TextArea,
 ) !void {
-    var effects = journal.registry.get(weapon, c.Effects) orelse return;
-    if (journal.registry.get(weapon, c.Modification)) |modification| {
-        if (journal.isKnown(weapon)) {
+    var effects = journal.registry.get(entity, c.Effects) orelse return;
+    const is_known = journal.isKnown(entity);
+    if (journal.registry.get(entity, c.Modification)) |modification| {
+        if (is_known) {
             modification.applyTo(effects);
-        } else {
-            const line = try text_area.addEmptyLine(alloc);
-            @memcpy(line[0..19], "It looks unusual(!)");
         }
     }
     var line = try text_area.addEmptyLine(alloc);
+    const article = if (weapon.class == .ancient) "an" else "a";
+    _ = try std.fmt.bufPrint(line, "This is {s} {t} weapon.", .{ article, weapon.class });
+    _ = try text_area.addEmptyLine(alloc);
+    line = try text_area.addEmptyLine(alloc);
     @memcpy(line[0..7], "Damage:");
     for (effects.items()) |effect| {
         line = try text_area.addEmptyLine(alloc);
         _ = try std.fmt.bufPrint(line[2..], "{t} {d}-{d}", .{ effect.effect_type, effect.min, effect.max });
+    }
+    if (weapon.max_distance > 1) {
+        _ = try text_area.addEmptyLine(alloc);
+        line = try text_area.addEmptyLine(alloc);
+        _ = try std.fmt.bufPrint(line, "Max distance: {d}", .{weapon.max_distance});
+    }
+    if (!is_known) {
+        _ = try text_area.addEmptyLine(alloc);
+        line = try text_area.addEmptyLine(alloc);
+        @memcpy(line[0..20], "It looks modified...");
     }
 }
 
@@ -567,10 +600,12 @@ pub fn describeEquipedItems(
     text_area: *g.windows.TextArea,
 ) !void {
     var line = try text_area.addEmptyLine(alloc);
-    if (equipment.weapon) |weapon| {
+    if (equipment.weapon) |weapon_id| {
         @memcpy(line[0..16], "Equiped weapon: ");
-        _ = try printName(line[16..], journal, weapon);
-        try describeWeapon(alloc, journal, weapon, text_area);
+        _ = try text_area.addEmptyLine(alloc);
+        _ = try printName(line[16..], journal, weapon_id);
+        if (journal.registry.get(weapon_id, c.Weapon)) |weapon|
+            try describeWeapon(alloc, journal, weapon_id, weapon, text_area);
     } else {
         _ = try std.fmt.bufPrint(line, "Equiped weapon: none", .{});
     }
@@ -662,6 +697,9 @@ test "Describe player" {
         \\Health: 30/30
         \\
         \\Equiped weapon: Torch
+        \\
+        \\This is a primitive weapon.
+        \\
         \\Damage:
         \\  physical 1-1
         \\  burning 1-1
@@ -756,7 +794,11 @@ test "Describe a torch" {
     // then:
     try expectContent(text_area,
         \\Wooden handle, cloth wrap, burning
-        \\flame. Lasts until the fire dies.
+        \\flame. Lasts until the  fire dies.
+        \\It can be  used as a weapon out of
+        \\despair.
+        \\
+        \\This is a primitive weapon.
         \\
         \\Damage:
         \\  physical 1-1
@@ -765,6 +807,37 @@ test "Describe a torch" {
         \\Radius of light: 3
         \\
         \\Weight: 20
+    );
+}
+
+test "Describe a bow" {
+    // given:
+    var registry = try g.Registry.init(std.testing.allocator);
+    defer registry.deinit();
+    var journal = try g.Journal.init(std.testing.allocator, &registry, std.testing.random_seed);
+    defer journal.deinit(std.testing.allocator);
+
+    const id = try registry.addNewEntity(g.presets.Items.values.get(.short_bow).*);
+    var text_area: g.windows.TextArea = .empty;
+    defer text_area.deinit(std.testing.allocator);
+
+    // when:
+    try describeEntity(std.testing.allocator, journal, id, &text_area);
+
+    // then:
+    try expectContent(text_area,
+        \\A compact bow. Quick to draw,
+        \\quiet, and effective at short
+        \\range.
+        \\
+        \\This is a tricky weapon.
+        \\
+        \\Damage:
+        \\  physical 2-3
+        \\
+        \\Max distance: 5
+        \\
+        \\Weight: 50
     );
 }
 

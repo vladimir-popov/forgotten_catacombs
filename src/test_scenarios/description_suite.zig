@@ -15,11 +15,11 @@ test "Describe an item" {
         \\╔══════════════════════════════════════╗
         \\║┌───────────────Torch────────────────┐║
         \\║│ Wooden handle, cloth wrap, burning▒│║
-        \\║│ flame. Lasts until the fire dies. ░│║
+        \\║│ flame. Lasts until the  fire dies.░│║
+        \\║│ It can be  used as a weapon out of░│║
+        \\║│ despair.                          ░│║
         \\║│                                   ░│║
-        \\║│ Damage:                           ░│║
-        \\║│   physical 1-1                    ░│║
-        \\║│   burning 1-1                     ░│║
+        \\║│ This is a primitive weapon.       ░│║
         \\║└────────────────────────────────────┘║
         \\╚══════════════════════════════════════╝
     , .game_area);

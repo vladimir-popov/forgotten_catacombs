@@ -26,7 +26,7 @@ pub inline fn isItem(registry: *const g.Registry, entity: g.Entity) bool {
 
 /// Any entity with damage is weapon.
 pub inline fn isWeapon(registry: *const g.Registry, entity: g.Entity) bool {
-    return registry.has(entity, c.WeaponClass);
+    return registry.has(entity, c.Weapon);
 }
 
 /// Any entity with a `SourceOfLight` is a light.
@@ -119,7 +119,7 @@ pub fn fillShop(shop: *c.Shop, registry: *g.Registry, seed: u64) !void {
         const item = g.presets.Items.values.values[rand.weightedIndex(u8, &proportions)];
         const entity = try registry.addNewEntity(item.*);
         // Randomly modify a weapon:
-        if (item.weapon_class != null and rand.uintAtMost(u8, 100) < 15) {
+        if (isWeapon(registry, entity) and rand.uintAtMost(u8, 100) < 15) {
             try modifyWeapon(registry, rand, entity);
         }
         try shop.items.add(entity);

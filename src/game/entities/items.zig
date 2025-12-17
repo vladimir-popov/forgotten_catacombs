@@ -49,7 +49,7 @@ pub const Potions = struct {
         .description = .{ .preset = .poisoning_potion },
         .rarity = .rare,
         .sprite = .{ .codepoint = cp.potion },
-        .effects = .init(&.{.poisoning(20, 25)}),
+        .effects = .init(&.{.poisoning(10, 20)}),
         .weight = .{ .value = 10 },
         .price = .{ .value = 30 },
         .consumable = .{ .consumable_type = .potion, .calories = 0 },
@@ -74,7 +74,17 @@ pub const Weapons = struct {
         .weight = .{ .value = 80 },
         .effects = .init(&.{.physical(5, 8)}),
         .price = .{ .value = 28 },
-        .weapon_class = .primitive,
+        .weapon = .melee(.primitive),
+    }),
+
+    light_crossbow: c.Components = archetype.weapon(.{
+        .description = .{ .preset = .light_crossbow },
+        .effects = .init(&.{.physical(2, 3)}),
+        .price = .{ .value = 50 },
+        .rarity = .common,
+        .sprite = .{ .codepoint = cp.ranged_weapon },
+        .weapon = .ranged(5, .bolts, .primitive),
+        .weight = .{ .value = 70 },
     }),
 
     pickaxe: c.Components = archetype.weapon(.{
@@ -84,7 +94,7 @@ pub const Weapons = struct {
         .weight = .{ .value = 100 },
         .effects = .init(&.{.physical(3, 5)}),
         .price = .{ .value = 15 },
-        .weapon_class = .primitive,
+        .weapon = .melee(.primitive),
     }),
 
     torch: c.Components = archetype.weapon(.{
@@ -95,7 +105,7 @@ pub const Weapons = struct {
         .source_of_light = .{ .radius = 3 },
         .price = .{ .value = 5 },
         .effects = .init(&.{ .physical(1, 1), .burning(1, 1) }),
-        .weapon_class = .primitive,
+        .weapon = .melee(.primitive),
     }),
 
     poisoned_dagger: c.Components = archetype.weapon(.{
@@ -105,6 +115,16 @@ pub const Weapons = struct {
         .weight = .{ .value = 50 },
         .price = .{ .value = 50 },
         .effects = .init(&.{ .physical(2, 3), .poisoning(1, 3) }),
-        .weapon_class = .tricky,
+        .weapon = .melee(.tricky),
+    }),
+
+    short_bow: c.Components = archetype.weapon(.{
+        .description = .{ .preset = .short_bow },
+        .effects = .init(&.{.physical(2, 3)}),
+        .price = .{ .value = 50 },
+        .rarity = .common,
+        .sprite = .{ .codepoint = cp.ranged_weapon },
+        .weapon = .ranged(5, .arrows, .tricky),
+        .weight = .{ .value = 50 },
     }),
 };

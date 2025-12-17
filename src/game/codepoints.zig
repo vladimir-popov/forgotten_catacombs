@@ -1,8 +1,8 @@
 //! Codepoints for the special
 const std = @import("std");
 
-pub const armor = ')';
-pub const armor_unknown = '(';
+pub const armor = ']';
+pub const armor_unknown = '[';
 pub const container_opened = '=';
 pub const container_locked = '≠';
 pub const door_closed = '+';
@@ -18,8 +18,8 @@ pub const nothing = ' ';
 pub const noise = '♪';
 pub const pile = '=';
 pub const potion = '¿';
-pub const range_weapon = '}';
-pub const range_weapon_unknown = '{';
+pub const ranged_weapon = '}';
+pub const ranged_weapon_unknown = '{';
 pub const rock = '#';
 pub const source_of_light = '¡';
 pub const teleport = '_';
