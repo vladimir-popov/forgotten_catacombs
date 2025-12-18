@@ -24,7 +24,7 @@ pub inline fn isItem(registry: *const g.Registry, entity: g.Entity) bool {
     return registry.has(entity, c.Weight);
 }
 
-/// Any entity with damage is weapon.
+/// Any entity with the Weapon component is a weapon.
 pub inline fn isWeapon(registry: *const g.Registry, entity: g.Entity) bool {
     return registry.has(entity, c.Weapon);
 }

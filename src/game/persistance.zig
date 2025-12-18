@@ -411,7 +411,7 @@ test "All components should be serializable" {
         .effects = .init(&.{.physical(1, 2)}),
         .description = c.Description{ .preset = .player },
         .door = c.Door{ .state = .opened },
-        .equipment = c.Equipment{ .weapon = null, .light = .{ .id = 12 }, .quiver = .{ .id = 21 } },
+        .equipment = c.Equipment{ .weapon = null, .light = .{ .id = 12 }, .ammunition = .{ .id = 21 } },
         .experience = .zero,
         .health = c.Health{ .current = 42, .max = 100 },
         .hunger = .well_fed,

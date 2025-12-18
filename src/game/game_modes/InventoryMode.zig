@@ -188,9 +188,11 @@ fn formatInventoryLine(self: *Self, line: *w.TextArea.Line, item: g.Entity) ![]c
         "weapon"
     else if (item.eql(self.equipment.light))
         " light"
+    else if (item.eql(self.equipment.ammunition)) 
+        "  ammo"
     else
         "      ";
-    log.debug("{d}: {u}({d}) {s} {s}", .{ item.id, sprite.codepoint, sprite.codepoint, name, using });
+    log.debug("fromat line: {d}: {u}({d}) {s} {s}", .{ item.id, sprite.codepoint, sprite.codepoint, name, using });
     return try std.fmt.bufPrint(line, inventory_line_fmt, .{ sprite.codepoint, name, using });
 }
 
@@ -206,6 +208,9 @@ fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         }
         if (g.meta.isWeapon(&self.session.registry, item)) {
             try area.addOption(self.alloc, "Use as a weapon", item, useAsWeapon, null);
+        }
+        if (self.session.registry.get(item, c.Ammunition)) |_| {
+            try area.addOption(self.alloc, "Put to quiver", item, putToQuiver, null);
         }
         if (g.meta.isPotion(&self.session.registry, item)) |_| {
             try area.addOption(self.alloc, "Drink", item, consumeItem, null);
@@ -223,6 +228,8 @@ fn unequipItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         self.equipment.light = null;
     if (item.eql(self.equipment.weapon))
         self.equipment.weapon = null;
+    if (item.eql(self.equipment.ammunition))
+        self.equipment.ammunition = null;
 
     try self.updateInventoryTab();
 }
@@ -244,6 +251,13 @@ fn useAsWeapon(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         }
     }
 
+    try self.updateInventoryTab();
+}
+
+fn putToQuiver(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    log.debug("Use the item {d} as an ammunition. (current equipment: {any})", .{ item.id, self.equipment });
+    self.equipment.ammunition = item;
     try self.updateInventoryTab();
 }
 

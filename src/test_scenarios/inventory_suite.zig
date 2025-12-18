@@ -94,6 +94,42 @@ test "Use torch as a weapon" {
     , .game_area);
 }
 
+test "Put arrows to quiver" {
+    var test_session: TestSession = undefined;
+    try test_session.initEmpty(std.testing.allocator);
+    defer test_session.deinit();
+
+    const inventory = try test_session.openInventory();
+    const arrows = try inventory.add(g.presets.Items.values.get(.arrows).*);
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║                                      ║
+        \\║/ Pickaxe                     weapon  ║
+        \\║- Arrows 10                           ║
+        \\║¡ Torch                        light  ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+
+    var options = try inventory.chooseItemById(arrows);
+    try options.choose("Put to quiver");
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║                                      ║
+        \\║/ Pickaxe                     weapon  ║
+        \\║- Arrows 10                     ammo  ║
+        \\║¡ Torch                        light  ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+}
+
 test "Drink a healing potion" {
     var test_session: TestSession = undefined;
     try test_session.initEmpty(std.testing.allocator);

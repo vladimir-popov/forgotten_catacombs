@@ -67,6 +67,24 @@ pub const Potions = struct {
 };
 
 pub const Weapons = struct {
+    arrows: c.Components = archetype.ammo(.{
+        .ammunition = .arrows(10),
+        .description = .{ .preset = .arrows },
+        .rarity = .common,
+        .sprite = .{ .codepoint = cp.ammunition },
+        .weight = .{ .value = 10 },
+        .price = .{ .value = 10 },
+    }),
+
+    bolts: c.Components = archetype.ammo(.{
+        .ammunition = .bolts(10),
+        .description = .{ .preset = .bolts },
+        .rarity = .common,
+        .sprite = .{ .codepoint = cp.ammunition },
+        .weight = .{ .value = 10 },
+        .price = .{ .value = 10 },
+    }),
+
     club: c.Components = archetype.weapon(.{
         .description = .{ .preset = .club },
         .rarity = .common,

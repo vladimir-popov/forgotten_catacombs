@@ -200,15 +200,23 @@ pub const Wallet = struct {
 pub const Equipment = struct {
     weapon: ?g.Entity,
     light: ?g.Entity,
-    quiver: ?g.Entity,
+    ammunition: ?g.Entity,
 
-    pub const nothing: Equipment = .{ .weapon = null, .light = null, .quiver = null };
+    pub const nothing: Equipment = .{ .weapon = null, .light = null, .ammunition = null };
 };
 
 pub const Ammunition = struct {
     pub const Type = enum { arrows, bolts };
     amount: u8,
     ammunition_type: Type,
+
+    pub fn arrows(amount: u8) Ammunition {
+        return .{ .amount = amount, .ammunition_type = .arrows };
+    }
+
+    pub fn bolts(amount: u8) Ammunition {
+        return .{ .amount = amount, .ammunition_type = .bolts };
+    }
 };
 
 pub const Weapon = struct {

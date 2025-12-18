@@ -182,6 +182,20 @@ pub const Skills = struct {
 };
 
 pub const Weapon = struct {
+    arrows: Description = .{
+        .name = "Arrows",
+        .description = &.{
+            "Wooden arrows with metal tips.",
+            "Standard ammunition for bows.",
+        },
+    },
+    bolts: Description = .{
+        .name = "Bolts",
+        .description = &.{
+            "Wooden arrows with metal tips.",
+            "Standard ammunition for bows.",
+        },
+    },
     club: Description = .{
         .name = "Club",
         .description = &.{
@@ -308,6 +322,13 @@ pub fn printName(dest: []u8, journal: g.Journal, entity: g.Entity) ![]u8 {
     if (g.meta.isPotion(journal.registry, entity)) |potion_type| {
         if (journal.unknownPotionColor(potion_type)) |color|
             return try std.fmt.bufPrint(dest, "A {t} potion", .{color});
+    }
+    if (journal.registry.get2(entity, c.Description, c.Ammunition)) |tuple| {
+        return try std.fmt.bufPrint(
+            dest,
+            "{s} {d}",
+            .{ g.presets.Descriptions.values.get(tuple[0].preset).name, tuple[1].amount },
+        );
     }
     if (journal.registry.get(entity, c.Description)) |description| {
         return try std.fmt.bufPrint(dest, "{s}", .{g.presets.Descriptions.values.get(description.preset).name});

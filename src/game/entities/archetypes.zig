@@ -68,6 +68,14 @@ pub inline fn armor(components: c.Components) c.Components {
     }
 }
 
+pub inline fn ammo(components: c.Components) c.Components {
+    comptime {
+        _ = item(components);
+        defined(components, "ammunition");
+        return components;
+    }
+}
+
 pub inline fn weapon(components: c.Components) c.Components {
     comptime {
         _ = item(components);
