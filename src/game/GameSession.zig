@@ -194,8 +194,8 @@ pub fn switchModeToSavingSession(self: *GameSession) void {
 /// Produces an event to change the mode to `PlayMode`.
 /// Receives continuations: arguments to recover the previous state of the `PlayMode`.
 ///  - `entity_in_focus` - an entity that should be targeted in focus; This is either previous
-///    target, or a new target from the `LookingAround` mode.
-///  - `action` - an action to perform; Usually is action initiated during manage the inventory.
+///    target, or a new target from the `Explore` mode.
+///  - `action` - an action to perform; Usually is an action initiated during managing the inventory.
 pub fn continuePlay(self: *GameSession, entity_in_focus: ?g.Entity, action: ?g.actions.Action) !void {
     log.debug("Continue playing with entity_in_focus {any}, action {any}", .{ entity_in_focus, action });
     try self.events.sendEvent(

@@ -74,13 +74,28 @@ pub fn getLight(registry: *const g.Registry, equipment: *const c.Equipment) stru
 /// Returns an id of the equipped weapon, or the `actor`, because any enemy must be able to provide
 /// a damage without weapon. The player and humanoid enemies should be able to damage by hands,
 /// animal should bite (but hands and tooth are not equipped as a weapon).
-pub fn getWeapon(registry: *const g.Registry, actor: g.Entity) g.Entity {
+pub fn getWeapon(registry: *const g.Registry, actor: g.Entity) struct { g.Entity, c.Weapon } {
     if (registry.get(actor, c.Equipment)) |equipment| {
-        if (equipment.weapon) |weapon| {
-            return weapon;
+        if (equipment.weapon) |weapon_id| {
+            const weapon = registry.get(weapon_id, c.Weapon) orelse
+                std.debug.panic("A Weapon component is not provided for the weapon entity {d}", .{weapon_id.id});
+            return .{ weapon_id, weapon.* };
         }
     }
-    return actor;
+    // "tooth" and "bare hands" are not equipped weapon,
+    // just emulate them
+    return .{ actor, .melee(.primitive) };
+}
+
+pub fn getAmmunition(registry: *const g.Registry, actor: g.Entity) ?*c.Ammunition {
+    if (registry.get(actor, c.Equipment)) |equipment| {
+        if (equipment.ammunition) |ammo| {
+            return registry.get(ammo, c.Ammunition);
+        }
+    }
+
+    // Some animals can spit
+    return registry.get(actor, c.Ammunition);
 }
 
 pub fn statsFromArchetype(archetype: PlayerArchetype) c.Stats {

@@ -310,12 +310,15 @@ pub fn updateQuickActions(self: *PlayMode) anyerror!void {
         }
     }
 
-    // actualize and calculate quick actions for the target
-    var itr = TargetsIterator.init(self.target, self.session);
+    // actualize and calculate quick actions for the target if it's defined,
+    // or find another
+    const player_position = self.session.level.playerPosition();
+    const player_weapon = g.meta.getWeapon(&self.session.registry, self.session.player)[1];
+    var itr = TargetsIterator.init(self.target, self.session, player_position);
     while (itr.next()) |target| {
         self.target = target;
         log.debug("New target {d}", .{target.id});
-        if (self.session.actions.calculateQuickActionForTarget(target)) |qa| {
+        if (self.session.actions.calculateQuickActionForTarget(player_position.place, player_weapon, target)) |qa| {
             log.debug("Calculated action is {any}", .{qa});
             try self.quick_actions.actions.append(alloc, qa);
             if (qa.eql(selected_action)) {
@@ -326,9 +329,9 @@ pub fn updateQuickActions(self: *PlayMode) anyerror!void {
         log.debug("No quick action for entity {any}", .{target});
         self.target = null;
     }
-    // player should always be able to manage its inventory...
+    // player should always be able to wait...
     try self.quick_actions.actions.append(alloc, .wait);
-    // ...and wait
+    // ...and  manage its inventory.
     try self.quick_actions.actions.append(alloc, .open_inventory);
 }
 
@@ -338,10 +341,10 @@ const TargetsIterator = struct {
     player_position: *const c.Position,
     query: g.ecs.ArraySet(c.Position).Iterator,
 
-    fn init(curren_target: ?g.Entity, session: *g.GameSession) TargetsIterator {
+    fn init(curren_target: ?g.Entity, session: *g.GameSession, player_position: *const c.Position) TargetsIterator {
         return .{
             .player = session.player,
-            .player_position = session.level.playerPosition(),
+            .player_position = player_position,
             .curren_target = curren_target,
             .query = session.registry.query(c.Position),
         };

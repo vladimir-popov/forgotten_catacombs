@@ -54,6 +54,10 @@ pub const Point = struct {
         return .{ .row = r, .col = c };
     }
 
+    pub inline fn eql(self: Point, other: Point) bool {
+        return self.row == other.row and self.col == other.col;
+    }
+
     pub fn format(
         self: Point,
         comptime _: []const u8,
@@ -104,10 +108,6 @@ pub const Point = struct {
         var point = self;
         point.moveNTimes(direction, n);
         return point;
-    }
-
-    pub inline fn eql(self: Point, other: Point) bool {
-        return self.row == other.row and self.col == other.col;
     }
 
     /// Returns true if the `other` point is one of 4 neighbors:

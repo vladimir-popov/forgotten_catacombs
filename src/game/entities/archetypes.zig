@@ -27,14 +27,14 @@ pub fn enemy(components: c.Components) c.Components {
         defined(components, "armor");
         defined(components, "description");
         defined(components, "experience");
-        defined(components, "stats");
-        defined(components, "skills");
         defined(components, "health");
         defined(components, "initiative");
         defined(components, "regeneration");
+        defined(components, "skills");
         defined(components, "speed");
         defined(components, "sprite");
         defined(components, "state");
+        defined(components, "stats");
         hasType(g.meta.EnemyType, components);
         return components;
     }

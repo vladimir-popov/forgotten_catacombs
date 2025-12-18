@@ -14,13 +14,14 @@ inline fn session(self: *Self) *g.GameSession {
 
 pub fn calculateQuickActionForTarget(
     self: *Self,
+    player_place: p.Point,
+    player_weapon: c.Weapon,
     target_entity: g.Entity,
 ) ?g.Action {
-    const player_position = self.session().level.playerPosition();
     const target_position =
         self.session().registry.get(target_entity, c.Position) orelse return null;
 
-    if (player_position.place.eql(target_position.place)) {
+    if (player_place.eql(target_position.place)) {
         if (g.meta.isItem(&self.session().registry, target_entity)) {
             return .{ .pickup = target_entity };
         }
@@ -32,13 +33,18 @@ pub fn calculateQuickActionForTarget(
         }
     }
 
-    if (player_position.place.near4(target_position.place)) {
-        if (g.meta.isEnemy(&self.session().registry, target_entity)) |_| {
+    if (g.meta.isEnemy(&self.session().registry, target_entity)) |_| {
+        // Check the achievability of the target 
+        const distance: u8 = @intFromFloat(player_place.distanceTo(target_position.place));
+        if (distance <= player_weapon.max_distance) {
             return .{ .hit = target_entity };
         }
+    }
+
+    if (player_place.near4(target_position.place)) {
         if (self.session().registry.get(target_entity, c.Door)) |door| {
             // the player should not be able to open/close the door stay in the doorway
-            if (player_position.place.eql(target_position.place)) {
+            if (player_place.eql(target_position.place)) {
                 return null;
             }
             return switch (door.state) {
@@ -235,6 +241,25 @@ fn tryToHit(
     target: g.Entity,
     target_health: *c.Health,
 ) !void {
+    // Validate the weapon
+    const weapon_id, const weapon = g.meta.getWeapon(&self.session().registry, actor);
+    if (weapon.ammunition_type) |expected_ammo| {
+        const ammo = g.meta.getAmmunition(&self.session().registry, actor) orelse {
+            log.err("No `Ammunition` component for the entity {d}", .{weapon_id.id});
+            return;
+        };
+        if (ammo.ammunition_type != expected_ammo) {
+            log.err("TODO: Notify somehow about wrong type of ammo", .{});
+            return;
+        }
+        if (ammo.amount > 0) {
+            ammo.amount -= 1;
+        } else {
+            log.err("TODO: Notify somehow about ", .{});
+            return;
+        }
+    }
+
     // Calculate and handle evasion
     const actor_weapon_skill: i16 = if (self.session().registry.get(actor, c.Skills)) |skills|
         skills.values.get(.weapon_mastery)
@@ -259,7 +284,6 @@ fn tryToHit(
 
     // Calculate and apply the damage
     const target_armor = self.session().registry.get(target, c.Armor) orelse &c.Armor.zeros;
-    const weapon_id = g.meta.getWeapon(&self.session().registry, actor);
     if (self.session().registry.get(weapon_id, c.Effects)) |effects| {
         for (effects.items()) |effect| {
             const is_target_dead = try self.applyEffect(actor, weapon_id, effect, target, target_armor, target_health);
