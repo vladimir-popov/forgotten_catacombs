@@ -13,8 +13,15 @@ const log = std.log.scoped(.level);
 
 const Self = @This();
 
+/// The cell of the level.
 pub const Cell = union(enum) {
+    /// The cell of the dungeon. Can be an any kind of the walls or the empty floor/doorway.
     landscape: d.Dungeon.Cell,
+
+    /// An array of the entities on the place:
+    ///   0 - opened doors, ladders, teleports;
+    ///   1 - any dropped items;
+    ///   2 - player, enemies, npc, closed doors;
     entities: [3]?g.Entity,
 };
 
@@ -379,6 +386,14 @@ pub fn randomEmptyPlace(self: Self, rand: std.Random) ?p.Point {
         }
     }
     return null;
+}
+
+pub fn isObstaclesOnTheLine(self: Self, from: p.Point, to: p.Point) bool {
+    var itr = g.utils.Bresenham.init(from, to);
+    while (itr.next()) |place| {
+        if (self.isObstacle(place)) return true;
+    }
+    return false;
 }
 
 pub fn obstacles(self: *const Self) u.DijkstraMap.Obstacles {

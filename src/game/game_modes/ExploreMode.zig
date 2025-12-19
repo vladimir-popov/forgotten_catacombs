@@ -1,4 +1,4 @@
-//! This is the mode in which the player is able to look around,
+//! In this mode the player is able to look around,
 //! get an info about entities on the screen, and change the target entity.
 const std = @import("std");
 const g = @import("../game_pkg.zig");
@@ -56,7 +56,7 @@ pub fn tick(self: *ExploreMode) anyerror!void {
             }
         } else {
             switch (btn.game_button) {
-                .a => {
+                .b => {
                     if (btn.state == .hold and self.countOfEntitiesInFocus() > 1) {
                         if (self.entitiesInFocus()) |entities| {
                             self.entities_window = try self.windowWithEntities(entities);
@@ -65,7 +65,7 @@ pub fn tick(self: *ExploreMode) anyerror!void {
                         self.description_window = try self.windowWithDescription();
                     }
                 },
-                .b => {
+                .a => {
                     try self.session.continuePlay(self.entity_in_focus, null);
                     return;
                 },
@@ -85,13 +85,27 @@ fn draw(self: *const ExploreMode) !void {
         try window.draw(self.session.render);
     } else {
         try self.session.render.drawScene(self.session, self.entity_in_focus);
-        try self.session.render.drawLeftButton("Continue", false);
-        try self.session.render.drawRightButton("Describe", self.countOfEntitiesInFocus() > 1);
+        try self.session.render.drawLeftButton("Describe", self.countOfEntitiesInFocus() > 1);
+        if (self.canBeATarget()) {
+            try self.session.render.drawRightButton("Target", false);
+        } else {
+            try self.session.render.drawRightButton("Cancel", false);
+        }
         // Draw the name or health of the entity in focus
         var buf: [g.DISPLAY_COLS]u8 = undefined;
         const len = @min(try self.statusLine(self.entity_in_focus, &buf), g.Render.INFO_ZONE_LENGTH);
         try self.session.render.drawInfo(buf[0..len]);
     }
+}
+
+fn canBeATarget(self: *const ExploreMode) bool {
+    const weapon = g.meta.getWeapon(&self.session.registry, self.session.player);
+    const player_position = self.session.level.playerPosition();
+    return self.session.actions.calculateQuickActionForTarget(
+        player_position.place,
+        weapon[1],
+        self.entity_in_focus,
+    ) != null;
 }
 
 fn statusLine(self: ExploreMode, entity: g.Entity, line: []u8) !usize {

@@ -188,7 +188,7 @@ fn formatInventoryLine(self: *Self, line: *w.TextArea.Line, item: g.Entity) ![]c
         "weapon"
     else if (item.eql(self.equipment.light))
         " light"
-    else if (item.eql(self.equipment.ammunition)) 
+    else if (item.eql(self.equipment.ammunition))
         "  ammo"
     else
         "      ";

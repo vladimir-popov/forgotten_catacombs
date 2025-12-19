@@ -33,15 +33,20 @@ pub fn calculateQuickActionForTarget(
         }
     }
 
+    const is_near4 = player_place.near4(target_position.place);
+
     if (g.meta.isEnemy(&self.session().registry, target_entity)) |_| {
-        // Check the achievability of the target 
+        // Check the achievability of the target
         const distance: u8 = @intFromFloat(player_place.distanceTo(target_position.place));
         if (distance <= player_weapon.max_distance) {
-            return .{ .hit = target_entity };
+            const is_obstacles_between_target =
+                self.session().level.isObstaclesOnTheLine(player_place, target_position.place);
+            if (is_near4 or !is_obstacles_between_target)
+                return .{ .hit = target_entity };
         }
     }
 
-    if (player_place.near4(target_position.place)) {
+    if (is_near4) {
         if (self.session().registry.get(target_entity, c.Door)) |door| {
             // the player should not be able to open/close the door stay in the doorway
             if (player_place.eql(target_position.place)) {
