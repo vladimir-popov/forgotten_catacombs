@@ -17,7 +17,21 @@ pub const TradingMode = @import("game_modes/TradingMode.zig");
 
 const log = std.log.scoped(.game_session);
 
-const GameSession = @This();
+/// How long a notification should be shown
+const SHOW_NOTIFICATION_MS = 700;
+
+const Self = @This();
+
+const NotificationMessage = struct {
+    text: [20]u8 = undefined,
+    len: u8 = 0,
+    sent_at: c_uint,
+    pp: p.Point,
+
+    fn region(self: NotificationMessage) p.Region {
+        return .{ .top_left = self.pp, .rows = 1, .cols = @intCast(self.len) };
+    }
+};
 
 pub const Mode = union(enum) {
     explore: ExploreMode,
@@ -71,6 +85,8 @@ spent_move_points: u8,
 mode: Mode,
 ///
 actions: ActionSystem,
+/// A pop up notifications to show.
+notifications: std.ArrayListUnmanaged(NotificationMessage),
 
 /// Two cases of initialization exists:
 ///  1. Creating a new Game Session;
@@ -86,7 +102,7 @@ actions: ActionSystem,
 ///    move the viewport to the player; changes the inner state to the `play` mode.
 ///
 pub fn preInit(
-    self: *GameSession,
+    self: *Self,
     game_arena_allocator: std.mem.Allocator,
     runtime: g.Runtime,
     render: g.Render,
@@ -105,6 +121,7 @@ pub fn preInit(
         .spent_move_points = 0,
         .prng = std.Random.DefaultPrng.init(runtime.currentMillis()),
         .ai = g.AI{ .session = self, .rand = self.prng.random() },
+        .notifications = .empty,
         .journal = undefined,
         .player = undefined,
         .level = undefined,
@@ -118,7 +135,7 @@ pub fn preInit(
 ///  - subscribes event handlers;
 ///  - puts the viewport around the player;
 ///  - switches the game session to the `play` mode.
-pub fn completeInitialization(self: *GameSession) !void {
+pub fn completeInitialization(self: *Self) !void {
     self.journal = try g.Journal.init(self.arena.allocator(), &self.registry, self.seed);
     try self.events.subscribe(self.viewport.subscriber());
     try self.events.subscribe(self.subscriber());
@@ -131,7 +148,7 @@ pub fn completeInitialization(self: *GameSession) !void {
 
 /// Completely initializes an undefined GameSession.
 pub fn initNew(
-    self: *GameSession,
+    self: *Self,
     gpa: std.mem.Allocator,
     seed: u64,
     runtime: g.Runtime,
@@ -169,7 +186,7 @@ pub fn initNew(
     self.viewport.region.top_left.moveNTimes(.up, 3);
 }
 
-pub fn deinit(self: *GameSession) void {
+pub fn deinit(self: *Self) void {
     // to be sure that all files are closed
     self.mode.deinit();
     // free memory
@@ -178,7 +195,7 @@ pub fn deinit(self: *GameSession) void {
     log.debug("The game session is deinited", .{});
 }
 
-pub fn switchModeToLoadingSession(self: *GameSession) !void {
+pub fn switchModeToLoadingSession(self: *Self) !void {
     log.debug("Start loading a game session", .{});
     self.mode = .{ .save_load = SaveLoadMode.loadSession(self) };
 }
@@ -186,7 +203,7 @@ pub fn switchModeToLoadingSession(self: *GameSession) !void {
 /// Changes the mode to the SaveLoadMode.
 /// The next process after saving the session will be `.go_to_welcome_screen`.
 /// That means that the `error.GoToMainMenu` will be returned on next tick.
-pub fn switchModeToSavingSession(self: *GameSession) void {
+pub fn switchModeToSavingSession(self: *Self) void {
     self.mode.deinit();
     self.mode = .{ .save_load = SaveLoadMode.saveSession(self) };
 }
@@ -196,7 +213,7 @@ pub fn switchModeToSavingSession(self: *GameSession) void {
 ///  - `entity_in_focus` - an entity that should be targeted in focus; This is either previous
 ///    target, or a new target from the `Explore` mode.
 ///  - `action` - an action to perform; Usually is an action initiated during managing the inventory.
-pub fn continuePlay(self: *GameSession, entity_in_focus: ?g.Entity, action: ?g.actions.Action) !void {
+pub fn continuePlay(self: *Self, entity_in_focus: ?g.Entity, action: ?g.actions.Action) !void {
     log.debug("Continue playing with entity_in_focus {any}, action {any}", .{ entity_in_focus, action });
     try self.events.sendEvent(
         .{ .mode_changed = .{ .to_play = .{ .entity_in_focus = entity_in_focus, .action = action } } },
@@ -204,34 +221,34 @@ pub fn continuePlay(self: *GameSession, entity_in_focus: ?g.Entity, action: ?g.a
 }
 
 // should not be invoked outside. `continuePlay` should be used instead
-fn switchModeToPlay(self: *GameSession, entity_in_focus: ?g.Entity) !void {
+fn switchModeToPlay(self: *Self, entity_in_focus: ?g.Entity) !void {
     self.mode.deinit();
     self.mode = .{ .play = undefined };
     try self.render.redrawFromSceneBuffer();
     try self.mode.play.init(self.arena.allocator(), self, entity_in_focus);
 }
 
-pub fn explore(self: *GameSession) !void {
+pub fn explore(self: *Self) !void {
     try self.events.sendEvent(.{ .mode_changed = .to_explore });
 }
 
-pub fn lookAround(self: *GameSession) !void {
+pub fn lookAround(self: *Self) !void {
     try self.events.sendEvent(.{ .mode_changed = .to_looking_around });
 }
 
-pub fn manageInventory(self: *GameSession) !void {
+pub fn manageInventory(self: *Self) !void {
     try self.events.sendEvent(.{ .mode_changed = .to_inventory });
 }
 
-pub fn trade(self: *GameSession, shop: *c.Shop) !void {
+pub fn trade(self: *Self, shop: *c.Shop) !void {
     try self.events.sendEvent(.{ .mode_changed = .{ .to_trading = shop } });
 }
 
-pub fn movePlayerToLevel(self: *GameSession, by_ladder: c.Ladder) !void {
+pub fn movePlayerToLevel(self: *Self, by_ladder: c.Ladder) !void {
     try self.events.sendEvent(.{ .level_changed = .{ .by_ladder = by_ladder } });
 }
 
-pub fn onEntityDied(self: *GameSession, entity: g.Entity) !void {
+pub fn onEntityDied(self: *Self, entity: g.Entity) !void {
     if (entity.eql(self.player)) {
         log.info("Player is dead. Game is over.", .{});
         // return error for break the game loop:
@@ -247,7 +264,7 @@ pub fn onEntityDied(self: *GameSession, entity: g.Entity) !void {
 
 /// Handles events on the end of the `tick`
 fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
-    const self: *GameSession = @ptrCast(@alignCast(ptr));
+    const self: *Self = @ptrCast(@alignCast(ptr));
     switch (event) {
         .player_turn_completed => {
             self.spent_move_points += event.player_turn_completed.spent_move_points;
@@ -304,7 +321,7 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
     }
 }
 
-pub fn playerMovedToLevel(self: *GameSession) !void {
+pub fn playerMovedToLevel(self: *Self) !void {
     self.max_depth = @max(self.max_depth, self.level.depth);
     self.viewport.centeredAround(self.level.playerPosition().place);
     try self.switchModeToPlay(null);
@@ -319,18 +336,54 @@ pub fn playerMovedToLevel(self: *GameSession) !void {
     try self.events.sendEvent(event);
 }
 
-pub fn subscriber(self: *GameSession) g.events.Subscriber {
+pub fn subscriber(self: *Self) g.events.Subscriber {
     return .{ .context = self, .onEvent = handleEvent };
 }
 
-pub inline fn tick(self: *GameSession) !void {
+pub fn notify(self: *Self, notification: g.notifications.Notification) !void {
+    const msg = try self.notifications.addOne(self.arena.allocator());
+    msg.sent_at = self.runtime.currentMillis();
+    msg.len = @intCast((try std.fmt.bufPrint(&msg.text, "{f}", .{notification})).len);
+    const half: u8 = msg.len / 2;
+
+    msg.pp = self.viewport.relative(self.level.playerPosition().place);
+    if (msg.pp.row > self.notifications.items.len)
+        msg.pp.row -= @intCast(self.notifications.items.len)
+    else
+        msg.pp.row += @intCast(self.notifications.items.len);
+
+    if (msg.pp.col > half) msg.pp.col -= half;
+    if (msg.pp.col + half > g.DISPLAY_COLS) msg.pp.col -= msg.len;
+}
+
+pub inline fn tick(self: *Self) !void {
     switch (self.mode) {
         .explore => try self.mode.explore.tick(),
         .explore_level => try self.mode.explore_level.tick(),
         .inventory => try self.mode.inventory.tick(),
-        .play => try self.mode.play.tick(),
+        .play => {
+            try self.mode.play.tick();
+            if (self.notifications.items.len > 0)
+                try self.showNotifications();
+        },
         .save_load => try self.mode.save_load.tick(),
         .trading => try self.mode.trading.tick(),
     }
     try self.events.notifySubscribers();
+}
+
+fn showNotifications(self: *Self) !void {
+    var i: usize = 0;
+    while (true) {
+        if (i >= self.notifications.items.len) break;
+
+        const msg = self.notifications.items[i];
+        if (self.runtime.currentMillis() - msg.sent_at > SHOW_NOTIFICATION_MS) {
+            try self.render.redrawRegionFromSceneBuffer(msg.region());
+            _ = self.notifications.swapRemove(i);
+        } else {
+            try self.render.drawText(msg.text[0..msg.len], msg.pp, .normal);
+            i += 1;
+        }
+    }
 }

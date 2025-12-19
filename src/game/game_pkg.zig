@@ -9,6 +9,7 @@ pub const ecs = @import("ecs/ecs_pkg.zig");
 pub const entities = @import("entities/entities.zig");
 pub const events = @import("events.zig");
 pub const meta = @import("meta.zig");
+pub const notifications = @import("notifications.zig");
 pub const persistance = @import("persistance.zig");
 pub const primitives = @import("primitives.zig");
 pub const utils = @import("utils/utils_pkg.zig");

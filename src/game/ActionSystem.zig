@@ -65,6 +65,7 @@ pub fn calculateQuickActionForTarget(
 }
 
 pub fn onTurnCompleted(self: *Self) !void {
+    // Regenerate health
     var regen_itr = self.session().registry.query(c.Regeneration);
     while (regen_itr.next()) |tuple| {
         const entity, const regeneration = tuple;
@@ -76,6 +77,7 @@ pub fn onTurnCompleted(self: *Self) !void {
             health.add(1);
         }
     }
+    //  Handle hunger
     var hunger_itr = self.session().registry.query(c.Hunger);
     while (hunger_itr.next()) |tuple| {
         const entity, const hunger = tuple;
@@ -91,13 +93,13 @@ pub fn onTurnCompleted(self: *Self) !void {
 
         const health = self.session().registry.get(entity, c.Health) orelse
             std.debug.panic("Entity {d} has Hunger, but doesn't have a Health component", .{entity.id});
-        _ = try self.applyDamage(entity, entity, health, 1, "hunger");
+        _ = try self.applyDamage(entity, entity, health, 1, .healing);
     }
 }
 
 /// Handles intentions to do some actions.
 /// Returns an optional happened action and a count of used move points.
-/// Returned null and 0 mp mean that action was declined (moving to the wall as example).
+/// Returned null and 0 mp mean that the action was declined (moving to the wall as example).
 pub fn doAction(self: *Self, actor: g.Entity, action: g.Action) !struct { ?g.Action, g.MovePoints } {
     if (std.log.logEnabled(.debug, .actions) and action != .do_nothing) {
         log.debug("Do action {any} by the entity {d}", .{ action, actor.id });
@@ -123,7 +125,7 @@ pub fn doAction(self: *Self, actor: g.Entity, action: g.Action) !struct { ?g.Act
             return .{ action, 0 };
         },
         .hit => |target| if (self.session().registry.get(target, c.Health)) |target_health| {
-            try self.tryToHit(actor, target, target_health);
+            if (!try self.tryToHit(actor, target, target_health)) return .{ null, 0 };
         } else {
             return .{ null, 0 };
         },
@@ -240,28 +242,37 @@ fn checkCollision(self: *Self, place: p.Point) ?g.Action {
     return .do_nothing;
 }
 
+/// Returns `true` if the hit happens.
 fn tryToHit(
     self: *Self,
     actor: g.Entity,
     target: g.Entity,
     target_health: *c.Health,
-) !void {
+) !bool {
     // Validate the weapon
     const weapon_id, const weapon = g.meta.getWeapon(&self.session().registry, actor);
     if (weapon.ammunition_type) |expected_ammo| {
-        const ammo = g.meta.getAmmunition(&self.session().registry, actor) orelse {
-            log.err("No `Ammunition` component for the entity {d}", .{weapon_id.id});
-            return;
+        const ammo_id, const ammo = g.meta.getAmmunition(&self.session().registry, actor) orelse {
+            if (actor.eql(self.session().player))
+                try self.session().notify(.no_ammo);
+            return false;
         };
         if (ammo.ammunition_type != expected_ammo) {
-            log.err("TODO: Notify somehow about wrong type of ammo", .{});
-            return;
+            if (actor.eql(self.session().player))
+                try self.session().notify(.wrong_ammo);
+            return false;
         }
-        if (ammo.amount > 0) {
-            ammo.amount -= 1;
-        } else {
-            log.err("TODO: Notify somehow about ", .{});
-            return;
+        ammo.amount -= 1;
+        if (ammo.amount == 0) {
+            try self.session().registry.removeEntity(ammo_id);
+            if (self.session().registry.get(actor, c.Equipment)) |equipment| {
+                if (ammo_id.eql(equipment.ammunition)) {
+                    equipment.ammunition = null;
+                }
+            }
+            if (self.session().registry.get(actor, c.Inventory)) |inventory| {
+                _ = inventory.items.remove(ammo_id);
+            }
         }
     }
 
@@ -284,7 +295,11 @@ fn tryToHit(
             "Actor {d} missed by the enemy {d} with evation {d} and rand {d}",
             .{ actor.id, target.id, evation, rand },
         );
-        return;
+        if (actor.eql(self.session().player))
+            try self.session().notify(.miss)
+        else if (target.eql(self.session().player))
+            try self.session().notify(.dodge);
+        return true;
     }
 
     // Calculate and apply the damage
@@ -302,10 +317,11 @@ fn tryToHit(
                         }
                     }
                 }
-                return;
+                return true;
             }
         }
     }
+    return true;
 }
 
 /// Applies the effect to the target. Calculates and applies the damage, or increase the target health for the
@@ -345,7 +361,7 @@ fn applyEffect(
                 "Base damage {d}; Character factor {d}; Damage {d}; Absorbed damage {d};",
                 .{ base_damage, character_factor, damage, absorbed_damage },
             );
-            return self.applyDamage(actor, target, target_health, damage_value, @tagName(effect.effect_type));
+            return self.applyDamage(actor, target, target_health, damage_value, effect.effect_type);
         },
         .burning, .corrosion, .poisoning => {
             const base_damage = self.session().prng.random().intRangeAtMost(u8, effect.min, effect.max);
@@ -359,7 +375,7 @@ fn applyEffect(
                 target,
                 target_health,
                 base_damage -| absorbed_damage,
-                @tagName(effect.effect_type),
+                effect.effect_type,
             );
         },
         .healing => {
@@ -392,15 +408,25 @@ fn applyDamage(
     target: g.Entity,
     target_health: *c.Health,
     damage_value: u8,
-    effect_type: []const u8, // just for log
+    effect_type: c.Effect.Type,
 ) !bool {
     if (damage_value == 0) return false;
     const orig_health = target_health.current;
     target_health.current -|= damage_value;
     log.debug(
-        "Entity {d} received {s} damage {d}. HP: {d} -> {d}",
+        "Entity {d} received {t} damage {d}. HP: {d} -> {d}",
         .{ target.id, effect_type, damage_value, orig_health, target_health.current },
     );
+
+    if (effect_type != .healing) {
+        if (actor.eql(self.session().player))
+            try self.session().notify(
+                .{ .hit = .{ .target = target, .damage = damage_value, .damage_type = effect_type } },
+            )
+        else if (target.eql(self.session().player))
+            try self.session().notify(.{ .damage = .{ .damage = damage_value, .damage_type = effect_type } });
+    }
+
     if (target_health.current == 0) {
         try self.session().onEntityDied(target);
         return true;

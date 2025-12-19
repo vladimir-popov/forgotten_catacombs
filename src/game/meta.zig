@@ -87,15 +87,21 @@ pub fn getWeapon(registry: *const g.Registry, actor: g.Entity) struct { g.Entity
     return .{ actor, .melee(.primitive) };
 }
 
-pub fn getAmmunition(registry: *const g.Registry, actor: g.Entity) ?*c.Ammunition {
+pub fn getAmmunition(registry: *const g.Registry, actor: g.Entity) ?struct { g.Entity, *c.Ammunition } {
     if (registry.get(actor, c.Equipment)) |equipment| {
-        if (equipment.ammunition) |ammo| {
-            return registry.get(ammo, c.Ammunition);
+        if (equipment.ammunition) |ammo_id| {
+            if (registry.get(ammo_id, c.Ammunition)) |ammo| {
+                return .{ ammo_id, ammo };
+            }
         }
     }
 
     // Some animals can spit
-    return registry.get(actor, c.Ammunition);
+    if (registry.get(actor, c.Ammunition)) |ammo| {
+        return .{ actor, ammo };
+    }
+
+    return null;
 }
 
 pub fn statsFromArchetype(archetype: PlayerArchetype) c.Stats {

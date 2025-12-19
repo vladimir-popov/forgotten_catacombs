@@ -268,6 +268,15 @@ fn drawInfoBar(self: *const PlayMode) !void {
         }
         var buf: [32]u8 = undefined;
         try self.session.render.drawInfo(try g.descriptions.printName(&buf, self.session.journal, entity));
+    } else if (self.session.registry.get(self.session.player, c.Hunger)) |hunger| {
+        // Draw the hunger level
+        switch (hunger.level()) {
+            .well_fed => try self.session.render.cleanInfo(),
+            else => |lvl| {
+                var buf: [g.Render.INFO_ZONE_LENGTH]u8 = undefined;
+                try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "{f}", .{lvl}));
+            },
+        }
     } else {
         try self.session.render.cleanInfo();
     }

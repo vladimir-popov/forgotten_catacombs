@@ -97,7 +97,10 @@ pub fn Registry(comptime ComponentsStruct: type) type {
         }
 
         pub fn getUnsafe(self: Self, entity: Entity, comptime C: type) *C {
-            return get(self, entity, C) orelse unreachable;
+            return get(self, entity, C) orelse std.debug.panic(
+                "Entity {d} doesn't have component {any}",
+                .{ entity.id, C },
+            );
         }
 
         pub fn getOrSet(self: *Self, entity: Entity, comptime C: type, default: C) !*C {
