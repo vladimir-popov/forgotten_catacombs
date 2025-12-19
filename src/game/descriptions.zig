@@ -565,7 +565,6 @@ fn describeWeapon(
     var line = try text_area.addEmptyLine(alloc);
     const article = if (weapon.class == .ancient) "an" else "a";
     _ = try std.fmt.bufPrint(line, "This is {s} {t} weapon.", .{ article, weapon.class });
-    _ = try text_area.addEmptyLine(alloc);
     line = try text_area.addEmptyLine(alloc);
     @memcpy(line[0..7], "Damage:");
     for (effects.items()) |effect| {
@@ -623,7 +622,6 @@ pub fn describeEquipedItems(
     var line = try text_area.addEmptyLine(alloc);
     if (equipment.weapon) |weapon_id| {
         @memcpy(line[0..16], "Equiped weapon: ");
-        _ = try text_area.addEmptyLine(alloc);
         _ = try printName(line[16..], journal, weapon_id);
         if (journal.registry.get(weapon_id, c.Weapon)) |weapon|
             try describeWeapon(alloc, journal, weapon_id, weapon, text_area);
@@ -694,7 +692,7 @@ pub fn describeEnemy(
     }
 }
 
-test "Describe player" {
+test "Describe a player" {
     // given:
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -718,9 +716,7 @@ test "Describe player" {
         \\Health: 30/30
         \\
         \\Equiped weapon: Torch
-        \\
         \\This is a primitive weapon.
-        \\
         \\Damage:
         \\  physical 1-1
         \\  burning 1-1
@@ -820,7 +816,6 @@ test "Describe a torch" {
         \\despair.
         \\
         \\This is a primitive weapon.
-        \\
         \\Damage:
         \\  physical 1-1
         \\  burning 1-1
@@ -852,7 +847,6 @@ test "Describe a bow" {
         \\range.
         \\
         \\This is a tricky weapon.
-        \\
         \\Damage:
         \\  physical 2-3
         \\

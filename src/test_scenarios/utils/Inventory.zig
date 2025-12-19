@@ -17,7 +17,7 @@ pub fn isClosed(self: Self) bool {
     return self.test_session.session.mode != .inventory;
 }
 
-pub fn close(self: Self) void {
+pub fn close(self: Self) !void {
     std.debug.assert(self.inventoryMode().actions_window == null);
     std.debug.assert(self.inventoryMode().description_window == null);
     try self.test_session.pressButton(.b);

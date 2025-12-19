@@ -3,11 +3,12 @@ const Frame = @import("utils/Frame.zig");
 const TestSession = @import("utils/TestSession.zig");
 
 test {
+    _ = @import("battle_suite.zig");
     _ = @import("description_suite.zig");
     _ = @import("inventory_suite.zig");
+    _ = @import("moving_suite.zig");
     _ = @import("save_load_suite.zig");
     _ = @import("update_target_suite.zig");
-    _ = @import("moving_suite.zig");
 }
 
 test "Hello world!" {

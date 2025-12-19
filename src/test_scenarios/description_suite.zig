@@ -94,7 +94,7 @@ test "Describe an unknown enemy" {
     try test_session.exploreMode();
     try test_session.pressButton(.up);
     try std.testing.expectEqual(rat, test_session.player.target());
-    try test_session.pressButton(.a);
+    try test_session.pressButton(.b);
 
     try test_session.runtime.display.expectLooksLike(
         \\######################################30
@@ -139,7 +139,7 @@ test "Describe a known enemy (after killing a similar creature)" {
     try test_session.exploreMode();
     try test_session.pressButton(.up);
     try std.testing.expectEqual(rat_to_describe, test_session.player.target());
-    try test_session.pressButton(.a);
+    try test_session.pressButton(.b);
 
     try test_session.runtime.display.expectLooksLike(
         \\┌─────────────────Rat──────────────────┐
