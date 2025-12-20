@@ -21,6 +21,9 @@ pub fn calculateQuickActionForTarget(
     const target_position =
         self.session().registry.get(target_entity, c.Position) orelse return null;
 
+    if (self.session().level.checkVisibility(target_position.place) != .visible)
+        return null;
+
     if (player_place.eql(target_position.place)) {
         if (g.meta.isItem(&self.session().registry, target_entity)) {
             return .{ .pickup = target_entity };
@@ -36,12 +39,13 @@ pub fn calculateQuickActionForTarget(
     const is_near4 = player_place.near4(target_position.place);
 
     if (g.meta.isEnemy(&self.session().registry, target_entity)) |_| {
+        // It's always possible to hit neighbors in 4 directions
+        if (is_near4) return .{ .hit = target_entity };
+
         // Check the achievability of the target
         const distance: u8 = @intFromFloat(player_place.distanceTo(target_position.place));
         if (distance <= player_weapon.max_distance) {
-            const is_obstacles_between_target =
-                self.session().level.isObstaclesOnTheLine(player_place, target_position.place);
-            if (is_near4 or !is_obstacles_between_target)
+            if (!self.session().level.isObstaclesOnTheLine(player_place, target_position.place))
                 return .{ .hit = target_entity };
         }
     }
@@ -425,6 +429,10 @@ fn applyDamage(
             )
         else if (target.eql(self.session().player))
             try self.session().notify(.{ .damage = .{ .damage = damage_value, .damage_type = effect_type } });
+    }
+
+    if (self.session().registry.get(target, c.EnemyState)) |_| {
+        try self.session().registry.set(target, c.EnemyState.aggressive);
     }
 
     if (target_health.current == 0) {
