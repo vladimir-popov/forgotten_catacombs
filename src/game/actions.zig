@@ -48,6 +48,16 @@ pub const Action = union(enum) {
     //
     trade: *c.Shop,
 
+    pub fn priority(self: Action) u8 {
+        return switch (self) {
+            .do_nothing => 0,
+            .move_to_level => 10,
+            .hit => 9,
+            .pickup => 5,
+            else => 1,
+        };
+    }
+
     pub fn toString(action: Action) []const u8 {
         return switch (action) {
             .close => "Close",

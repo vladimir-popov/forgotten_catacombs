@@ -304,6 +304,7 @@ pub fn updateQuickActions(self: *PlayMode) anyerror!void {
     }
 
     const alloc = self.arena.allocator();
+    // Remember the previously selected action to trying to keep it selected
     const selected_action = self.quickAction();
     log.debug(
         "Updating selected actions. Current selected action is {any}; target is {any}",
@@ -311,18 +312,20 @@ pub fn updateQuickActions(self: *PlayMode) anyerror!void {
     );
     self.quick_actions.reset();
 
-    // validate the target
+    // validate the current target
     if (self.target) |target| {
         if (!self.session.registry.contains(target)) {
-            log.debug("Target entity {d} was removed. Reset target.", .{target.id});
+            log.debug("Target entity {d} was removed. Reset the target.", .{target.id});
             self.target = null;
         }
     }
 
-    // actualize and calculate quick actions for the target if it's defined,
-    // or find another
     const player_position = self.session.level.playerPosition();
+
+    // Actualize and calculate quick actions for the target if it's defined,
+    // or find another
     const player_weapon = g.meta.getWeapon(&self.session.registry, self.session.player)[1];
+    // iterate over all possible targets starting from the current
     var itr = TargetsIterator.init(self.target, self.session, player_position);
     while (itr.next()) |target| {
         self.target = target;
@@ -338,12 +341,40 @@ pub fn updateQuickActions(self: *PlayMode) anyerror!void {
         log.debug("No quick action for entity {any}", .{target});
         self.target = null;
     }
+
+    // Entities under the player's feet should be included to possible actions
+    const cell_under_feet = self.session.level.cellAt(player_position.place);
+    switch (cell_under_feet) {
+        .entities => |entities| {
+            for (0..2) |i| {
+                if (entities[i]) |entity| {
+                    const maybe_action = self.session.actions.calculateQuickActionForTarget(
+                        player_position.place,
+                        player_weapon,
+                        entity,
+                    );
+                    if (maybe_action) |qa| {
+                        try self.quick_actions.actions.append(alloc, qa);
+                        // Compare action priorities to choose the most important target
+                        if (qa.priority() > self.quickAction().priority()) {
+                            self.target = entity;
+                            self.quick_actions.selected_idx = self.quick_actions.actions.items.len - 1;
+                        }
+                    }
+                }
+            }
+        },
+        else => {},
+    }
+
     // player should always be able to wait...
     try self.quick_actions.actions.append(alloc, .wait);
     // ...and  manage its inventory.
     try self.quick_actions.actions.append(alloc, .open_inventory);
 }
 
+/// Iterates over all entities with `Position` component on the level,
+/// except entities under the player's feet.
 const TargetsIterator = struct {
     curren_target: ?g.Entity,
     player: g.Entity,
@@ -367,7 +398,7 @@ const TargetsIterator = struct {
             while (self.query.next()) |tuple| {
                 const entity: g.Entity, const position: *c.Position = tuple;
                 if (position.place.near4(self.player_position.place)) {
-                    if (entity.eql(self.player)) {
+                    if (position.place.eql(self.player_position.place)) {
                         continue;
                     } else {
                         return entity;

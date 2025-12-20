@@ -15,6 +15,8 @@ pub const Notification = union(enum) {
         damage: u8,
         damage_type: c.Effect.Type,
     },
+    /// The player received experience points
+    exp: u16,
     /// The enemy dodged
     miss,
     /// The player dodged
@@ -29,6 +31,7 @@ pub const Notification = union(enum) {
         switch (self) {
             .hit => |hit| try writer.print("Hit {d}", .{hit.damage}),
             .damage => |dmg| try writer.print("Damage -{d}", .{dmg.damage}),
+            .exp => |exp| try writer.print("+{d} EXP", .{exp}),
             .miss => _ = try writer.write("Miss!"),
             .dodge => _ = try writer.write("Dodge!"),
             .no_ammo => _ = try writer.write("No ammo!"),

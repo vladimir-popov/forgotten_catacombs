@@ -21,6 +21,7 @@ pub const std_options: std.Options = .{
         // .{ .scope = .cmd, .level = .debug },
         // .{ .scope = .events, .level = .debug },
         // .{ .scope = .game, .level = .debug },
+        .{ .scope = .game_session, .level = .info },
         .{ .scope = .inventory_mode, .level = .debug },
         // .{ .scope = .level, .level = .debug },
         // .{ .scope = .load_level_mode, .level = .debug },

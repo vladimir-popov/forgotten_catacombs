@@ -200,7 +200,7 @@ fn doMove(
         log.debug("Collision lead to {s}", .{@tagName(action)});
         return try doAction(self, entity, action);
     }
-    const event = g.events.Event{
+    const entity_moved_event = g.events.Event{
         .entity_moved = .{
             .entity = entity,
             .is_player = (entity.eql(self.session().player)),
@@ -208,7 +208,7 @@ fn doMove(
             .target = move.target,
         },
     };
-    try self.session().events.sendEvent(event);
+    try self.session().events.sendEvent(entity_moved_event);
     from_position.place = new_place;
     return .{ .{ .move = move }, move_speed };
 }
@@ -309,21 +309,23 @@ fn tryToHit(
     // Calculate and apply the damage
     const target_armor = self.session().registry.get(target, c.Armor) orelse &c.Armor.zeros;
     if (self.session().registry.get(weapon_id, c.Effects)) |effects| {
+        const actor_experience = self.session().registry.getUnsafe(actor, c.Experience);
+        const enemy_experience = self.session().registry.getUnsafe(target, c.Experience);
         for (effects.items()) |effect| {
-            const is_target_dead = try self.applyEffect(actor, weapon_id, effect, target, target_armor, target_health);
+            const is_target_dead =
+                try self.applyEffect(actor, weapon_id, effect, target, target_armor, target_health);
+
             if (is_target_dead) {
-                if (self.session().registry.get(actor, c.Experience)) |actor_experience| {
-                    if (self.session().registry.get(target, c.Experience)) |enemy_experience| {
-                        const level_before = actor_experience.level;
-                        actor_experience.add(enemy_experience.asReward());
-                        if (actor_experience.level > level_before) {
-                            @panic("TODO: HANDLE LEVEL UP");
-                        }
-                    }
+                const level_before = actor_experience.level;
+                actor_experience.add(enemy_experience.asReward());
+                if (actor.eql(self.session().player))
+                    try self.session().notify(.{ .exp = enemy_experience.asReward() });
+                if (actor_experience.level > level_before) {
+                    @panic("TODO: HANDLE LEVEL UP");
                 }
-                return true;
             }
         }
+        return true;
     }
     return true;
 }
