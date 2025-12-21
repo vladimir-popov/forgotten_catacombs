@@ -117,6 +117,9 @@ pub fn doAction(self: *Self, actor: g.Entity, action: g.Action) !struct { ?g.Act
         .drink => |potion_id| if (g.meta.isPotion(&self.session().registry, potion_id)) |potion_type| {
             try self.drinkPotion(actor, potion_id, potion_type);
         },
+        .eat => |food_id| {
+            try self.consume(actor, food_id, self.session().registry.getUnsafe(food_id, c.Consumable));
+        },
         .open_inventory => {
             try self.session().manageInventory();
         },
@@ -459,10 +462,17 @@ fn drinkPotion(self: *Self, actor: g.Entity, potion_id: g.Entity, potion_type: g
             }
         }
     }
+    try self.consume(actor, potion_id, self.session().registry.getUnsafe(potion_id, c.Consumable));
+}
+
+fn consume(self: *Self, actor: g.Entity, item: g.Entity, consumable: *const c.Consumable) !void {
+    if (self.session().registry.get(actor, c.Hunger)) |hunger| {
+        hunger.turns_after_eating -= consumable.calories;
+    }
     // try to remove from the inventory
     if (self.session().registry.get(actor, c.Inventory)) |inventory| {
-        _ = inventory.items.remove(potion_id);
+        _ = inventory.items.remove(item);
     }
     // remove the potion
-    try self.session().registry.removeEntity(potion_id);
+    try self.session().registry.removeEntity(item);
 }

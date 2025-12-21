@@ -42,6 +42,13 @@ pub inline fn isPotion(registry: *const g.Registry, entity: g.Entity) ?PotionTyp
         null;
 }
 
+pub inline fn isFood(registry: *const g.Registry, entity: g.Entity) bool {
+    if (registry.get(entity, c.Consumable)) |consumable| {
+        return consumable.consumable_type == .food;
+    }
+    return false;
+}
+
 /// Returns a type of an enemy if it has description preset from appropriate namespace.
 pub inline fn isEnemy(registry: *const g.Registry, entity: g.Entity) ?EnemyType {
     return if (registry.get(entity, c.Description)) |descr|

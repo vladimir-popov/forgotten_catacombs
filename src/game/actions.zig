@@ -33,8 +33,10 @@ pub const Action = union(enum) {
     hit: g.Entity,
     /// The id of an item that someone is going to take from the floor
     pickup: g.Entity,
-    /// The id of a potion to drink it
+    /// The id of a potion to drink
     drink: g.Entity,
+    /// The id of a food to eat
+    eat: g.Entity,
     /// The player moves from the level to another level
     move_to_level: c.Ladder,
     /// Change the state of the entity to sleep
@@ -62,6 +64,7 @@ pub const Action = union(enum) {
         return switch (action) {
             .close => "Close",
             .drink => "Drink",
+            .eat => "Eat",
             .hit => "Attack",
             .move_to_level => |ladder| switch (ladder.direction) {
                 .up => "Go up",

@@ -215,6 +215,9 @@ fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         if (g.meta.isPotion(&self.session.registry, item)) |_| {
             try area.addOption(self.alloc, "Drink", item, consumeItem, null);
         }
+        if (g.meta.isFood(&self.session.registry, item)) {
+            try area.addOption(self.alloc, "Eat", item, consumeItem, null);
+        }
     }
     try area.addOption(self.alloc, "Drop", item, dropSelectedItem, null);
     try area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
@@ -265,10 +268,15 @@ fn consumeItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     if (self.session.registry.get(item, c.Consumable)) |consumable| {
         log.debug("Consume the item {d} {any}. (current equipment: {any})", .{ item.id, consumable, self.equipment });
-        if (consumable.consumable_type == .potion) {
-            self.action = .{ .drink = item };
-            _ = self.inventory.items.remove(item);
+        switch (consumable.consumable_type) {
+            .potion => {
+                self.action = .{ .drink = item };
+            },
+            .food => {
+                self.action = .{ .eat = item };
+            },
         }
+        _ = self.inventory.items.remove(item);
     }
     try self.updateInventoryTab();
 }

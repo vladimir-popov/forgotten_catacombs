@@ -34,38 +34,6 @@ pub const Armor = struct {
     }),
 };
 
-pub const Potions = struct {
-    healing_potion: c.Components = archetype.potion(.{
-        .description = .{ .preset = .healing_potion },
-        .rarity = .rare,
-        .sprite = .{ .codepoint = cp.potion },
-        .effects = .init(&.{.healing(20, 25)}),
-        .weight = .{ .value = 10 },
-        .price = .{ .value = 50 },
-        .consumable = .{ .consumable_type = .potion, .calories = 10 },
-    }),
-
-    poisoning_potion: c.Components = archetype.potion(.{
-        .description = .{ .preset = .poisoning_potion },
-        .rarity = .rare,
-        .sprite = .{ .codepoint = cp.potion },
-        .effects = .init(&.{.poisoning(10, 20)}),
-        .weight = .{ .value = 10 },
-        .price = .{ .value = 30 },
-        .consumable = .{ .consumable_type = .potion, .calories = 0 },
-    }),
-
-    oil_potion: c.Components = archetype.potion(.{
-        .description = .{ .preset = .oil_potion },
-        .rarity = .rare,
-        .sprite = .{ .codepoint = cp.potion },
-        .effects = .init(&.{.poisoning(20, 25)}),
-        .weight = .{ .value = 10 },
-        .price = .{ .value = 30 },
-        .consumable = .{ .consumable_type = .potion, .calories = 0 },
-    }),
-};
-
 pub const Weapons = struct {
     arrows: c.Components = archetype.ammo(.{
         .ammunition = .arrows(10),
@@ -144,5 +112,48 @@ pub const Weapons = struct {
         .sprite = .{ .codepoint = cp.ranged_weapon },
         .weapon = .ranged(5, .arrows, .tricky),
         .weight = .{ .value = 50 },
+    }),
+};
+
+pub const Food = struct {
+    apple: c.Components = archetype.food(.{
+        .description = .{ .preset = .apple },
+        .rarity = .common,
+        .sprite = .{ .codepoint = cp.food },
+        .weight = .{ .value = 5 },
+        .price = .{ .value = 10 },
+        .consumable = .{ .consumable_type = .food, .calories = 50 },
+    }),
+};
+
+pub const Potions = struct {
+    healing_potion: c.Components = archetype.potion(.{
+        .description = .{ .preset = .healing_potion },
+        .rarity = .rare,
+        .sprite = .{ .codepoint = cp.potion },
+        .effects = .init(&.{.healing(20, 25)}),
+        .weight = .{ .value = 10 },
+        .price = .{ .value = 50 },
+        .consumable = .{ .consumable_type = .potion, .calories = 10 },
+    }),
+
+    poisoning_potion: c.Components = archetype.potion(.{
+        .description = .{ .preset = .poisoning_potion },
+        .rarity = .rare,
+        .sprite = .{ .codepoint = cp.potion },
+        .effects = .init(&.{.poisoning(10, 20)}),
+        .weight = .{ .value = 10 },
+        .price = .{ .value = 30 },
+        .consumable = .{ .consumable_type = .potion, .calories = 0 },
+    }),
+
+    oil_potion: c.Components = archetype.potion(.{
+        .description = .{ .preset = .oil_potion },
+        .rarity = .rare,
+        .sprite = .{ .codepoint = cp.potion },
+        .effects = .init(&.{.poisoning(20, 25)}),
+        .weight = .{ .value = 10 },
+        .price = .{ .value = 30 },
+        .consumable = .{ .consumable_type = .potion, .calories = 0 },
     }),
 };

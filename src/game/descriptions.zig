@@ -88,66 +88,6 @@ pub const Archetypes = struct {
     },
 };
 
-// All descriptions for potions MUST be declared here
-pub const Potions = struct {
-    /// Enum of all potion types
-    pub const Enum = std.meta.FieldEnum(Potions);
-
-    healing_potion: Description = .{
-        .name = "A healing potion",
-        .description = &.{
-            "A brew that glows faintly, as if",
-            "mends alive. It warms your veins",
-            "and your wounds instantly.",
-        },
-    },
-    poisoning_potion: Description = .{
-        .name = "A poison",
-        .description = &.{
-            "A vial filled with a thick, bitter",
-            "liquid that smells of decay.",
-        },
-    },
-    oil_potion: Description = .{
-        .name = "Oil",
-        .description = &.{
-            "Glass bottle filled with viscous",
-            "oil. Useful as lamp fuel.",
-        },
-    },
-};
-
-// All descriptions for enemies MUST be declared here
-pub const Enemies = struct {
-    /// Enum of all enemies types
-    pub const Enum = std.meta.FieldEnum(Enemies);
-
-    rat: Description = .{
-        .name = "Rat",
-        .description = &.{
-            "A big, nasty rat with vicious eyes",
-            "that thrives in dark corners and",
-            "forgotten cellars.",
-        },
-    },
-    snake: Description = .{
-        .name = "Snake",
-        .description = &.{
-            "A silent reptile with a venomous",
-            "bite. Inflicts poison at close",
-            "range.",
-        },
-    },
-    wolf: Description = .{
-        .name = "Wolf",
-        .description = &.{
-            "Wild predator. Its fur is smeared",
-            "with blood, eyes glinting with",
-            "hunger.",
-        },
-    },
-};
-
 pub const Skills = struct {
     pub const Enum = std.meta.FieldEnum(Skills);
     weapon_mastery: Description = .{
@@ -185,6 +125,37 @@ pub const Skills = struct {
             "comprehend  devices  and  artifacts",
             "from  the past and to apply them in",
             "practice.",
+        },
+    },
+};
+
+// All descriptions for enemies MUST be declared here
+pub const Enemies = struct {
+    /// Enum of all enemies types
+    pub const Enum = std.meta.FieldEnum(Enemies);
+
+    rat: Description = .{
+        .name = "Rat",
+        .description = &.{
+            "A big, nasty rat with vicious eyes",
+            "that thrives in dark corners and",
+            "forgotten cellars.",
+        },
+    },
+    snake: Description = .{
+        .name = "Snake",
+        .description = &.{
+            "A silent reptile with a venomous",
+            "bite. Inflicts poison at close",
+            "range.",
+        },
+    },
+    wolf: Description = .{
+        .name = "Wolf",
+        .description = &.{
+            "Wild predator. Its fur is smeared",
+            "with blood, eyes glinting with",
+            "hunger.",
         },
     },
 };
@@ -249,6 +220,46 @@ pub const Weapon = struct {
             "A compact bow. Quick to draw,",
             "quiet, and effective at short",
             "range.",
+        },
+    },
+};
+
+// All descriptions for potions MUST be declared here
+pub const Potions = struct {
+    /// Enum of all potion types
+    pub const Enum = std.meta.FieldEnum(Potions);
+
+    healing_potion: Description = .{
+        .name = "A healing potion",
+        .description = &.{
+            "A brew that glows faintly, as if",
+            "mends alive. It warms your veins",
+            "and your wounds instantly.",
+        },
+    },
+    poisoning_potion: Description = .{
+        .name = "A poison",
+        .description = &.{
+            "A vial filled with a thick, bitter",
+            "liquid that smells of decay.",
+        },
+    },
+    oil_potion: Description = .{
+        .name = "Oil",
+        .description = &.{
+            "Glass bottle filled with viscous",
+            "oil. Useful as lamp fuel.",
+        },
+    },
+};
+
+pub const Food = struct {
+    apple: Description = .{
+        .name = "Apple",
+        .description = &.{
+            "A  simple  apple.  Briefly  eases",
+            "hunger,   but    offers    little",
+            "sustenance.",
         },
     },
 };
