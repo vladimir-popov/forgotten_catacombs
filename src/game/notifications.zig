@@ -30,7 +30,12 @@ pub const Notification = union(enum) {
     pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
         switch (self) {
             .hit => |hit| try writer.print("Hit {d}", .{hit.damage}),
-            .damage => |dmg| try writer.print("Damage -{d}", .{dmg.damage}),
+            .damage => |dmg| {
+                if (dmg.damage_type == .physical)
+                    try writer.print("-{d} damage", .{ dmg.damage })
+                else
+                    try writer.print("-{d} {t}", .{ dmg.damage, dmg.damage_type });
+            },
             .exp => |exp| try writer.print("+{d} EXP", .{exp}),
             .miss => _ = try writer.write("Miss!"),
             .dodge => _ = try writer.write("Dodge!"),
