@@ -34,7 +34,7 @@ pub const ModeChanged = union(enum) {
 };
 
 pub const PlayerTurnCompleted = struct {
-    spent_move_points: u8,
+    spent_move_points: g.MovePoints,
 };
 
 pub const Event = union(enum) {

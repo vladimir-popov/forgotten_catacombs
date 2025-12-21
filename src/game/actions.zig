@@ -6,7 +6,7 @@ const p = g.primitives;
 
 const log = std.log.scoped(.actions);
 
-pub const MovePoints = u8;
+pub const MovePoints = u5;
 
 /// The intension to perform an action.
 /// Describes what some entity is going to do.

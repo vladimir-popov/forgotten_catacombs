@@ -61,6 +61,7 @@ pub fn tick(self: *PlayMode) !void {
         // break this function if no input
         const action = (try self.handleInput()) orelse return;
         if (try self.doTurn(self.session.player, action)) |actual_action| {
+            // Force change the target
             switch (actual_action) {
                 .hit => |enemy| {
                     self.setTarget(enemy);
@@ -70,18 +71,17 @@ pub fn tick(self: *PlayMode) !void {
                 },
                 else => {},
             }
+            // Update counters of unknown equipments
             try self.session.journal.onTurnCompleted();
             self.is_player_turn = false;
         }
     } else {
-        var itr = self.session.registry.query3(c.EnemyState, c.Initiative, c.Speed);
+        var itr = self.session.registry.query2(c.Initiative, c.Speed);
         while (itr.next()) |tuple| {
-            const npc, const state, const initiative, const speed = tuple;
-            _ = state;
-            if (speed.move_points > initiative.move_points) continue;
-
-            const action = self.session.ai.action(npc);
-            _ = try self.doTurn(npc, action);
+            const npc, const initiative, const speed = tuple;
+            while (speed.move_points <= initiative.move_points) {
+                _ = try self.doTurn(npc, self.session.ai.action(npc));
+            }
         }
         self.is_player_turn = true;
     }
@@ -105,16 +105,15 @@ pub fn doTurn(self: *PlayMode, actor: g.Entity, action: g.actions.Action) !?g.ac
 
     // Handle Initiative
     if (self.is_player_turn) {
-        try self.session.events.sendEvent(.{ .player_turn_completed = .{ .spent_move_points = mp } });
+        // Add initiative points to enemies
         var itr = self.session.registry.query(c.Initiative);
         while (itr.next()) |tuple| {
             tuple[1].move_points += mp;
         }
+        try self.session.events.sendEvent(.{ .player_turn_completed = .{ .spent_move_points = mp } });
     } else {
-        const initiative = self.session.registry.get(actor, c.Initiative) orelse {
-            log.err("The entity {d} doesn't have initiative.", .{actor.id});
-            return error.NotEnoughComponents;
-        };
+        // Decrease initiative points of the enemy
+        const initiative = self.session.registry.getUnsafe(actor, c.Initiative);
         std.debug.assert(0 < mp and mp <= initiative.move_points);
         initiative.move_points -= mp;
     }

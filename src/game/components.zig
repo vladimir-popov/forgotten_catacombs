@@ -137,7 +137,7 @@ pub const Regeneration = struct {
 
 pub const Speed = struct {
     /// How many move points are needed for moving on the neighbor position
-    move_points: u8,
+    move_points: g.MovePoints,
 
     pub const default: Speed = .{ .move_points = g.MOVE_POINTS_IN_TURN };
 };

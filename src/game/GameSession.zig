@@ -88,7 +88,7 @@ max_depth: u8,
 /// How many turns have passed from the start of this game session
 spent_turns: u32,
 // How many move points spent within the current turn
-spent_move_points: u8,
+spent_move_points: g.MovePoints,
 /// The current mode of the game
 mode: Mode,
 ///
