@@ -75,7 +75,7 @@ pub const Animation = struct {
     is_blocked: bool = false,
 
     pub fn frame(self: *Animation, now: u32) ?g.Codepoint {
-        const frames = FramesPresets.values.get(self.preset);
+        const frames = FramesPresets.fields.get(self.preset);
         if (now - self.previous_render_time > g.RENDER_DELAY_MS) {
             self.previous_render_time = now;
             self.current_frame += 1;
@@ -240,7 +240,7 @@ pub const Weapon = struct {
 };
 
 pub const Effect = struct {
-    pub const Type = enum { physical, burning, corrosion, poisoning, healing };
+    pub const Type = enum { physical, burning, dissolving, poisoning, healing };
     pub const TypesCount = @typeInfo(Type).@"enum".fields.len;
     effect_type: Type,
     min: u8,
@@ -254,8 +254,8 @@ pub const Effect = struct {
         return .{ .effect_type = .burning, .min = min, .max = max };
     }
 
-    pub fn corrosion(min: u8, max: u8) Effect {
-        return .{ .effect_type = .corrosion, .min = min, .max = max };
+    pub fn dissolving(min: u8, max: u8) Effect {
+        return .{ .effect_type = .dissolving, .min = min, .max = max };
     }
 
     pub fn poisoning(min: u8, max: u8) Effect {

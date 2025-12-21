@@ -369,7 +369,7 @@ fn applyEffect(
             );
             return self.applyDamage(actor, target, target_health, damage_value, effect.effect_type);
         },
-        .burning, .corrosion, .poisoning => {
+        .burning, .dissolving, .poisoning => {
             const base_damage = self.session().prng.random().intRangeAtMost(u8, effect.min, effect.max);
             const absorbed_damage: u8 = self.session().prng.random().intRangeAtMost(
                 u8,

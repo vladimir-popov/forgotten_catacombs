@@ -100,7 +100,7 @@ test "Put arrows to quiver" {
     defer test_session.deinit();
 
     const inventory = try test_session.openInventory();
-    const arrows = try inventory.add(g.presets.Items.values.get(.arrows).*);
+    const arrows = try inventory.add(g.presets.Items.get(.arrows));
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
@@ -137,7 +137,7 @@ test "Drink a healing potion" {
 
     test_session.player.health().current = 5;
     var inventory = try test_session.openInventory();
-    const potion = try inventory.add(g.presets.Items.values.get(.healing_potion).*);
+    const potion = try inventory.add(g.presets.Items.get(.healing_potion));
     const options = try inventory.chooseItemById(potion);
     try options.choose("Drink");
     try std.testing.expect(inventory.isClosed());

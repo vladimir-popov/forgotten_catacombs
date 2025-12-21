@@ -4,7 +4,9 @@ const cp = @import("../codepoints.zig");
 const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
-pub const Items = @import("items.zig");
+
+pub const Items = @import("Items.zig");
+pub const Enemies = @import("Enemies.zig");
 
 /// Creates components for the player with empty inventory and nothing equipped.
 ///
@@ -24,27 +26,6 @@ pub fn player(alloc: std.mem.Allocator, stats: c.Stats, skills: c.Skills, health
         .stats = stats,
         .wallet = .{ .money = 0 },
     };
-}
-
-const Rat = archetype.enemy(.{
-    .armor = .init(&.{.physical(0, 1)}),
-    .description = .{ .preset = .rat },
-    .experience = .reward(10),
-    .stats = .zeros,
-    .skills = .zeros,
-    .initiative = .empty,
-    .sprite = .{ .codepoint = 'r' },
-    .health = .{ .max = 10, .current = 10 },
-    .effects = .init(&.{.physical(1, 3)}),
-    .regeneration = .regular,
-    .speed = .{ .move_points = 14 },
-    .state = .sleeping,
-});
-
-pub fn rat(place: p.Point) c.Components {
-    var entity = Rat;
-    entity.position = .{ .zorder = .obstacle, .place = place };
-    return entity;
 }
 
 pub fn openedDoor(place: p.Point) c.Components {

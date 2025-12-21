@@ -230,8 +230,7 @@ pub fn tryGenerateNew(
     const rand = prng.random();
     for (0..rand.uintLessThan(u8, 10) + 10) |_| {
         if (self.randomEmptyPlace(rand)) |place| {
-            const state: c.EnemyState = if (rand.uintLessThan(u8, 5) == 0) .sleeping else .walking;
-            _ = try self.addEnemy(state, g.entities.rat(place));
+            _ = try self.addRandomEnemy(rand, place);
         }
     }
 
@@ -516,5 +515,15 @@ pub fn addEnemy(self: *g.Level, state: c.EnemyState, enemy: c.Components) !g.Ent
     const id = try self.registry.addNewEntity(enemy);
     try self.entities_on_level.append(self.arena.allocator(), id);
     try self.registry.set(id, state);
+    return id;
+}
+
+pub fn addRandomEnemy(self: *g.Level, rand: std.Random, place: p.Point) !g.Entity {
+    const idx = rand.uintLessThan(usize, g.presets.Enemies.fields.values.len);
+    var enemy = g.presets.Enemies.fields.values[idx].*;
+    enemy.position = .{ .place = place, .zorder = .obstacle };
+    enemy.state = if (rand.uintLessThan(u8, 5) == 0) .sleeping else .walking;
+    const id = try self.registry.addNewEntity(enemy);
+    try self.entities_on_level.append(self.arena.allocator(), id);
     return id;
 }

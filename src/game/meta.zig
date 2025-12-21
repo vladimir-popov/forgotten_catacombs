@@ -128,7 +128,7 @@ pub fn fillShop(shop: *c.Shop, registry: *g.Registry, seed: u64) !void {
     const rand = prng.random();
     const count = rand.uintAtMost(usize, 5) + 10;
     // Build a weighted index for all items according to their rarity:
-    var proportions: [g.presets.Items.values.values.len]u8 = undefined;
+    var proportions: [g.presets.Items.fields.values.len]u8 = undefined;
     var i: usize = 0;
     var itr = g.presets.Items.iterator();
     while (itr.next()) |item| {
@@ -137,7 +137,7 @@ pub fn fillShop(shop: *c.Shop, registry: *g.Registry, seed: u64) !void {
     }
     for (0..count) |_| {
         // Choose an item for the shop using the weighted index:
-        const item = g.presets.Items.values.values[rand.weightedIndex(u8, &proportions)];
+        const item = g.presets.Items.fields.values[rand.weightedIndex(u8, &proportions)];
         const entity = try registry.addNewEntity(item.*);
         // Randomly modify a weapon:
         if (isWeapon(registry, entity) and rand.uintAtMost(u8, 100) < 15) {
@@ -155,7 +155,7 @@ fn modifyWeapon(registry: *g.Registry, rand: std.Random, weapon: g.Entity) !void
     weighted_index[@intFromEnum(c.Effect.Type.physical)] = 20;
     weighted_index[@intFromEnum(c.Effect.Type.burning)] = 8;
     weighted_index[@intFromEnum(c.Effect.Type.poisoning)] = 10;
-    weighted_index[@intFromEnum(c.Effect.Type.corrosion)] = 5;
+    weighted_index[@intFromEnum(c.Effect.Type.dissolving)] = 5;
     const effect_type = rand.weightedIndex(u8, &weighted_index);
     const value = rand.intRangeAtMost(i8, -5, 5);
     modification.modificators.values[effect_type] = if (value == 0) -5 else value;

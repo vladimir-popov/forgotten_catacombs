@@ -2,9 +2,10 @@ const std = @import("std");
 
 const Type = std.builtin.Type;
 
-/// Builds a static enum array with constant pointers to default values of fields of S with type T,
-/// and all fields of all inner structures.
-/// It makes possible to get a constant value by its name known only in runtime.
+/// Builds a static enum array with constant pointers to default values of fields of `S` with type `T`,
+/// and all fields with same type of all inner structures.
+/// It makes possible to get a constant value by its name known only in runtime,
+/// and also it solves the issue with getting list of constants within a structure.
 pub fn Preset(comptime T: type, S: type) type {
     const type_info = @typeInfo(S);
     switch (type_info) {
@@ -15,8 +16,13 @@ pub fn Preset(comptime T: type, S: type) type {
         )),
     }
     const fields_count = fieldsCount(S, T);
+    if (fields_count == 0)
+        @compileError(std.fmt.comptimePrint(
+            "To build a preset of {any} from {any} at least one field with type {any} should exist",
+            .{ T, S, T },
+        ));
 
-    const fields = blk: {
+    const all_fields = blk: {
         var acc: [fields_count]Type.StructField = undefined;
         _ = collectFields(&acc, S, T);
         break :blk acc;
@@ -24,7 +30,7 @@ pub fn Preset(comptime T: type, S: type) type {
 
     const s_enum = blk: {
         var efs: [fields_count]Type.EnumField = undefined;
-        for (fields, 0..) |field, i| {
+        for (all_fields, 0..) |field, i| {
             efs[i] = .{ .name = field.name, .value = i };
         }
         break :blk @Type(.{
@@ -44,9 +50,9 @@ pub fn Preset(comptime T: type, S: type) type {
             index: usize = 0,
 
             pub fn next(self: *Iterator) ?*const T {
-                if (self.index < values.values.len) {
+                if (self.index < fields.values.len) {
                     defer self.index += 1;
-                    return values.values[self.index];
+                    return fields.values[self.index];
                 } else {
                     return null;
                 }
@@ -57,17 +63,22 @@ pub fn Preset(comptime T: type, S: type) type {
             return .{};
         }
 
-        pub const values: std.EnumArray(Tag, *const T) = blk: {
+        pub const fields: std.EnumArray(Tag, *const T) = blk: {
             var map = std.EnumArray(Tag, *const T).initUndefined();
-            for (fields, 0..) |field, i| {
+            for (all_fields, 0..) |field, i| {
                 map.set(@enumFromInt(i), @ptrCast(@alignCast(field.default_value_ptr)));
             }
             break :blk map;
         };
 
+        /// Returns a copy of the default value for the field `item`.
+        pub inline fn get(item: Tag) T {
+            return fields.get(item).*;
+        }
+
         /// Gets an enum item, cast it to the string and then casts the string to the `T`.
         pub inline fn castByNameAndGet(item: anytype) *const T {
-            return values.get(std.meta.stringToEnum(Tag, @tagName(item)).?);
+            return fields.get(std.meta.stringToEnum(Tag, @tagName(item)).?);
         }
     };
 }
@@ -119,8 +130,8 @@ test Preset {
         };
     });
 
-    try std.testing.expectEqual(3, p.values.values.len);
-    try std.testing.expectEqualStrings("Hello", p.values.get(.foo).*);
-    try std.testing.expectEqualStrings("world", p.values.get(.bar).*);
-    try std.testing.expectEqualStrings("!", p.values.get(.baz).*);
+    try std.testing.expectEqual(3, p.fields.values.len);
+    try std.testing.expectEqualStrings("Hello", p.fields.get(.foo).*);
+    try std.testing.expectEqualStrings("world", p.fields.get(.bar).*);
+    try std.testing.expectEqualStrings("!", p.fields.get(.baz).*);
 }

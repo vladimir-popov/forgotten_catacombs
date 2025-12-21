@@ -130,6 +130,14 @@ pub const Enemies = struct {
             "forgotten cellars.",
         },
     },
+    snake: Description = .{
+        .name = "Snake",
+        .description = &.{
+            "A silent reptile with a venomous",
+            "bite. Inflicts poison at close",
+            "range.",
+        },
+    },
     wolf: Description = .{
         .name = "Wolf",
         .description = &.{
@@ -327,11 +335,11 @@ pub fn printName(dest: []u8, journal: g.Journal, entity: g.Entity) ![]u8 {
         return try std.fmt.bufPrint(
             dest,
             "{s} {d}",
-            .{ g.presets.Descriptions.values.get(tuple[0].preset).name, tuple[1].amount },
+            .{ g.presets.Descriptions.fields.get(tuple[0].preset).name, tuple[1].amount },
         );
     }
     if (journal.registry.get(entity, c.Description)) |description| {
-        return try std.fmt.bufPrint(dest, "{s}", .{g.presets.Descriptions.values.get(description.preset).name});
+        return try std.fmt.bufPrint(dest, "{s}", .{g.presets.Descriptions.fields.get(description.preset).name});
     }
     return try std.fmt.bufPrint(dest, "Unknown", .{});
 }
@@ -484,7 +492,7 @@ fn writeActualDescription(
         }
     }
     const description = if (journal.registry.get(entity, c.Description)) |descr|
-        g.presets.Descriptions.values.get(descr.preset).description
+        g.presets.Descriptions.fields.get(descr.preset).description
     else
         &.{};
     for (description) |str| {
@@ -703,7 +711,7 @@ test "Describe a player" {
 
     const player = try registry.addNewEntity(try g.entities.player(alloc, .zeros, .zeros, .init(30)));
     const equipmen = registry.getUnsafe(player, c.Equipment);
-    equipmen.weapon = try registry.addNewEntity(g.presets.Items.values.get(.torch).*);
+    equipmen.weapon = try registry.addNewEntity(g.presets.Items.fields.get(.torch).*);
 
     // when:
     try describePlayer(alloc, journal, player, &text_area);
@@ -746,7 +754,7 @@ test "Describe an unknown rat" {
     var journal = try g.Journal.init(std.testing.allocator, &registry, std.testing.random_seed);
     defer journal.deinit(std.testing.allocator);
 
-    const id = try registry.addNewEntity(g.entities.rat(.{ .row = 1, .col = 1 }));
+    const id = try registry.addNewEntity(g.presets.Enemies.get(.rat));
     var text_area: g.windows.TextArea = .empty;
     defer text_area.deinit(std.testing.allocator);
 
@@ -771,7 +779,7 @@ test "Describe a known rat" {
     var journal = try g.Journal.init(std.testing.allocator, &registry, std.testing.random_seed);
     defer journal.deinit(std.testing.allocator);
 
-    const id = try registry.addNewEntity(g.entities.rat(.{ .row = 1, .col = 1 }));
+    const id = try registry.addNewEntity(g.presets.Enemies.get(.rat));
     try journal.markEnemyAsKnown(g.meta.isEnemy(&registry, id) orelse unreachable);
     var text_area: g.windows.TextArea = .empty;
     defer text_area.deinit(std.testing.allocator);
@@ -801,7 +809,7 @@ test "Describe a torch" {
     var journal = try g.Journal.init(std.testing.allocator, &registry, std.testing.random_seed);
     defer journal.deinit(std.testing.allocator);
 
-    const id = try registry.addNewEntity(g.presets.Items.values.get(.torch).*);
+    const id = try registry.addNewEntity(g.presets.Items.fields.get(.torch).*);
     var text_area: g.windows.TextArea = .empty;
     defer text_area.deinit(std.testing.allocator);
 
@@ -833,7 +841,7 @@ test "Describe a bow" {
     var journal = try g.Journal.init(std.testing.allocator, &registry, std.testing.random_seed);
     defer journal.deinit(std.testing.allocator);
 
-    const id = try registry.addNewEntity(g.presets.Items.values.get(.short_bow).*);
+    const id = try registry.addNewEntity(g.presets.Items.fields.get(.short_bow).*);
     var text_area: g.windows.TextArea = .empty;
     defer text_area.deinit(std.testing.allocator);
 

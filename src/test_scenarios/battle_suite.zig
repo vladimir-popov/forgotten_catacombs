@@ -56,7 +56,7 @@ test "The arrows entity should be removed when the last arrow was issued" {
 fn initFirstLevelWithRat(test_session: *TestSession) !g.Entity {
     // Prepare a game session:
     const pp = test_session.player.position().place.movedToNTimes(.up, 4);
-    const rat = try test_session.session.level.addEnemy(.sleeping, g.entities.rat(pp));
+    const rat = try test_session.session.level.addEnemy(.sleeping, g.entities.Enemies.atPlace(.rat, pp));
 
     // The initial game state:
     try test_session.tick();
@@ -80,8 +80,8 @@ fn initFirstLevelWithRat(test_session: *TestSession) !g.Entity {
 
 fn equipBowAndArrows(test_session: *TestSession) !struct { g.Entity, g.Entity } {
     const inventory = try test_session.openInventory();
-    const arrows_id = try inventory.add(g.presets.Items.values.get(.arrows).*);
-    const bow_id = try inventory.add(g.presets.Items.values.get(.short_bow).*);
+    const arrows_id = try inventory.add(g.presets.Items.get(.arrows));
+    const bow_id = try inventory.add(g.presets.Items.get(.short_bow));
     var options = try inventory.chooseItemById(arrows_id);
     try options.choose("Put to quiver");
     try std.testing.expectEqual(arrows_id, test_session.player.equipment().ammunition);
