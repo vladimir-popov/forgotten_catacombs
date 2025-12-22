@@ -32,8 +32,6 @@ const NotificationMessage = struct {
     len: u8 = 0,
     /// when the notification appears on a screen
     start_showing_at: c_uint,
-    /// how long the notification should be shown
-    show_for_ms: u16 = SHOW_NOTIFICATION_MS,
     /// where to place the first latter of the notification
     pp: p.Point,
     /// which mode should be used to show the notification
@@ -44,31 +42,59 @@ const NotificationMessage = struct {
         return .{ .top_left = self.pp, .rows = 1, .cols = @intCast(self.len) };
     }
 
+    /// Precalculates a notification message from a notification.
+    /// Text, position and mode will be calculate once to show the message every tick for the whole delay.
     pub fn init(notification: g.notifications.Notification, session: *const g.GameSession) !NotificationMessage {
-        var msg: NotificationMessage = undefined;
-        msg.start_showing_at = session.runtime.currentMillis();
+        var msg: NotificationMessage = .{
+            // Start calculation of the place to show from the player place on the screen
+            .pp = session.viewport.relative(session.level.playerPosition().place),
+            .start_showing_at = session.runtime.currentMillis(),
+            .mode = switch (notification) {
+                .exp => .inverted,
+                else => .normal,
+            },
+        };
         msg.len = @intCast((try std.fmt.bufPrint(&msg.buffer, "{f}", .{notification})).len);
         const half: u8 = msg.len / 2;
+        const display_region = p.Region.init(1, 1, session.viewport.region.rows, session.viewport.region.cols);
 
-        msg.pp = session.viewport.relative(session.level.playerPosition().place);
-        if (msg.pp.col > half) msg.pp.col -= half;
-        if (msg.pp.col + half > g.DISPLAY_COLS) msg.pp.col -= msg.len;
+        // The notification should not hide the current enemy (but it could be dead and removed at
+        // this moment, for example, when we're showing a notification about receiving exp)
+        const maybe_enemy_position = switch (notification) {
+            .hit => |hit| session.registry.get(hit.target, c.Position),
+            .damage => |damage| session.registry.get(damage.actor, c.Position),
+            .miss => |miss| session.registry.get(miss.target, c.Position),
+            .dodge => |dodge| session.registry.get(dodge.actor, c.Position),
+            else => null,
+        };
+        const enemy_pp = if (maybe_enemy_position) |pos| session.viewport.relative(pos.place) else msg.pp;
 
-        if (msg.pp.row > session.notifications.items.len)
-            msg.pp.row -= @intCast(session.notifications.items.len)
-        else
-            msg.pp.row += @intCast(session.notifications.items.len);
-        // msg.pp = .init(1, self.viewport.relative(self.level.playerPosition().place).col - half);
-
-        switch (notification) {
-            .exp => {
-                msg.mode = .inverted;
-                msg.show_for_ms = 2 * SHOW_NOTIFICATION_MS;
-            },
-            else => {
-                msg.mode = .normal;
-                msg.show_for_ms = SHOW_NOTIFICATION_MS;
-            },
+        // Trying to place the notification relative to the player in follow order:
+        const relative_positions = [_]p.Direction{ .up, .down, .right, .left };
+        for (relative_positions) |direction| {
+            switch (direction) {
+                .up, .down => {
+                    msg.pp.move(direction);
+                    // trying to center the notification
+                    if (msg.pp.col > half) msg.pp.col -= half;
+                    if (msg.pp.col + half >= display_region.cols) msg.pp.col -= half;
+                },
+                .right => {
+                    msg.pp.move(direction);
+                },
+                .left => {
+                    msg.pp.moveNTimes(.left, msg.len);
+                },
+            }
+            const is_first_letter_on_screen = display_region.containsPoint(msg.pp);
+            const is_last_letter_on_screen = display_region.containsPoint(msg.pp.movedToNTimes(.right, msg.len));
+            if (is_first_letter_on_screen and is_last_letter_on_screen and !msg.region().containsPoint(enemy_pp)) {
+                // all done
+                break;
+            } else {
+                // reset the point and try another direction
+                msg.pp = session.viewport.relative(session.level.playerPosition().place);
+            }
         }
         return msg;
     }
@@ -257,25 +283,28 @@ fn handleInput(self: *Self) !?g.actions.Action {
 }
 
 /// If returns true then the input should be ignored
-/// until all frames from all blocked animations will be drawn.
+/// until all notifications and all frames from all blocked animations will be drawn.
 fn draw(self: *Self) !bool {
-    var hold_input = false;
     if (self.quick_actions_window == null) {
         try self.drawInfoBar();
         const level = &self.session.level;
-        try self.session.render.drawDungeon(self.session.viewport, level);
+        try self.session.render.drawDungeonToBuffer(self.session.viewport, level);
         try self.session.render.drawSpritesToBuffer(self.session.viewport, level, self.target);
-        hold_input = try self.drawAnimationsFrames() or try self.showNotifications();
+        const blocked_animation = try self.drawAnimationsFramesToBuffer();
         try self.session.render.drawChangedSymbols();
+        const notification_shown = try self.showNotifications();
+        if (blocked_animation or notification_shown) {
+            try self.session.runtime.cleanInputBuffer();
+            return true;
+        }
     }
-    if (hold_input) try self.session.runtime.cleanInputBuffer();
-    return hold_input;
+    return false;
 }
 
 /// Draws a single frame from every animation.
 /// Removes the animation if the last frame was drawn.
 /// Returns true if one of animation is blocked.
-pub fn drawAnimationsFrames(self: Self) !bool {
+pub fn drawAnimationsFramesToBuffer(self: Self) !bool {
     const now: c_uint = self.session.runtime.currentMillis();
     var was_blocked_animation: bool = false;
     var itr = self.session.level.registry.query2(c.Position, c.Animation);
@@ -306,7 +335,7 @@ pub fn drawAnimationsFrames(self: Self) !bool {
 
 fn showNotifications(self: *Self) !bool {
     if (self.notification) |msg| {
-        if (self.session.runtime.currentMillis() - msg.start_showing_at > msg.show_for_ms) {
+        if (self.session.runtime.currentMillis() - msg.start_showing_at > SHOW_NOTIFICATION_MS) {
             try self.session.render.redrawRegionFromSceneBuffer(msg.region());
             self.notification = null;
             return false;

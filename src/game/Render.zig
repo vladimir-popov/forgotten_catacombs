@@ -74,7 +74,7 @@ pub fn deinit(self: *Render) void {
 /// Draws the dungeon and visible sprites on the screen.
 pub fn drawScene(self: Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
     const level = &session.level;
-    try self.drawDungeon(session.viewport, level);
+    try self.drawDungeonToBuffer(session.viewport, level);
     try self.drawSpritesToBuffer(session.viewport, level, entity_in_focus);
     try self.drawChangedSymbols();
 }
@@ -92,7 +92,7 @@ pub inline fn clearDisplay(self: Render) !void {
     try self.runtime.clearDisplay();
 }
 
-pub fn drawDungeon(self: Render, viewport: g.Viewport, level: *g.Level) anyerror!void {
+pub fn drawDungeonToBuffer(self: Render, viewport: g.Viewport, level: *g.Level) anyerror!void {
     var itr = level.dungeon.cellsInRegion(viewport.region);
     var place = viewport.region.top_left;
     while (itr.next()) |cell| {
@@ -428,6 +428,19 @@ fn drawTextWithMaxLength(
         if (lines >= max_length) break;
 
         try self.drawSymbol(symbol, point, mode);
+        point.move(.right);
+    }
+}
+
+pub fn drawTextToBuffer(
+    self: Render,
+    ascii_text: []const u8,
+    position_on_display: p.Point,
+    mode: g.DrawingMode,
+) !void {
+    var point = position_on_display;
+    for (ascii_text) |symbol| {
+        self.scene_buffer.setSymbol(point, symbol, mode, 3);
         point.move(.right);
     }
 }
