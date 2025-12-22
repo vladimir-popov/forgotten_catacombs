@@ -59,12 +59,14 @@ pub fn main() !void {
     defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK DETECTED!");
     const alloc = gpa.allocator();
 
+    var single_threaded_io: std.Io.Threaded = .init_single_threaded;
+
     const use_cheats = Args.flag("devmode");
     const use_mouse = Args.flag("mouse");
     const preset = if (Args.str("preset")) |preset| parsePreset(preset) else null;
 
     var runtime = try TtyRuntime.TtyRuntime(g.DISPLAY_ROWS + 2, g.DISPLAY_COLS + 2)
-        .init(alloc, true, true, use_cheats, use_mouse);
+        .init(alloc, single_threaded_io.ioBasic(), true, true, use_cheats, use_mouse);
     defer runtime.deinit();
 
     if (use_cheats) {

@@ -5,7 +5,7 @@ const TestSession = @import("utils/TestSession.zig");
 
 test "Shoot at the target" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty(std.testing.allocator);
+    try test_session.initEmpty(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
     errdefer test_session.printDisplay();
 
@@ -28,7 +28,7 @@ test "Shoot at the target" {
 
 test "The arrows entity should be removed when the last arrow was issued" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty(std.testing.allocator);
+    try test_session.initEmpty(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
     errdefer test_session.printDisplay();
 

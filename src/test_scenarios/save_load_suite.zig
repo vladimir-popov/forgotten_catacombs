@@ -4,7 +4,7 @@ const TestSession = @import("utils/TestSession.zig");
 
 test "Saving a game session and go back to the main menu" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty(std.testing.allocator);
+    try test_session.initEmpty(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
 
     test_session.session.switchModeToSavingSession();
@@ -65,7 +65,7 @@ test "Loading a game session" {
     _ = try level0_file.write(@embedFile("resources/level_0.json"));
 
     var test_session: TestSession = undefined;
-    try test_session.load(std.testing.allocator, tmp_dir);
+    try test_session.load(std.testing.allocator, std.testing.io, tmp_dir);
     defer test_session.deinit();
 
     try std.testing.expectEqual(.load_session, test_session.session.mode.save_load.process.loading.progress);

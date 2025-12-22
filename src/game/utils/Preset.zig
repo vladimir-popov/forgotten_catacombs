@@ -29,18 +29,19 @@ pub fn Preset(comptime T: type, S: type) type {
     };
 
     const s_enum = blk: {
-        var efs: [fields_count]Type.EnumField = undefined;
+        const TagInt = std.math.IntFittingRange(0, fields_count - 1);
+        var names: [fields_count][]const u8 = undefined;
+        var values: [fields_count]TagInt = undefined;
         for (all_fields, 0..) |field, i| {
-            efs[i] = .{ .name = field.name, .value = i };
+            names[i] = field.name;
+            values[i] = i;
         }
-        break :blk @Type(.{
-            .@"enum" = .{
-                .tag_type = std.math.IntFittingRange(0, efs.len - 1),
-                .fields = &efs,
-                .decls = &.{},
-                .is_exhaustive = true,
-            },
-        });
+        break :blk @Enum(
+            TagInt,
+            .exhaustive,
+            &names,
+            &values,
+        );
     };
 
     return struct {

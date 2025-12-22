@@ -33,7 +33,7 @@ pub const Notification = union(enum) {
             .hit => |hit| try writer.print("Hit {d}", .{hit.damage}),
             .damage => |dmg| {
                 if (dmg.damage_type == .physical)
-                    try writer.print("-{d} damage", .{ dmg.damage })
+                    try writer.print("-{d} damage", .{dmg.damage})
                 else
                     try writer.print("-{d} {t}", .{ dmg.damage, dmg.damage_type });
             },

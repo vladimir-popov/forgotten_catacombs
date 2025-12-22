@@ -21,17 +21,17 @@ pub fn ComponentsMap(comptime ComponentsStruct: anytype) type {
         @compileError("At least one component should exist");
     }
 
-    var components: [struct_fields.len]Type.StructField = undefined;
+    var names: [struct_fields.len][]const u8 = undefined;
+    var types: [struct_fields.len]type = undefined;
+    var attrs: [struct_fields.len]Type.StructField.Attributes = undefined;
     // every field inside the ComponentsStruct should be optional, but we need their child types
     for (struct_fields, 0..) |field, i| {
         switch (@typeInfo(field.type)) {
             .optional => |opt| {
-                components[i] = .{
-                    .name = @typeName(opt.child),
-                    .type = ArraySet(opt.child),
-                    .default_value_ptr = null,
-                    .is_comptime = false,
-                    .alignment = @alignOf(ArraySet(opt.child)),
+                names[i] = @typeName(opt.child);
+                types[i] = ArraySet(opt.child);
+                attrs[i] = .{
+                    .@"align" = @alignOf(ArraySet(opt.child)),
                 };
             },
             else => {
@@ -43,12 +43,11 @@ pub fn ComponentsMap(comptime ComponentsStruct: anytype) type {
         }
     }
 
-    return @Type(.{
-        .@"struct" = .{
-            .layout = .auto,
-            .fields = components[0..],
-            .decls = &[_]std.builtin.Type.Declaration{},
-            .is_tuple = false,
-        },
-    });
+    return @Struct(
+        .auto,
+        null,
+        names[0..],
+        &types,
+        &attrs,
+    );
 }

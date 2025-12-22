@@ -4,7 +4,7 @@ const TestSession = @import("utils/TestSession.zig");
 
 test "Change a target to an atacked enemy" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty(std.testing.allocator);
+    try test_session.initEmpty(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
     errdefer test_session.printDisplay();
 
@@ -49,7 +49,7 @@ test "Change a target to an atacked enemy" {
 
 test "Lose target on moving away" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty(std.testing.allocator);
+    try test_session.initEmpty(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
     errdefer test_session.printDisplay();
 

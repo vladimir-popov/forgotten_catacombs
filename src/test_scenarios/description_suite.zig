@@ -4,7 +4,7 @@ const TestSession = @import("utils/TestSession.zig");
 
 test "Describe an item" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty(std.testing.allocator);
+    try test_session.initEmpty(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
 
     const inventory = try test_session.openInventory();
@@ -27,7 +27,7 @@ test "Describe an item" {
 
 test "Describe an unknown potion" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty(std.testing.allocator);
+    try test_session.initEmpty(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
 
     const inventory = try test_session.openInventory();
@@ -51,7 +51,7 @@ test "Describe an unknown potion" {
 
 test "Describe a known potion (after drinking a similar)" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty(std.testing.allocator);
+    try test_session.initEmpty(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
 
     // Drink a potion:
@@ -82,7 +82,7 @@ test "Describe a known potion (after drinking a similar)" {
 
 test "Describe an unknown enemy" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty(std.testing.allocator);
+    try test_session.initEmpty(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
     errdefer test_session.printDisplay();
 
@@ -112,7 +112,7 @@ test "Describe an unknown enemy" {
 
 test "Describe a known enemy (after killing a similar creature)" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty(std.testing.allocator);
+    try test_session.initEmpty(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
     errdefer test_session.printDisplay();
 

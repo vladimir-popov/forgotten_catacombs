@@ -9,6 +9,7 @@ const Menu = terminal.TtyRuntime.Menu;
 const Self = @This();
 
 alloc: std.mem.Allocator,
+io: std.Io,
 test_dir: std.fs.Dir,
 menu: Menu(g.DISPLAY_ROWS, g.DISPLAY_COLS),
 display: Frame = .empty,
@@ -18,9 +19,10 @@ pushed_buttons: std.ArrayListUnmanaged(?g.Button) = .empty,
 is_dev_mode: bool = false,
 cheat: ?g.Cheat = null,
 
-pub fn init(alloc: std.mem.Allocator, working_dir: std.fs.Dir) !Self {
+pub fn init(alloc: std.mem.Allocator, io: std.Io, working_dir: std.fs.Dir) !Self {
     return .{
         .alloc = alloc,
+        .io = io,
         .test_dir = working_dir,
         .menu = try Menu(g.DISPLAY_ROWS, g.DISPLAY_COLS).init(alloc),
     };
@@ -54,8 +56,10 @@ pub fn runtime(self: *Self) g.Runtime {
     };
 }
 
-fn currentMillis(_: *anyopaque) c_uint {
-    return @truncate(@as(u64, @intCast(std.time.milliTimestamp())));
+fn currentMillis(ptr: *anyopaque) c_uint {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    const now = std.Io.Clock.awake.now(self.io) catch unreachable;
+    return @truncate(@as(u64, @intCast(now.toMilliseconds())));
 }
 
 fn addMenuItem(
@@ -110,7 +114,8 @@ fn openFile(ptr: *anyopaque, file_path: []const u8, mode: g.Runtime.FileMode, bu
     const file_wrapper = try self.alloc.create(terminal.TtyRuntime.FileWrapper);
     file_wrapper.* = switch (mode) {
         .read => .{
-            .reader = (try self.test_dir.openFile(file_path, .{ .mode = std.fs.File.OpenMode.read_only })).reader(buffer),
+            .reader = (try self.test_dir.openFile(file_path, .{ .mode = std.fs.File.OpenMode.read_only }))
+                .reader(self.io, buffer),
         },
         .write => .{
             .writer = (try self.test_dir.createFile(file_path, .{})).writer(buffer),
@@ -127,7 +132,7 @@ fn closeFile(ptr: *anyopaque, file: *anyopaque) void {
             std.debug.panic("Error on flushing file {any}: {any}", .{ file, err });
         };
     switch (file_wrapper.*) {
-        .reader => file_wrapper.reader.file.close(),
+        .reader => file_wrapper.reader.file.close(self.io),
         .writer => file_wrapper.writer.file.close(),
     }
     self.alloc.destroy(file_wrapper);

@@ -4,7 +4,7 @@ const TestSession = @import("utils/TestSession.zig");
 
 test "Rendering initial inventory" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty(std.testing.allocator);
+    try test_session.initEmpty(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
 
     _ = try test_session.openInventory();
@@ -25,7 +25,7 @@ test "Rendering initial inventory" {
 
 test "Unequip torch" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty(std.testing.allocator);
+    try test_session.initEmpty(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
 
     var inventory = try test_session.openInventory();
@@ -60,7 +60,7 @@ test "Unequip torch" {
 
 test "Use torch as a weapon" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty(std.testing.allocator);
+    try test_session.initEmpty(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
 
     const inventory = try test_session.openInventory();
@@ -96,7 +96,7 @@ test "Use torch as a weapon" {
 
 test "Put arrows to quiver" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty(std.testing.allocator);
+    try test_session.initEmpty(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
 
     const inventory = try test_session.openInventory();
@@ -132,7 +132,7 @@ test "Put arrows to quiver" {
 
 test "Drink a healing potion" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty(std.testing.allocator);
+    try test_session.initEmpty(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
 
     test_session.player.health().current = 5;

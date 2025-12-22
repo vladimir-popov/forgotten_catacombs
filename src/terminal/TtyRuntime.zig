@@ -28,7 +28,7 @@ pub fn disableGameMode() !void {
     try tty.Display.showCursor();
 }
 
-fn handleWindowResize(_: i32) callconv(.c) void {
+fn handleWindowResize(_: std.c.SIG) callconv(.c) void {
     window_size = tty.Display.getWindowSize() catch unreachable;
     tty.Display.clearScreen() catch unreachable;
     if (should_render_in_center) {
@@ -49,6 +49,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
         const menu_cols = (display_cols - 2) / 2;
 
         termios: std.c.termios,
+        io: std.Io,
         alloc: std.mem.Allocator,
         // The main buffer to render the game
         buffer: DisplayBuffer(display_rows, display_cols),
@@ -68,6 +69,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
 
         pub fn init(
             alloc: std.mem.Allocator,
+            io: std.Io,
             draw_border: bool,
             render_in_center: bool,
             is_dev_mode: bool,
@@ -75,6 +77,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
         ) !Self {
             const instance = Self{
                 .alloc = alloc,
+                .io = io,
                 .buffer = try DisplayBuffer(display_rows, display_cols).init(alloc),
                 .menu = try Menu(display_rows, menu_cols).init(alloc),
                 .cmd = try Cmd(display_cols - 2).init(alloc),
@@ -122,7 +125,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
         pub fn run(self: *Self, game: anytype) !void {
             var buffer: [2048]u8 = undefined;
             var stdout = std.fs.File.stdout().writer(&buffer);
-            handleWindowResize(0);
+            handleWindowResize(std.c.SIG.WINCH);
             while (!self.is_exit) {
                 if (self.menu.is_shown) {
                     try self.menu.buffer.writeBuffer(
@@ -176,8 +179,10 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             self.keyboard_buffer = null;
         }
 
-        fn currentMillis(_: *anyopaque) c_uint {
-            return @truncate(@as(u64, @intCast(std.time.milliTimestamp())));
+        fn currentMillis(ptr: *anyopaque) c_uint {
+            const self: *Self = @ptrCast(@alignCast(ptr));
+            const now = std.Io.Clock.awake.now(self.io) catch unreachable;
+            return @truncate(@as(u64, @intCast(now.toMilliseconds())));
         }
 
         fn addMenuItem(
@@ -282,7 +287,8 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             const file_wrapper = try self.alloc.create(FileWrapper);
             file_wrapper.* = switch (mode) {
                 .read => .{
-                    .reader = (try self.saves_dir.openFile(file_path, .{ .mode = std.fs.File.OpenMode.read_only })).reader(buffer),
+                    .reader = (try self.saves_dir.openFile(file_path, .{ .mode = std.fs.File.OpenMode.read_only }))
+                        .reader(self.io, buffer),
                 },
                 .write => .{
                     .writer = (try self.saves_dir.createFile(file_path, .{})).writer(buffer),
@@ -299,7 +305,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                     std.debug.panic("Error on flushing file {any}: {any}", .{ file, err });
                 };
             switch (file_wrapper.*) {
-                .reader => file_wrapper.reader.file.close(),
+                .reader => file_wrapper.reader.file.close(self.io),
                 .writer => file_wrapper.writer.file.close(),
             }
             self.alloc.destroy(file_wrapper);

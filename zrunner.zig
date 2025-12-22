@@ -86,6 +86,9 @@ pub fn main() !void {
     var gpa: std.heap.DebugAllocator(.{}) = .{};
     defer if (gpa.deinit() == .leak) unreachable;
 
+    var threaded: std.Io.Threaded = .init(gpa.allocator());
+    defer threaded.deinit();
+
     var args = try std.process.argsWithAllocator(gpa.allocator());
     defer args.deinit();
 
@@ -159,11 +162,12 @@ pub fn main() !void {
         reporter.config = .no_color;
     }
 
-    try run(&arena, process_name, test_filter, &reporter, failed_only, no_stack_trace);
+    try run(&arena, threaded.io(), process_name, test_filter, &reporter, failed_only, no_stack_trace);
 }
 
 pub fn run(
     arena: *std.heap.ArenaAllocator,
+    io: std.Io,
     process_name: []const u8,
     test_filter: ?[]const u8,
     reporter: anytype,
@@ -192,7 +196,7 @@ pub fn run(
     };
 
     try reporter.writeTitle(report.process_name, test_filter, tests.len);
-    try runTests(arena, tests, &report, no_stack_trace);
+    try runTests(arena, io, tests, &report, no_stack_trace);
     try writeTestResults(arena, reporter, report, failed_only);
     try reporter.writeSummary(
         report.passed_count,
@@ -204,7 +208,13 @@ pub fn run(
     if (report.failed_count != 0 or report.is_mem_leak) std.process.exit(1);
 }
 
-fn runTests(arena: *std.heap.ArenaAllocator, tests: []const TestFn, report: *Report, no_stack_trace: bool) !void {
+fn runTests(
+    arena: *std.heap.ArenaAllocator,
+    io: std.Io,
+    tests: []const TestFn,
+    report: *Report,
+    no_stack_trace: bool,
+) !void {
     if (tests.len == 0) return;
 
     var total_timer: std.time.Timer = try std.time.Timer.start();
@@ -213,7 +223,7 @@ fn runTests(arena: *std.heap.ArenaAllocator, tests: []const TestFn, report: *Rep
         const t = Test.wrap(test_fn);
 
         // Run tests:
-        report.test_results[idx] = try t.run(arena, &test_timer, no_stack_trace);
+        report.test_results[idx] = try t.run(arena, io, &test_timer, no_stack_trace);
 
         switch (report.test_results[idx]) {
             .passed => {
@@ -291,14 +301,25 @@ const Test = struct {
     }
 
     /// Runs the test and builds the result. Marks a test thrown the error.SkipZigTest as skipped.
-    fn run(self: Test, arena: *std.heap.ArenaAllocator, timer: *std.time.Timer, no_stack_trace: bool) !TestResult {
+    fn run(
+        self: Test,
+        arena: *std.heap.ArenaAllocator,
+        io: std.Io,
+        timer: *std.time.Timer,
+        no_stack_trace: bool,
+    ) !TestResult {
+        var is_mem_leak: bool = false;
+        std.testing.allocator_instance = .{};
+        std.testing.io_instance = .init(std.testing.allocator);
+        defer {
+            std.testing.io_instance.deinit();
+            is_mem_leak = (std.testing.allocator_instance.deinit() == .leak);
+        }
         var test_result: TestResult = undefined;
         timer.reset();
+
         const result = self.test_fn.func();
         const duration = Duration.fromNanos(timer.read());
-
-        const is_mem_leak = (std.testing.allocator_instance.deinit() == .leak);
-        std.testing.allocator_instance = .{};
 
         if (result) |_| {
             test_result = .{
@@ -311,15 +332,18 @@ const Test = struct {
             else => {
                 var str: []u8 = &.{};
                 if (!no_stack_trace) {
-                    if (@errorReturnTrace()) |st| {
+                    if (@errorReturnTrace()) |trace| {
                         var stack_trace_writer = std.Io.Writer.Allocating.init(arena.allocator());
-                        // skip frame from the testing.zig:
-                        while (isTestingZig(st.instruction_addresses[0])) {
-                            st.index -= 1;
-                            st.instruction_addresses = st.instruction_addresses[1..];
-                        }
-                        try st.format(&stack_trace_writer.writer);
-                        str = stack_trace_writer.written();
+                        if (std.debug.getSelfDebugInfo()) |di| {
+                            const di_gpa = std.debug.getDebugInfoAllocator();
+                            // skip frame from the testing.zig:
+                            while (isTestingZig(di_gpa, io, di, trace.instruction_addresses[0])) {
+                                trace.index -= 1;
+                                trace.instruction_addresses = trace.instruction_addresses[1..];
+                            }
+                            try std.debug.writeStackTrace(trace, &stack_trace_writer.writer, .no_color);
+                            str = stack_trace_writer.written();
+                        } else |_| {}
                     }
                 }
                 test_result = TestResult{
@@ -337,13 +361,11 @@ const Test = struct {
     }
 
     /// Returns true only if the address is point on some place inside `testing.zig` file.
-    fn isTestingZig(address: usize) bool {
-        const debug_info = std.debug.getSelfDebugInfo() catch return false;
-        const module = debug_info.getModuleForAddress(address) catch return false;
-        const symbol = module.getSymbolAtAddress(debug_info.allocator, address) catch return false;
+    fn isTestingZig(alloc: std.mem.Allocator, io: std.Io, debug_info: *std.debug.SelfInfo, address: usize) bool {
+        const symbol = debug_info.getSymbol(alloc, io, address) catch return false;
         if (symbol.source_location) |sl| {
             const result = std.mem.endsWith(u8, sl.file_name, "testing.zig");
-            debug_info.allocator.free(sl.file_name);
+            alloc.free(sl.file_name);
             return result;
         }
         return false;

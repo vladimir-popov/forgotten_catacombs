@@ -46,7 +46,7 @@ pub const Event = union(enum) {
     mode_changed: ModeChanged,
     player_turn_completed: PlayerTurnCompleted,
 
-    pub fn get(self: Event, comptime tag: Tag) ?std.meta.TagPayload(Event, tag) {
+    pub fn get(self: Event, comptime tag: Tag) ?@FieldType(Event, @tagName(tag)) {
         switch (self) {
             tag => |v| return v,
             else => return null,

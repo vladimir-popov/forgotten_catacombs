@@ -13,7 +13,7 @@ test {
 
 test "Hello world!" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty(std.testing.allocator);
+    try test_session.initEmpty(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
 
     try test_session.tick();

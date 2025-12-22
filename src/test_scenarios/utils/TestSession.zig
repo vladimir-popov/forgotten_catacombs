@@ -17,12 +17,12 @@ player: Player,
 tmp_dir: std.testing.TmpDir,
 
 /// Creates a new game session with TestRuntime and the first level.
-pub fn initEmpty(self: *Self, gpa: std.mem.Allocator) !void {
+pub fn initEmpty(self: *Self, gpa: std.mem.Allocator, io: std.Io) !void {
     self.tmp_dir = std.testing.tmpDir(.{});
     self.arena = std.heap.ArenaAllocator.init(gpa);
     const arena_alloc = self.arena.allocator();
     log.info("Test directory is {s}", .{try self.tmp_dir.dir.realpathAlloc(arena_alloc, ".")});
-    self.runtime = try TestRuntime.init(arena_alloc, self.tmp_dir.dir);
+    self.runtime = try TestRuntime.init(arena_alloc, io, self.tmp_dir.dir);
     try self.render.init(arena_alloc, self.runtime.runtime(), g.DISPLAY_ROWS, g.DISPLAY_COLS);
     try self.session.initNew(
         arena_alloc,
@@ -38,11 +38,11 @@ pub fn initEmpty(self: *Self, gpa: std.mem.Allocator) !void {
     self.runtime.display.merge(self.runtime.last_frame);
 }
 
-pub fn load(self: *Self, gpa: std.mem.Allocator, working_dir: std.testing.TmpDir) !void {
+pub fn load(self: *Self, gpa: std.mem.Allocator, io: std.Io, working_dir: std.testing.TmpDir) !void {
     self.tmp_dir = working_dir;
     self.arena = std.heap.ArenaAllocator.init(gpa);
     const arena_alloc = self.arena.allocator();
-    self.runtime = try TestRuntime.init(arena_alloc, self.tmp_dir.dir);
+    self.runtime = try TestRuntime.init(arena_alloc, io, self.tmp_dir.dir);
     try self.render.init(arena_alloc, self.runtime.runtime(), g.DISPLAY_ROWS, g.DISPLAY_COLS);
     try self.session.preInit(
         arena_alloc,
