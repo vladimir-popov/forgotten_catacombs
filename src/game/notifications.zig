@@ -12,15 +12,16 @@ pub const Notification = union(enum) {
     },
     /// The player was hit
     damage: struct {
+        actor: g.Entity,
         damage: u8,
         damage_type: c.Effect.Type,
     },
     /// The player received experience points
     exp: u16,
     /// The enemy dodged
-    miss,
+    miss: struct { target: g.Entity },
     /// The player dodged
-    dodge,
+    dodge: struct { actor: g.Entity },
     /// The quiver is empty
     no_ammo,
     /// The weapon requires different type of the ammo

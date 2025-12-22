@@ -41,6 +41,7 @@ pub fn runtime(self: *Self) g.Runtime {
             .removeAllMenuItems = removeAllMenuItems,
             .currentMillis = currentMillis,
             .readPushedButtons = readPushedButtons,
+            .cleanInputBuffer = cleanInputBuffer,
             .clearDisplay = clearDisplay,
             .drawSprite = drawSprite,
             .openFile = openFile,
@@ -75,6 +76,11 @@ fn removeAllMenuItems(ptr: *anyopaque) void {
 fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
     const self: *Self = @ptrCast(@alignCast(ptr));
     return if (self.pushed_buttons.pop()) |maybe_button| maybe_button else null;
+}
+
+fn cleanInputBuffer(ptr: *anyopaque) anyerror!void {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    self.pushed_buttons.clearRetainingCapacity();
 }
 
 fn isDevMode(ptr: *anyopaque) bool {

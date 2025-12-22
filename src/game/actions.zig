@@ -6,7 +6,7 @@ const p = g.primitives;
 
 const log = std.log.scoped(.actions);
 
-pub const MovePoints = u5;
+pub const MovePoints = u8;
 
 /// The intension to perform an action.
 /// Describes what some entity is going to do.
@@ -53,8 +53,8 @@ pub const Action = union(enum) {
     pub fn priority(self: Action) u8 {
         return switch (self) {
             .do_nothing => 0,
-            .move_to_level => 10,
-            .hit => 9,
+            .hit => 10,
+            .move_to_level => 9,
             .pickup => 5,
             else => 1,
         };

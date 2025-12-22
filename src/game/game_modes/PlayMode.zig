@@ -7,7 +7,10 @@ const w = g.windows;
 
 const log = std.log.scoped(.play_mode);
 
-const PlayMode = @This();
+/// How long a notification should be shown by default
+const SHOW_NOTIFICATION_MS = 700;
+
+const Self = @This();
 
 pub const QuickActions = struct {
     // The actions which can be applied to the entity in focus
@@ -21,6 +24,56 @@ pub const QuickActions = struct {
     }
 };
 
+/// A notification about important event.
+/// Should be show for some time.
+const NotificationMessage = struct {
+    /// the buffer for the text of the notification
+    buffer: [20]u8 = undefined,
+    len: u8 = 0,
+    /// when the notification appears on a screen
+    start_showing_at: c_uint,
+    /// how long the notification should be shown
+    show_for_ms: u16 = SHOW_NOTIFICATION_MS,
+    /// where to place the first latter of the notification
+    pp: p.Point,
+    /// which mode should be used to show the notification
+    mode: g.DrawingMode,
+
+    /// The region of the display occupied by the notification
+    pub fn region(self: NotificationMessage) p.Region {
+        return .{ .top_left = self.pp, .rows = 1, .cols = @intCast(self.len) };
+    }
+
+    pub fn init(notification: g.notifications.Notification, session: *const g.GameSession) !NotificationMessage {
+        var msg: NotificationMessage = undefined;
+        msg.start_showing_at = session.runtime.currentMillis();
+        msg.len = @intCast((try std.fmt.bufPrint(&msg.buffer, "{f}", .{notification})).len);
+        const half: u8 = msg.len / 2;
+
+        msg.pp = session.viewport.relative(session.level.playerPosition().place);
+        if (msg.pp.col > half) msg.pp.col -= half;
+        if (msg.pp.col + half > g.DISPLAY_COLS) msg.pp.col -= msg.len;
+
+        if (msg.pp.row > session.notifications.items.len)
+            msg.pp.row -= @intCast(session.notifications.items.len)
+        else
+            msg.pp.row += @intCast(session.notifications.items.len);
+        // msg.pp = .init(1, self.viewport.relative(self.level.playerPosition().place).col - half);
+
+        switch (notification) {
+            .exp => {
+                msg.mode = .inverted;
+                msg.show_for_ms = 2 * SHOW_NOTIFICATION_MS;
+            },
+            else => {
+                msg.mode = .normal;
+                msg.show_for_ms = SHOW_NOTIFICATION_MS;
+            },
+        }
+        return msg;
+    }
+};
+
 arena: std.heap.ArenaAllocator,
 session: *g.GameSession,
 // The entity to which a quick actions can be applied
@@ -28,9 +81,11 @@ target: ?g.Entity = null,
 quick_actions: QuickActions,
 is_player_turn: bool = true,
 quick_actions_window: ?w.ModalWindow(w.OptionsArea(void)) = null,
+// If defined then all input should be ignored.
+notification: ?NotificationMessage = null,
 
 pub fn init(
-    self: *PlayMode,
+    self: *Self,
     alloc: std.mem.Allocator,
     session: *g.GameSession,
     target: ?g.Entity,
@@ -50,11 +105,11 @@ pub fn init(
     );
 }
 
-pub fn deinit(self: PlayMode) void {
+pub fn deinit(self: Self) void {
     self.arena.deinit();
 }
 
-pub fn tick(self: *PlayMode) !void {
+pub fn tick(self: *Self) !void {
     if (try self.draw()) return;
 
     if (self.is_player_turn) {
@@ -88,13 +143,13 @@ pub fn tick(self: *PlayMode) !void {
     try self.updateQuickActions();
 }
 
-fn setTarget(self: *PlayMode, target: g.Entity) void {
+fn setTarget(self: *Self, target: g.Entity) void {
     log.debug("Change target from {any} to {any}", .{ self.target, target });
     self.target = target;
     self.quick_actions.reset();
 }
 
-pub fn doTurn(self: *PlayMode, actor: g.Entity, action: g.actions.Action) !?g.actions.Action {
+pub fn doTurn(self: *Self, actor: g.Entity, action: g.actions.Action) !?g.actions.Action {
     log.info("The turn of the entity {d}.", .{actor.id});
     defer log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
 
@@ -120,7 +175,7 @@ pub fn doTurn(self: *PlayMode, actor: g.Entity, action: g.actions.Action) !?g.ac
     return actual_action;
 }
 
-fn handleInput(self: *PlayMode) !?g.actions.Action {
+fn handleInput(self: *Self) !?g.actions.Action {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (self.quick_actions_window) |*window| {
             if (try window.handleButton(btn)) {
@@ -203,23 +258,24 @@ fn handleInput(self: *PlayMode) !?g.actions.Action {
 
 /// If returns true then the input should be ignored
 /// until all frames from all blocked animations will be drawn.
-fn draw(self: *const PlayMode) !bool {
-    var was_blocked_animation = false;
+fn draw(self: *Self) !bool {
+    var hold_input = false;
     if (self.quick_actions_window == null) {
+        try self.drawInfoBar();
         const level = &self.session.level;
         try self.session.render.drawDungeon(self.session.viewport, level);
         try self.session.render.drawSpritesToBuffer(self.session.viewport, level, self.target);
-        was_blocked_animation = try self.drawAnimationsFrames();
+        hold_input = try self.drawAnimationsFrames() or try self.showNotifications();
         try self.session.render.drawChangedSymbols();
-        try self.drawInfoBar();
     }
-    return was_blocked_animation;
+    if (hold_input) try self.session.runtime.cleanInputBuffer();
+    return hold_input;
 }
 
 /// Draws a single frame from every animation.
 /// Removes the animation if the last frame was drawn.
 /// Returns true if one of animation is blocked.
-pub fn drawAnimationsFrames(self: PlayMode) !bool {
+pub fn drawAnimationsFrames(self: Self) !bool {
     const now: c_uint = self.session.runtime.currentMillis();
     var was_blocked_animation: bool = false;
     var itr = self.session.level.registry.query2(c.Position, c.Animation);
@@ -248,7 +304,26 @@ pub fn drawAnimationsFrames(self: PlayMode) !bool {
     return was_blocked_animation;
 }
 
-fn drawInfoBar(self: *const PlayMode) !void {
+fn showNotifications(self: *Self) !bool {
+    if (self.notification) |msg| {
+        if (self.session.runtime.currentMillis() - msg.start_showing_at > msg.show_for_ms) {
+            try self.session.render.redrawRegionFromSceneBuffer(msg.region());
+            self.notification = null;
+            return false;
+        } else {
+            try self.session.render.drawText(msg.buffer[0..msg.len], msg.pp, msg.mode);
+            // try self.session.render.drawInfo(msg.buffer[0..msg.len]);
+            return true;
+        }
+    }
+    if (self.session.notifications.pop()) |notification| {
+        self.notification = try .init(notification, self.session);
+        return true;
+    }
+    return false;
+}
+
+fn drawInfoBar(self: *const Self) !void {
     if (self.session.registry.get(self.session.player, c.Health)) |health| {
         try self.session.render.drawPlayerHp(health);
     }
@@ -281,7 +356,7 @@ fn drawInfoBar(self: *const PlayMode) !void {
     }
 }
 
-fn quickAction(self: PlayMode) g.actions.Action {
+fn quickAction(self: Self) g.actions.Action {
     if (self.quick_actions.actions.items.len > 0)
         return self.quick_actions.actions.items[self.quick_actions.selected_idx]
     else
@@ -289,7 +364,7 @@ fn quickAction(self: PlayMode) g.actions.Action {
 }
 
 /// Checks that a target is exists and recalculates a list of available quick actions applicable to the target.
-pub fn updateQuickActions(self: *PlayMode) anyerror!void {
+pub fn updateQuickActions(self: *Self) anyerror!void {
     defer {
         log.debug(
             "{d} quick actions after update:\n{any}\nThe selected action is {any}\nThe target is {any}",
@@ -409,7 +484,7 @@ const TargetsIterator = struct {
     }
 };
 
-fn windowWithQuickActions(self: *PlayMode) !w.ModalWindow(w.OptionsArea(void)) {
+fn windowWithQuickActions(self: *Self) !w.ModalWindow(w.OptionsArea(void)) {
     var area = w.OptionsArea(void).center(self);
     for (self.quick_actions.actions.items, 0..) |qa, idx| {
         try area.addOption(self.arena.allocator(), qa.toString(), {}, chooseEntity, null);
@@ -420,7 +495,7 @@ fn windowWithQuickActions(self: *PlayMode) !w.ModalWindow(w.OptionsArea(void)) {
 }
 
 fn chooseEntity(ptr: *anyopaque, line_idx: usize, _: void) anyerror!void {
-    const self: *PlayMode = @ptrCast(@alignCast(ptr));
+    const self: *Self = @ptrCast(@alignCast(ptr));
     self.quick_actions.selected_idx = line_idx;
     log.debug("Choosen option {d}: {t}", .{ line_idx, self.quickAction() });
 }

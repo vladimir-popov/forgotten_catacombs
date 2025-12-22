@@ -303,9 +303,9 @@ fn tryToHit(
             .{ actor.id, target.id, evation, rand },
         );
         if (actor.eql(self.session().player))
-            try self.session().notify(.miss)
+            try self.session().notify(.{ .miss = .{ .target = target } })
         else if (target.eql(self.session().player))
-            try self.session().notify(.dodge);
+            try self.session().notify(.{ .dodge = .{ .actor = actor } });
         return true;
     }
 
@@ -433,7 +433,9 @@ fn applyDamage(
                 .{ .hit = .{ .target = target, .damage = damage_value, .damage_type = effect_type } },
             )
         else if (target.eql(self.session().player))
-            try self.session().notify(.{ .damage = .{ .damage = damage_value, .damage_type = effect_type } });
+            try self.session().notify(
+                .{ .damage = .{ .actor = actor, .damage = damage_value, .damage_type = effect_type } },
+            );
     }
 
     if (self.session().registry.get(target, c.EnemyState)) |_| {

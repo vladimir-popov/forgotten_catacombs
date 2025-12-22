@@ -17,29 +17,7 @@ pub const TradingMode = @import("game_modes/TradingMode.zig");
 
 const log = std.log.scoped(.game_session);
 
-/// How long a notification should be shown by default
-const SHOW_NOTIFICATION_MS = 700;
-
 const Self = @This();
-
-const NotificationMessage = struct {
-    /// the buffer for the text of the notification
-    buffer: [20]u8 = undefined,
-    len: u8 = 0,
-    /// when the notification was sent
-    sent_at: c_uint,
-    /// how long the notification should be shown
-    show_for_ms: u16 = SHOW_NOTIFICATION_MS,
-    /// where to place the first latter of the notification text
-    pp: p.Point,
-    /// which mode should be used to show the notification
-    mode: g.DrawingMode,
-
-    /// The region of the display occupied by the notification
-    fn region(self: NotificationMessage) p.Region {
-        return .{ .top_left = self.pp, .rows = 1, .cols = @intCast(self.len) };
-    }
-};
 
 pub const Mode = union(enum) {
     explore: ExploreMode,
@@ -94,7 +72,7 @@ mode: Mode,
 ///
 actions: ActionSystem,
 /// A pop up notifications to show.
-notifications: std.ArrayListUnmanaged(NotificationMessage),
+notifications: std.ArrayListUnmanaged(g.notifications.Notification),
 
 /// Two cases of initialization exists:
 ///  1. Creating a new Game Session;
@@ -350,30 +328,7 @@ pub fn subscriber(self: *Self) g.events.Subscriber {
 
 pub fn notify(self: *Self, notification: g.notifications.Notification) !void {
     log.info("Notification: {any}", .{notification});
-    const msg = try self.notifications.addOne(self.arena.allocator());
-    msg.sent_at = self.runtime.currentMillis();
-    msg.len = @intCast((try std.fmt.bufPrint(&msg.buffer, "{f}", .{notification})).len);
-    const half: u8 = msg.len / 2;
-
-    msg.pp = self.viewport.relative(self.level.playerPosition().place);
-    if (msg.pp.col > half) msg.pp.col -= half;
-    if (msg.pp.col + half > g.DISPLAY_COLS) msg.pp.col -= msg.len;
-
-    if (msg.pp.row > self.notifications.items.len)
-        msg.pp.row -= @intCast(self.notifications.items.len)
-    else
-        msg.pp.row += @intCast(self.notifications.items.len);
-
-    switch (notification) {
-        .exp => {
-            msg.mode = .inverted;
-            msg.show_for_ms = 2 * SHOW_NOTIFICATION_MS;
-        },
-        else => {
-            msg.mode = .normal;
-            msg.show_for_ms = SHOW_NOTIFICATION_MS;
-        },
-    }
+    try self.notifications.append(self.arena.allocator(), notification);
 }
 
 pub inline fn tick(self: *Self) !void {
@@ -382,9 +337,10 @@ pub inline fn tick(self: *Self) !void {
         .explore_level => try self.mode.explore_level.tick(),
         .inventory => try self.mode.inventory.tick(),
         .play => {
+            // if (self.notifications.items.len > 0)
+            //     try self.showNotifications()
+            // else
             try self.mode.play.tick();
-            if (self.notifications.items.len > 0)
-                try self.showNotifications();
         },
         .save_load => try self.mode.save_load.tick(),
         .trading => try self.mode.trading.tick(),
@@ -398,7 +354,7 @@ fn showNotifications(self: *Self) !void {
         if (i >= self.notifications.items.len) break;
 
         const msg = self.notifications.items[i];
-        if (self.runtime.currentMillis() - msg.sent_at > msg.show_for_ms) {
+        if (self.runtime.currentMillis() - msg.start_showing_at > msg.show_for_ms) {
             try self.render.redrawRegionFromSceneBuffer(msg.region());
             _ = self.notifications.swapRemove(i);
         } else {

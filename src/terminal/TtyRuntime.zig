@@ -105,6 +105,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                     .removeAllMenuItems = removeAllMenuItems,
                     .currentMillis = currentMillis,
                     .readPushedButtons = readPushedButtons,
+                    .cleanInputBuffer = cleanInputBuffer,
                     .clearDisplay = clearDisplay,
                     .drawSprite = drawSprite,
                     .openFile = openFile,
@@ -168,6 +169,11 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                 }
             }
             return self.keyboard_buffer;
+        }
+
+        fn cleanInputBuffer(ptr: *anyopaque) anyerror!void {
+            const self: *Self = @ptrCast(@alignCast(ptr));
+            self.keyboard_buffer = null;
         }
 
         fn currentMillis(_: *anyopaque) c_uint {

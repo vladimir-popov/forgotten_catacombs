@@ -71,6 +71,7 @@ pub fn runtime(self: *Self) g.Runtime {
             .removeAllMenuItems = removeAllMenuItems,
             .currentMillis = currentMillis,
             .readPushedButtons = readPushedButtons,
+            .cleanInputBuffer = cleanInputBuffer,
             .clearDisplay = clearDisplay,
             .drawSprite = drawSprite,
             .openFile = openFile,
@@ -125,6 +126,11 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
     }
 
     return self.last_button.pop(currentMillis(ptr));
+}
+
+fn cleanInputBuffer(ptr: *anyopaque) anyerror!void {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    self.last_button.* = .reset;
 }
 
 fn clearDisplay(ptr: *anyopaque) anyerror!void {

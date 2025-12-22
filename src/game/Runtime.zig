@@ -15,6 +15,7 @@ pub const FileMode = enum { read, write };
 
 const VTable = struct {
     readPushedButtons: *const fn (context: *anyopaque) anyerror!?g.Button,
+    cleanInputBuffer: *const fn (context: *anyopaque) anyerror!void,
     addMenuItem: *const fn (
         context: *anyopaque,
         title: []const u8,
@@ -75,6 +76,10 @@ pub fn readPushedButtons(self: Runtime) !?g.Button {
     const btn = try self.vtable.readPushedButtons(self.context);
     if (btn) |b| log.debug("Pressed button {s}", .{@tagName(b.game_button)});
     return btn;
+}
+
+pub fn cleanInputBuffer(self: Runtime) !void {
+    try self.vtable.cleanInputBuffer(self.context);
 }
 
 pub fn clearDisplay(self: Runtime) !void {
