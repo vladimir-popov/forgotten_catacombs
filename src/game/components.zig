@@ -240,7 +240,7 @@ pub const Weapon = struct {
 };
 
 pub const Effect = struct {
-    pub const Type = enum { physical, burning, dissolving, poisoning, healing };
+    pub const Type = enum { physical, fire, acid, poison, heal };
     pub const TypesCount = @typeInfo(Type).@"enum".fields.len;
     effect_type: Type,
     min: u8,
@@ -250,20 +250,20 @@ pub const Effect = struct {
         return .{ .effect_type = .physical, .min = min, .max = max };
     }
 
-    pub fn burning(min: u8, max: u8) Effect {
-        return .{ .effect_type = .burning, .min = min, .max = max };
+    pub fn fire(min: u8, max: u8) Effect {
+        return .{ .effect_type = .fire, .min = min, .max = max };
     }
 
-    pub fn dissolving(min: u8, max: u8) Effect {
-        return .{ .effect_type = .dissolving, .min = min, .max = max };
+    pub fn acid(min: u8, max: u8) Effect {
+        return .{ .effect_type = .acid, .min = min, .max = max };
     }
 
-    pub fn poisoning(min: u8, max: u8) Effect {
-        return .{ .effect_type = .poisoning, .min = min, .max = max };
+    pub fn poison(min: u8, max: u8) Effect {
+        return .{ .effect_type = .poison, .min = min, .max = max };
     }
 
-    pub fn healing(min: u8, max: u8) Effect {
-        return .{ .effect_type = .healing, .min = min, .max = max };
+    pub fn heal(min: u8, max: u8) Effect {
+        return .{ .effect_type = .heal, .min = min, .max = max };
     }
 
     pub fn modify(self: *Effect, modificator: i8) void {

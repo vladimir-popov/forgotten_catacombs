@@ -74,7 +74,7 @@ test "Describe a known potion (after drinking a similar)" {
         \\║│ and your wounds instantly.        ░│║
         \\║│                                   ░│║
         \\║│ Effects:                          ░│║
-        \\║│   healing 20-25                   ░│║
+        \\║│   heal 20-25                      ░│║
         \\║└────────────────────────────────────┘║
         \\╚══════════════════════════════════════╝
     , .game_area);

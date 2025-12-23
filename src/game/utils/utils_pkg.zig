@@ -15,6 +15,12 @@ pub inline fn isDebug() bool {
     };
 }
 
+pub fn assert(p: bool, comptime fmt: []const u8, args: anytype) void {
+    if (isDebug()) {
+        if (!p) std.debug.panic(fmt, args);
+    }
+}
+
 pub fn toStringWithListOf(tagged_unions: anytype) ToString.List(@typeInfo(@TypeOf(tagged_unions)).pointer.child) {
     return ToString.List(@typeInfo(@TypeOf(tagged_unions)).pointer.child){ .values = tagged_unions };
 }

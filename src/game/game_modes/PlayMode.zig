@@ -135,40 +135,6 @@ pub fn deinit(self: Self) void {
     self.arena.deinit();
 }
 
-pub fn tick(self: *Self) !void {
-    if (try self.draw()) return;
-
-    if (self.is_player_turn) {
-        // break this function if no input
-        const action = (try self.handleInput()) orelse return;
-        if (try self.doTurn(self.session.player, action)) |actual_action| {
-            // Force change the target
-            switch (actual_action) {
-                .hit => |enemy| {
-                    self.setTarget(enemy);
-                },
-                .open => |door| {
-                    self.setTarget(door.id);
-                },
-                else => {},
-            }
-            // Update counters of unknown equipments
-            try self.session.journal.onTurnCompleted();
-            self.is_player_turn = false;
-        }
-    } else {
-        var itr = self.session.registry.query2(c.Initiative, c.Speed);
-        while (itr.next()) |tuple| {
-            const npc, const initiative, const speed = tuple;
-            while (speed.move_points <= initiative.move_points) {
-                _ = try self.doTurn(npc, self.session.ai.action(npc));
-            }
-        }
-        self.is_player_turn = true;
-    }
-    try self.updateQuickActions();
-}
-
 fn setTarget(self: *Self, target: g.Entity) void {
     log.debug("Change target from {any} to {any}", .{ self.target, target });
     self.target = target;
@@ -195,7 +161,7 @@ pub fn doTurn(self: *Self, actor: g.Entity, action: g.actions.Action) !?g.action
     } else {
         // Decrease initiative points of the enemy
         const initiative = self.session.registry.getUnsafe(actor, c.Initiative);
-        std.debug.assert(0 < mp and mp <= initiative.move_points);
+        g.utils.assert(mp <= initiative.move_points, "Spent more MP {d} than initiative has {any}", .{ mp, initiative });
         initiative.move_points -= mp;
     }
     return actual_action;
@@ -282,6 +248,40 @@ fn handleInput(self: *Self) !?g.actions.Action {
     return null;
 }
 
+pub fn tick(self: *Self) !void {
+    if (try self.draw()) return;
+
+    if (self.is_player_turn) {
+        // break this function if no input
+        const action = (try self.handleInput()) orelse return;
+        if (try self.doTurn(self.session.player, action)) |actual_action| {
+            // Force change the target
+            switch (actual_action) {
+                .hit => |enemy| {
+                    self.setTarget(enemy);
+                },
+                .open => |door| {
+                    self.setTarget(door.id);
+                },
+                else => {},
+            }
+            // Update counters of unknown equipments
+            try self.session.journal.onTurnCompleted();
+            self.is_player_turn = false;
+        }
+    } else {
+        var itr = self.session.registry.query2(c.Initiative, c.Speed);
+        while (itr.next()) |tuple| {
+            const npc, const initiative, const speed = tuple;
+            while (speed.move_points <= initiative.move_points) {
+                _ = try self.doTurn(npc, self.session.ai.action(npc));
+            }
+        }
+        self.is_player_turn = true;
+    }
+    try self.updateQuickActions();
+}
+
 /// If returns true then the input should be ignored
 /// until all notifications and all frames from all blocked animations will be drawn.
 fn draw(self: *Self) !bool {
@@ -296,6 +296,9 @@ fn draw(self: *Self) !bool {
         if (blocked_animation or notification_shown) {
             try self.session.runtime.cleanInputBuffer();
             return true;
+        }
+        if (self.session.registry.get(self.session.player, c.Health)) |health| {
+            try self.session.render.drawPlayerHp(health);
         }
     }
     return false;
@@ -345,7 +348,7 @@ fn showNotifications(self: *Self) !bool {
             return true;
         }
     }
-    if (self.session.notifications.pop()) |notification| {
+    if (self.session.notifications.popFront()) |notification| {
         self.notification = try .init(notification, self.session);
         return true;
     }
@@ -353,9 +356,6 @@ fn showNotifications(self: *Self) !bool {
 }
 
 fn drawInfoBar(self: *const Self) !void {
-    if (self.session.registry.get(self.session.player, c.Health)) |health| {
-        try self.session.render.drawPlayerHp(health);
-    }
     try self.session.render.drawLeftButton("Explore", true);
     const qa = self.quickAction();
     const action_label = qa.toString();

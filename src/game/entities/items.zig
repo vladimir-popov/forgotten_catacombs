@@ -25,7 +25,7 @@ oil_lamp: c.Components = archetype.item(.{
 
 pub const Armor = struct {
     jacket: c.Components = archetype.armor(.{
-        .armor = .init(&.{ .physical(0, 5), .burning(0, 2) }),
+        .armor = .init(&.{ .physical(0, 5), .fire(0, 2) }),
         .description = .{ .preset = .jacket },
         .rarity = .common,
         .sprite = .{ .codepoint = cp.armor },
@@ -90,7 +90,7 @@ pub const Weapons = struct {
         .weight = .{ .value = 20 },
         .source_of_light = .{ .radius = 3 },
         .price = .{ .value = 5 },
-        .effects = .init(&.{ .physical(1, 1), .burning(1, 1) }),
+        .effects = .init(&.{ .physical(1, 1), .fire(1, 1) }),
         .weapon = .melee(.primitive),
     }),
 
@@ -100,7 +100,7 @@ pub const Weapons = struct {
         .sprite = .{ .codepoint = cp.weapon_melee },
         .weight = .{ .value = 50 },
         .price = .{ .value = 50 },
-        .effects = .init(&.{ .physical(2, 3), .poisoning(1, 3) }),
+        .effects = .init(&.{ .physical(2, 3), .poison(1, 3) }),
         .weapon = .melee(.tricky),
     }),
 
@@ -131,7 +131,7 @@ pub const Potions = struct {
         .description = .{ .preset = .healing_potion },
         .rarity = .rare,
         .sprite = .{ .codepoint = cp.potion },
-        .effects = .init(&.{.healing(20, 25)}),
+        .effects = .init(&.{.heal(20, 25)}),
         .weight = .{ .value = 10 },
         .price = .{ .value = 50 },
         .consumable = .{ .consumable_type = .potion, .calories = 10 },
@@ -141,7 +141,7 @@ pub const Potions = struct {
         .description = .{ .preset = .poisoning_potion },
         .rarity = .rare,
         .sprite = .{ .codepoint = cp.potion },
-        .effects = .init(&.{.poisoning(10, 20)}),
+        .effects = .init(&.{.poison(10, 20)}),
         .weight = .{ .value = 10 },
         .price = .{ .value = 30 },
         .consumable = .{ .consumable_type = .potion, .calories = 0 },
@@ -151,7 +151,7 @@ pub const Potions = struct {
         .description = .{ .preset = .oil_potion },
         .rarity = .rare,
         .sprite = .{ .codepoint = cp.potion },
-        .effects = .init(&.{.poisoning(20, 25)}),
+        .effects = .init(&.{.poison(20, 25)}),
         .weight = .{ .value = 10 },
         .price = .{ .value = 30 },
         .consumable = .{ .consumable_type = .potion, .calories = 0 },

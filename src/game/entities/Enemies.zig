@@ -29,7 +29,7 @@ snake: c.Components = archetype.enemy(.{
     .initiative = .empty,
     .sprite = .{ .codepoint = 's' },
     .health = .init(8),
-    .effects = .init(&.{.poisoning(1, 3)}),
+    .effects = .init(&.{.poison(1, 3)}),
     .regeneration = .regular,
     .speed = .{ .move_points = 9 },
     .state = .sleeping,

@@ -213,8 +213,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
 
                 pub fn next(self: *@This()) ?struct { Entity, *C1, *C2 } {
                     while (self.main_iterator.next()) |tuple| {
-                        const entity: Entity = tuple[0];
-                        const c1: *C1 = tuple[1];
+                        const entity: Entity, const c1: *C1 = tuple;
                         if (self.manager.get(entity, C2)) |c2|
                             return .{ entity, c1, c2 };
                     }
@@ -237,8 +236,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
 
                 pub fn next(self: *@This()) ?struct { Entity, *C1, *C2, *C3 } {
                     while (self.main_iterator.next()) |tuple| {
-                        const entity: Entity = tuple[0];
-                        const c1: *C1 = tuple[1];
+                        const entity: Entity, const c1: *C1 = tuple;
                         if (self.manager.get2(entity, C2, C3)) |cc|
                             return .{ entity, c1, cc[0], cc[1] };
                     }
@@ -261,8 +259,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
 
                 pub fn next(self: *@This()) ?struct { Entity, *C1, *C2, *C3, *C4 } {
                     while (self.main_iterator.next()) |tuple| {
-                        const entity: Entity = tuple[0];
-                        const c1: *C1 = tuple[1];
+                        const entity: Entity, const c1: *C1 = tuple;
                         if (self.manager.get3(entity, C2, C3, C4)) |cc|
                             return .{ entity, c1, cc[0], cc[1], cc[2] };
                     }

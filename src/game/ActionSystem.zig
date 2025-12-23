@@ -97,21 +97,20 @@ pub fn onTurnCompleted(self: *Self) !void {
 
         const health = self.session().registry.get(entity, c.Health) orelse
             std.debug.panic("Entity {d} has Hunger, but doesn't have a Health component", .{entity.id});
-        _ = try self.applyDamage(entity, entity, health, 1, .healing);
+        _ = try self.applyDamage(entity, entity, health, 1, .heal);
     }
 }
 
 /// Handles intentions to do some actions.
 /// Returns an optional happened action and a count of used move points.
-/// Returned null and 0 mp mean that the action was declined (moving to the wall as example).
+/// Returned null and 0 mp mean that the action was declined (moving to the wall as example),
+/// But in some cases (like moving to another level) it's possible to return some action and zero mp.
 pub fn doAction(self: *Self, actor: g.Entity, action: g.Action) !struct { ?g.Action, g.MovePoints } {
     if (std.log.logEnabled(.debug, .actions) and action != .do_nothing) {
         log.debug("Do action {any} by the entity {d}", .{ action, actor.id });
     }
-    const speed = self.session().registry.get(actor, c.Speed) orelse {
-        log.err("The entity {d} doesn't have speed and can't do action.", .{actor.id});
-        return error.NotEnoughComponents;
-    };
+    // speed is used for most actions
+    const speed = self.session().registry.getUnsafe(actor, c.Speed);
     switch (action) {
         .do_nothing => return .{ null, 0 },
         .drink => |potion_id| if (g.meta.isPotion(&self.session().registry, potion_id)) |potion_type| {
@@ -249,7 +248,7 @@ fn checkCollision(self: *Self, place: p.Point) ?g.Action {
     return .do_nothing;
 }
 
-/// Returns `true` if the hit happens.
+/// Returns `true` if the hit or evasion happens.
 fn tryToHit(
     self: *Self,
     actor: g.Entity,
@@ -312,8 +311,10 @@ fn tryToHit(
     // Calculate and apply the damage
     const target_armor = self.session().registry.get(target, c.Armor) orelse &c.Armor.zeros;
     if (self.session().registry.get(weapon_id, c.Effects)) |effects| {
-        const actor_experience = self.session().registry.getUnsafe(actor, c.Experience);
-        const enemy_experience = self.session().registry.getUnsafe(target, c.Experience);
+        const actor_experience: *c.Experience = self.session().registry.getUnsafe(actor, c.Experience);
+        // we have to copy the whole component, because the enemy can be removed,
+        // and the pointer becomes invalid.
+        const enemy_experience: c.Experience = self.session().registry.getUnsafe(target, c.Experience).*;
         for (effects.items()) |effect| {
             const is_target_dead =
                 try self.applyEffect(actor, weapon_id, effect, target, target_armor, target_health);
@@ -372,7 +373,7 @@ fn applyEffect(
             );
             return self.applyDamage(actor, target, target_health, damage_value, effect.effect_type);
         },
-        .burning, .dissolving, .poisoning => {
+        .fire, .acid, .poison => {
             const base_damage = self.session().prng.random().intRangeAtMost(u8, effect.min, effect.max);
             const absorbed_damage: u8 = self.session().prng.random().intRangeAtMost(
                 u8,
@@ -387,7 +388,7 @@ fn applyEffect(
                 effect.effect_type,
             );
         },
-        .healing => {
+        .heal => {
             const value = self.session().prng.random().intRangeAtMost(u8, effect.min, effect.max);
             target_health.current += value;
             target_health.current = @min(target_health.max, target_health.current);
@@ -427,7 +428,7 @@ fn applyDamage(
         .{ target.id, effect_type, damage_value, orig_health, target_health.current },
     );
 
-    if (effect_type != .healing) {
+    if (effect_type != .heal) {
         if (actor.eql(self.session().player))
             try self.session().notify(
                 .{ .hit = .{ .target = target, .damage = damage_value, .damage_type = effect_type } },
@@ -469,7 +470,7 @@ fn drinkPotion(self: *Self, actor: g.Entity, potion_id: g.Entity, potion_type: g
 
 fn consume(self: *Self, actor: g.Entity, item: g.Entity, consumable: *const c.Consumable) !void {
     if (self.session().registry.get(actor, c.Hunger)) |hunger| {
-        hunger.turns_after_eating -= consumable.calories;
+        hunger.turns_after_eating -|= consumable.calories;
     }
     // try to remove from the inventory
     if (self.session().registry.get(actor, c.Inventory)) |inventory| {

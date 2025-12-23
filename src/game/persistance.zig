@@ -404,7 +404,7 @@ test "All components should be serializable" {
 
     // Random components to check serialization:
     const expected = c.Components{
-        .armor = .init(&.{ .physical(0, 1), .poisoning(2, 2), .burning(1, 3) }),
+        .armor = .init(&.{ .physical(0, 1), .poison(2, 2), .fire(1, 3) }),
         .ammunition = .{ .amount = 42, .ammunition_type = .arrows },
         .animation = c.Animation{ .preset = .hit },
         .consumable = .{ .calories = 12, .consumable_type = .food },
@@ -418,7 +418,7 @@ test "All components should be serializable" {
         .initiative = c.Initiative{ .move_points = 5 },
         .inventory = inventory,
         .ladder = c.Ladder{ .id = .{ .id = 2 }, .direction = .down, .target_ladder = .{ .id = 3 } },
-        .modification = c.Modification.init(.{ .burning = -3 }),
+        .modification = c.Modification.init(.{ .fire = -3 }),
         .pile = pile,
         .price = .{ .value = 100 },
         .position = c.Position{ .place = p.Point.init(12, 42), .zorder = .item },

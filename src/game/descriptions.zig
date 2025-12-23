@@ -738,7 +738,7 @@ test "Describe a player" {
         \\This is a primitive weapon.
         \\Damage:
         \\  physical 1-1
-        \\  burning 1-1
+        \\  fire 1-1
         \\
         \\Source of light: Torch
         \\       distance: 3
@@ -837,7 +837,7 @@ test "Describe a torch" {
         \\This is a primitive weapon.
         \\Damage:
         \\  physical 1-1
-        \\  burning 1-1
+        \\  fire 1-1
         \\
         \\Radius of light: 3
         \\

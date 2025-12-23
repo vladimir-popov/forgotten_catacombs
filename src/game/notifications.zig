@@ -32,15 +32,22 @@ pub const Notification = union(enum) {
         switch (self) {
             .hit => |hit| try writer.print("Hit {d}", .{hit.damage}),
             .damage => |dmg| {
-                if (dmg.damage_type == .physical)
-                    try writer.print("-{d} damage", .{dmg.damage})
-                else
-                    try writer.print("-{d} {t}", .{ dmg.damage, dmg.damage_type });
+                // if (dmg.damage_type == .physical)
+                //     try writer.print("-{d} damage", .{dmg.damage})
+                // else
+                //     try writer.print("-{d} {t}", .{ dmg.damage, dmg.damage_type });
+                switch (dmg.damage_type) {
+                    .heal => try writer.print("Heal +{d}", .{dmg.damage}),
+                    .physical => try writer.print("Damage -{d}", .{dmg.damage}),
+                    .fire => try writer.print("Fire -{d}", .{dmg.damage}),
+                    .acid => try writer.print("Acid -{d}", .{dmg.damage}),
+                    .poison => try writer.print("Poison -{d}", .{dmg.damage}),
+                }
             },
             .exp => |exp| try writer.print("+{d} EXP", .{exp}),
-            .miss => _ = try writer.write("Miss!"),
-            .dodge => _ = try writer.write("Dodge!"),
-            .no_ammo => _ = try writer.write("No ammo!"),
+            .miss => _ = try writer.write("Miss"),
+            .dodge => _ = try writer.write("Dodge"),
+            .no_ammo => _ = try writer.write("No ammo"),
             .wrong_ammo => _ = try writer.write("Wrong ammo!"),
         }
     }

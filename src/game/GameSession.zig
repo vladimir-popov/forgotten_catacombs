@@ -72,7 +72,7 @@ mode: Mode,
 ///
 actions: ActionSystem,
 /// A pop up notifications to show.
-notifications: std.ArrayListUnmanaged(g.notifications.Notification),
+notifications: std.Deque(g.notifications.Notification),
 
 /// Two cases of initialization exists:
 ///  1. Creating a new Game Session;
@@ -328,7 +328,7 @@ pub fn subscriber(self: *Self) g.events.Subscriber {
 
 pub fn notify(self: *Self, notification: g.notifications.Notification) !void {
     log.info("Notification: {any}", .{notification});
-    try self.notifications.append(self.arena.allocator(), notification);
+    try self.notifications.pushBack(self.arena.allocator(), notification);
 }
 
 pub inline fn tick(self: *Self) !void {

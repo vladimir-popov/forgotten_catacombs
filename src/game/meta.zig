@@ -160,9 +160,9 @@ fn modifyWeapon(registry: *g.Registry, rand: std.Random, weapon: g.Entity) !void
     var weighted_index: [c.Effect.TypesCount]u8 = undefined;
     @memset(&weighted_index, 0);
     weighted_index[@intFromEnum(c.Effect.Type.physical)] = 20;
-    weighted_index[@intFromEnum(c.Effect.Type.burning)] = 8;
-    weighted_index[@intFromEnum(c.Effect.Type.poisoning)] = 10;
-    weighted_index[@intFromEnum(c.Effect.Type.dissolving)] = 5;
+    weighted_index[@intFromEnum(c.Effect.Type.fire)] = 8;
+    weighted_index[@intFromEnum(c.Effect.Type.poison)] = 10;
+    weighted_index[@intFromEnum(c.Effect.Type.acid)] = 5;
     const effect_type = rand.weightedIndex(u8, &weighted_index);
     const value = rand.intRangeAtMost(i8, -5, 5);
     modification.modificators.values[effect_type] = if (value == 0) -5 else value;
