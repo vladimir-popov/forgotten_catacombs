@@ -55,29 +55,24 @@ const NotificationMessage = struct {
             },
         };
         msg.len = @intCast((try std.fmt.bufPrint(&msg.buffer, "{f}", .{notification})).len);
-        const half: u8 = msg.len / 2;
         const display_region = p.Region.init(1, 1, session.viewport.region.rows, session.viewport.region.cols);
-
-        // The notification should not hide the current enemy (but it could be dead and removed at
-        // this moment, for example, when we're showing a notification about receiving exp)
-        const maybe_enemy_position = switch (notification) {
-            .hit => |hit| session.registry.get(hit.target, c.Position),
-            .damage => |damage| session.registry.get(damage.actor, c.Position),
-            .miss => |miss| session.registry.get(miss.target, c.Position),
-            .dodge => |dodge| session.registry.get(dodge.actor, c.Position),
-            else => null,
-        };
-        const enemy_pp = if (maybe_enemy_position) |pos| session.viewport.relative(pos.place) else msg.pp;
 
         // Trying to place the notification relative to the player in follow order:
         const relative_positions = [_]p.Direction{ .up, .down, .right, .left };
         for (relative_positions) |direction| {
             switch (direction) {
                 .up, .down => {
+                    const left_half: u8 = if (msg.len % 2 == 0) msg.len / 2 else msg.len / 2 + 1;
                     msg.pp.move(direction);
-                    // trying to center the notification
-                    if (msg.pp.col > half) msg.pp.col -= half;
-                    if (msg.pp.col + half >= display_region.cols) msg.pp.col -= half;
+                    // center the notification.
+                    // validate left border
+                    if (msg.pp.col > left_half)
+                        msg.pp.col -= left_half
+                    else if (left_half > msg.pp.col)
+                        msg.pp.col = 1;
+                    // validate right border
+                    if (msg.pp.col + msg.len - 1 > display_region.cols)
+                        msg.pp.col = display_region.cols - msg.len + 1;
                 },
                 .right => {
                     msg.pp.move(direction);
@@ -86,9 +81,24 @@ const NotificationMessage = struct {
                     msg.pp.moveNTimes(.left, msg.len);
                 },
             }
+
+            // The notification should not hide the current enemy (but it could be dead and removed at
+            // this moment, for example, when we're showing a notification about receiving exp)
+            const maybe_enemy_position = switch (notification) {
+                .hit => |hit| session.registry.get(hit.target, c.Position),
+                .damage => |damage| session.registry.get(damage.actor, c.Position),
+                .miss => |miss| session.registry.get(miss.target, c.Position),
+                .dodge => |dodge| session.registry.get(dodge.actor, c.Position),
+                else => null,
+            };
+            const is_hide_the_target = if (maybe_enemy_position) |pos|
+                msg.region().containsPoint(session.viewport.relative(pos.place))
+            else
+                false;
             const is_first_letter_on_screen = display_region.containsPoint(msg.pp);
-            const is_last_letter_on_screen = display_region.containsPoint(msg.pp.movedToNTimes(.right, msg.len));
-            if (is_first_letter_on_screen and is_last_letter_on_screen and !msg.region().containsPoint(enemy_pp)) {
+            const is_last_letter_on_screen = display_region.containsPoint(msg.pp.movedToNTimes(.right, msg.len - 1));
+
+            if (is_first_letter_on_screen and is_last_letter_on_screen and !is_hide_the_target) {
                 // all done
                 break;
             } else {
@@ -293,12 +303,12 @@ fn draw(self: *Self) !bool {
         const blocked_animation = try self.drawAnimationsFramesToBuffer();
         try self.session.render.drawChangedSymbols();
         const notification_shown = try self.showNotifications();
+        if (self.session.registry.get(self.session.player, c.Health)) |health| {
+            try self.session.render.drawPlayerHp(health);
+        }
         if (blocked_animation or notification_shown) {
             try self.session.runtime.cleanInputBuffer();
             return true;
-        }
-        if (self.session.registry.get(self.session.player, c.Health)) |health| {
-            try self.session.render.drawPlayerHp(health);
         }
     }
     return false;

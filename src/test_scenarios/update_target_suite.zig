@@ -4,7 +4,7 @@ const TestSession = @import("utils/TestSession.zig");
 
 test "Change a target to an atacked enemy" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty(std.testing.allocator, std.testing.io);
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
     errdefer test_session.printDisplay();
 
@@ -49,12 +49,12 @@ test "Change a target to an atacked enemy" {
 
 test "Lose target on moving away" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty(std.testing.allocator, std.testing.io);
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
     errdefer test_session.printDisplay();
 
     // Prepare a game session:
-    try test_session.player.moveTo(.{ .row = 3, .col = 17 });
+    try test_session.player.moveOnScreenTo(.{ .row = 4, .col = 18 });
     try test_session.tick();
     try test_session.runtime.display.expectLooksLike(
         \\######################################30

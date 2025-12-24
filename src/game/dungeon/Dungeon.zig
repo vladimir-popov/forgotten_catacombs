@@ -7,6 +7,7 @@ const d = @import("dungeon_pkg.zig");
 const log = std.log.scoped(.dungeon);
 
 pub const Type = enum {
+    test_location,
     first_location,
     cave,
     catacomb,

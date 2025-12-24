@@ -336,12 +336,7 @@ pub inline fn tick(self: *Self) !void {
         .explore => try self.mode.explore.tick(),
         .explore_level => try self.mode.explore_level.tick(),
         .inventory => try self.mode.inventory.tick(),
-        .play => {
-            // if (self.notifications.items.len > 0)
-            //     try self.showNotifications()
-            // else
-            try self.mode.play.tick();
-        },
+        .play => try self.mode.play.tick(),
         .save_load => try self.mode.save_load.tick(),
         .trading => try self.mode.trading.tick(),
     }

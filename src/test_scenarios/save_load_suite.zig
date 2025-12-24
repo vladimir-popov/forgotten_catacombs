@@ -4,7 +4,7 @@ const TestSession = @import("utils/TestSession.zig");
 
 test "Saving a game session and go back to the main menu" {
     var test_session: TestSession = undefined;
-    try test_session.initEmpty(std.testing.allocator, std.testing.io);
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
 
     test_session.session.switchModeToSavingSession();

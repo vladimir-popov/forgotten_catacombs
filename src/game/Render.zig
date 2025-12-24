@@ -261,6 +261,8 @@ pub fn drawHorizontalLine(self: Render, codepoint: u21, left_point: p.Point, len
     }
 }
 
+// Draws the current count of player's hp at the top right corner
+// directly on the screen.
 pub fn drawPlayerHp(self: Render, health: *const cm.Health) !void {
     var buf = [_]u8{0} ** BUTTON_ZONE_LENGTH;
     const text = if (health.current > 0)
@@ -268,7 +270,7 @@ pub fn drawPlayerHp(self: Render, health: *const cm.Health) !void {
         try std.fmt.bufPrint(&buf, "{d:2}", .{@abs(health.current)})
     else
         try std.fmt.bufPrint(&buf, "{d:2}", .{health.current});
-    try self.drawText(text, .{ .row = 1, .col = g.DISPLAY_COLS - 1 }, .inverted);
+    try self.drawText(text, .{ .row = 1, .col = g.DISPLAY_COLS - @as(u8, @intCast(text.len)) + 1 }, .inverted);
 }
 
 pub fn drawEnemyHealth(self: Render, codepoint: g.Codepoint, health: *const cm.Health) !void {

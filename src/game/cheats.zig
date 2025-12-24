@@ -21,7 +21,7 @@ pub const Cheat = union(enum) {
     /// Prints to log a Dijkstra map
     dump_vector_field,
 
-    // Moves the player to the point on the screen.
+    // Moves the player to the point on the screen (1-based).
     goto: p.Point,
 
     /// Moves the player to a ladder lead to an upper level.
@@ -185,8 +185,8 @@ pub const Cheat = union(enum) {
             .goto => |goto| {
                 const screen_corner = session.viewport.region.top_left;
                 return movePlayerToPoint(.{
-                    .row = goto.row + screen_corner.row,
-                    .col = goto.col + screen_corner.col,
+                    .row = goto.row + screen_corner.row - 1,
+                    .col = goto.col + screen_corner.col - 1,
                 });
             },
             .trade => {

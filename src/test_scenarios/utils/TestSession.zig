@@ -1,9 +1,11 @@
 const std = @import("std");
 const g = @import("game");
+const c = g.components;
 const p = g.primitives;
 const TestRuntime = @import("TestRuntime.zig");
 const Inventory = @import("Inventory.zig");
 const Player = @import("Player.zig");
+const TestLocation = @import("TestLocation.zig");
 
 pub const log = std.log.scoped(.test_session);
 
@@ -17,7 +19,7 @@ player: Player,
 tmp_dir: std.testing.TmpDir,
 
 /// Creates a new game session with TestRuntime and the first level.
-pub fn initEmpty(self: *Self, gpa: std.mem.Allocator, io: std.Io) !void {
+pub fn initOnFirstLevel(self: *Self, gpa: std.mem.Allocator, io: std.Io) !void {
     self.tmp_dir = std.testing.tmpDir(.{});
     self.arena = std.heap.ArenaAllocator.init(gpa);
     const arena_alloc = self.arena.allocator();
@@ -36,6 +38,39 @@ pub fn initEmpty(self: *Self, gpa: std.mem.Allocator, io: std.Io) !void {
     self.player = .{ .test_session = self, .id = self.session.player };
     // because for optimization purpose we draw the horizontal line right in init method of the PlayMode
     self.runtime.display.merge(self.runtime.last_frame);
+}
+
+/// ```
+///••••••••••••••••••••••••••••••••••••••30
+///••••••••••••••••••••••••••••••••••••••••
+///••••••••••••••••••••••••••••••••••••••••
+///••••••••••••••••••••••••••••••••••••••••
+///•••••••••••••••••••@••••••••••••••••••••
+///••••••••••••••••••••••••••••••••••••••••
+///••••••••••••••••••••••••••••••••••••••••
+///••••••••••••••••••••••••••••••••••••••••
+///••••••••••••••••••••••••••••••••••••••••
+///••••••••••••••••••••••••••••••••••••••••
+///════════════════════════════════════════
+///                    ⇧Explore ��  Wait  ⇧
+/// ```
+pub fn initWithTestArea(self: *Self, gpa: std.mem.Allocator, io: std.Io) !void {
+    // TODO: Refactor to not create a first level here
+    try self.initOnFirstLevel(gpa, io);
+    for (self.session.level.entities_on_level.items) |entity| {
+        if (!entity.eql(self.session.player)) {
+            try self.session.registry.removeEntity(entity);
+        }
+    }
+    self.session.level.deinit();
+    self.session.level = g.Level.preInit(self.session.arena.allocator(), &self.session.registry);
+    const level = &self.session.level;
+    const dungeon = try TestLocation.generateDungeon(&self.session.level.arena);
+    try level.setupDungeon(0, dungeon, self.session.player);
+    try level.completeInitialization(null);
+    const center = p.Point.init((g.DISPLAY_ROWS - 2) / 2, g.DISPLAY_COLS / 2);
+    self.session.registry.getUnsafe(self.session.player, c.Position).place = center;
+    self.session.viewport.region.top_left = .init(1, 1);
 }
 
 pub fn load(self: *Self, gpa: std.mem.Allocator, io: std.Io, working_dir: std.testing.TmpDir) !void {

@@ -13,6 +13,7 @@ io: std.Io,
 test_dir: std.fs.Dir,
 menu: Menu(g.DISPLAY_ROWS, g.DISPLAY_COLS),
 display: Frame = .empty,
+current_millis: c_uint,
 last_frame: Frame = .empty,
 pushed_buttons: std.ArrayListUnmanaged(?g.Button) = .empty,
 
@@ -23,6 +24,7 @@ pub fn init(alloc: std.mem.Allocator, io: std.Io, working_dir: std.fs.Dir) !Self
     return .{
         .alloc = alloc,
         .io = io,
+        .current_millis = @intCast((try std.Io.Clock.awake.now(io)).toMilliseconds()),
         .test_dir = working_dir,
         .menu = try Menu(g.DISPLAY_ROWS, g.DISPLAY_COLS).init(alloc),
     };
@@ -58,8 +60,8 @@ pub fn runtime(self: *Self) g.Runtime {
 
 fn currentMillis(ptr: *anyopaque) c_uint {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    const now = std.Io.Clock.awake.now(self.io) catch unreachable;
-    return @truncate(@as(u64, @intCast(now.toMilliseconds())));
+    self.current_millis += 1;
+    return self.current_millis;
 }
 
 fn addMenuItem(

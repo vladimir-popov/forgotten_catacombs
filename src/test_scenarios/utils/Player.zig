@@ -61,7 +61,7 @@ pub fn move(self: Self, direction: p.Direction, count: u8) !void {
     try self.test_session.tick();
 }
 
-pub fn moveTo(self: Self, place: p.Point) !void {
+pub fn moveOnScreenTo(self: Self, place: p.Point) !void {
     try self.doCheat(.{ .goto = place });
 }
 

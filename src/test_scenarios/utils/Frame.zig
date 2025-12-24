@@ -11,19 +11,6 @@ const Self = @This();
 const zero_symbol = '�';
 const space_symbol = '¶';
 
-sprites: [g.DISPLAY_ROWS][g.DISPLAY_COLS]g.Render.DrawableSymbol,
-
-pub const empty: Self = blk: {
-    var frame: Self = undefined;
-    for (0..g.DISPLAY_ROWS) |r| {
-        for (0..g.DISPLAY_COLS) |c| {
-            frame.sprites[r][c].codepoint = 0;
-            frame.sprites[r][c].mode = .normal;
-        }
-    }
-    break :blk frame;
-};
-
 pub const ComparingArea = union(enum) {
     whole_display,
     game_area,
@@ -87,6 +74,20 @@ const FormatedArea = struct {
         }
     }
 };
+
+pub const empty: Self = blk: {
+    var frame: Self = undefined;
+    for (0..g.DISPLAY_ROWS) |r| {
+        for (0..g.DISPLAY_COLS) |c| {
+            frame.sprites[r][c].codepoint = 0;
+            frame.sprites[r][c].mode = .normal;
+        }
+    }
+    break :blk frame;
+};
+
+/// Zero-based buffer
+sprites: [g.DISPLAY_ROWS][g.DISPLAY_COLS]g.Render.DrawableSymbol,
 
 fn formatArea(self: *const Self, area: ComparingArea, opt: FormatedArea.OutputOptions) FormatedArea {
     return .{ .frame = self, .area = area, .opt = opt };

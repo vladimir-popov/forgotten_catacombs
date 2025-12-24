@@ -30,18 +30,22 @@ pub const Notification = union(enum) {
     // Max length is 20 symbols
     pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
         switch (self) {
-            .hit => |hit| try writer.print("Hit {d}", .{hit.damage}),
+            .hit => |hit| {
+                switch (hit.damage_type) {
+                    .heal => unreachable,
+                    .physical => try writer.print("{d} hit", .{hit.damage}),
+                    .fire => try writer.print("{d} fire", .{hit.damage}),
+                    .acid => try writer.print("{d} acid", .{hit.damage}),
+                    .poison => try writer.print("{d} poison", .{hit.damage}),
+                }
+            },
             .damage => |dmg| {
-                // if (dmg.damage_type == .physical)
-                //     try writer.print("-{d} damage", .{dmg.damage})
-                // else
-                //     try writer.print("-{d} {t}", .{ dmg.damage, dmg.damage_type });
                 switch (dmg.damage_type) {
-                    .heal => try writer.print("Heal +{d}", .{dmg.damage}),
-                    .physical => try writer.print("Damage -{d}", .{dmg.damage}),
-                    .fire => try writer.print("Fire -{d}", .{dmg.damage}),
-                    .acid => try writer.print("Acid -{d}", .{dmg.damage}),
-                    .poison => try writer.print("Poison -{d}", .{dmg.damage}),
+                    .heal => unreachable,
+                    .physical => try writer.print("-{d} damage", .{dmg.damage}),
+                    .fire => try writer.print("-{d} fire", .{dmg.damage}),
+                    .acid => try writer.print("-{d} acid", .{dmg.damage}),
+                    .poison => try writer.print("-{d} poison", .{dmg.damage}),
                 }
             },
             .exp => |exp| try writer.print("+{d} EXP", .{exp}),

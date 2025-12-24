@@ -4,7 +4,7 @@ const c = g.components;
 const TestSession = @import("utils/TestSession.zig");
 
 fn setup(test_session: *TestSession) !void {
-    try test_session.initEmpty(std.testing.allocator, std.testing.io);
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
     try test_session.tick();
     try test_session.runtime.display.expectLooksLike(
         \\######################################30

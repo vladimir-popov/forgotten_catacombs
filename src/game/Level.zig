@@ -75,6 +75,7 @@ pub fn reset(self: *Self) void {
 }
 
 /// Generates a dungeon with the passed seed and sets up a dungeon to the preinited level.
+/// The type of the dungeon depends on the depth.
 /// This is the first step in loading a level.
 pub fn initWithEmptyDungeon(
     self: *Self,
@@ -91,7 +92,7 @@ pub fn initWithEmptyDungeon(
 
 /// Sets up the dungeon to the level, and initializes the inner state according to the dungeon.
 /// The level should be preinitialized before run this method.
-fn setupDungeon(
+pub fn setupDungeon(
     self: *Self,
     depth: u8,
     dungeon: d.Dungeon,
@@ -109,6 +110,7 @@ fn setupDungeon(
     self.player_equipment = self.registry.getUnsafe(player, c.Equipment);
     self.dungeon = dungeon;
     self.visibility_strategy = switch (dungeon.type) {
+        .test_location => g.visibility.showNearestWholePlacements,
         .first_location => g.visibility.showTheCurrentPlacement,
         .cave => g.visibility.showInRadiusOfSourceOfLight,
         .catacomb => if (depth < 3)

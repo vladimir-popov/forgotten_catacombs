@@ -13,6 +13,7 @@ pub const MovePoints = u8;
 pub const Action = union(enum) {
     pub const Move = struct {
         pub const Target = union(enum) {
+            /// A place in the dungeon (1-based)
             new_place: p.Point,
             direction: p.Direction,
         };
