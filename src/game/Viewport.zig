@@ -61,7 +61,7 @@ pub fn centeredAround(self: *Viewport, point: p.Point) void {
 }
 
 /// Try to keep the player inside this region
-pub inline fn innerRegion(self: Viewport) p.Region {
+pub fn innerRegion(self: Viewport) p.Region {
     var inner_region = self.region;
     inner_region.top_left.row += self.rows_pad;
     inner_region.top_left.col += self.cols_pad;
@@ -71,8 +71,18 @@ pub inline fn innerRegion(self: Viewport) p.Region {
 }
 
 /// Gets the point in the dungeon and return its coordinates on the screen.
-pub inline fn relative(self: Viewport, point: p.Point) p.Point {
-    return .{ .row = point.row - self.region.top_left.row + 1, .col = point.col - self.region.top_left.col + 1 };
+/// The null means that the point is out of the screen.
+pub fn relative(self: Viewport, point: p.Point) ?p.Point {
+    if (point.row < self.region.top_left.row or point.col < self.region.top_left.col)
+        return null;
+
+    if (point.row > self.region.bottomRightRow() or point.col > self.region.bottomRightCol())
+        return null;
+
+    return p.Point{
+        .row = point.row - self.region.top_left.row + 1,
+        .col = point.col - self.region.top_left.col + 1,
+    };
 }
 
 pub inline fn move(self: *Viewport, direction: p.Direction) void {

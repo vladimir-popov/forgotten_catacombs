@@ -103,14 +103,23 @@ pub fn onTurnCompleted(self: *Self) !void {
 
 /// Handles intentions to do some actions.
 /// Returns an optional happened action and a count of used move points.
-/// Returned null and 0 mp mean that the action was declined (moving to the wall as example),
-/// But in some cases (like moving to another level) it's possible to return some action and zero mp.
-pub fn doAction(self: *Self, actor: g.Entity, action: g.Action) !struct { ?g.Action, g.MovePoints } {
+/// Returned null and 0 mp mean that the action was declined (moving to the wall as example).
+/// In some cases (like moving to another level) it's possible to return some action and zero mp.
+/// When action requires more move points than limit, the `error.NotEnoughMovePoints` will be
+/// returned.
+pub fn doAction(
+    self: *Self,
+    actor: g.Entity,
+    action: g.Action,
+    move_points_limit: g.MovePoints,
+) !struct { ?g.Action, g.MovePoints } {
     if (std.log.logEnabled(.debug, .actions) and action != .do_nothing) {
         log.debug("Do action {any} by the entity {d}", .{ action, actor.id });
     }
-    // speed is used for most actions
-    const speed = self.session().registry.getUnsafe(actor, c.Speed);
+    const move_points_for_action = g.meta.movePointsForAction(&self.session().registry, actor, action);
+    if (move_points_for_action > move_points_limit)
+        return error.NotEnoughMovePoints;
+
     switch (action) {
         .do_nothing => return .{ null, 0 },
         .drink => |potion_id| if (g.meta.isPotion(&self.session().registry, potion_id)) |potion_type| {
@@ -124,7 +133,7 @@ pub fn doAction(self: *Self, actor: g.Entity, action: g.Action) !struct { ?g.Act
         },
         .move => |move| {
             if (self.session().registry.get(actor, c.Position)) |position|
-                return doMove(self, actor, position, move, speed.move_points);
+                return doMove(self, actor, position, move, move_points_for_action, move_points_limit);
         },
         .move_to_level => |ladder| {
             try self.session().movePlayerToLevel(ladder);
@@ -182,7 +191,7 @@ pub fn doAction(self: *Self, actor: g.Entity, action: g.Action) !struct { ?g.Act
             );
         },
     }
-    return .{ action, speed.move_points };
+    return .{ action, move_points_for_action };
 }
 
 fn doMove(
@@ -191,6 +200,7 @@ fn doMove(
     from_position: *c.Position,
     move: g.Action.Move,
     move_speed: g.MovePoints,
+    move_points_limit: g.MovePoints,
 ) anyerror!struct { ?g.Action, g.MovePoints } {
     const new_place = switch (move.target) {
         .direction => |direction| from_position.place.movedTo(direction),
@@ -200,7 +210,7 @@ fn doMove(
 
     if (checkCollision(self, new_place)) |action| {
         log.debug("Collision lead to {s}", .{@tagName(action)});
-        return try doAction(self, entity, action);
+        return try doAction(self, entity, action, move_points_limit);
     }
     const entity_moved_event = g.events.Event{
         .entity_moved = .{
@@ -309,6 +319,7 @@ fn tryToHit(
     }
 
     // Calculate and apply the damage
+    const target_health_before = target_health.current;
     const target_armor = self.session().registry.get(target, c.Armor) orelse &c.Armor.zeros;
     if (self.session().registry.get(weapon_id, c.Effects)) |effects| {
         const actor_experience: *c.Experience = self.session().registry.getUnsafe(actor, c.Experience);
@@ -319,17 +330,27 @@ fn tryToHit(
             const is_target_dead =
                 try self.applyEffect(actor, weapon_id, effect, target, target_armor, target_health);
 
-            if (is_target_dead) {
+            // Give experience to player
+            if (is_target_dead and actor.eql(self.session().player)) {
                 const level_before = actor_experience.level;
                 actor_experience.add(enemy_experience.asReward());
-                if (actor.eql(self.session().player))
-                    try self.session().notify(.{ .exp = enemy_experience.asReward() });
+                try self.session().notify(.{ .exp = enemy_experience.asReward() });
                 if (actor_experience.level > level_before) {
                     @panic("TODO: HANDLE LEVEL UP");
                 }
             }
+
+            // Break the function because the target is dead
+            if (is_target_dead) return true;
         }
-        return true;
+        if (actor.eql(self.session().player))
+            try self.session().notify(
+                .{ .hit = .{ .target = target, .damage = target_health_before - target_health.current } },
+            )
+        else if (target.eql(self.session().player))
+            try self.session().notify(
+                .{ .damage = .{ .actor = actor, .damage = target_health_before - target_health.current } },
+            );
     }
     return true;
 }
@@ -394,10 +415,11 @@ fn applyEffect(
             target_health.current = @min(target_health.max, target_health.current);
             const is_blocked_animation = actor.eql(self.session().player) or target.eql(self.session().player);
             try self.session().registry.set(target, c.Animation{ .preset = .healing, .is_blocked = is_blocked_animation });
+
             log.debug("Entity {d} recovered up to {d} hp", .{ target.id, value });
+            return false;
         },
     }
-    return false;
 }
 
 inline fn statBonus(actor_stats: c.Stats, weapon_class: c.Weapon.Class) f32 {
@@ -428,22 +450,16 @@ fn applyDamage(
         .{ target.id, effect_type, damage_value, orig_health, target_health.current },
     );
 
-    if (effect_type != .heal) {
-        if (actor.eql(self.session().player))
-            try self.session().notify(
-                .{ .hit = .{ .target = target, .damage = damage_value, .damage_type = effect_type } },
-            )
-        else if (target.eql(self.session().player))
-            try self.session().notify(
-                .{ .damage = .{ .actor = actor, .damage = damage_value, .damage_type = effect_type } },
-            );
-    }
-
     if (self.session().registry.get(target, c.EnemyState)) |_| {
         try self.session().registry.set(target, c.EnemyState.aggressive);
     }
 
     if (target_health.current == 0) {
+        // If the enemy was killed by the player, we should mark it as known
+        if (actor.eql(self.session().player))
+            if (g.meta.isEnemy(&self.session().registry, target)) |enemy_type|
+                try self.session().journal.markEnemyAsKnown(enemy_type);
+
         try self.session().onEntityDied(target);
         return true;
     } else {

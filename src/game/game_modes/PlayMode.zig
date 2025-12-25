@@ -31,7 +31,7 @@ const NotificationMessage = struct {
     buffer: [20]u8 = undefined,
     len: u8 = 0,
     /// when the notification appears on a screen
-    start_showing_at: c_uint,
+    start_showing_at: u64,
     /// where to place the first latter of the notification
     pp: p.Point,
     /// which mode should be used to show the notification
@@ -47,7 +47,7 @@ const NotificationMessage = struct {
     pub fn init(notification: g.notifications.Notification, session: *const g.GameSession) !NotificationMessage {
         var msg: NotificationMessage = .{
             // Start calculation of the place to show from the player place on the screen
-            .pp = session.viewport.relative(session.level.playerPosition().place),
+            .pp = session.viewport.relative(session.level.playerPosition().place) orelse unreachable,
             .start_showing_at = session.runtime.currentMillis(),
             .mode = switch (notification) {
                 .exp => .inverted,
@@ -62,7 +62,7 @@ const NotificationMessage = struct {
         for (relative_positions) |direction| {
             switch (direction) {
                 .up, .down => {
-                    const left_half: u8 = if (msg.len % 2 == 0) msg.len / 2 else msg.len / 2 + 1;
+                    const left_half: u8 = msg.len / 2;
                     msg.pp.move(direction);
                     // center the notification.
                     // validate left border
@@ -92,7 +92,10 @@ const NotificationMessage = struct {
                 else => null,
             };
             const is_hide_the_target = if (maybe_enemy_position) |pos|
-                msg.region().containsPoint(session.viewport.relative(pos.place))
+                if (session.viewport.relative(pos.place)) |enemy_pp|
+                    msg.region().containsPoint(enemy_pp)
+                else
+                    false
             else
                 false;
             const is_first_letter_on_screen = display_region.containsPoint(msg.pp);
@@ -103,7 +106,7 @@ const NotificationMessage = struct {
                 break;
             } else {
                 // reset the point and try another direction
-                msg.pp = session.viewport.relative(session.level.playerPosition().place);
+                msg.pp = session.viewport.relative(session.level.playerPosition().place) orelse unreachable;
             }
         }
         return msg;
@@ -151,30 +154,35 @@ fn setTarget(self: *Self, target: g.Entity) void {
     self.quick_actions.reset();
 }
 
-pub fn doTurn(self: *Self, actor: g.Entity, action: g.actions.Action) !?g.actions.Action {
+/// Trying to do an action. Action can be changed, or ignored.
+/// For example, moving can lead to a collision with an enemy, or with a wall. In first case the
+/// action will be changed to `hit` and completely ignored in another.
+/// Returns an actual action and a count of spent move points.
+/// When action requires more move points than initiative, the `error.NotEnoughMovePoints` will be
+/// returned.
+pub fn doTurn(
+    self: *Self,
+    actor: g.Entity,
+    action: g.actions.Action,
+    initiative: g.MovePoints,
+) !struct { ?g.Action, g.MovePoints } {
     log.info("The turn of the entity {d}.", .{actor.id});
     defer log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
 
     // Do Actions
-    const actual_action, const mp = try self.session.actions.doAction(actor, action);
+    const actual_action, const mp = try self.session.actions.doAction(actor, action, initiative);
     log.info("Entity {d} spent {d} move points", .{ actor.id, mp });
-    if (mp == 0) return actual_action;
 
     // Handle Initiative
-    if (self.is_player_turn) {
+    if (self.is_player_turn and mp > 0) {
         // Add initiative points to enemies
         var itr = self.session.registry.query(c.Initiative);
         while (itr.next()) |tuple| {
             tuple[1].move_points += mp;
         }
         try self.session.events.sendEvent(.{ .player_turn_completed = .{ .spent_move_points = mp } });
-    } else {
-        // Decrease initiative points of the enemy
-        const initiative = self.session.registry.getUnsafe(actor, c.Initiative);
-        g.utils.assert(mp <= initiative.move_points, "Spent more MP {d} than initiative has {any}", .{ mp, initiative });
-        initiative.move_points -= mp;
     }
-    return actual_action;
+    return .{ actual_action, mp };
 }
 
 fn handleInput(self: *Self) !?g.actions.Action {
@@ -264,7 +272,8 @@ pub fn tick(self: *Self) !void {
     if (self.is_player_turn) {
         // break this function if no input
         const action = (try self.handleInput()) orelse return;
-        if (try self.doTurn(self.session.player, action)) |actual_action| {
+        const tuple = try self.doTurn(self.session.player, action, std.math.maxInt(g.MovePoints));
+        if (tuple[0]) |actual_action| {
             // Force change the target
             switch (actual_action) {
                 .hit => |enemy| {
@@ -280,11 +289,24 @@ pub fn tick(self: *Self) !void {
             self.is_player_turn = false;
         }
     } else {
-        var itr = self.session.registry.query2(c.Initiative, c.Speed);
+        var itr = self.session.registry.query(c.Initiative);
         while (itr.next()) |tuple| {
-            const npc, const initiative, const speed = tuple;
-            while (speed.move_points <= initiative.move_points) {
-                _ = try self.doTurn(npc, self.session.ai.action(npc));
+            const npc, const initiative = tuple;
+            loop: while (true) {
+                // TODO: compare initiative with minimal required mp to prevent calculating an action
+                const action = self.session.ai.action(npc);
+                const actual_action, const mp = self.doTurn(npc, action, initiative.move_points) catch |err| {
+                    switch (err) {
+                        error.NotEnoughMovePoints => break :loop,
+                        else => return err,
+                    }
+                };
+                g.utils.assert(
+                    mp <= initiative.move_points,
+                    "Entity {d} spent more MP {d} than initiative has {any}. Actin was {any}",
+                    .{ npc.id, mp, initiative, actual_action },
+                );
+                initiative.move_points -= mp;
             }
         }
         self.is_player_turn = true;
@@ -318,7 +340,7 @@ fn draw(self: *Self) !bool {
 /// Removes the animation if the last frame was drawn.
 /// Returns true if one of animation is blocked.
 pub fn drawAnimationsFramesToBuffer(self: Self) !bool {
-    const now: c_uint = self.session.runtime.currentMillis();
+    const now: u64 = self.session.runtime.currentMillis();
     var was_blocked_animation: bool = false;
     var itr = self.session.level.registry.query2(c.Position, c.Animation);
     while (itr.next()) |components| {

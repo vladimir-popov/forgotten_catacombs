@@ -30,7 +30,7 @@ const VTable = struct {
         position_on_display: p.Point,
         mode: DrawingMode,
     ) anyerror!void,
-    currentMillis: *const fn (context: *anyopaque) c_uint,
+    currentMillis: *const fn (context: *anyopaque) u64,
     isDevMode: *const fn (context: *anyopaque) bool,
     popCheat: *const fn (context: *anyopaque) ?g.Cheat,
     // --------- FS operations ---------
@@ -55,7 +55,7 @@ pub inline fn popCheat(self: Runtime) ?g.Cheat {
     return self.vtable.popCheat(self.context);
 }
 
-pub inline fn currentMillis(self: Runtime) c_uint {
+pub inline fn currentMillis(self: Runtime) u64 {
     return self.vtable.currentMillis(self.context);
 }
 

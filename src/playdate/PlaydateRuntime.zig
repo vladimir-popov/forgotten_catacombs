@@ -91,9 +91,9 @@ fn isDevMode(ptr: *anyopaque) bool {
     return self.is_dev_mode;
 }
 
-fn currentMillis(ptr: *anyopaque) c_uint {
+fn currentMillis(ptr: *anyopaque) u64 {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    return self.playdate.system.getCurrentTimeMilliseconds();
+    return @intCast(self.playdate.system.getCurrentTimeMilliseconds());
 }
 
 fn addMenuItem(

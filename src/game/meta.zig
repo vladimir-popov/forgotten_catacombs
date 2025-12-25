@@ -125,6 +125,11 @@ pub fn initialHealth(constitution: i4) c.Health {
     return .init(@intFromFloat(@round(constitution_factor * 20)));
 }
 
+pub fn movePointsForAction(registry: *const g.Registry, actor: g.Entity, _: g.Action) g.MovePoints {
+    // TODO: return different mp for attacks
+    return registry.getUnsafe(actor, c.Speed).move_points;
+}
+
 /// Algorithm of filling a shop:
 /// 1. Build a weighted index for all defined in `g.entities.Items` items according to their rarity;
 /// 2. Randomly choose a count of items in the shop: [10, 15]

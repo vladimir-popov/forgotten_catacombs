@@ -234,14 +234,15 @@ pub fn movePlayerToLevel(self: *Self, by_ladder: c.Ladder) !void {
     try self.events.sendEvent(.{ .level_changed = .{ .by_ladder = by_ladder } });
 }
 
+/// Removes the entity or returns `error.GameOver`.
 pub fn onEntityDied(self: *Self, entity: g.Entity) !void {
     if (entity.eql(self.player)) {
         log.info("Player is dead. Game is over.", .{});
         // return error for break the game loop:
         return error.GameOver;
-    } else if (g.meta.isEnemy(&self.registry, entity)) |enemy_type| {
+    } else {
         log.debug("NPC {d} is dead", .{entity.id});
-        try self.journal.markEnemyAsKnown(enemy_type);
+        // Handle death and remove the entity here, within the current tick
         try self.registry.removeEntity(entity);
         try self.level.removeEntity(entity);
         try self.events.sendEvent(.{ .entity_died = entity });
@@ -266,7 +267,7 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
             .to_play => |args| {
                 try self.switchModeToPlay(args.entity_in_focus);
                 if (args.action) |action| {
-                    _ = try self.mode.play.doTurn(self.player, action);
+                    _ = try self.mode.play.doTurn(self.player, action, std.math.maxInt(g.MovePoints));
                 }
             },
             .to_explore => {

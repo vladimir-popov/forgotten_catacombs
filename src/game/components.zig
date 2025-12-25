@@ -70,11 +70,11 @@ pub const Animation = struct {
 
     preset: FramesPresets.Tag,
     current_frame: u8 = 0,
-    previous_render_time: c_uint = 0,
+    previous_render_time: u64 = 0,
     /// true means that input should not be handled until all frames of this animation will be played.
     is_blocked: bool = false,
 
-    pub fn frame(self: *Animation, now: u32) ?g.Codepoint {
+    pub fn frame(self: *Animation, now: u64) ?g.Codepoint {
         const frames = FramesPresets.fields.get(self.preset);
         if (now - self.previous_render_time > g.RENDER_DELAY_MS) {
             self.previous_render_time = now;

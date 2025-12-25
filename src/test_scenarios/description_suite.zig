@@ -133,6 +133,8 @@ test "Describe a known enemy (after killing a similar creature)" {
         if (health.current == 0) break;
 
         try test_session.pressButton(.up);
+        // wait when notification disappears
+        test_session.runtime.current_millis += 3000;
 
         if (attempt > 15) return error.ToManyAttemptsToKick;
         attempt += 1;

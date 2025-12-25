@@ -179,10 +179,10 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             self.keyboard_buffer = null;
         }
 
-        fn currentMillis(ptr: *anyopaque) c_uint {
+        fn currentMillis(ptr: *anyopaque) u64 {
             const self: *Self = @ptrCast(@alignCast(ptr));
             const now = std.Io.Clock.awake.now(self.io) catch unreachable;
-            return @truncate(@as(u64, @intCast(now.toMilliseconds())));
+            return @as(u64, @intCast(now.toMilliseconds()));
         }
 
         fn addMenuItem(

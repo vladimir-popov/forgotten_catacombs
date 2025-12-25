@@ -132,7 +132,7 @@ test "Show a notification near an enemy" {
     const rat = try test_session.session.level.addEnemy(.sleeping, g.entities.Enemies.atPlace(.rat, pp));
     test_session.session.mode.play.target = rat;
 
-    try test_session.session.notify(.{ .hit = .{ .target = rat, .damage = 5, .damage_type = .physical } });
+    try test_session.session.notify(.{ .hit = .{ .target = rat, .damage = 5 } });
     try test_session.tick();
     try test_session.tick();
 
@@ -142,7 +142,7 @@ test "Show a notification near an enemy" {
         \\••••••••••••••••••••••••••••••••••••••••
         \\••••••••••••••••••r•••••••••••••••••••••
         \\•••••••••••••••••••@••••••••••••••••••••
-        \\••••••••••••••••5 hit•••••••••••••••••••
+        \\•••••••••••••••••Hit 5••••••••••••••••••
         \\••••••••••••••••••••••••••••••••••••••••
         \\••••••••••••••••••••••••••••••••••••••••
         \\••••••••••••••••••••••••••••••••••••••••
