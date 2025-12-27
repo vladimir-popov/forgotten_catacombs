@@ -146,12 +146,11 @@ pub fn initNew(
     log.debug("Begin a new game session with seed {d}", .{seed});
     try self.preInit(gpa, runtime, render);
     self.seed = seed;
+    var prng = std.Random.DefaultPrng.init(seed);
     self.player = try self.registry.addNewEntity(
-        try g.entities.player(self.registry.allocator(), stats, skills, health),
+        try g.entities.player(self.registry.allocator(), prng.random(), stats, skills, health),
     );
 
-    // Creates the initial equipment of the player
-    self.registry.getUnsafe(self.player, c.Wallet).money += 200;
     var equipment: *c.Equipment = self.registry.getUnsafe(self.player, c.Equipment);
     var invent: *c.Inventory = self.registry.getUnsafe(self.player, c.Inventory);
     const weapon = try self.registry.addNewEntity(g.presets.Items.fields.get(.pickaxe).*);

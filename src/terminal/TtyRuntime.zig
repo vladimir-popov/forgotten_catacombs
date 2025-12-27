@@ -230,8 +230,8 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                             .LEFT => {
                                 // -1 for border
                                 self.cheat = .{ .goto = .{
-                                    .row = m.row - rows_pad - 1,
-                                    .col = m.col - cols_pad - 1,
+                                    .row = m.row - rows_pad,
+                                    .col = m.col - cols_pad,
                                 } };
                             },
                             .WHEEL_UP => self.cheat = .move_player_to_ladder_up,

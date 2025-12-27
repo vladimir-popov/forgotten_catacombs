@@ -11,7 +11,13 @@ pub const Enemies = @import("Enemies.zig");
 /// Creates components for the player with empty inventory and nothing equipped.
 ///
 /// - `alloc` the ecs.Registry allocator.
-pub fn player(alloc: std.mem.Allocator, stats: c.Stats, skills: c.Skills, health: c.Health) !c.Components {
+pub fn player(
+    alloc: std.mem.Allocator,
+    rand: std.Random,
+    stats: c.Stats,
+    skills: c.Skills,
+    health: c.Health,
+) !c.Components {
     return .{
         .description = .{ .preset = .player },
         .equipment = .nothing,
@@ -24,7 +30,7 @@ pub fn player(alloc: std.mem.Allocator, stats: c.Stats, skills: c.Skills, health
         .speed = .{ .move_points = g.MOVE_POINTS_IN_TURN },
         .sprite = .{ .codepoint = cp.human },
         .stats = stats,
-        .wallet = .{ .money = 0 },
+        .wallet = .{ .money = rand.uintAtMost(u16, 20) + 30 },
     };
 }
 

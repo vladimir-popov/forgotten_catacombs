@@ -91,11 +91,11 @@ pub fn deinit(self: *Self) void {
     self.main_window.deinit(self.alloc);
 }
 
-fn buyingTab(self: *Self) *w.WindowWithTabs.Tab {
+inline fn buyingTab(self: *Self) *w.WindowWithTabs.Tab {
     return &self.main_window.tabs[0];
 }
 
-fn sellingTab(self: *Self) *w.WindowWithTabs.Tab {
+inline fn sellingTab(self: *Self) *w.WindowWithTabs.Tab {
     return &self.main_window.tabs[1];
 }
 
@@ -157,10 +157,10 @@ fn draw(self: *Self) !void {
 
 fn drawBalance(self: Self) !void {
     var buf: [30]u8 = undefined;
-    if (self.main_window.active_tab_idx == 0) {
-        try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "Traider's: {d:4}$", .{self.shop.balance}));
+    if (self.main_window.active_tab_idx == 1) {
+        try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "Traider's:  {d:4}$", .{self.shop.balance}));
     } else {
-        try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "Your:      {d:4}$", .{self.wallet.money}));
+        try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "Your money: {d:4}$", .{self.wallet.money}));
     }
 }
 
