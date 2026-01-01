@@ -228,7 +228,6 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                         if (m.is_released) return null;
                         switch (m.button) {
                             .LEFT => {
-                                // -1 for border
                                 self.cheat = .{ .goto = .{
                                     .row = m.row - rows_pad,
                                     .col = m.col - cols_pad,

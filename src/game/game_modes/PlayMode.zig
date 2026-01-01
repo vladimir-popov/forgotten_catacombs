@@ -250,9 +250,9 @@ fn handleInput(self: *Self) !?g.actions.Action {
                 }
             },
             .recognize => |entity| {
-                if (g.meta.isEnemy(&self.session.registry, entity)) |enemy_type| {
+                if (g.meta.getEnemyType(&self.session.registry, entity)) |enemy_type| {
                     try self.session.journal.markEnemyAsKnown(enemy_type);
-                } else if (g.meta.isPotion(&self.session.registry, entity)) |potion_type| {
+                } else if (g.meta.getPotionType(&self.session.registry, entity)) |potion_type| {
                     try self.session.journal.markPotionAsKnown(potion_type);
                 } else {
                     try self.session.journal.markWeaponAsKnown(entity);
@@ -471,12 +471,18 @@ pub fn updateQuickActions(self: *Self) anyerror!void {
             if (qa.eql(selected_action)) {
                 self.quick_actions.selected_idx = self.quick_actions.actions.items.len - 1;
             }
+            // Compare action priorities to choose the most important target
+            else if (qa.priority() > self.quickAction().priority()) {
+                self.target = target;
+                self.quick_actions.selected_idx = self.quick_actions.actions.items.len - 1;
+            }
             break;
         }
         log.debug("No quick action for entity {any}", .{target});
         self.target = null;
     }
 
+    // TODO: Move to the iterator
     // Entities under the player's feet should be included to possible actions
     const cell_under_feet = self.session.level.cellAt(player_position.place);
     switch (cell_under_feet) {

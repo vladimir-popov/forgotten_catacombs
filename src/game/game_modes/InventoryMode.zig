@@ -53,7 +53,7 @@ equipment: *c.Equipment,
 drop: ?g.Entity,
 /// The action initiated during manage the inventory.
 action: ?g.actions.Action = null,
-main_window: w.WindowWithTabs,
+main_window: w.WindowWithTabs = .{},
 description_window: ?w.ModalWindow(w.TextArea) = null,
 actions_window: ?w.ModalWindow(w.OptionsArea(g.Entity)) = null,
 
@@ -72,9 +72,8 @@ pub fn init(
         .equipment = equipment,
         .inventory = inventory,
         .drop = drop,
-        .main_window = w.WindowWithTabs.init(self),
     };
-    self.main_window.addTab("Inventory");
+    self.main_window.addTab("Inventory", self);
     try self.updateInventoryTab();
 
     if (drop) |item| {
@@ -127,13 +126,13 @@ pub fn tick(self: *Self) !void {
 
 fn draw(self: *Self) !void {
     if (self.description_window) |*window| {
-        log.debug("Draw description window", .{});
+        log.debug("Draw the description window", .{});
         try window.draw(self.session.render);
     } else if (self.actions_window) |*window| {
-        log.debug("Draw actions window", .{});
+        log.debug("Draw the actions window", .{});
         try window.draw(self.session.render);
     } else {
-        log.debug("Draw main window tab {d}", .{self.main_window.active_tab_idx});
+        log.debug("Draw the main window tab {d}", .{self.main_window.active_tab_idx});
         try self.main_window.draw(self.session.render);
         var buf: [10]u8 = undefined;
         const money = self.session.registry.getUnsafe(self.session.player, c.Wallet).money;
@@ -141,7 +140,7 @@ fn draw(self: *Self) !void {
     }
 }
 
-fn tabWithInventory(self: *Self) *w.WindowWithTabs.Tab {
+inline fn tabWithInventory(self: *Self) *w.WindowWithTabs.Tab {
     return &self.main_window.tabs[0];
 }
 
@@ -203,20 +202,16 @@ fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     if (item.eql(self.equipment.light) or item.eql(self.equipment.weapon)) {
         try area.addOption(self.alloc, "Unequip", item, unequipItem, null);
     } else {
-        if (g.meta.isLight(&self.session.registry, item)) {
-            try area.addOption(self.alloc, "Use as a light", item, useAsLight, null);
-        }
-        if (g.meta.isWeapon(&self.session.registry, item)) {
-            try area.addOption(self.alloc, "Use as a weapon", item, useAsWeapon, null);
-        }
-        if (self.session.registry.get(item, c.Ammunition)) |_| {
-            try area.addOption(self.alloc, "Put to quiver", item, putToQuiver, null);
-        }
-        if (g.meta.isPotion(&self.session.registry, item)) |_| {
-            try area.addOption(self.alloc, "Drink", item, consumeItem, null);
-        }
-        if (g.meta.isFood(&self.session.registry, item)) {
-            try area.addOption(self.alloc, "Eat", item, consumeItem, null);
+        switch (g.meta.entityType(&self.session.registry, item)) {
+            .weapon => try area.addOption(self.alloc, "Use as a weapon", item, useAsWeapon, null),
+            .ammunition => try area.addOption(self.alloc, "Put to quiver", item, putToQuiver, null),
+            .armor => try area.addOption(self.alloc, "Equip", item, useAsArmor, null),
+            .light => try area.addOption(self.alloc, "Use as a light", item, useAsLight, null),
+            .potion => try area.addOption(self.alloc, "Drink", item, consumeItem, null),
+            .food => try area.addOption(self.alloc, "Eat", item, consumeItem, null),
+            .enemy => {
+                log.err("Attempt to use an enemy {d}", .{item.id});
+            },
         }
     }
     try area.addOption(self.alloc, "Drop", item, dropSelectedItem, null);
@@ -257,6 +252,13 @@ fn useAsWeapon(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     try self.updateInventoryTab();
 }
 
+fn useAsArmor(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    log.debug("Use the item {d} as armor. (current equipment: {any})", .{ item.id, self.equipment });
+    self.equipment.armor = item;
+    try self.updateInventoryTab();
+}
+
 fn putToQuiver(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Use the item {d} as an ammunition. (current equipment: {any})", .{ item.id, self.equipment });
@@ -292,7 +294,7 @@ fn takeFromPileOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
 fn addDropTab(self: *Self, drop: g.Entity) !void {
     if (self.main_window.tabs_count < 2) {
         log.debug("Add drop tab for {any}", .{drop});
-        self.main_window.addTab("Drop");
+        self.main_window.addTab("Drop", self);
     }
     try self.updateDropTab(drop);
 }

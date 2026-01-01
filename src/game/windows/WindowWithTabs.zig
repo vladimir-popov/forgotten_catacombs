@@ -48,14 +48,9 @@ pub const Tab = struct {
 
 const Self = @This();
 
-owner: *anyopaque,
 tabs: [MAX_TABS]Tab = undefined,
 tabs_count: u8 = 0,
 active_tab_idx: usize = 0,
-
-pub fn init(owner: *anyopaque) Self {
-    return .{ .owner = owner };
-}
 
 pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
     for (0..self.tabs_count) |idx| {
@@ -63,11 +58,13 @@ pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
     }
 }
 
-pub fn addTab(self: *Self, title: []const u8) void {
+/// Adds one more tab to this window.
+///   - `context` is a pointer that will be passed to every option handler on this tab.
+pub fn addTab(self: *Self, title: []const u8, context: *anyopaque) void {
     std.debug.assert(self.tabs_count < MAX_TABS);
     self.tabs[self.tabs_count] = .{
         .title = title,
-        .area = .init(w.OptionsArea(g.Entity).init(self.owner, .left), CONTENT_AREA_REGION),
+        .area = .init(w.OptionsArea(g.Entity).init(context, .left), CONTENT_AREA_REGION),
     };
     self.tabs_count += 1;
 }

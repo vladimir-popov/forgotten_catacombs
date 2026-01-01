@@ -30,6 +30,7 @@ pub const ModeChanged = union(enum) {
     to_looking_around,
     to_inventory,
     to_trading: *c.Shop,
+    to_modify_recognize,
     to_play: struct { entity_in_focus: ?g.Entity, action: ?g.actions.Action },
 };
 

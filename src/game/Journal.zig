@@ -59,10 +59,10 @@ pub fn isKnown(self: Self, entity: g.Entity) bool {
     if (self.known_equipment.contains(entity)) {
         return true;
     }
-    if (g.meta.isPotion(self.registry, entity)) |potion_type| {
+    if (g.meta.getPotionType(self.registry, entity)) |potion_type| {
         return self.known_potions.contains(potion_type);
     }
-    if (g.meta.isEnemy(self.registry, entity)) |enemy_type| {
+    if (g.meta.getEnemyType(self.registry, entity)) |enemy_type| {
         return self.known_enemies.contains(enemy_type);
     }
     if (self.registry.has(entity, c.Modification)) {
@@ -93,10 +93,30 @@ pub fn markPotionAsKnown(self: *Self, potion_type: g.meta.PotionType) !void {
     try self.known_potions.put(self.alloc, potion_type, {});
 }
 
+pub fn markArmorAsKnown(self: *Self, armor: g.Entity) !void {
+    log.debug("Mark the armor {d} as known", .{armor.id});
+    try self.known_equipment.put(self.alloc, armor, {});
+    try self.registry.set(armor, c.Sprite{ .codepoint = g.codepoints.armor });
+}
+
 pub fn markWeaponAsKnown(self: *Self, weapon: g.Entity) !void {
     log.debug("Mark the weapon {d} as known", .{weapon.id});
     try self.known_equipment.put(self.alloc, weapon, {});
-    try self.registry.set(weapon, c.Sprite{ .codepoint = g.codepoints.weapon_melee });
+    const sprite = self.registry.getUnsafe(weapon, c.Sprite);
+    sprite.codepoint = if (self.registry.getUnsafe(weapon, c.Weapon).ammunition_type == null)
+        g.codepoints.weapon_melee
+    else
+        g.codepoints.weapon_ranged;
+}
+
+pub fn forgetWeapon(self: *Self, weapon: g.Entity) !void {
+    log.debug("Mark the weapon {d} as unknown", .{weapon.id});
+    _ = self.known_equipment.remove(weapon);
+    const sprite = self.registry.getUnsafe(weapon, c.Sprite);
+    sprite.codepoint = if (self.registry.getUnsafe(weapon, c.Weapon).ammunition_type == null)
+        g.codepoints.weapon_melee_unknown
+    else
+        g.codepoints.weapon_ranged_unknown;
 }
 
 pub fn onTurnCompleted(self: *Self) !void {

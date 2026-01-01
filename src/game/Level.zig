@@ -164,11 +164,7 @@ pub fn initAsFirstLevel(
     try self.entities_on_level.append(arena_alloc, entity);
 
     // Add the scientist
-    entity = try self.registry.addNewEntity(.{
-        .position = .{ .place = d.FirstLocation.scientist_place, .zorder = .obstacle },
-        .sprite = .{ .codepoint = cp.human },
-        .description = .{ .preset = .scientist },
-    });
+    entity = try self.registry.addNewEntity(g.entities.scientist(d.FirstLocation.scientist_place));
     try self.entities_on_level.append(arena_alloc, entity);
 
     // Add the teleport

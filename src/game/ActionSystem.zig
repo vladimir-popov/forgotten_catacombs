@@ -38,7 +38,7 @@ pub fn calculateQuickActionForTarget(
 
     const is_near4 = player_place.near4(target_position.place);
 
-    if (g.meta.isEnemy(&self.session().registry, target_entity)) |_| {
+    if (g.meta.getEnemyType(&self.session().registry, target_entity)) |_| {
         // It's always possible to hit neighbors in 4 directions
         if (is_near4) return .{ .hit = target_entity };
 
@@ -51,6 +51,14 @@ pub fn calculateQuickActionForTarget(
     }
 
     if (is_near4) {
+        if (self.session().registry.get(target_entity, c.Shop)) |shop| {
+            return .{ .trade = shop };
+        }
+        if (self.session().registry.get(target_entity, c.Description)) |descr| {
+            if (descr.preset == .scientist) {
+                return .modify_recognize;
+            }
+        }
         if (self.session().registry.get(target_entity, c.Door)) |door| {
             // the player should not be able to open/close the door stay in the doorway
             if (player_place.eql(target_position.place)) {
@@ -60,9 +68,6 @@ pub fn calculateQuickActionForTarget(
                 .opened => .{ .close = .{ .id = target_entity, .place = target_position.place } },
                 .closed => .{ .open = .{ .id = target_entity, .place = target_position.place } },
             };
-        }
-        if (self.session().registry.get(target_entity, c.Shop)) |shop| {
-            return .{ .trade = shop };
         }
     }
     return null;
@@ -122,7 +127,7 @@ pub fn doAction(
 
     switch (action) {
         .do_nothing => return .{ null, 0 },
-        .drink => |potion_id| if (g.meta.isPotion(&self.session().registry, potion_id)) |potion_type| {
+        .drink => |potion_id| if (g.meta.getPotionType(&self.session().registry, potion_id)) |potion_type| {
             try self.drinkPotion(actor, potion_id, potion_type);
         },
         .eat => |food_id| {
@@ -180,6 +185,9 @@ pub fn doAction(
                 target,
                 c.Animation{ .preset = .get_angry },
             );
+        },
+        .modify_recognize => {
+            try self.session().modifyRecognize();
         },
         .trade => |shop| {
             try self.session().trade(shop);
@@ -240,11 +248,17 @@ fn checkCollision(self: *Self, place: p.Point) ?g.Action {
                 if (self.session().registry.get(entity, c.Door)) |_|
                     return .{ .open = .{ .id = entity, .place = place } };
 
-                if (g.meta.isEnemy(&self.session().registry, entity)) |_|
+                if (g.meta.getEnemyType(&self.session().registry, entity)) |_|
                     return .{ .hit = entity };
 
                 if (self.session().registry.get(entity, c.Shop)) |shop| {
                     return .{ .trade = shop };
+                }
+
+                if (self.session().registry.get(entity, c.Description)) |descr| {
+                    if (descr.preset == .scientist) {
+                        return .modify_recognize;
+                    }
                 }
 
                 // the player should not step on the place with entity with z-order = 2
@@ -320,7 +334,7 @@ fn tryToHit(
 
     // Calculate and apply the damage
     const target_health_before = target_health.current;
-    const target_armor = self.session().registry.get(target, c.Armor) orelse &c.Armor.zeros;
+    const target_armor = self.session().registry.get(target, c.Protection) orelse &c.Protection.zeros;
     if (self.session().registry.get(weapon_id, c.Effects)) |effects| {
         const actor_experience: *c.Experience = self.session().registry.getUnsafe(actor, c.Experience);
         // we have to copy the whole component, because the enemy can be removed,
@@ -365,7 +379,7 @@ fn applyEffect(
     source: g.Entity,
     effect: c.Effect,
     target: g.Entity,
-    target_armor: *const c.Armor,
+    target_armor: *const c.Protection,
     target_health: *c.Health,
 ) !bool {
     std.debug.assert(effect.min <= effect.max);
@@ -457,7 +471,7 @@ fn applyDamage(
     if (target_health.current == 0) {
         // If the enemy was killed by the player, we should mark it as known
         if (actor.eql(self.session().player))
-            if (g.meta.isEnemy(&self.session().registry, target)) |enemy_type|
+            if (g.meta.getEnemyType(&self.session().registry, target)) |enemy_type|
                 try self.session().journal.markEnemyAsKnown(enemy_type);
 
         try self.session().onEntityDied(target);
@@ -474,7 +488,7 @@ fn drinkPotion(self: *Self, actor: g.Entity, potion_id: g.Entity, potion_type: g
     if (self.session().registry.get(potion_id, c.Effects)) |effects| {
         for (effects.items()) |effect| {
             if (self.session().registry.get(actor, c.Health)) |health| {
-                const armor = self.session().registry.get(actor, c.Armor) orelse &c.Armor.zeros;
+                const armor = self.session().registry.get(actor, c.Protection) orelse &c.Protection.zeros;
                 try self.session().journal.markPotionAsKnown(potion_type);
                 const is_actor_dead = try self.applyEffect(actor, potion_id, effect, actor, armor, health);
                 if (is_actor_dead) break;

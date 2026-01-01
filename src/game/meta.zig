@@ -10,6 +10,16 @@ pub const EnemyType = g.descriptions.Enemies.Enum;
 pub const PlayerArchetype = g.descriptions.Archetypes.Enum;
 pub const Skill = g.descriptions.Skills.Enum;
 
+pub const ItemType = enum {
+    ammunition,
+    armor,
+    enemy,
+    food,
+    light,
+    potion,
+    weapon,
+};
+
 /// A numbers of required exp point for level up.
 /// The 0 element is a required amount of exp point to get the
 /// second level.
@@ -19,38 +29,40 @@ pub inline fn experienceToNextLevel(current_level: u4) u16 {
     return Levels[current_level - 1];
 }
 
+pub fn entityType(registry: *const g.Registry, entity: g.Entity) ItemType {
+    if (registry.has(entity, c.Weight))
+        return .weapon;
+    if (registry.has(entity, c.Protection))
+        return .armor;
+    if (getPotionType(registry, entity)) |_|
+        return .potion;
+    if (registry.has(entity, c.SourceOfLight))
+        return .light;
+    if (registry.has(entity, c.Consumable))
+        return .food;
+    if (getEnemyType(registry, entity)) |_|
+        return .enemy;
+    if (registry.has(entity, c.Ammunition))
+        return .ammunition;
+
+    std.debug.panic("Undefined type of the entity {d}: {f}", .{ entity.id, try registry.entityToStruct(entity) });
+}
+
 /// Any entity with weight is item.
 pub inline fn isItem(registry: *const g.Registry, entity: g.Entity) bool {
     return registry.has(entity, c.Weight);
 }
 
-/// Any entity with the Weapon component is a weapon.
-pub inline fn isWeapon(registry: *const g.Registry, entity: g.Entity) bool {
-    return registry.has(entity, c.Weapon);
-}
-
-/// Any entity with a `SourceOfLight` is a light.
-pub inline fn isLight(registry: *const g.Registry, entity: g.Entity) bool {
-    return registry.has(entity, c.SourceOfLight);
-}
-
 /// Returns a type of a potion if it has description preset from appropriate namespace.
-pub inline fn isPotion(registry: *const g.Registry, entity: g.Entity) ?PotionType {
+pub inline fn getPotionType(registry: *const g.Registry, entity: g.Entity) ?PotionType {
     return if (registry.get(entity, c.Description)) |descr|
         std.meta.stringToEnum(PotionType, @tagName(descr.preset))
     else
         null;
 }
 
-pub inline fn isFood(registry: *const g.Registry, entity: g.Entity) bool {
-    if (registry.get(entity, c.Consumable)) |consumable| {
-        return consumable.consumable_type == .food;
-    }
-    return false;
-}
-
 /// Returns a type of an enemy if it has description preset from appropriate namespace.
-pub inline fn isEnemy(registry: *const g.Registry, entity: g.Entity) ?EnemyType {
+pub inline fn getEnemyType(registry: *const g.Registry, entity: g.Entity) ?EnemyType {
     return if (registry.get(entity, c.Description)) |descr|
         std.meta.stringToEnum(EnemyType, @tagName(descr.preset))
     else
@@ -59,7 +71,10 @@ pub inline fn isEnemy(registry: *const g.Registry, entity: g.Entity) ?EnemyType 
 
 /// Only weapon and source of light can be equipped.
 pub fn canEquip(registry: *const g.Registry, item: g.Entity) bool {
-    return isWeapon(registry, item) or isLight(registry, item);
+    switch (entityType(registry, item)) {
+        .weapon, .light, .armor => true,
+        else => false,
+    }
 }
 
 /// Returns the id of the item with maximal radius of light through all equipped sources of the light,
@@ -152,14 +167,19 @@ pub fn fillShop(shop: *c.Shop, registry: *g.Registry, seed: u64) !void {
         const item = g.presets.Items.fields.values[rand.weightedIndex(u8, &proportions)];
         const entity = try registry.addNewEntity(item.*);
         // Randomly modify a weapon:
-        if (isWeapon(registry, entity) and rand.uintAtMost(u8, 100) < 15) {
-            try modifyWeapon(registry, rand, entity);
+        if (registry.has(entity, c.Weapon) and rand.uintAtMost(u8, 100) < 15) {
+            try modifyWeapon(registry, rand, entity, -5, 5);
         }
         try shop.items.add(entity);
     }
 }
 
-fn modifyWeapon(registry: *g.Registry, rand: std.Random, weapon: g.Entity) !void {
+/// Applies a random modification value from the range [`min`, `max`] using the weighted index:
+///   - physical = 20;
+///   - fire = 8;
+///   - poison = 10;
+///   - acid = 5;
+pub fn modifyWeapon(registry: *g.Registry, rand: std.Random, weapon: g.Entity, min: i8, max: i8) !void {
     try registry.set(weapon, c.Sprite{ .codepoint = g.codepoints.weapon_melee_unknown });
     var modification: c.Modification = .{ .modificators = .initFull(0) };
     var weighted_index: [c.Effect.TypesCount]u8 = undefined;
@@ -169,7 +189,7 @@ fn modifyWeapon(registry: *g.Registry, rand: std.Random, weapon: g.Entity) !void
     weighted_index[@intFromEnum(c.Effect.Type.poison)] = 10;
     weighted_index[@intFromEnum(c.Effect.Type.acid)] = 5;
     const effect_type = rand.weightedIndex(u8, &weighted_index);
-    const value = rand.intRangeAtMost(i8, -5, 5);
+    const value = rand.intRangeAtMost(i8, min, max);
     modification.modificators.values[effect_type] = if (value == 0) -5 else value;
     log.debug("{f} for {d}", .{ modification, weapon.id });
     try registry.set(weapon, modification);

@@ -12,6 +12,7 @@ pub const ExploreLevelMode = @import("game_modes/ExploreLevelMode.zig");
 pub const ExploreMode = @import("game_modes/ExploreMode.zig");
 pub const InventoryMode = @import("game_modes/InventoryMode.zig");
 pub const PlayMode = @import("game_modes/PlayMode.zig");
+pub const ModifyMode = @import("game_modes/ModifyMode.zig");
 pub const SaveLoadMode = @import("game_modes/SaveLoadMode.zig");
 pub const TradingMode = @import("game_modes/TradingMode.zig");
 
@@ -25,6 +26,7 @@ pub const Mode = union(enum) {
     inventory: InventoryMode,
     play: PlayMode,
     save_load: SaveLoadMode,
+    modify_recognize: ModifyMode,
     trading: TradingMode,
 
     inline fn deinit(self: *Mode) void {
@@ -34,6 +36,7 @@ pub const Mode = union(enum) {
             .inventory => self.inventory.deinit(),
             .play => self.play.deinit(),
             .save_load => self.save_load.deinit(),
+            .modify_recognize => self.modify_recognize.deinit(),
             .trading => self.trading.deinit(),
         }
     }
@@ -225,6 +228,10 @@ pub fn manageInventory(self: *Self) !void {
     try self.events.sendEvent(.{ .mode_changed = .to_inventory });
 }
 
+pub fn modifyRecognize(self: *Self) !void {
+    try self.events.sendEvent(.{ .mode_changed = .to_modify_recognize });
+}
+
 pub fn trade(self: *Self, shop: *c.Shop) !void {
     try self.events.sendEvent(.{ .mode_changed = .{ .to_trading = shop } });
 }
@@ -291,6 +298,13 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
                 self.mode = .{ .trading = undefined };
                 try self.mode.trading.init(self.arena.allocator(), self, shop);
             },
+            .to_modify_recognize => {
+                self.mode.deinit();
+                self.mode = .{ .modify_recognize = undefined };
+                if (self.registry.get2(self.player, c.Inventory, c.Wallet)) |tuple| {
+                    try self.mode.modify_recognize.init(self.arena.allocator(), self, tuple[0], tuple[1]);
+                }
+            },
         },
         .level_changed => |lvl| {
             self.mode.deinit();
@@ -338,6 +352,7 @@ pub inline fn tick(self: *Self) !void {
         .inventory => try self.mode.inventory.tick(),
         .play => try self.mode.play.tick(),
         .save_load => try self.mode.save_load.tick(),
+        .modify_recognize => try self.mode.modify_recognize.tick(),
         .trading => try self.mode.trading.tick(),
     }
     try self.events.notifySubscribers();

@@ -51,7 +51,7 @@ session: *g.GameSession,
 wallet: *c.Wallet,
 inventory: *c.Inventory,
 shop: *c.Shop,
-main_window: w.WindowWithTabs,
+main_window: w.WindowWithTabs = .{},
 /// Contains an entity description, or a notification.
 modal_window: ?w.ModalWindow(w.TextArea) = null,
 /// Contains available actions
@@ -69,12 +69,11 @@ pub fn init(
         .wallet = session.registry.getUnsafe(session.player, c.Wallet),
         .inventory = session.registry.getUnsafe(session.player, c.Inventory),
         .shop = shop,
-        .main_window = w.WindowWithTabs.init(self),
     };
-    self.main_window.addTab("Buy");
+    self.main_window.addTab("Buy", self);
     try self.updateBuyingTab();
 
-    self.main_window.addTab("Sell");
+    self.main_window.addTab("Sell", self);
     try self.updateSellingTab();
 
     try self.draw();

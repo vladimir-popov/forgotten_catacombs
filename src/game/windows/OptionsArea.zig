@@ -50,8 +50,8 @@ pub fn OptionsArea(comptime Item: type) type {
             }
         };
 
-        /// The owner is always passed to button handlers
-        owner: *anyopaque,
+        /// The context is always passed to button handlers
+        context: *anyopaque,
         options: std.ArrayListUnmanaged(Option),
         text_align: g.TextAlign,
         /// The absolute index of the selected line (includes the lines out of scroll)
@@ -61,8 +61,8 @@ pub fn OptionsArea(comptime Item: type) type {
             return .init(owner, .center);
         }
 
-        pub fn init(owner: *anyopaque, text_align: g.TextAlign) Self {
-            return .{ .owner = owner, .text_align = text_align, .options = .empty };
+        pub fn init(context: *anyopaque, text_align: g.TextAlign) Self {
+            return .{ .context = context, .text_align = text_align, .options = .empty };
         }
 
         pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
@@ -162,9 +162,9 @@ pub fn OptionsArea(comptime Item: type) type {
                 .a => {
                     const option = self.options.items[self.selected_line];
                     if (btn.state == .hold and option.onHoldButtonFn != null) {
-                        try option.onHoldButtonFn.?(self.owner, self.selected_line, option.item);
+                        try option.onHoldButtonFn.?(self.context, self.selected_line, option.item);
                     } else {
-                        try option.onReleaseButtonFn(self.owner, self.selected_line, option.item);
+                        try option.onReleaseButtonFn(self.context, self.selected_line, option.item);
                     }
                 },
                 else => {},

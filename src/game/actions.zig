@@ -48,6 +48,8 @@ pub const Action = union(enum) {
     get_angry: g.Entity,
     //
     open_inventory,
+    // 
+    modify_recognize,
     //
     trade: *c.Shop,
 
@@ -57,6 +59,7 @@ pub const Action = union(enum) {
             .hit => 10,
             .move_to_level => 9,
             .pickup => 5,
+            .modify_recognize, .trade => 4,
             else => 1,
         };
     }
@@ -76,6 +79,7 @@ pub const Action = union(enum) {
             .pickup => "Pickup",
             .trade => "Trade",
             .wait => "Wait",
+            .modify_recognize => "Mod/Rec",
             .get_angry, .chill, .go_sleep, .do_nothing, .move => "???",
         };
     }

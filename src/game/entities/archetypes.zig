@@ -24,11 +24,11 @@ inline fn hasType(comptime E: type, components: c.Components) void {
 
 pub fn enemy(components: c.Components) c.Components {
     comptime {
-        defined(components, "armor");
         defined(components, "description");
         defined(components, "experience");
         defined(components, "health");
         defined(components, "initiative");
+        defined(components, "protection");
         defined(components, "regeneration");
         defined(components, "skills");
         defined(components, "speed");
@@ -63,7 +63,7 @@ pub inline fn food(components: c.Components) c.Components {
 pub inline fn armor(components: c.Components) c.Components {
     comptime {
         _ = item(components);
-        defined(components, "armor");
+        defined(components, "protection");
         return components;
     }
 }

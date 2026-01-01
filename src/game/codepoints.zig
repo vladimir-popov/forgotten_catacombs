@@ -19,8 +19,6 @@ pub const nothing = ' ';
 pub const noise = '♪';
 pub const pile = '=';
 pub const potion = '¿';
-pub const ranged_weapon = '}';
-pub const ranged_weapon_unknown = '{';
 pub const rock = '#';
 pub const source_of_light = '¡';
 pub const teleport = '_';
@@ -32,6 +30,8 @@ pub const walls = [_]u21{ '│', '┐', '┌', '─', '┘', '└', '├', '┤'
 pub const water = '~';
 pub const weapon_melee = '/';
 pub const weapon_melee_unknown = '\\';
+pub const weapon_ranged = '}';
+pub const weapon_ranged_unknown = '{';
 
 pub fn toArray(comptime codepoint: u21) [utf8CodepointSequenceLength(codepoint)]u8 {
     var buf: [utf8CodepointSequenceLength(codepoint)]u8 = undefined;

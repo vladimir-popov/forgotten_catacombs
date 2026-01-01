@@ -25,7 +25,7 @@ oil_lamp: c.Components = archetype.item(.{
 
 pub const Armor = struct {
     jacket: c.Components = archetype.armor(.{
-        .armor = .init(&.{ .physical(0, 5), .fire(0, 2) }),
+        .protection = .init(&.{ .physical(0, 5), .fire(0, 2) }),
         .description = .{ .preset = .jacket },
         .rarity = .common,
         .sprite = .{ .codepoint = cp.armor },
@@ -68,7 +68,7 @@ pub const Weapons = struct {
         .effects = .init(&.{.physical(2, 3)}),
         .price = .{ .value = 50 },
         .rarity = .common,
-        .sprite = .{ .codepoint = cp.ranged_weapon },
+        .sprite = .{ .codepoint = cp.weapon_ranged },
         .weapon = .ranged(5, .bolts, .primitive),
         .weight = .{ .value = 70 },
     }),
@@ -109,7 +109,7 @@ pub const Weapons = struct {
         .effects = .init(&.{.physical(2, 3)}),
         .price = .{ .value = 50 },
         .rarity = .common,
-        .sprite = .{ .codepoint = cp.ranged_weapon },
+        .sprite = .{ .codepoint = cp.weapon_ranged },
         .weapon = .ranged(5, .arrows, .tricky),
         .weight = .{ .value = 50 },
     }),

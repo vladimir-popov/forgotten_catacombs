@@ -6,7 +6,7 @@ const c = g.components;
 const p = g.primitives;
 
 rat: c.Components = archetype.enemy(.{
-    .armor = .init(&.{.physical(0, 1)}),
+    .protection = .init(&.{.physical(0, 1)}),
     .description = .{ .preset = .rat },
     .experience = .reward(10),
     .stats = .zeros,
@@ -21,7 +21,7 @@ rat: c.Components = archetype.enemy(.{
 }),
 
 snake: c.Components = archetype.enemy(.{
-    .armor = .init(&.{}),
+    .protection = .init(&.{}),
     .description = .{ .preset = .snake },
     .experience = .reward(20),
     .stats = .init(0, 1, 0, 0, 0),

@@ -338,7 +338,7 @@ test "All descriptions should have lines with no more than 35 symbols" {
 /// Writes an actual name of the entity according to its "known" status in the journal
 /// to the `dest` buffer and returns a slice with result.
 pub fn printName(dest: []u8, journal: g.Journal, entity: g.Entity) ![]u8 {
-    if (g.meta.isPotion(journal.registry, entity)) |potion_type| {
+    if (g.meta.getPotionType(journal.registry, entity)) |potion_type| {
         if (journal.unknownPotionColor(potion_type)) |color|
             return try std.fmt.bufPrint(dest, "A {t} potion", .{color});
     }
@@ -480,7 +480,7 @@ pub fn describeEntity(
     // Then write properties:
     if (g.meta.isItem(journal.registry, entity)) {
         try describeItem(alloc, journal, entity, text_area);
-    } else if (g.meta.isEnemy(journal.registry, entity)) |enemy_type| {
+    } else if (g.meta.getEnemyType(journal.registry, entity)) |enemy_type| {
         try describeEnemy(alloc, journal, entity, enemy_type, text_area);
     }
 }
@@ -493,7 +493,7 @@ fn writeActualDescription(
     entity: g.Entity,
     text_area: *g.windows.TextArea,
 ) !void {
-    if (g.meta.isPotion(journal.registry, entity)) |potion_type| {
+    if (g.meta.getPotionType(journal.registry, entity)) |potion_type| {
         if (journal.unknownPotionColor(potion_type)) |color| {
             var line = try text_area.addEmptyLine(alloc);
             _ = try std.fmt.bufPrint(line, "A swirling liquid of {t} color", .{color});
@@ -518,7 +518,7 @@ pub fn describeItem(
     entity: g.Entity,
     text_area: *g.windows.TextArea,
 ) !void {
-    if (g.meta.isPotion(journal.registry, entity)) |potion_type| {
+    if (g.meta.getPotionType(journal.registry, entity)) |potion_type| {
         if (journal.known_potions.contains(potion_type)) {
             if (journal.registry.get(entity, c.Effects)) |effects| {
                 _ = try text_area.addEmptyLine(alloc);
@@ -716,11 +716,12 @@ test "Describe a player" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const alloc = arena.allocator();
+    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
     var registry = try g.Registry.init(alloc);
     const journal = try g.Journal.init(alloc, &registry, std.testing.random_seed);
     var text_area: g.windows.TextArea = .empty;
 
-    const player = try registry.addNewEntity(try g.entities.player(alloc, .zeros, .zeros, .init(30)));
+    const player = try registry.addNewEntity(try g.entities.player(alloc, prng.random(), .zeros, .zeros, .init(30)));
     const equipmen = registry.getUnsafe(player, c.Equipment);
     equipmen.weapon = try registry.addNewEntity(g.presets.Items.fields.get(.torch).*);
 
@@ -791,7 +792,7 @@ test "Describe a known rat" {
     defer journal.deinit(std.testing.allocator);
 
     const id = try registry.addNewEntity(g.presets.Enemies.get(.rat));
-    try journal.markEnemyAsKnown(g.meta.isEnemy(&registry, id) orelse unreachable);
+    try journal.markEnemyAsKnown(g.meta.getEnemyType(&registry, id) orelse unreachable);
     var text_area: g.windows.TextArea = .empty;
     defer text_area.deinit(std.testing.allocator);
 

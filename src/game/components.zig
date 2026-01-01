@@ -3,8 +3,8 @@ const g = @import("game_pkg.zig");
 const p = g.primitives;
 const u = g.utils;
 
-pub const Armor = struct {
-    pub const zeros: Armor = .{ .resistance = .initFill(.zero) };
+pub const Protection = struct {
+    pub const zeros: Protection = .{ .resistance = .initFill(.zero) };
 
     // The min and max inclusive values of absorbed damage
     pub const Defence = struct {
@@ -17,8 +17,8 @@ pub const Armor = struct {
     };
     resistance: std.EnumArray(Effect.Type, Defence),
 
-    pub fn init(effs: []const Effect) Armor {
-        var self: Armor = zeros;
+    pub fn init(effs: []const Effect) Protection {
+        var self: Protection = zeros;
         for (effs) |effect| {
             self.resistance.set(effect.effect_type, .init(effect.min, effect.max));
         }
@@ -201,8 +201,9 @@ pub const Equipment = struct {
     weapon: ?g.Entity,
     light: ?g.Entity,
     ammunition: ?g.Entity,
+    armor: ?g.Entity,
 
-    pub const nothing: Equipment = .{ .weapon = null, .light = null, .ammunition = null };
+    pub const nothing: Equipment = .{ .weapon = null, .light = null, .ammunition = null, .armor = null };
 };
 
 pub const Ammunition = struct {
@@ -534,7 +535,6 @@ pub const Weight = struct {
 pub const Components = struct {
     ammunition: ?Ammunition = null,
     animation: ?Animation = null,
-    armor: ?Armor = null,
     consumable: ?Consumable = null,
     description: ?Description, // must be provided for every entity
     door: ?Door = null,
@@ -550,6 +550,7 @@ pub const Components = struct {
     pile: ?Pile = null,
     position: ?Position = null,
     price: ?Price = null,
+    protection: ?Protection = null,
     rarity: ?Rarity = null,
     regeneration: ?Regeneration = null,
     shop: ?Shop = null,

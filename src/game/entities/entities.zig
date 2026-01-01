@@ -86,6 +86,14 @@ pub fn pile(alloc: std.mem.Allocator, place: p.Point) !c.Components {
     };
 }
 
+pub fn scientist(place: p.Point) c.Components {
+    return .{
+        .position = .{ .place = place, .zorder = .obstacle },
+        .sprite = .{ .codepoint = cp.human },
+        .description = .{ .preset = .scientist },
+    };
+}
+
 pub fn trader(
     registry: *g.Registry,
     place: p.Point,

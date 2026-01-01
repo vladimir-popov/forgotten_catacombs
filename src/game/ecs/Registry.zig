@@ -5,6 +5,8 @@ const ArraySet = @import("ArraySet.zig").ArraySet;
 
 const log = std.log.scoped(.registry);
 
+// TODO: Convert Registry to a fast pointer
+
 /// The manager of the entities and components.
 pub fn Registry(comptime ComponentsStruct: type) type {
     return struct {
