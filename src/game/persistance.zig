@@ -404,11 +404,11 @@ test "All components should be serializable" {
 
     // Random components to check serialization:
     const expected = c.Components{
-        .protection = .init(&.{ .physical(0, 1), .poison(2, 2), .fire(1, 3) }),
+        .protection = .init(.{ .physical = .range(0, 1), .poison = .range(2, 2), .fire = .range(1, 3) }),
         .ammunition = .{ .amount = 42, .ammunition_type = .arrows },
         .animation = c.Animation{ .preset = .hit },
         .consumable = .{ .calories = 12, .consumable_type = .food },
-        .effects = .init(&.{.physical(1, 2)}),
+        .effects = .init(.{ .physical = .range(1, 2) }),
         .description = c.Description{ .preset = .player },
         .door = c.Door{ .state = .opened },
         .equipment = c.Equipment{

@@ -34,16 +34,18 @@ pub fn entityType(registry: *const g.Registry, entity: g.Entity) ItemType {
         return .weapon;
     if (registry.has(entity, c.Protection))
         return .armor;
-    if (getPotionType(registry, entity)) |_|
-        return .potion;
+    if (registry.get(entity, c.Consumable)) |consumable| {
+        switch (consumable.consumable_type) {
+            .potion => return .potion,
+            .food => return .food,
+        }
+    }
     if (registry.has(entity, c.SourceOfLight))
         return .light;
-    if (registry.has(entity, c.Consumable))
-        return .food;
-    if (getEnemyType(registry, entity)) |_|
-        return .enemy;
     if (registry.has(entity, c.Ammunition))
         return .ammunition;
+    if (getEnemyType(registry, entity)) |_|
+        return .enemy;
 
     std.debug.panic("Undefined type of the entity {d}: {f}", .{ entity.id, try registry.entityToStruct(entity) });
 }
@@ -95,7 +97,7 @@ pub fn getLight(registry: *const g.Registry, equipment: *const c.Equipment) stru
 
 /// Returns an id of the equipped weapon, or the `actor`, because any enemy must be able to provide
 /// a damage without weapon. The player and humanoid enemies should be able to damage by hands,
-/// animal should bite (but hands and tooth are not equipped as a weapon).
+/// animal should bite (but, hands and tooth are not equipped as a weapon).
 pub fn getWeapon(registry: *const g.Registry, actor: g.Entity) struct { g.Entity, c.Weapon } {
     if (registry.get(actor, c.Equipment)) |equipment| {
         if (equipment.weapon) |weapon_id| {
@@ -124,6 +126,16 @@ pub fn getAmmunition(registry: *const g.Registry, actor: g.Entity) ?struct { g.E
     }
 
     return null;
+}
+
+pub fn getActualEffects(registry: *const g.Registry, weapon_id: g.Entity) c.Effects {
+    const effects: *c.Effects = registry.getUnsafe(weapon_id, c.Effects);
+    // Merge with modifications
+    if (registry.get(weapon_id, c.Modification)) |modifications| {
+        modifications.applyTo(effects);
+    }
+    // Return a copy of the merged effects
+    return effects.*;
 }
 
 pub fn statsFromArchetype(archetype: PlayerArchetype) c.Stats {
@@ -174,6 +186,16 @@ pub fn fillShop(shop: *c.Shop, registry: *g.Registry, seed: u64) !void {
     }
 }
 
+const weighted_index: [c.Effects.TypesCount]u8 = blk: {
+    var wi: [c.Effects.TypesCount]u8 = undefined;
+    @memset(&wi, 0);
+    wi[@intFromEnum(c.Effects.Type.physical)] = 20;
+    wi[@intFromEnum(c.Effects.Type.fire)] = 8;
+    wi[@intFromEnum(c.Effects.Type.poison)] = 10;
+    wi[@intFromEnum(c.Effects.Type.acid)] = 5;
+    break :blk wi;
+};
+
 /// Applies a random modification value from the range [`min`, `max`] using the weighted index:
 ///   - physical = 20;
 ///   - fire = 8;
@@ -181,16 +203,12 @@ pub fn fillShop(shop: *c.Shop, registry: *g.Registry, seed: u64) !void {
 ///   - acid = 5;
 pub fn modifyWeapon(registry: *g.Registry, rand: std.Random, weapon: g.Entity, min: i8, max: i8) !void {
     try registry.set(weapon, c.Sprite{ .codepoint = g.codepoints.weapon_melee_unknown });
-    var modification: c.Modification = .{ .modificators = .initFull(0) };
-    var weighted_index: [c.Effect.TypesCount]u8 = undefined;
-    @memset(&weighted_index, 0);
-    weighted_index[@intFromEnum(c.Effect.Type.physical)] = 20;
-    weighted_index[@intFromEnum(c.Effect.Type.fire)] = 8;
-    weighted_index[@intFromEnum(c.Effect.Type.poison)] = 10;
-    weighted_index[@intFromEnum(c.Effect.Type.acid)] = 5;
     const effect_type = rand.weightedIndex(u8, &weighted_index);
     const value = rand.intRangeAtMost(i8, min, max);
-    modification.modificators.values[effect_type] = if (value == 0) -5 else value;
-    log.debug("{f} for {d}", .{ modification, weapon.id });
-    try registry.set(weapon, modification);
+    const modification = try registry.getOrSet(weapon, c.Modification, .{ .modificators = .initFull(0) });
+    modification.modificators.values[effect_type] +|= value;
+    log.debug(
+        "Add modificator {t} = {d} for {d}",
+        .{ @as(c.Effects.Type, @enumFromInt(effect_type)), value, weapon.id },
+    );
 }

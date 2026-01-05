@@ -57,12 +57,12 @@ test "Saving a game session and go back to the main menu" {
 
 test "Loading a game session" {
     const tmp_dir = std.testing.tmpDir(.{});
-    const session_file = try tmp_dir.dir.createFile(g.persistance.SESSION_FILE_NAME, .{});
-    _ = try session_file.write(@embedFile("resources/session.json"));
+    const session_file = try tmp_dir.dir.createFile(std.testing.io, g.persistance.SESSION_FILE_NAME, .{});
+    _ = try session_file.writeStreamingAll(std.testing.io, @embedFile("resources/session.json"));
 
     var buf: [64]u8 = undefined;
-    const level0_file = try tmp_dir.dir.createFile(try g.persistance.pathToLevelFile(&buf, 0), .{});
-    _ = try level0_file.write(@embedFile("resources/level_0.json"));
+    const level0_file = try tmp_dir.dir.createFile(std.testing.io, try g.persistance.pathToLevelFile(&buf, 0), .{});
+    _ = try level0_file.writeStreamingAll(std.testing.io, @embedFile("resources/level_0.json"));
 
     var test_session: TestSession = undefined;
     try test_session.load(std.testing.allocator, std.testing.io, tmp_dir);

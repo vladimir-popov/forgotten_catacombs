@@ -48,7 +48,7 @@ pub const Action = union(enum) {
     get_angry: g.Entity,
     //
     open_inventory,
-    // 
+    //
     modify_recognize,
     //
     trade: *c.Shop,

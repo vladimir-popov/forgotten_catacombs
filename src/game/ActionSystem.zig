@@ -335,37 +335,37 @@ fn tryToHit(
     // Calculate and apply the damage
     const target_health_before = target_health.current;
     const target_armor = self.session().registry.get(target, c.Protection) orelse &c.Protection.zeros;
-    if (self.session().registry.get(weapon_id, c.Effects)) |effects| {
-        const actor_experience: *c.Experience = self.session().registry.getUnsafe(actor, c.Experience);
-        // we have to copy the whole component, because the enemy can be removed,
-        // and the pointer becomes invalid.
-        const enemy_experience: c.Experience = self.session().registry.getUnsafe(target, c.Experience).*;
-        for (effects.items()) |effect| {
-            const is_target_dead =
-                try self.applyEffect(actor, weapon_id, effect, target, target_armor, target_health);
+    const actor_experience: *c.Experience = self.session().registry.getUnsafe(actor, c.Experience);
+    // we have to copy the whole component, because the enemy can be removed,
+    // and the pointer becomes invalid.
+    const enemy_experience: c.Experience = self.session().registry.getUnsafe(target, c.Experience).*;
+    var effects = g.meta.getActualEffects(&self.session().registry, weapon_id);
+    var itr = effects.values.iterator();
+    while (itr.next()) |tuple| {
+        const is_target_dead =
+            try self.applyEffect(actor, weapon_id, tuple.key, tuple.value.*, target, target_armor, target_health);
 
-            // Give experience to player
-            if (is_target_dead and actor.eql(self.session().player)) {
-                const level_before = actor_experience.level;
-                actor_experience.add(enemy_experience.asReward());
-                try self.session().notify(.{ .exp = enemy_experience.asReward() });
-                if (actor_experience.level > level_before) {
-                    @panic("TODO: HANDLE LEVEL UP");
-                }
+        // Give experience to player
+        if (is_target_dead and actor.eql(self.session().player)) {
+            const level_before = actor_experience.level;
+            actor_experience.add(enemy_experience.asReward());
+            try self.session().notify(.{ .exp = enemy_experience.asReward() });
+            if (actor_experience.level > level_before) {
+                @panic("TODO: HANDLE LEVEL UP");
             }
-
-            // Break the function because the target is dead
-            if (is_target_dead) return true;
         }
-        if (actor.eql(self.session().player))
-            try self.session().notify(
-                .{ .hit = .{ .target = target, .damage = target_health_before - target_health.current } },
-            )
-        else if (target.eql(self.session().player))
-            try self.session().notify(
-                .{ .damage = .{ .actor = actor, .damage = target_health_before - target_health.current } },
-            );
+
+        // Break the function because the target is dead
+        if (is_target_dead) return true;
     }
+    if (actor.eql(self.session().player))
+        try self.session().notify(
+            .{ .hit = .{ .target = target, .damage = target_health_before - target_health.current } },
+        )
+    else if (target.eql(self.session().player))
+        try self.session().notify(
+            .{ .damage = .{ .actor = actor, .damage = target_health_before - target_health.current } },
+        );
     return true;
 }
 
@@ -377,23 +377,20 @@ fn applyEffect(
     self: *Self,
     actor: g.Entity,
     source: g.Entity,
-    effect: c.Effect,
+    effect_type: c.Effects.Type,
+    effect_range: p.Range,
     target: g.Entity,
     target_armor: *const c.Protection,
     target_health: *c.Health,
 ) !bool {
-    std.debug.assert(effect.min <= effect.max);
-
-    const target_defence = target_armor.resistance.get(effect.effect_type);
-    std.debug.assert(target_defence.min <= target_defence.max);
-
-    switch (effect.effect_type) {
+    const target_defence: p.Range = target_armor.resistance.get(effect_type) orelse .zeros;
+    switch (effect_type) {
         .physical => {
             const weapon_class =
                 if (self.session().registry.get(source, c.Weapon)) |weapon| weapon.class else .primitive;
             const actor_stats = if (self.session().registry.get(actor, c.Stats)) |st| st.* else c.Stats.zeros;
             const base_damage: f32 =
-                @floatFromInt(self.session().prng.random().intRangeAtMost(u8, effect.min, effect.max));
+                @floatFromInt(self.session().prng.random().intRangeAtMost(u8, effect_range.min, effect_range.max));
             const character_factor: f32 = (0.4 * statBonus(actor_stats, weapon_class) + 4) / 4;
             const damage: u8 = @intFromFloat(@round(base_damage * character_factor));
             const absorbed_damage: u8 = self.session().prng.random().intRangeAtMost(
@@ -406,10 +403,10 @@ fn applyEffect(
                 "Base damage {d}; Character factor {d}; Damage {d}; Absorbed damage {d};",
                 .{ base_damage, character_factor, damage, absorbed_damage },
             );
-            return self.applyDamage(actor, target, target_health, damage_value, effect.effect_type);
+            return self.applyDamage(actor, target, target_health, damage_value, effect_type);
         },
         .fire, .acid, .poison => {
-            const base_damage = self.session().prng.random().intRangeAtMost(u8, effect.min, effect.max);
+            const base_damage = self.session().prng.random().intRangeAtMost(u8, effect_range.min, effect_range.max);
             const absorbed_damage: u8 = self.session().prng.random().intRangeAtMost(
                 u8,
                 target_defence.min,
@@ -420,11 +417,11 @@ fn applyEffect(
                 target,
                 target_health,
                 base_damage -| absorbed_damage,
-                effect.effect_type,
+                effect_type,
             );
         },
         .heal => {
-            const value = self.session().prng.random().intRangeAtMost(u8, effect.min, effect.max);
+            const value = self.session().prng.random().intRangeAtMost(u8, effect_range.min, effect_range.max);
             target_health.current += value;
             target_health.current = @min(target_health.max, target_health.current);
             const is_blocked_animation = actor.eql(self.session().player) or target.eql(self.session().player);
@@ -454,7 +451,7 @@ fn applyDamage(
     target: g.Entity,
     target_health: *c.Health,
     damage_value: u8,
-    effect_type: c.Effect.Type,
+    effect_type: c.Effects.Type,
 ) !bool {
     if (damage_value == 0) return false;
     const orig_health = target_health.current;
@@ -486,11 +483,20 @@ fn applyDamage(
 
 fn drinkPotion(self: *Self, actor: g.Entity, potion_id: g.Entity, potion_type: g.meta.PotionType) !void {
     if (self.session().registry.get(potion_id, c.Effects)) |effects| {
-        for (effects.items()) |effect| {
+        var itr = effects.values.iterator();
+        while (itr.next()) |tuple| {
             if (self.session().registry.get(actor, c.Health)) |health| {
                 const armor = self.session().registry.get(actor, c.Protection) orelse &c.Protection.zeros;
                 try self.session().journal.markPotionAsKnown(potion_type);
-                const is_actor_dead = try self.applyEffect(actor, potion_id, effect, actor, armor, health);
+                const is_actor_dead = try self.applyEffect(
+                    actor,
+                    potion_id,
+                    tuple.key,
+                    tuple.value.*,
+                    actor,
+                    armor,
+                    health,
+                );
                 if (is_actor_dead) break;
             }
         }

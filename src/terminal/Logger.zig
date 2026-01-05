@@ -1,7 +1,8 @@
 const std = @import("std");
 
+var threaded: std.Io.Threaded = .init_single_threaded;
 var buffer: [128]u8 = undefined;
-var log_writer: ?std.fs.File.Writer = null;
+var log_writer: ?std.Io.File.Writer = null;
 
 pub fn writeLog(
     comptime message_level: std.log.Level,
@@ -19,10 +20,10 @@ pub fn writeLog(
             @panic("Error on flushing log buffer");
         };
     } else {
-        const file = std.fs.cwd().createFile("game.log", .{ .read = false, .truncate = true }) catch {
+        const file = std.Io.Dir.cwd().createFile(threaded.io(), "game.log", .{ .read = false, .truncate = true }) catch {
             @panic("Error on open log file.");
         };
-        log_writer = file.writer(&buffer);
+        log_writer = file.writer(threaded.io(), &buffer);
         writeLog(message_level, scope, format, args);
     }
 }

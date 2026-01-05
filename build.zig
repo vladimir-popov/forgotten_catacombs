@@ -112,7 +112,7 @@ pub fn build(b: *std.Build) !void {
     _ = writer.addCopyFile(elf.getEmittedBin(), "pdex.elf");
 
     // copy resources:
-    try addCopyDirectory(writer, "assets", ".");
+    try addCopyDirectory(writer, b.graph.io, "assets", ".");
 
     // ------------------------------------------------------------
     //                Build pdex lib for emulator
@@ -250,17 +250,15 @@ pub fn build(b: *std.Build) !void {
 
 fn addCopyDirectory(
     wf: *std.Build.Step.WriteFile,
+    io: std.Io,
     src_path: []const u8,
     dest_path: []const u8,
 ) !void {
     const b = wf.step.owner;
-    var dir = try b.build_root.handle.openDir(
-        src_path,
-        .{ .iterate = true },
-    );
-    defer dir.close();
+    var dir = try b.build_root.handle.openDir(io, src_path, .{ .iterate = true });
+    defer dir.close(io);
     var it = dir.iterate();
-    while (try it.next()) |entry| {
+    while (try it.next(io)) |entry| {
         const new_src_path = b.pathJoin(&.{ src_path, entry.name });
         const new_dest_path = b.pathJoin(&.{ dest_path, entry.name });
         const new_src = b.path(new_src_path);
@@ -269,11 +267,7 @@ fn addCopyDirectory(
                 _ = wf.addCopyFile(new_src, new_dest_path);
             },
             .directory => {
-                try addCopyDirectory(
-                    wf,
-                    new_src_path,
-                    new_dest_path,
-                );
+                try addCopyDirectory(wf, io, new_src_path, new_dest_path);
             },
             //TODO: possible support for sym links?
             else => {},

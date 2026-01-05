@@ -518,19 +518,14 @@ pub fn describeItem(
     entity: g.Entity,
     text_area: *g.windows.TextArea,
 ) !void {
-    if (g.meta.getPotionType(journal.registry, entity)) |potion_type| {
-        if (journal.known_potions.contains(potion_type)) {
-            if (journal.registry.get(entity, c.Effects)) |effects| {
-                _ = try text_area.addEmptyLine(alloc);
-                var line = try text_area.addEmptyLine(alloc);
-                @memcpy(line[0..8], "Effects:");
-                for (effects.items()) |effect| {
-                    line = try text_area.addEmptyLine(alloc);
-                    _ = try std.fmt.bufPrint(line[2..], "{t} {d}-{d}", .{ effect.effect_type, effect.min, effect.max });
-                }
-            }
-        }
+    if (journal.registry.get(entity, c.Consumable)) |consumable| {
+        _ = try text_area.addEmptyLine(alloc);
+        try describeEffects(alloc, journal, entity, "Effects", text_area);
+
+        const line = try text_area.addEmptyLine(alloc);
+        _ = try std.fmt.bufPrint(line, "Calories: {d}", .{consumable.calories});
     }
+
     if (journal.registry.get(entity, c.Weapon)) |weapon| {
         _ = try text_area.addEmptyLine(alloc);
         try describeWeapon(alloc, journal, entity, weapon, text_area);
@@ -541,6 +536,7 @@ pub fn describeItem(
         const line = try text_area.addEmptyLine(alloc);
         _ = try std.fmt.bufPrint(line, "Radius of light: {d}", .{light.radius});
     }
+
     if (journal.registry.get(entity, c.Weight)) |weight| {
         _ = try text_area.addEmptyLine(alloc);
         const line = try text_area.addEmptyLine(alloc);
@@ -549,23 +545,24 @@ pub fn describeItem(
 }
 
 /// Shows the damage of existed effects. If the weapon has modification,
-/// and is known, then the modification is applied to the effects.
+/// and is known, then the modification is applied to the effects, otherwise
+/// a line with "It looks unusual(!)" text is appended.
 ///
 /// Example of a known weapon:
 /// ```
-/// Primitive weapon.
+/// This is a primitive weapon.
 /// Damage:
-///   physical 1-3
-/// ...
+///   physical 3-5
+///   fire 1-2
 /// ```
 /// Example of unknown weapon:
 /// ```
-/// It looks unusual(!)
-///
-/// Primitive weapon.
+/// This is a primitive weapon.
 /// Damage:
-///   physical 2-5
-/// ...
+///   physical 1-3
+///   ?
+///
+/// It looks unusual(!)
 /// ```
 fn describeWeapon(
     alloc: std.mem.Allocator,
@@ -574,60 +571,76 @@ fn describeWeapon(
     weapon: *const c.Weapon,
     text_area: *g.windows.TextArea,
 ) !void {
-    var effects = journal.registry.get(entity, c.Effects) orelse return;
-    const is_known = journal.isKnown(entity);
-    if (journal.registry.get(entity, c.Modification)) |modification| {
-        if (is_known) {
-            modification.applyTo(effects);
-        }
-    }
     var line = try text_area.addEmptyLine(alloc);
     const article = if (weapon.class == .ancient) "an" else "a";
     _ = try std.fmt.bufPrint(line, "This is {s} {t} weapon.", .{ article, weapon.class });
-    line = try text_area.addEmptyLine(alloc);
-    @memcpy(line[0..7], "Damage:");
-    for (effects.items()) |effect| {
-        line = try text_area.addEmptyLine(alloc);
-        _ = try std.fmt.bufPrint(line[2..], "{t} {d}-{d}", .{ effect.effect_type, effect.min, effect.max });
-    }
+    try describeEffects(alloc, journal, entity, "Damage", text_area);
+
     if (weapon.max_distance > 1) {
         _ = try text_area.addEmptyLine(alloc);
         line = try text_area.addEmptyLine(alloc);
         _ = try std.fmt.bufPrint(line, "Max distance: {d}", .{weapon.max_distance});
     }
-    if (!is_known) {
+    if (!journal.isKnown(entity) and journal.registry.has(entity, c.Modification)) {
         _ = try text_area.addEmptyLine(alloc);
         line = try text_area.addEmptyLine(alloc);
         @memcpy(line[0..20], "It looks modified...");
     }
 }
 
+/// Adds lines with not zero effects to the `text_area`.
+/// It check the knowing status of the entity and merge modifications to the effects before showing
+/// their values.
+///
 /// Example for known source:
 /// ```
-/// <pad><effect_type> <min>-<max>
+/// <title>:
+///   <effect type 1> <min>-<max>
+///   <effect type 2> <min>-<max>
+/// ...
 /// ```
 /// Example for unknown source:
 /// ```
-/// <pad>?
+/// <title>:
+///     ?
+///     ?
+/// ...
 /// ```
-/// Does nothing for empty set of effects.
+/// Does nothing if a component `Effects` is not defined for the `entity`.
 fn describeEffects(
     alloc: std.mem.Allocator,
     journal: g.Journal,
     source: g.Entity,
+    title: []const u8,
     text_area: *g.windows.TextArea,
 ) !void {
-    if (journal.registry.get(source, c.Effects)) |effects| {
-        if (effects.len == 0) return;
-
+    if (journal.registry.get(source, c.Effects)) |effs| {
+        var effects: c.Effects = effs.*;
         const is_known_source = journal.isKnown(source);
+        if (is_known_source) {
+            if (journal.registry.get(source, c.Modification)) |modification| {
+                modification.applyTo(&effects);
+            }
+        }
+        var line = try text_area.addEmptyLine(alloc);
+        @memcpy(line[0..title.len], title);
+        line[title.len] = ':';
 
-        for (effects.items()) |effect| {
-            var line = try text_area.addEmptyLine(alloc);
-            if (is_known_source or effect.effect_type == .physical)
-                _ = try std.fmt.bufPrint(line[2..], "{t} {d}-{d}", .{ effect.effect_type, effect.min, effect.max })
-            else
+        var itr = effects.values.iterator();
+        while (itr.next()) |tuple| {
+            if (tuple.value.min == 0 and tuple.value.max == 0)
+                continue;
+
+            line = try text_area.addEmptyLine(alloc);
+            if (is_known_source or tuple.key == .physical) {
+                if (tuple.value.min == tuple.value.max) {
+                    _ = try std.fmt.bufPrint(line[2..], "{t} {d}", .{ tuple.key, tuple.value.min });
+                } else {
+                    _ = try std.fmt.bufPrint(line[2..], "{t} {d}-{d}", .{ tuple.key, tuple.value.min, tuple.value.max });
+                }
+            } else {
                 line[4] = '?';
+            }
         }
     }
 }
@@ -672,14 +685,9 @@ pub fn describeEnemy(
         }
         if (journal.registry.get(enemy, c.Equipment)) |equipment| {
             try describeEquipedItems(alloc, journal, equipment, text_area);
-        } else if (journal.registry.get(enemy, c.Effects)) |effects| {
+        } else if (journal.registry.has(enemy, c.Effects)) {
             _ = try text_area.addEmptyLine(alloc);
-            var line = try text_area.addEmptyLine(alloc);
-            @memcpy(line[0..7], "Damage:");
-            for (effects.items()) |effect| {
-                line = try text_area.addEmptyLine(alloc);
-                _ = try std.fmt.bufPrint(line[2..], "{t} {d}-{d}", .{ effect.effect_type, effect.min, effect.max });
-            }
+            try describeEffects(alloc, journal, enemy, "Damage", text_area);
         }
         if (journal.registry.get(enemy, c.Speed)) |speed| {
             _ = try text_area.addEmptyLine(alloc);

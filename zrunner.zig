@@ -54,9 +54,15 @@ pub const std_options: std.Options = .{
     },
 };
 
-const log_file = "test.log";
-var log_buffer: [128]u8 = undefined;
-var log_writer: ?std.fs.File.Writer = null;
+const Logger = struct {
+    const log_file = "test.log";
+
+    io: std.Io,
+    buffer: [128]u8 = undefined,
+    writer: ?std.Io.File.Writer = null,
+};
+
+var global_logger: Logger = undefined;
 
 pub fn writeLog(
     comptime message_level: std.log.Level,
@@ -64,7 +70,7 @@ pub fn writeLog(
     comptime format: []const u8,
     args: anytype,
 ) void {
-    if (log_writer) |*writer| {
+    if (global_logger.writer) |*writer| {
         const level_txt = comptime message_level.asText();
         const prefix2 = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
         writer.interface.print(level_txt ++ prefix2 ++ format ++ "\n", args) catch {
@@ -74,10 +80,14 @@ pub fn writeLog(
             @panic("Error on flushing log buffer");
         };
     } else {
-        const file = std.fs.cwd().createFile(log_file, .{ .read = false, .truncate = true }) catch {
+        const file = std.Io.Dir.cwd().createFile(
+            global_logger.io,
+            Logger.log_file,
+            .{ .read = false, .truncate = true },
+        ) catch {
             @panic("Error on open log file.");
         };
-        log_writer = file.writer(&log_buffer);
+        global_logger.writer = file.writer(global_logger.io, &global_logger.buffer);
         writeLog(message_level, scope, format, args);
     }
 }
@@ -86,7 +96,7 @@ pub fn main() !void {
     var gpa: std.heap.DebugAllocator(.{}) = .{};
     defer if (gpa.deinit() == .leak) unreachable;
 
-    var threaded: std.Io.Threaded = .init(gpa.allocator());
+    var threaded: std.Io.Threaded = .init(gpa.allocator(), .{});
     defer threaded.deinit();
 
     var args = try std.process.argsWithAllocator(gpa.allocator());
@@ -95,13 +105,15 @@ pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(gpa.allocator());
     defer arena.deinit();
 
+    global_logger = .{ .io = threaded.io() };
+
     const process_name = args.next() orelse unreachable;
     const module_name = std.fs.path.basename(process_name);
 
     // Parse arguments and prepare a reporter
     var io_buffer: [2048]u8 = undefined;
     var custom_colors: ?[:0]const u8 = null;
-    var custom_out: ?std.fs.File.Writer = null;
+    var custom_out: ?std.Io.File = null;
     var module_filter: ?[:0]const u8 = null;
     var test_filter: ?[:0]const u8 = null;
     var failed_only: bool = false;
@@ -126,12 +138,11 @@ pub fn main() !void {
         } else if (std.mem.startsWith(u8, arg, "--colors=")) {
             custom_colors = arg[9..];
         } else if (std.mem.eql(u8, arg, "--stdout")) {
-            custom_out = std.fs.File.stdout().writer(&io_buffer);
+            custom_out = std.Io.File.stdout();
         } else if (std.mem.eql(u8, arg, "--stderr")) {
-            custom_out = std.fs.File.stderr().writer(&io_buffer);
+            custom_out = std.Io.File.stderr();
         } else if (std.mem.startsWith(u8, arg, "--file=")) {
-            const file = try std.fs.cwd().createFile(arg[7..], .{ .truncate = false });
-            custom_out = std.fs.File.writer(file, &io_buffer);
+            custom_out = try std.Io.Dir.cwd().createFile(threaded.io(), arg[7..], .{ .truncate = false });
         } else {
             std.debug.print("Unsupported option '{s}'.\n", .{arg});
             std.process.exit(1);
@@ -154,12 +165,12 @@ pub fn main() !void {
         .default;
 
     var reporter: FileReporter = if (custom_out) |out|
-        .{ .file_writer = out, .config = std.Io.tty.Config.detect(out.file), .colors = colors }
+        try .init(&threaded, out, &io_buffer, colors)
     else
-        .stdout(&io_buffer, colors);
+        try .stdout(&threaded, &io_buffer, colors);
 
     if (no_colors) {
-        reporter.config = .no_color;
+        reporter.mode = .no_color;
     }
 
     try run(&arena, threaded.io(), process_name, test_filter, &reporter, failed_only, no_stack_trace);
@@ -310,7 +321,7 @@ const Test = struct {
     ) !TestResult {
         var is_mem_leak: bool = false;
         std.testing.allocator_instance = .{};
-        std.testing.io_instance = .init(std.testing.allocator);
+        std.testing.io_instance = .init(std.testing.allocator, .{});
         defer {
             std.testing.io_instance.deinit();
             is_mem_leak = (std.testing.allocator_instance.deinit() == .leak);
@@ -341,7 +352,10 @@ const Test = struct {
                                 trace.index -= 1;
                                 trace.instruction_addresses = trace.instruction_addresses[1..];
                             }
-                            try std.debug.writeStackTrace(trace, &stack_trace_writer.writer, .no_color);
+                            try std.debug.writeStackTrace(
+                                trace,
+                                .{ .writer = &stack_trace_writer.writer, .mode = .no_color },
+                            );
                             str = stack_trace_writer.written();
                         } else |_| {}
                     }
@@ -480,7 +494,7 @@ const Duration = struct {
 
 /// Writes to a file a tests report as an optionally colored text.
 const FileReporter = struct {
-    const Color = std.Io.tty.Color;
+    const Color = std.Io.Terminal.Color;
 
     const Colors = struct {
         title: Color = .cyan,
@@ -500,13 +514,23 @@ const FileReporter = struct {
 
     const border = "=" ** 65;
 
-    file_writer: std.fs.File.Writer,
-    config: std.Io.tty.Config,
+    file_writer: std.Io.File.Writer,
+    mode: std.Io.Terminal.Mode,
     colors: Colors,
 
-    pub fn stdout(buffer: []u8, colors: Colors) FileReporter {
-        const file = std.fs.File.stdout();
-        return .{ .file_writer = file.writer(buffer), .config = std.Io.tty.Config.detect(file), .colors = colors };
+    pub fn init(threaded: *std.Io.Threaded, file: std.Io.File, buffer: []u8, colors: Colors) !FileReporter {
+        const NO_COLOR = threaded.environ.exist.NO_COLOR;
+        const CLICOLOR_FORCE = threaded.environ.exist.CLICOLOR_FORCE;
+        const mode = try std.Io.Terminal.Mode.detect(threaded.io(), file, NO_COLOR, CLICOLOR_FORCE);
+        return .{ .file_writer = file.writer(threaded.io(), buffer), .mode = mode, .colors = colors };
+    }
+
+    pub fn stdout(threaded: *std.Io.Threaded, buffer: []u8, colors: Colors) !FileReporter {
+        return .init(threaded, std.Io.File.stdout(), buffer, colors);
+    }
+
+    fn terminal(self: *FileReporter) std.Io.Terminal {
+        return .{ .writer = &self.file_writer.interface, .mode = self.mode };
     }
 
     pub fn writeTitle(
@@ -618,8 +642,9 @@ const FileReporter = struct {
         comptime format: []const u8,
         args: anytype,
     ) !void {
-        try self.config.setColor(&self.file_writer.interface, color);
+        const t = self.terminal();
+        try t.setColor(color);
         try self.file_writer.interface.print(format, args);
-        try self.config.setColor(&self.file_writer.interface, .reset);
+        try t.setColor(.reset);
     }
 };

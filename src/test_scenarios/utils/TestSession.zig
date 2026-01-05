@@ -23,7 +23,7 @@ pub fn initOnFirstLevel(self: *Self, gpa: std.mem.Allocator, io: std.Io) !void {
     self.tmp_dir = std.testing.tmpDir(.{});
     self.arena = std.heap.ArenaAllocator.init(gpa);
     const arena_alloc = self.arena.allocator();
-    log.info("Test directory is {s}", .{try self.tmp_dir.dir.realpathAlloc(arena_alloc, ".")});
+    log.info("Test directory is {s}", .{try self.tmp_dir.dir.realPathFileAlloc(io, ".", arena_alloc)});
     self.runtime = try TestRuntime.init(arena_alloc, io, self.tmp_dir.dir);
     try self.render.init(arena_alloc, self.runtime.runtime(), g.DISPLAY_ROWS, g.DISPLAY_COLS);
     try self.session.initNew(

@@ -3,29 +3,6 @@ const g = @import("game_pkg.zig");
 const p = g.primitives;
 const u = g.utils;
 
-pub const Protection = struct {
-    pub const zeros: Protection = .{ .resistance = .initFill(.zero) };
-
-    // The min and max inclusive values of absorbed damage
-    pub const Defence = struct {
-        pub const zero: Defence = .{ .min = 0, .max = 0 };
-        min: u8,
-        max: u8,
-        pub fn init(min: u8, max: u8) Defence {
-            return .{ .min = min, .max = max };
-        }
-    };
-    resistance: std.EnumArray(Effect.Type, Defence),
-
-    pub fn init(effs: []const Effect) Protection {
-        var self: Protection = zeros;
-        for (effs) |effect| {
-            self.resistance.set(effect.effect_type, .init(effect.min, effect.max));
-        }
-        return self;
-    }
-};
-
 /// A place in the dungeon where an entity is, and its z-order.
 /// A place with zero row and zero column is undefined.
 /// **NOTE:** do not replace the whole position. Only the place should be changed during the game,
@@ -221,14 +198,20 @@ pub const Ammunition = struct {
 };
 
 pub const Weapon = struct {
+    /// The damage depends on the weapon class
     pub const Class = enum {
+        /// The strength is used
         primitive,
+        /// The dexterity is used
         tricky,
+        /// The intelligence is used
         ancient,
     };
-    max_distance: u8,
-    ammunition_type: ?Ammunition.Type,
     class: Class,
+    /// A type of required ammunition.
+    /// The null means that the weapon is melee.
+    ammunition_type: ?Ammunition.Type,
+    max_distance: u8,
 
     pub fn melee(class: Class) Weapon {
         return .{ .max_distance = 1, .ammunition_type = null, .class = class };
@@ -240,101 +223,83 @@ pub const Weapon = struct {
     }
 };
 
-pub const Effect = struct {
+pub const Effects = struct {
     pub const Type = enum { physical, fire, acid, poison, heal };
     pub const TypesCount = @typeInfo(Type).@"enum".fields.len;
-    effect_type: Type,
-    min: u8,
-    max: u8,
 
-    pub fn physical(min: u8, max: u8) Effect {
-        return .{ .effect_type = .physical, .min = min, .max = max };
+    values: std.EnumMap(Type, p.Range),
+
+    /// Example:
+    /// ```
+    /// .init(.{ .fire = .{ .min = 0, .max = 3 } });
+    /// ```
+    pub fn init(values: std.enums.EnumFieldStruct(Type, p.Range, .zeros)) Effects {
+        return .{ .values = .initFullWithDefault(.zeros, values) };
     }
 
-    pub fn fire(min: u8, max: u8) Effect {
-        return .{ .effect_type = .fire, .min = min, .max = max };
+    pub fn modify(self: *Effects, effect_type: Type, modificator: i8) void {
+        if (self.values.getPtr(effect_type)) |values| {
+            values.min = @max(0, modificator + @as(i8, @intCast(values.min)));
+            values.max = @max(0, modificator + @as(i8, @intCast(values.max)));
+        }
     }
 
-    pub fn acid(min: u8, max: u8) Effect {
-        return .{ .effect_type = .acid, .min = min, .max = max };
-    }
-
-    pub fn poison(min: u8, max: u8) Effect {
-        return .{ .effect_type = .poison, .min = min, .max = max };
-    }
-
-    pub fn heal(min: u8, max: u8) Effect {
-        return .{ .effect_type = .heal, .min = min, .max = max };
-    }
-
-    pub fn modify(self: *Effect, modificator: i8) void {
-        self.min = @max(0, modificator + @as(i8, @intCast(self.min)));
-        self.max = @max(0, modificator + @as(i8, @intCast(self.max)));
+    pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
+        _ = try writer.write("Effects{ ");
+        const effect_types = std.enums.values(Effects.Type);
+        for (effect_types) |effect_type| {
+            try writer.print("{t}={any}, ", .{ effect_type, self.values.get(effect_type) });
+        }
+        _ = try writer.write(" }");
     }
 };
 
-pub const Effects = struct {
-    buffer: [3]Effect = undefined,
-    len: usize = 0,
+pub const Protection = struct {
+    pub const zeros: Protection = .{ .resistance = .initFull(.zeros) };
 
-    pub fn init(effs: []const Effect) Effects {
-        var self: Effects = .{};
-        self.len = effs.len;
-        @memcpy(self.buffer[0..self.len], effs);
-        return self;
+    resistance: std.EnumMap(Effects.Type, p.Range),
+
+    /// Example:
+    /// ```
+    /// .init(.{ .fire = .{ .min = 0, .max = 3 } });
+    /// ```
+    pub fn init(values: std.enums.EnumFieldStruct(Effects.Type, p.Range, .zeros)) Protection {
+        return .{ .resistance = .initFullWithDefault(.zeros, values) };
     }
 
-    pub inline fn items(self: Effects) []const Effect {
-        return self.buffer[0..self.len];
-    }
-
-    /// - `writer` - as example: `*persistance.Writer(Runtime.FileWriter.Writer)`
-    pub fn save(self: Effects, writer: anytype) !void {
-        try writer.beginCollection();
-        for (self.items()) |effect| {
-            try writer.write(effect);
+    pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
+        _ = try writer.write("Protection{ ");
+        const effect_types = std.enums.values(Effects.Type);
+        for (effect_types) |effect_type| {
+            try writer.print("{t}={any}, ", .{ effect_type, self.resistance.get(effect_type) });
         }
-        try writer.endCollection();
-    }
-
-    /// - `reader` - as example: `*persistance.Reader(Runtime.FileReader.Reader)`
-    pub fn load(reader: anytype) !Effects {
-        var self = Effects{};
-        try reader.beginCollection();
-        while (!try reader.isCollectionEnd()) {
-            self.buffer[self.len] = try reader.read(Effect);
-            self.len += 1;
-        }
-        try reader.endCollection();
-        return self;
+        _ = try writer.write(" }");
     }
 };
 
 pub const Modification = struct {
-    modificators: std.EnumMap(Effect.Type, i8),
+    modificators: std.EnumMap(Effects.Type, i8),
 
     /// Example:
     /// ```
-    /// .init(.{ .burning = -3 });
+    /// .init(.{ .fire = -3 });
     /// ```
-    pub fn init(modificators: std.enums.EnumFieldStruct(Effect.Type, i8, 0)) Modification {
+    pub fn init(modificators: std.enums.EnumFieldStruct(Effects.Type, i8, 0)) Modification {
         return .{ .modificators = .initFullWithDefault(0, modificators) };
     }
 
-    pub fn applyTo(self: Modification, effects: *Effects) void {
-        for (0..effects.len) |i| {
-            if (self.modificators.get(effects.buffer[i].effect_type)) |modificator| {
-                if (modificator != 0)
-                    effects.buffer[i].modify(modificator);
-            }
+    pub fn applyTo(self: *Modification, effects: *Effects) void {
+        var itr = self.modificators.iterator();
+        while (itr.next()) |modificator| {
+            effects.modify(modificator.key, modificator.value.*);
         }
     }
 
     pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
         _ = try writer.write("Modificators{ ");
-        const effect_types = std.enums.values(Effect.Type);
+        const effect_types = std.enums.values(Effects.Type);
         for (effect_types) |effect_type| {
-            try writer.print(" {t}={d} ", .{ effect_type, self.modificators.get(effect_type) orelse 0 });
+            try writer.print("{t}={d}, ", .{ effect_type, self.modificators.get(effect_type) orelse 0 });
         }
         _ = try writer.write(" }");
     }

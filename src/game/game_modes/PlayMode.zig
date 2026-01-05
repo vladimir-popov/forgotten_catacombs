@@ -249,6 +249,9 @@ fn handleInput(self: *Self) !?g.actions.Action {
                     health.current = hp;
                 }
             },
+            .set_money => |money| {
+                self.session.registry.getUnsafe(self.session.player, c.Wallet).money = money;
+            },
             .recognize => |entity| {
                 if (g.meta.getEnemyType(&self.session.registry, entity)) |enemy_type| {
                     try self.session.journal.markEnemyAsKnown(enemy_type);
@@ -424,7 +427,8 @@ fn quickAction(self: Self) g.actions.Action {
         return .wait;
 }
 
-/// Checks that a target is exists and recalculates a list of available quick actions applicable to the target.
+/// Checks that the target is exists, or find another.
+/// Recalculates a list of available quick actions applicable to the target.
 pub fn updateQuickActions(self: *Self) anyerror!void {
     defer {
         log.debug(
@@ -440,10 +444,10 @@ pub fn updateQuickActions(self: *Self) anyerror!void {
 
     const alloc = self.arena.allocator();
     // Remember the previously selected action to trying to keep it selected
-    const selected_action = self.quickAction();
+    const prev_selected_action = self.quickAction();
     log.debug(
         "Updating selected actions. Current selected action is {any}; target is {any}",
-        .{ selected_action, self.target },
+        .{ prev_selected_action, self.target },
     );
     self.quick_actions.reset();
 
@@ -460,7 +464,8 @@ pub fn updateQuickActions(self: *Self) anyerror!void {
     // Actualize and calculate quick actions for the target if it's defined,
     // or find another
     const player_weapon = g.meta.getWeapon(&self.session.registry, self.session.player)[1];
-    // iterate over all possible targets starting from the current
+    // Iterate through all valid targets, skipping entities located at the same position as the player,
+    // starting from the current target.
     var itr = TargetsIterator.init(self.target, self.session, player_position);
     while (itr.next()) |target| {
         self.target = target;
@@ -468,22 +473,20 @@ pub fn updateQuickActions(self: *Self) anyerror!void {
         if (self.session.actions.calculateQuickActionForTarget(player_position.place, player_weapon, target)) |qa| {
             log.debug("Calculated action is {any}", .{qa});
             try self.quick_actions.actions.append(alloc, qa);
-            if (qa.eql(selected_action)) {
+            // Try to keep previous selection
+            if (qa.eql(prev_selected_action)) {
                 self.quick_actions.selected_idx = self.quick_actions.actions.items.len - 1;
             }
-            // Compare action priorities to choose the most important target
-            else if (qa.priority() > self.quickAction().priority()) {
-                self.target = target;
-                self.quick_actions.selected_idx = self.quick_actions.actions.items.len - 1;
-            }
+            // Let's use the first target with calculated qa.
+            // It makes impossible to choose the best possible action, but it's more effective
+            // and not so terrible.
             break;
         }
         log.debug("No quick action for entity {any}", .{target});
         self.target = null;
     }
 
-    // TODO: Move to the iterator
-    // Entities under the player's feet should be included to possible actions
+    // Entities under the player's feet should be additionally included to the possible actions
     const cell_under_feet = self.session.level.cellAt(player_position.place);
     switch (cell_under_feet) {
         .entities => |entities| {

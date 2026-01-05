@@ -10,7 +10,7 @@ const Self = @This();
 
 alloc: std.mem.Allocator,
 io: std.Io,
-test_dir: std.fs.Dir,
+test_dir: std.Io.Dir,
 menu: Menu(g.DISPLAY_ROWS, g.DISPLAY_COLS),
 display: Frame = .empty,
 current_millis: u64,
@@ -20,7 +20,7 @@ pushed_buttons: std.ArrayListUnmanaged(?g.Button) = .empty,
 is_dev_mode: bool = false,
 cheat: ?g.Cheat = null,
 
-pub fn init(alloc: std.mem.Allocator, io: std.Io, working_dir: std.fs.Dir) !Self {
+pub fn init(alloc: std.mem.Allocator, io: std.Io, working_dir: std.Io.Dir) !Self {
     return .{
         .alloc = alloc,
         .io = io,
@@ -116,11 +116,11 @@ fn openFile(ptr: *anyopaque, file_path: []const u8, mode: g.Runtime.FileMode, bu
     const file_wrapper = try self.alloc.create(terminal.TtyRuntime.FileWrapper);
     file_wrapper.* = switch (mode) {
         .read => .{
-            .reader = (try self.test_dir.openFile(file_path, .{ .mode = std.fs.File.OpenMode.read_only }))
+            .reader = (try self.test_dir.openFile(self.io, file_path, .{ .mode = .read_only }))
                 .reader(self.io, buffer),
         },
         .write => .{
-            .writer = (try self.test_dir.createFile(file_path, .{})).writer(buffer),
+            .writer = (try self.test_dir.createFile(self.io, file_path, .{})).writer(self.io, buffer),
         },
     };
     return file_wrapper;
@@ -135,7 +135,7 @@ fn closeFile(ptr: *anyopaque, file: *anyopaque) void {
         };
     switch (file_wrapper.*) {
         .reader => file_wrapper.reader.file.close(self.io),
-        .writer => file_wrapper.writer.file.close(),
+        .writer => file_wrapper.writer.file.close(self.io),
     }
     self.alloc.destroy(file_wrapper);
 }
@@ -152,7 +152,7 @@ fn writeToFile(_: *anyopaque, file_ptr: *anyopaque) *std.Io.Writer {
 
 fn isFileExists(ptr: *anyopaque, file_path: []const u8) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    if (self.test_dir.access(file_path, .{})) |_| {
+    if (self.test_dir.access(self.io, file_path, .{})) |_| {
         return true;
     } else |err| switch (err) {
         error.FileNotFound => return false,
@@ -162,7 +162,7 @@ fn isFileExists(ptr: *anyopaque, file_path: []const u8) !bool {
 
 fn deleteFileIfExists(ptr: *anyopaque, file_path: []const u8) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    self.test_dir.deleteFile(file_path) catch |err| {
+    self.test_dir.deleteFile(self.io, file_path) catch |err| {
         switch (err) {
             error.FileNotFound => {},
             else => return err,

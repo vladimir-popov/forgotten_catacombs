@@ -38,8 +38,8 @@ fn handleWindowResize(_: std.c.SIG) callconv(.c) void {
 }
 
 pub const FileWrapper = union(enum) {
-    writer: std.fs.File.Writer,
-    reader: std.fs.File.Reader,
+    writer: std.Io.File.Writer,
+    reader: std.Io.File.Reader,
 };
 
 pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
@@ -65,7 +65,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
         // true means that program should be closed
         is_exit: bool = false,
         // The path to the dir with save files
-        saves_dir: std.fs.Dir,
+        saves_dir: std.Io.Dir,
 
         pub fn init(
             alloc: std.mem.Allocator,
@@ -84,7 +84,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                 .termios = tty.Display.enterRawMode(),
                 .draw_border = draw_border,
                 .is_dev_mode = is_dev_mode,
-                .saves_dir = try std.fs.cwd().makeOpenPath("save", .{}),
+                .saves_dir = try std.Io.Dir.cwd().createDirPathOpen(io, "save", .{}),
             };
             try enableGameMode(use_mouse);
             should_render_in_center = render_in_center;
@@ -124,7 +124,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
         /// Run the main loop of the game
         pub fn run(self: *Self, game: anytype) !void {
             var buffer: [2048]u8 = undefined;
-            var stdout = std.fs.File.stdout().writer(&buffer);
+            var stdout = std.Io.File.stdout().writer(self.io, &buffer);
             handleWindowResize(std.c.SIG.WINCH);
             while (!self.is_exit) {
                 if (self.menu.is_shown) {
@@ -286,11 +286,11 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             const file_wrapper = try self.alloc.create(FileWrapper);
             file_wrapper.* = switch (mode) {
                 .read => .{
-                    .reader = (try self.saves_dir.openFile(file_path, .{ .mode = std.fs.File.OpenMode.read_only }))
+                    .reader = (try self.saves_dir.openFile(self.io, file_path, .{ .mode = std.Io.File.OpenMode.read_only }))
                         .reader(self.io, buffer),
                 },
                 .write => .{
-                    .writer = (try self.saves_dir.createFile(file_path, .{})).writer(buffer),
+                    .writer = (try self.saves_dir.createFile(self.io, file_path, .{})).writer(self.io, buffer),
                 },
             };
             return file_wrapper;
@@ -305,7 +305,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                 };
             switch (file_wrapper.*) {
                 .reader => file_wrapper.reader.file.close(self.io),
-                .writer => file_wrapper.writer.file.close(),
+                .writer => file_wrapper.writer.file.close(self.io),
             }
             self.alloc.destroy(file_wrapper);
         }
@@ -322,7 +322,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
 
         fn isFileExists(ptr: *anyopaque, file_path: []const u8) !bool {
             const self: *Self = @ptrCast(@alignCast(ptr));
-            if (self.saves_dir.access(file_path, .{})) |_| {
+            if (self.saves_dir.access(self.io, file_path, .{})) |_| {
                 return true;
             } else |err| switch (err) {
                 error.FileNotFound => return false,
@@ -332,7 +332,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
 
         fn deleteFileIfExists(ptr: *anyopaque, file_path: []const u8) !void {
             const self: *Self = @ptrCast(@alignCast(ptr));
-            self.saves_dir.deleteFile(file_path) catch |err| {
+            self.saves_dir.deleteFile(self.io, file_path) catch |err| {
                 switch (err) {
                     error.FileNotFound => {},
                     else => return err,

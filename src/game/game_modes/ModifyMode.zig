@@ -230,6 +230,7 @@ fn modifyItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
             std.debug.panic("Entity {d} with type {t} can't be modified", .{ item.id, t });
         },
     }
+    try self.updateTabs();
 }
 
 fn describeItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
