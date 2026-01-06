@@ -159,7 +159,7 @@ pub fn OptionsArea(comptime Item: type) type {
             switch (btn.game_button) {
                 .up => self.selectPreviousLine(),
                 .down => self.selectNextLine(),
-                .a => {
+                .a => if (self.options.items.len > 0) {
                     const option = self.options.items[self.selected_line];
                     if (btn.state == .hold and option.onHoldButtonFn != null) {
                         try option.onHoldButtonFn.?(self.context, self.selected_line, option.item);

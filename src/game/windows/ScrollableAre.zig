@@ -31,6 +31,8 @@ pub fn ScrollableAre(comptime Area: type) type {
             return self.content.totalLines() -| (self.region.rows);
         }
 
+        /// Returns a label for the right button handled by the content, 
+        /// or null if the content doesn't handle the right button.
         pub fn button(self: Self) ?struct { []const u8, bool } {
             return self.content.button();
         }

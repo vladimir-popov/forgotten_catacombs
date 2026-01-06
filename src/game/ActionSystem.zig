@@ -398,7 +398,7 @@ fn applyEffect(
                 target_defence.min,
                 target_defence.max,
             );
-            const damage_value: u8 = @max(1, damage - absorbed_damage);
+            const damage_value: u8 = if (damage > absorbed_damage) damage - absorbed_damage else 1;
             log.debug(
                 "Base damage {d}; Character factor {d}; Damage {d}; Absorbed damage {d};",
                 .{ base_damage, character_factor, damage, absorbed_damage },

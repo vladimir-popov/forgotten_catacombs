@@ -87,6 +87,7 @@ pub fn handleButton(self: *Self, btn: g.Button) !bool {
     const tab = &self.tabs[self.active_tab_idx];
     try tab.area.handleButton(btn);
     switch (btn.game_button) {
+        .a => return tab.area.button() == null,
         .b => return true,
         .left => if (self.active_tab_idx > 0) {
             self.active_tab_idx -= 1;
