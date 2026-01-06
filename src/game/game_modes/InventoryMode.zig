@@ -220,7 +220,7 @@ fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     }
     try area.addOption(self.alloc, "Drop", item, dropSelectedItem, null);
     try area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
-    self.actions_window = .init(area, MODAL_WINDOW_REGION);
+    self.actions_window = .modalWindow(area, MODAL_WINDOW_REGION);
 }
 
 inline fn isEquipped(self: Self, item: g.Entity) bool {
@@ -299,7 +299,7 @@ fn takeFromPileOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     var area = w.OptionsArea(g.Entity).center(self);
     try area.addOption(self.alloc, "Take", item, takeSelectedItem, null);
     try area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
-    self.actions_window = .init(area, MODAL_WINDOW_REGION);
+    self.actions_window = .modalWindow(area, MODAL_WINDOW_REGION);
 }
 
 fn addDropTab(self: *Self, drop: g.Entity) !void {

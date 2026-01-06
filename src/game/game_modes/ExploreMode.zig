@@ -236,7 +236,7 @@ fn windowWithEntities(
                 try area.selectLine(area.options.items.len - 1);
         }
     }
-    return .default(area);
+    return .defaultModalWindow(area);
 }
 
 fn showEntityDescription(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!void {

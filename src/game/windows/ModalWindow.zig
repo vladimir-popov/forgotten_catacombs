@@ -2,6 +2,13 @@
 //! It has fixed width and dynamic hight that depends on a number of lines
 //! in the content aria.
 //!
+//! The modal window and its content are drawing directly on the display.
+//! To "hide" the window two options exist:
+//!   1. Redraw the window region from the scene buffer - the best option for a single modal window;
+//!   2. Fill the window region by spaces - compromise for windows drawn above another.
+//!      Be careful with second option! The new window has to occupy the same or bigger region than
+//!      previous!
+//!
 //! The Modal window always has 'Close' button, and may have an optional button
 //! provided by the area.
 //!
@@ -28,11 +35,11 @@ pub fn ModalWindow(comptime Area: type) type {
         /// An actual region occupied by this window (including borders)
         region: p.Region,
 
-        pub inline fn default(content: Area) Self {
-            return init(content, DEFAULT_MAX_REGION);
+        pub inline fn defaultModalWindow(content: Area) Self {
+            return modalWindow(content, DEFAULT_MAX_REGION);
         }
 
-        pub fn init(content: Area, max_region: p.Region) Self {
+        pub fn modalWindow(content: Area, max_region: p.Region) Self {
             const region = calculateOccupiedRegion(content, max_region);
             return .{ .content = .init(content, region.innerRegion(1, 1, 1, 1)), .region = region };
         }

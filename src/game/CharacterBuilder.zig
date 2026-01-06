@@ -291,7 +291,7 @@ fn showDescription(self: *Self, description: *const g.descriptions.Description) 
         const line = try area.addEmptyLine(self.arena.allocator());
         _ = try std.fmt.bufPrint(line, "{s}", .{descr_line});
     }
-    var window = w.ModalWindow(w.TextArea).default(area);
+    var window: w.ModalWindow(w.TextArea) = .defaultModalWindow(area);
     window.title_len = (try std.fmt.bufPrint(&window.title_buffer, "{s}", .{description.name})).len;
     self.description = window;
 }

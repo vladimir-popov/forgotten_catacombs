@@ -188,7 +188,7 @@ fn recognizeDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     var area = w.OptionsArea(g.Entity).center(self);
     try area.addOption(self.alloc, "Recognize", item, recognizeItem, null);
     try area.addOption(self.alloc, "Describe", item, describeItem, null);
-    self.actions_window = .init(area, MODAL_WINDOW_REGION);
+    self.actions_window = .modalWindow(area, MODAL_WINDOW_REGION);
 }
 
 fn recognizeItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
@@ -208,7 +208,7 @@ fn modifyDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     var area = w.OptionsArea(g.Entity).center(self);
     try area.addOption(self.alloc, "Modify", item, modifyItem, null);
     try area.addOption(self.alloc, "Describe", item, describeItem, null);
-    self.actions_window = .init(area, MODAL_WINDOW_REGION);
+    self.actions_window = .modalWindow(area, MODAL_WINDOW_REGION);
 }
 
 fn modifyItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {

@@ -28,6 +28,10 @@ pub fn equipment(self: Self) *c.Equipment {
     return self.test_session.session.registry.getUnsafe(self.id, c.Equipment);
 }
 
+pub fn wallet(self: Self) *c.Wallet {
+    return self.test_session.session.registry.getUnsafe(self.id, c.Wallet);
+}
+
 pub fn target(self: Self) ?g.Entity {
     return switch (self.test_session.session.mode) {
         .play => |play| play.target,

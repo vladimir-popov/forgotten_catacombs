@@ -70,9 +70,12 @@ pub fn scrollingProgress(scrolled_lines: usize, area_height: usize, max_scroll_c
     return progress;
 }
 
+/// Shows a multiline message in the modal window.
 /// Example:
 /// ```
 /// ┌───────────────Title───────────────┐
+/// │               Multi               │
+/// │               line                │
 /// │              Message              │
 /// └───────────────────────────────────┘
 ///═══════════════════════════════════════
@@ -80,11 +83,14 @@ pub fn scrollingProgress(scrolled_lines: usize, area_height: usize, max_scroll_c
 /// ```
 pub fn notification(alloc: std.mem.Allocator, message: []const u8) !ModalWindow(TextArea) {
     var text_area: TextArea = .empty;
-    const line = try text_area.addEmptyLine(alloc);
-    const width = g.DISPLAY_COLS - 2;
-    const pad = p.diff(usize, message.len, width) / 2;
-    _ = try std.fmt.bufPrint(line[pad..], "{s}", .{message});
-    return .default(text_area);
+    var itr = std.mem.splitScalar(u8, message, '\n');
+    while (itr.next()) |msg_line| {
+        const line = try text_area.addEmptyLine(alloc);
+        const width = g.DISPLAY_COLS - 2;
+        const pad = p.diff(usize, msg_line.len, width) / 2;
+        _ = try std.fmt.bufPrint(line[pad..], "{s}", .{msg_line});
+    }
+    return .defaultModalWindow(text_area);
 }
 
 /// Approximate example:
@@ -113,9 +119,9 @@ pub fn entityDescription(args: struct {
         try g.descriptions.describeEntity(args.alloc, args.session.journal, args.entity, &area);
     }
     var window = if (args.max_region) |mr|
-        w.ModalWindow(TextArea).init(area, mr)
+        w.ModalWindow(TextArea).modalWindow(area, mr)
     else
-        w.ModalWindow(TextArea).default(area);
+        w.ModalWindow(TextArea).defaultModalWindow(area);
     window.title_len = (try g.descriptions.printName(&window.title_buffer, args.session.journal, args.entity)).len;
     return window;
 }

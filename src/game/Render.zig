@@ -3,7 +3,7 @@
 //! to draw objects from the game domain.
 //!
 //! The Welcome and Game over screen, as windows are drawn directly to the
-//! screen by runtime methods.
+//! screen by Runtime methods.
 //!
 //! The game scene is drawing not directly to the screen, but to the buffer.
 //! It makes it possible to calculate changed symbols and draw only them.

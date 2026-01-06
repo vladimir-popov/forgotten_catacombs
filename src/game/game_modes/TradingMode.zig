@@ -243,7 +243,7 @@ fn buyOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     var area = w.OptionsArea(g.Entity).center(self);
     try area.addOption(self.alloc, "Buy", item, buySelectedItem, null);
     try area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
-    self.actions_window = .default(area);
+    self.actions_window = .defaultModalWindow(area);
 }
 
 fn sellOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
@@ -251,7 +251,7 @@ fn sellOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     var area = w.OptionsArea(g.Entity).center(self);
     try area.addOption(self.alloc, "Sell", item, sellSelectedItem, null);
     try area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
-    self.actions_window = .default(area);
+    self.actions_window = .defaultModalWindow(area);
 }
 
 fn buySelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
@@ -265,7 +265,7 @@ fn buySelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         try self.updateBuyingTab();
         try self.updateSellingTab();
     } else {
-        self.modal_window = try w.notification(self.alloc, "You have not enough money");
+        self.modal_window = try w.notification(self.alloc, "You have not enough\nmoney.");
     }
 }
 
@@ -280,7 +280,7 @@ fn sellSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         try self.updateBuyingTab();
         try self.updateSellingTab();
     } else {
-        self.modal_window = try w.notification(self.alloc, "Traider doesn't have enough money");
+        self.modal_window = try w.notification(self.alloc, "Traider doesn't have\nenough money");
     }
 }
 

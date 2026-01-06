@@ -33,6 +33,11 @@ pub fn chooseById(self: Self, item_id: g.Entity) !void {
     return error.OptionWasNotFound;
 }
 
+pub fn chooseByIndex(self: Self, idx: usize) !void {
+    try self.options_area.selectLine(idx);
+    try self.test_session.pressButton(.a);
+}
+
 pub fn contains(self: Self, item_id: g.Entity) bool {
     for (self.options_area.options.items) |option| {
         if (option.item.eql(item_id)) {

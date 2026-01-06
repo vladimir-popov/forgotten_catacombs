@@ -561,7 +561,7 @@ fn windowWithQuickActions(self: *Self) !w.ModalWindow(w.OptionsArea(void)) {
         if (idx == self.quick_actions.selected_idx)
             try area.selectLine(idx);
     }
-    return .default(area);
+    return .defaultModalWindow(area);
 }
 
 fn chooseEntity(ptr: *anyopaque, line_idx: usize, _: void) anyerror!void {
