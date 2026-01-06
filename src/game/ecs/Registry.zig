@@ -100,8 +100,8 @@ pub fn Registry(comptime ComponentsStruct: type) type {
 
         pub fn getUnsafe(self: Self, entity: Entity, comptime C: type) *C {
             return get(self, entity, C) orelse std.debug.panic(
-                "Entity {d} doesn't have component {any}",
-                .{ entity.id, C },
+                "Entity {d} doesn't have component {any}\n{any}",
+                .{ entity.id, C, self.entityToStruct(entity) },
             );
         }
 

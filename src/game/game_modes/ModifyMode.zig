@@ -180,10 +180,7 @@ fn calculateModificationPrice(self: Self, item: g.Entity) u16 {
 }
 
 inline fn canBeModified(self: *Self, item: g.Entity) bool {
-    return switch (g.meta.entityType(&self.session.registry, item)) {
-        .weapon, .armor => true,
-        else => false,
-    };
+    return self.session.registry.has(item, c.Weapon) or self.session.registry.has(item, c.Protection);
 }
 
 fn recognizeDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
@@ -196,16 +193,13 @@ fn recognizeDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
 
 fn recognizeItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    switch (g.meta.entityType(&self.session.registry, item)) {
-        .weapon => try self.session.journal.markWeaponAsKnown(item),
-        .armor => try self.session.journal.markArmorAsKnown(item),
-        .potion => if (g.meta.getPotionType(&self.session.registry, item)) |potion_type| {
-            try self.session.journal.markPotionAsKnown(potion_type);
-        },
-        else => |t| {
-            std.debug.panic("Entity {d} with type {t} can't be recognized", .{ item.id, t });
-        },
-    }
+    if (self.session.registry.has(item, c.Weapon))
+        try self.session.journal.markWeaponAsKnown(item)
+    else if (self.session.registry.has(item, c.Protection))
+        try self.session.journal.markArmorAsKnown(item)
+    else if (g.meta.getPotionType(&self.session.registry, item)) |potion_type|
+        try self.session.journal.markPotionAsKnown(potion_type);
+
     try self.updateTabs();
 }
 
@@ -220,16 +214,11 @@ fn modifyDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
 fn modifyItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     var prng = std.Random.DefaultPrng.init(self.session.seed);
-    switch (g.meta.entityType(&self.session.registry, item)) {
-        .weapon => {
-            try g.meta.modifyWeapon(&self.session.registry, prng.random(), item, 1, 5);
-            try self.session.journal.forgetWeapon(item);
-        },
-        // TODO: Modify an armor
-        else => |t| {
-            std.debug.panic("Entity {d} with type {t} can't be modified", .{ item.id, t });
-        },
+    if (self.session.registry.has(item, c.Weapon)) {
+        try g.meta.modifyWeapon(&self.session.registry, prng.random(), item, 1, 5);
+        try self.session.journal.forgetWeapon(item);
     }
+    // TODO: Modify an armor
     try self.updateTabs();
 }
 

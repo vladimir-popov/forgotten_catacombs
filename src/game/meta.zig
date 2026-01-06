@@ -10,16 +10,6 @@ pub const EnemyType = g.descriptions.Enemies.Enum;
 pub const PlayerArchetype = g.descriptions.Archetypes.Enum;
 pub const Skill = g.descriptions.Skills.Enum;
 
-pub const ItemType = enum {
-    ammunition,
-    armor,
-    enemy,
-    food,
-    light,
-    potion,
-    weapon,
-};
-
 /// A numbers of required exp point for level up.
 /// The 0 element is a required amount of exp point to get the
 /// second level.
@@ -27,27 +17,6 @@ pub const Levels = [_]u16{ 500, 1000, 15000, std.math.maxInt(u16) };
 
 pub inline fn experienceToNextLevel(current_level: u4) u16 {
     return Levels[current_level - 1];
-}
-
-pub fn entityType(registry: *const g.Registry, entity: g.Entity) ItemType {
-    if (registry.has(entity, c.Weight))
-        return .weapon;
-    if (registry.has(entity, c.Protection))
-        return .armor;
-    if (registry.get(entity, c.Consumable)) |consumable| {
-        switch (consumable.consumable_type) {
-            .potion => return .potion,
-            .food => return .food,
-        }
-    }
-    if (registry.has(entity, c.SourceOfLight))
-        return .light;
-    if (registry.has(entity, c.Ammunition))
-        return .ammunition;
-    if (getEnemyType(registry, entity)) |_|
-        return .enemy;
-
-    std.debug.panic("Undefined type of the entity {d}: {f}", .{ entity.id, try registry.entityToStruct(entity) });
 }
 
 /// Any entity with weight is item.
@@ -69,14 +38,6 @@ pub inline fn getEnemyType(registry: *const g.Registry, entity: g.Entity) ?Enemy
         std.meta.stringToEnum(EnemyType, @tagName(descr.preset))
     else
         null;
-}
-
-/// Only weapon and source of light can be equipped.
-pub fn canEquip(registry: *const g.Registry, item: g.Entity) bool {
-    switch (entityType(registry, item)) {
-        .weapon, .light, .armor => true,
-        else => false,
-    }
 }
 
 /// Returns the id of the item with maximal radius of light through all equipped sources of the light,

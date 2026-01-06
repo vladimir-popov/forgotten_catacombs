@@ -37,14 +37,14 @@ test "Describe an unknown potion" {
 
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
-        \\║              Inventory               ║
         \\║┌───────────A green potion───────────┐║
-        \\║│ A swirling liquid of green color   │║
-        \\║│ rests in a vial.                   │║
-        \\║│                                    │║
-        \\║│ Weight: 10                         │║
+        \\║│ A swirling liquid of green color  ▒│║
+        \\║│ rests in a vial.                  ░│║
+        \\║│                                   ░│║
+        \\║│ Effects:                          ░│║
+        \\║│     ?                             ░│║
+        \\║│ Calories: 10                      ░│║
         \\║└────────────────────────────────────┘║
-        \\║                                      ║
         \\╚══════════════════════════════════════╝
     , .game_area);
 }

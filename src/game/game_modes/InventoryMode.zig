@@ -199,24 +199,35 @@ fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Buttons is helt. Show modal window for {any}", .{item});
     var area = w.OptionsArea(g.Entity).center(self);
-    if (item.eql(self.equipment.light) or item.eql(self.equipment.weapon)) {
+    if (self.isEquipped(item)) {
         try area.addOption(self.alloc, "Unequip", item, unequipItem, null);
     } else {
-        switch (g.meta.entityType(&self.session.registry, item)) {
-            .weapon => try area.addOption(self.alloc, "Use as a weapon", item, useAsWeapon, null),
-            .ammunition => try area.addOption(self.alloc, "Put to quiver", item, putToQuiver, null),
-            .armor => try area.addOption(self.alloc, "Equip", item, useAsArmor, null),
-            .light => try area.addOption(self.alloc, "Use as a light", item, useAsLight, null),
-            .potion => try area.addOption(self.alloc, "Drink", item, consumeItem, null),
-            .food => try area.addOption(self.alloc, "Eat", item, consumeItem, null),
-            .enemy => {
-                log.err("Attempt to use an enemy {d}", .{item.id});
-            },
+        if (self.session.registry.has(item, c.SourceOfLight)) {
+            try area.addOption(self.alloc, "Use as a light", item, useAsLight, null);
+        }
+        if (self.session.registry.has(item, c.Weapon)) {
+            try area.addOption(self.alloc, "Use as a weapon", item, useAsWeapon, null);
+        }
+        if (self.session.registry.has(item, c.Ammunition)) {
+            try area.addOption(self.alloc, "Put to quiver", item, putToQuiver, null);
+        }
+        if (self.session.registry.get(item, c.Consumable)) |consumable| {
+            switch (consumable.consumable_type) {
+                .potion => try area.addOption(self.alloc, "Drink", item, consumeItem, null),
+                .food => try area.addOption(self.alloc, "Eat", item, consumeItem, null),
+            }
         }
     }
     try area.addOption(self.alloc, "Drop", item, dropSelectedItem, null);
     try area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
     self.actions_window = .init(area, MODAL_WINDOW_REGION);
+}
+
+inline fn isEquipped(self: Self, item: g.Entity) bool {
+    return item.eql(self.equipment.light) or
+        item.eql(self.equipment.weapon) or
+        item.eql(self.equipment.armor) or
+        item.eql(self.equipment.ammunition);
 }
 
 fn unequipItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {

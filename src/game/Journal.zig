@@ -147,7 +147,7 @@ test "Move unknown equipment to known after N turns" {
     var journal = try init(std.testing.allocator, &registry, 0);
     defer journal.deinit(std.testing.allocator);
 
-    const equipment = g.Entity{ .id = 42 };
+    const equipment = try registry.addNewEntity(g.presets.Items.get(.pickaxe));
     try journal.addUnknownEquipment(equipment);
 
     // when:
