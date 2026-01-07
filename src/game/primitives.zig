@@ -154,17 +154,19 @@ pub const Point = struct {
 };
 
 // The range from the `min` value inclusive to the `max` value inclusive.
-pub const Range = struct {
-    pub const zeros: Range = .{ .min = 0, .max = 0 };
+pub fn Range(comptime T: type) type {
+    return struct {
+        pub const zeros: @This() = .{ .min = 0, .max = 0 };
 
-    min: u8,
-    max: u8,
+        min: T,
+        max: T,
 
-    pub fn range(min: u8, max: u8) Range {
-        std.debug.assert(min <= max);
-        return .{ .min = min, .max = max };
-    }
-};
+        pub fn range(min: T, max: T) @This() {
+            std.debug.assert(min <= max);
+            return .{ .min = min, .max = max };
+        }
+    };
+}
 
 /// The region described as its top left corner
 /// and count of rows and columns.

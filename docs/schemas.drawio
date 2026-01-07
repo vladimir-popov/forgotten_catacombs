@@ -1,4 +1,4 @@
-<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/26.1.1 Chrome/132.0.6834.210 Electron/34.3.3 Safari/537.36" version="26.1.1" pages="11">
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.0.3 Chrome/140.0.7339.249 Electron/38.7.0 Safari/537.36" version="29.0.3" pages="12">
   <diagram id="HEc6ijCT2G0Q-exSr9Sf" name="Build graph">
     <mxGraphModel dx="2074" dy="2335" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
@@ -509,7 +509,7 @@
     </mxGraphModel>
   </diagram>
   <diagram id="PEu5v51dWF8_odGiC0OC" name="Events">
-    <mxGraphModel dx="2483" dy="1104" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="2061" dy="833" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -672,41 +672,52 @@
         <mxCell id="N0jYmiD9XO5zHJZ2UNU2-30" value="Throws GameOver" style="shape=callout;whiteSpace=wrap;html=1;perimeter=calloutPerimeter;flipV=1;size=10;position=0.79;fillColor=#f5f5f5;strokeColor=#666666;base=9;position2=0.86;" parent="1" vertex="1">
           <mxGeometry x="-60" y="540" width="90" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="agQlTyWkTaZV8Ir9TKI8-1" value="" style="group" vertex="1" connectable="0" parent="1">
+        <mxCell id="agQlTyWkTaZV8Ir9TKI8-1" value="" style="group" parent="1" vertex="1" connectable="0">
           <mxGeometry x="380" y="190" width="60" height="110" as="geometry" />
         </mxCell>
-        <mxCell id="agQlTyWkTaZV8Ir9TKI8-2" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;endWidth=10;endSize=3.665;width=6;" edge="1" parent="agQlTyWkTaZV8Ir9TKI8-1">
+        <mxCell id="agQlTyWkTaZV8Ir9TKI8-2" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;endWidth=10;endSize=3.665;width=6;" parent="agQlTyWkTaZV8Ir9TKI8-1" edge="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="30" as="sourcePoint" />
             <mxPoint x="29.5" y="110" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="agQlTyWkTaZV8Ir9TKI8-3" value="Turn completed" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="agQlTyWkTaZV8Ir9TKI8-1">
+        <mxCell id="agQlTyWkTaZV8Ir9TKI8-3" value="Turn completed" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="agQlTyWkTaZV8Ir9TKI8-1" vertex="1">
           <mxGeometry y="30" width="60" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="agQlTyWkTaZV8Ir9TKI8-4" value="Update unknown equipment timers" style="shape=callout;whiteSpace=wrap;html=1;perimeter=calloutPerimeter;flipV=1;size=10;position=0.43;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;base=16;" vertex="1" parent="1">
+        <mxCell id="agQlTyWkTaZV8Ir9TKI8-4" value="Update unknown equipment timers" style="shape=callout;whiteSpace=wrap;html=1;perimeter=calloutPerimeter;flipV=1;size=10;position=0.43;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;base=16;" parent="1" vertex="1">
           <mxGeometry x="855" y="540" width="105" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="agQlTyWkTaZV8Ir9TKI8-5" value="Journal" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+        <mxCell id="agQlTyWkTaZV8Ir9TKI8-5" value="Journal" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
           <mxGeometry x="820" y="470" width="150" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="agQlTyWkTaZV8Ir9TKI8-6" value="" style="group" vertex="1" connectable="0" parent="1">
+        <mxCell id="agQlTyWkTaZV8Ir9TKI8-6" value="" style="group" parent="1" vertex="1" connectable="0">
           <mxGeometry x="870" y="350" width="60" height="110" as="geometry" />
         </mxCell>
-        <mxCell id="agQlTyWkTaZV8Ir9TKI8-7" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;endWidth=10;endSize=3.665;width=6;" edge="1" parent="agQlTyWkTaZV8Ir9TKI8-6">
+        <mxCell id="agQlTyWkTaZV8Ir9TKI8-7" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;endWidth=10;endSize=3.665;width=6;" parent="agQlTyWkTaZV8Ir9TKI8-6" edge="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="30" as="sourcePoint" />
             <mxPoint x="29.5" y="110" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="agQlTyWkTaZV8Ir9TKI8-8" value="Turn completed" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="agQlTyWkTaZV8Ir9TKI8-6">
+        <mxCell id="agQlTyWkTaZV8Ir9TKI8-8" value="Turn completed" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="agQlTyWkTaZV8Ir9TKI8-6" vertex="1">
           <mxGeometry y="30" width="60" height="50" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
   </diagram>
+  <diagram id="Q5mxnjguWuWon7duKe69" name="Stealth">
+    <mxGraphModel dx="1028" dy="694" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="fcno9wgf7SWZbkjeNU_S-1" value="&lt;h1 style=&quot;margin-top: 0px;&quot;&gt;Stealth&lt;/h1&gt;&lt;p data-start=&quot;0&quot; data-end=&quot;68&quot;&gt;Detection of the player by enemies is influenced by several factors:&lt;/p&gt;&lt;ul data-start=&quot;70&quot; data-end=&quot;324&quot; data-is-last-node=&quot;&quot; data-is-only-node=&quot;&quot;&gt;&lt;li data-start=&quot;70&quot; data-end=&quot;99&quot;&gt;&lt;p data-start=&quot;72&quot; data-end=&quot;99&quot;&gt;The enemy’s current state&lt;/p&gt;&lt;/li&gt;&lt;li data-start=&quot;100&quot; data-end=&quot;181&quot;&gt;&lt;p data-start=&quot;102&quot; data-end=&quot;181&quot;&gt;The distance between the player and the enemy (according to Dijkstra Map value)&lt;/p&gt;&lt;/li&gt;&lt;li data-start=&quot;182&quot; data-end=&quot;278&quot;&gt;&lt;p data-start=&quot;184&quot; data-end=&quot;278&quot;&gt;The light source (the greater the visibility radius, the higher the chance of being noticed&lt;/p&gt;&lt;/li&gt;&lt;li data-start=&quot;279&quot; data-end=&quot;304&quot;&gt;&lt;p data-start=&quot;281&quot; data-end=&quot;304&quot;&gt;The Agility attribute&lt;/p&gt;&lt;/li&gt;&lt;li data-start=&quot;305&quot; data-end=&quot;324&quot; data-is-last-node=&quot;&quot;&gt;&lt;p data-start=&quot;307&quot; data-end=&quot;324&quot; data-is-last-node=&quot;&quot;&gt;The Stealth skill&lt;/p&gt;&lt;/li&gt;&lt;/ul&gt;&lt;div&gt;The size of the DM depends on player&#39;s dexterity and stealth skill.&lt;/div&gt;An angry enemy always sees the player until he out of the DM.&lt;div&gt;The chance of changing the enemy&#39;s state from the &quot;walking&quot; to &quot;aggressive&quot; depends on&amp;nbsp;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;player&#39;s dexterity and stealth skill, DM value and visibility state. The chance to notice for an enemy out of light should be [10..50] percent. If the enemy is within radius of the light the chance to notice the player is [50..90] percent.&lt;/span&gt;&lt;/div&gt;" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="750" height="510" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
   <diagram id="x6jjJTwnwj9cOMHpFXST" name="AI">
-    <mxGraphModel dx="1242" dy="830" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="1234" dy="833" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />

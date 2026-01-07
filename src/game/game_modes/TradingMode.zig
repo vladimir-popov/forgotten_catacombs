@@ -42,7 +42,7 @@ const w = g.windows;
 const log = std.log.scoped(.trading_mode);
 
 /// The biggest region that can be occupied by a modal window with description
-const MODAL_WINDOW_REGION: p.Region = p.Region.init(2, 2, g.DISPLAY_ROWS - 4, g.DISPLAY_COLS - 2);
+const MODAL_WINDOW_REGION: p.Region = p.Region.init(3, 2, g.DISPLAY_ROWS - 5, g.DISPLAY_COLS - 2);
 
 const Self = @This();
 
@@ -103,14 +103,14 @@ pub fn tick(self: *Self) !void {
         if (self.modal_window) |*window| {
             if (try window.handleButton(btn)) {
                 std.log.debug("Close description window", .{});
-                try window.hide(self.session.render, .fill_region);
+                try self.main_window.draw(self.session.render);
                 window.deinit(self.alloc);
                 self.modal_window = null;
             }
         } else if (self.actions_window) |*window| {
             if (try window.handleButton(btn)) {
                 std.log.debug("Close actions window", .{});
-                try window.hide(self.session.render, .fill_region);
+                try self.main_window.draw(self.session.render);
                 window.deinit(self.alloc);
                 self.actions_window = null;
             }
@@ -193,12 +193,12 @@ fn actualPrice(self: Self, price: *const c.Price, for_buying: bool) u16 {
 
 fn updateBuyingTab(self: *Self) !void {
     const tab = self.buyingTab();
-    const selected_line = tab.area.content.selected_line;
-    tab.area.content.clearRetainingCapacity();
+    const selected_line = tab.scrollable_area.content.selected_line;
+    tab.scrollable_area.content.clearRetainingCapacity();
     var itr = self.shop.items.iterator();
     while (itr.next()) |item_ptr| {
         var buffer: w.TextArea.Line = undefined;
-        try tab.area.content.addOption(
+        try tab.scrollable_area.content.addOption(
             self.alloc,
             try self.formatProduct(&buffer, item_ptr.*, true),
             item_ptr.*,
@@ -206,22 +206,22 @@ fn updateBuyingTab(self: *Self) !void {
             describeSelectedItem,
         );
     }
-    if (tab.area.content.options.items.len > 0) {
-        try tab.area.content.selectLine(if (selected_line < tab.area.content.options.items.len)
+    if (tab.scrollable_area.content.options.items.len > 0) {
+        try tab.scrollable_area.content.selectLine(if (selected_line < tab.scrollable_area.content.options.items.len)
             selected_line
         else
-            tab.area.content.options.items.len - 1);
+            tab.scrollable_area.content.options.items.len - 1);
     }
 }
 
 fn updateSellingTab(self: *Self) !void {
     const tab = self.sellingTab();
-    const selected_line = tab.area.content.selected_line;
-    tab.area.content.clearRetainingCapacity();
+    const selected_line = tab.scrollable_area.content.selected_line;
+    tab.scrollable_area.content.clearRetainingCapacity();
     var itr = self.inventory.items.iterator();
     while (itr.next()) |item_ptr| {
         var buffer: w.TextArea.Line = undefined;
-        try tab.area.content.addOption(
+        try tab.scrollable_area.content.addOption(
             self.alloc,
             try self.formatProduct(&buffer, item_ptr.*, false),
             item_ptr.*,
@@ -229,32 +229,36 @@ fn updateSellingTab(self: *Self) !void {
             describeSelectedItem,
         );
     }
-    if (tab.area.content.options.items.len > 0) {
-        try tab.area.content.selectLine(if (selected_line < tab.area.content.options.items.len)
+    if (tab.scrollable_area.content.options.items.len > 0) {
+        try tab.scrollable_area.content.selectLine(if (selected_line < tab.scrollable_area.content.options.items.len)
             selected_line
         else
-            tab.area.content.options.items.len - 1);
+            tab.scrollable_area.content.options.items.len - 1);
     }
 }
 
-fn buyOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+fn buyOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Buttons is helt. Show modal window for {any}", .{item});
-    var area = w.OptionsArea(g.Entity).center(self);
+    var area = w.OptionsArea(g.Entity).centered(self);
     try area.addOption(self.alloc, "Buy", item, buySelectedItem, null);
     try area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
     self.actions_window = .defaultModalWindow(area);
+    // keep the main window opened
+    return false;
 }
 
-fn sellOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+fn sellOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    var area = w.OptionsArea(g.Entity).center(self);
+    var area = w.OptionsArea(g.Entity).centered(self);
     try area.addOption(self.alloc, "Sell", item, sellSelectedItem, null);
     try area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
     self.actions_window = .defaultModalWindow(area);
+    // keep the main window opened
+    return false;
 }
 
-fn buySelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+fn buySelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const price = self.actualPrice(self.session.registry.getUnsafe(item, c.Price), true);
     log.debug("Buying item {d}", .{item.id});
@@ -265,11 +269,17 @@ fn buySelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         try self.updateBuyingTab();
         try self.updateSellingTab();
     } else {
-        self.modal_window = try w.notification(self.alloc, "You have not enough\nmoney.");
+        self.modal_window = try w.notification(
+            self.alloc,
+            "You have not enough\nmoney.",
+            .{ .max_region = MODAL_WINDOW_REGION },
+        );
     }
+    // close the modal window
+    return true;
 }
 
-fn sellSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+fn sellSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const price = self.actualPrice(self.session.registry.getUnsafe(item, c.Price), false);
     log.debug("Selling {d}", .{item.id});
@@ -280,16 +290,20 @@ fn sellSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         try self.updateBuyingTab();
         try self.updateSellingTab();
     } else {
-        self.modal_window = try w.notification(self.alloc, "Traider doesn't have\nenough money");
+        self.modal_window = try w.notification(
+            self.alloc,
+            "Traider doesn't have\nenough money",
+            .{ .max_region = MODAL_WINDOW_REGION },
+        );
     }
+    // close the modal window
+    return true;
 }
 
-fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Show info about item {d}", .{item.id});
-    self.modal_window = try w.entityDescription(.{
-        .alloc = self.alloc,
-        .session = self.session,
-        .entity = item,
-    });
+    self.modal_window = try w.entityDescription(self.alloc, self.session, item);
+    // keep the main window opened
+    return false;
 }

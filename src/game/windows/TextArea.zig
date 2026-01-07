@@ -47,7 +47,9 @@ pub fn addEmptyLine(self: *Self, alloc: std.mem.Allocator) !*Line {
 }
 
 // for compatibility with required interface used by the ModalWindow
-pub fn handleButton(_: *Self, _: g.Button) !void {}
+pub fn handleButton(_: *Self, _: g.Button) !bool {
+    return false;
+}
 
 /// Uses the render to draw the text area directly to the screen.
 ///

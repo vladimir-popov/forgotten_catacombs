@@ -143,9 +143,7 @@ pub fn build(b: *std.Build) !void {
     // ------------------------------------------------------------
     //                Step to run on emulator
     // ------------------------------------------------------------
-    if (std.process.hasEnvVarConstant(PLAYDATE_SDK_PATH)) {
-        const playdate_sdk_path = try std.process.getEnvVarOwned(b.allocator, PLAYDATE_SDK_PATH);
-
+    if (b.graph.environ_map.get(PLAYDATE_SDK_PATH)) |playdate_sdk_path| {
         const pdc_path = b.pathJoin(&.{ playdate_sdk_path, "bin", if (native_os_tag == .windows) "pdc.exe" else "pdc" });
         const pd_simulator_path = switch (native_os_tag) {
             .linux => b.pathJoin(&.{ playdate_sdk_path, "bin", "PlaydateSimulator" }),

@@ -227,13 +227,13 @@ pub const Effects = struct {
     pub const Type = enum { physical, fire, acid, poison, heal };
     pub const TypesCount = @typeInfo(Type).@"enum".fields.len;
 
-    values: std.EnumMap(Type, p.Range),
+    values: std.EnumMap(Type, p.Range(u8)),
 
     /// Example:
     /// ```
     /// .init(.{ .fire = .{ .min = 0, .max = 3 } });
     /// ```
-    pub fn init(values: std.enums.EnumFieldStruct(Type, p.Range, .zeros)) Effects {
+    pub fn init(values: std.enums.EnumFieldStruct(Type, p.Range(u8), .zeros)) Effects {
         return .{ .values = .initFullWithDefault(.zeros, values) };
     }
 
@@ -257,13 +257,13 @@ pub const Effects = struct {
 pub const Protection = struct {
     pub const zeros: Protection = .{ .resistance = .initFull(.zeros) };
 
-    resistance: std.EnumMap(Effects.Type, p.Range),
+    resistance: std.EnumMap(Effects.Type, p.Range(u8)),
 
     /// Example:
     /// ```
     /// .init(.{ .fire = .{ .min = 0, .max = 3 } });
     /// ```
-    pub fn init(values: std.enums.EnumFieldStruct(Effects.Type, p.Range, .zeros)) Protection {
+    pub fn init(values: std.enums.EnumFieldStruct(Effects.Type, p.Range(u8), .zeros)) Protection {
         return .{ .resistance = .initFullWithDefault(.zeros, values) };
     }
 

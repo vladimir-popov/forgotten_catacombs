@@ -23,17 +23,19 @@ pub fn OptionsArea(comptime Item: type) type {
     return struct {
         const Self = @This();
 
+        /// Returns true to close the parent window.
         pub const OnReleaseButton = *const fn (
             owner: *anyopaque,
             line_idx: usize,
             item: Item,
-        ) anyerror!void;
+        ) anyerror!bool;
 
+        /// Returns true to close the parent window.
         pub const OnHoldButton = *const fn (
             owner: *anyopaque,
             line_idx: usize,
             item: Item,
-        ) anyerror!void;
+        ) anyerror!bool;
 
         pub const Option = struct {
             item: Item,
@@ -57,7 +59,7 @@ pub fn OptionsArea(comptime Item: type) type {
         /// The absolute index of the selected line (includes the lines out of scroll)
         selected_line: usize = 0,
 
-        pub fn center(owner: *anyopaque) Self {
+        pub fn centered(owner: *anyopaque) Self {
             return .init(owner, .center);
         }
 
@@ -93,6 +95,7 @@ pub fn OptionsArea(comptime Item: type) type {
             }
         }
 
+        /// Adds a labeled option. The `label` is copied to an inner buffer.
         pub fn addOption(
             self: *Self,
             alloc: std.mem.Allocator,
@@ -130,7 +133,9 @@ pub fn OptionsArea(comptime Item: type) type {
             return line;
         }
 
-        fn doNothing(_: *anyopaque, _: usize, _: Item) anyerror!void {}
+        fn doNothing(_: *anyopaque, _: usize, _: Item) anyerror!bool {
+            return false;
+        }
 
         pub fn selectLine(self: *Self, idx: usize) !void {
             std.debug.assert(idx < self.options.items.len);
@@ -155,20 +160,22 @@ pub fn OptionsArea(comptime Item: type) type {
             return self.options.items[self.selected_line].item;
         }
 
-        pub fn handleButton(self: *Self, btn: g.Button) !void {
+        /// Returns true to close the parent window.
+        pub fn handleButton(self: *Self, btn: g.Button) !bool {
             switch (btn.game_button) {
                 .up => self.selectPreviousLine(),
                 .down => self.selectNextLine(),
                 .a => if (self.options.items.len > 0) {
                     const option = self.options.items[self.selected_line];
                     if (btn.state == .hold and option.onHoldButtonFn != null) {
-                        try option.onHoldButtonFn.?(self.context, self.selected_line, option.item);
+                        return try option.onHoldButtonFn.?(self.context, self.selected_line, option.item);
                     } else {
-                        try option.onReleaseButtonFn(self.context, self.selected_line, option.item);
+                        return try option.onReleaseButtonFn(self.context, self.selected_line, option.item);
                     }
                 },
                 else => {},
             }
+            return false;
         }
 
         /// Draws the options line by line inside the passed region. If the region has not enough

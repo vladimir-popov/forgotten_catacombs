@@ -92,15 +92,14 @@ pub fn writeLog(
     }
 }
 
-pub fn main() !void {
+pub fn main(init: std.process.Init.Minimal) !void {
     var gpa: std.heap.DebugAllocator(.{}) = .{};
     defer if (gpa.deinit() == .leak) unreachable;
 
-    var threaded: std.Io.Threaded = .init(gpa.allocator(), .{});
+    var threaded: std.Io.Threaded = .init(gpa.allocator(), .{ .environ = init.environ });
     defer threaded.deinit();
 
-    var args = try std.process.argsWithAllocator(gpa.allocator());
-    defer args.deinit();
+    var args = init.args.iterate();
 
     var arena = std.heap.ArenaAllocator.init(gpa.allocator());
     defer arena.deinit();
@@ -173,12 +172,13 @@ pub fn main() !void {
         reporter.mode = .no_color;
     }
 
-    try run(&arena, threaded.io(), process_name, test_filter, &reporter, failed_only, no_stack_trace);
+    try run(&arena, threaded.io(), init.environ, process_name, test_filter, &reporter, failed_only, no_stack_trace);
 }
 
 pub fn run(
     arena: *std.heap.ArenaAllocator,
     io: std.Io,
+    environ: std.process.Environ,
     process_name: []const u8,
     test_filter: ?[]const u8,
     reporter: anytype,
@@ -207,7 +207,7 @@ pub fn run(
     };
 
     try reporter.writeTitle(report.process_name, test_filter, tests.len);
-    try runTests(arena, io, tests, &report, no_stack_trace);
+    try runTests(arena, io, environ, tests, &report, no_stack_trace);
     try writeTestResults(arena, reporter, report, failed_only);
     try reporter.writeSummary(
         report.passed_count,
@@ -222,6 +222,7 @@ pub fn run(
 fn runTests(
     arena: *std.heap.ArenaAllocator,
     io: std.Io,
+    environ: std.process.Environ,
     tests: []const TestFn,
     report: *Report,
     no_stack_trace: bool,
@@ -234,7 +235,7 @@ fn runTests(
         const t = Test.wrap(test_fn);
 
         // Run tests:
-        report.test_results[idx] = try t.run(arena, io, &test_timer, no_stack_trace);
+        report.test_results[idx] = try t.run(arena, io, environ, &test_timer, no_stack_trace);
 
         switch (report.test_results[idx]) {
             .passed => {
@@ -316,12 +317,13 @@ const Test = struct {
         self: Test,
         arena: *std.heap.ArenaAllocator,
         io: std.Io,
+        environ: std.process.Environ,
         timer: *std.time.Timer,
         no_stack_trace: bool,
     ) !TestResult {
         var is_mem_leak: bool = false;
         std.testing.allocator_instance = .{};
-        std.testing.io_instance = .init(std.testing.allocator, .{});
+        std.testing.io_instance = .init(std.testing.allocator, .{ .environ = environ });
         defer {
             std.testing.io_instance.deinit();
             is_mem_leak = (std.testing.allocator_instance.deinit() == .leak);

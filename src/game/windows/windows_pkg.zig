@@ -54,7 +54,7 @@ pub const HideMode = enum { from_buffer, fill_region };
 
 pub const ModalWindow = @import("ModalWindow.zig").ModalWindow;
 pub const OptionsArea = @import("OptionsArea.zig").OptionsArea;
-pub const ScrollableAre = @import("ScrollableAre.zig").ScrollableAre;
+pub const ScrollableArea = @import("ScrollableArea.zig").ScrollableArea;
 pub const TextArea = @import("TextArea.zig");
 pub const WindowWithTabs = @import("WindowWithTabs.zig");
 
@@ -70,6 +70,12 @@ pub fn scrollingProgress(scrolled_lines: usize, area_height: usize, max_scroll_c
     return progress;
 }
 
+pub const NotificationOptions = struct {
+    title: []const u8 = &.{},
+    max_region: p.Region = .init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS),
+    text_align: g.TextAlign = .center,
+};
+
 /// Shows a multiline message in the modal window.
 /// Example:
 /// ```
@@ -81,16 +87,27 @@ pub fn scrollingProgress(scrolled_lines: usize, area_height: usize, max_scroll_c
 ///═══════════════════════════════════════
 ///                                Close
 /// ```
-pub fn notification(alloc: std.mem.Allocator, message: []const u8) !ModalWindow(TextArea) {
+pub fn notification(
+    alloc: std.mem.Allocator,
+    message: []const u8,
+    opts: NotificationOptions,
+) !ModalWindow(TextArea) {
     var text_area: TextArea = .empty;
     var itr = std.mem.splitScalar(u8, message, '\n');
     while (itr.next()) |msg_line| {
         const line = try text_area.addEmptyLine(alloc);
         const width = g.DISPLAY_COLS - 2;
-        const pad = p.diff(usize, msg_line.len, width) / 2;
+        const pad = switch (opts.text_align) {
+            .left => 0,
+            .center => p.diff(usize, msg_line.len, width) / 2,
+            .right => p.diff(usize, msg_line.len, width),
+        };
         _ = try std.fmt.bufPrint(line[pad..], "{s}", .{msg_line});
     }
-    return .defaultModalWindow(text_area);
+    if (opts.title.len > 0)
+        return .modalWindowWithTitle(opts.title, text_area, opts.max_region)
+    else
+        return .modalWindow(text_area, opts.max_region);
 }
 
 /// Approximate example:
@@ -106,23 +123,21 @@ pub fn notification(alloc: std.mem.Allocator, message: []const u8) !ModalWindow(
 ///═══════════════════════════════════════
 ///                                Close
 /// ```
-pub fn entityDescription(args: struct {
+pub fn entityDescription(
     alloc: std.mem.Allocator,
     session: *const g.GameSession,
     entity: g.Entity,
-    max_region: ?p.Region = null,
-}) !ModalWindow(TextArea) {
+) !ModalWindow(TextArea) {
     var area: TextArea = .empty;
-    if (args.session.player.id == args.entity.id) {
-        try g.descriptions.describePlayer(args.alloc, args.session.journal, args.entity, &area);
+    if (session.player.id == entity.id) {
+        try g.descriptions.describePlayer(alloc, session.journal, entity, &area);
     } else {
-        try g.descriptions.describeEntity(args.alloc, args.session.journal, args.entity, &area);
+        try g.descriptions.describeEntity(alloc, session.journal, entity, &area);
     }
-    var window = if (args.max_region) |mr|
-        w.ModalWindow(TextArea).modalWindow(area, mr)
-    else
-        w.ModalWindow(TextArea).defaultModalWindow(area);
-    window.title_len = (try g.descriptions.printName(&window.title_buffer, args.session.journal, args.entity)).len;
+    // A modal window with an entity description should always have the maximal possible width,
+    // because all descriptions have fixed length lines
+    var window = w.ModalWindow(TextArea).defaultModalWindow(area);
+    window.title_len = (try g.descriptions.printName(&window.title_buffer, session.journal, entity)).len;
     return window;
 }
 
@@ -140,5 +155,5 @@ pub fn options(
     comptime Item: type,
     owner: *anyopaque,
 ) ModalWindow(OptionsArea(Item)) {
-    return .{ .content = OptionsArea(Item).init(owner, .center) };
+    return .{ .scrollable_area = OptionsArea(Item).init(owner, .center) };
 }

@@ -555,7 +555,7 @@ const TargetsIterator = struct {
 };
 
 fn windowWithQuickActions(self: *Self) !w.ModalWindow(w.OptionsArea(void)) {
-    var area = w.OptionsArea(void).center(self);
+    var area = w.OptionsArea(void).centered(self);
     for (self.quick_actions.actions.items, 0..) |qa, idx| {
         try area.addOption(self.arena.allocator(), qa.toString(), {}, chooseEntity, null);
         if (idx == self.quick_actions.selected_idx)
@@ -564,8 +564,9 @@ fn windowWithQuickActions(self: *Self) !w.ModalWindow(w.OptionsArea(void)) {
     return .defaultModalWindow(area);
 }
 
-fn chooseEntity(ptr: *anyopaque, line_idx: usize, _: void) anyerror!void {
+fn chooseEntity(ptr: *anyopaque, line_idx: usize, _: void) anyerror!bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     self.quick_actions.selected_idx = line_idx;
     log.debug("Choosen option {d}: {t}", .{ line_idx, self.quickAction() });
+    return false;
 }

@@ -12,16 +12,16 @@ test "Describe an item" {
     try options.choose("Describe");
 
     try test_session.runtime.display.expectLooksLike(
-        \\╔══════════════════════════════════════╗
-        \\║┌───────────────Torch────────────────┐║
-        \\║│ Wooden handle, cloth wrap, burning▒│║
-        \\║│ flame. Lasts until the  fire dies.░│║
-        \\║│ It can be  used as a weapon out of░│║
-        \\║│ despair.                          ░│║
-        \\║│                                   ░│║
-        \\║│ This is a primitive weapon.       ░│║
-        \\║└────────────────────────────────────┘║
-        \\╚══════════════════════════════════════╝
+        \\┌────────────────Torch─────────────────┐
+        \\│ Wooden handle, cloth wrap, burning  ▒│
+        \\│ flame. Lasts until the  fire dies.  ░│
+        \\│ It can be  used as a weapon out of  ░│
+        \\│ despair.                            ░│
+        \\│                                     ░│
+        \\│ This is a primitive weapon.         ░│
+        \\│ Damage:                             ░│
+        \\│   physical 1                        ░│
+        \\└──────────────────────────────────────┘
     , .game_area);
 }
 
@@ -36,16 +36,16 @@ test "Describe an unknown potion" {
     try options.choose("Describe");
 
     try test_session.runtime.display.expectLooksLike(
-        \\╔══════════════════════════════════════╗
-        \\║┌───────────A green potion───────────┐║
-        \\║│ A swirling liquid of green color  ▒│║
-        \\║│ rests in a vial.                  ░│║
-        \\║│                                   ░│║
-        \\║│ Effects:                          ░│║
-        \\║│     ?                             ░│║
-        \\║│ Calories: 10                      ░│║
-        \\║└────────────────────────────────────┘║
-        \\╚══════════════════════════════════════╝
+        \\┌────────────A green potion────────────┐
+        \\│ A swirling liquid of green color     │
+        \\│ rests in a vial.                     │
+        \\│                                      │
+        \\│ Effects:                             │
+        \\│     ?                                │
+        \\│ Calories: 10                         │
+        \\│                                      │
+        \\│ Weight: 10                           │
+        \\└──────────────────────────────────────┘
     , .game_area);
 }
 
@@ -67,16 +67,16 @@ test "Describe a known potion (after drinking a similar)" {
     try options.choose("Describe");
 
     try test_session.runtime.display.expectLooksLike(
-        \\╔══════════════════════════════════════╗
-        \\║┌──────────A healing potion──────────┐║
-        \\║│ A brew that glows faintly, as if  ▒│║
-        \\║│ mends alive. It warms your veins  ░│║
-        \\║│ and your wounds instantly.        ░│║
-        \\║│                                   ░│║
-        \\║│ Effects:                          ░│║
-        \\║│   heal 20-25                      ░│║
-        \\║└────────────────────────────────────┘║
-        \\╚══════════════════════════════════════╝
+        \\┌───────────A healing potion───────────┐
+        \\│ A brew that glows faintly, as if    ▒│
+        \\│ mends alive. It warms your veins    ░│
+        \\│ and your wounds instantly.          ░│
+        \\│                                     ░│
+        \\│ Effects:                            ░│
+        \\│   heal 20-25                        ░│
+        \\│ Calories: 10                        ░│
+        \\│                                     ░│
+        \\└──────────────────────────────────────┘
     , .game_area);
 }
 

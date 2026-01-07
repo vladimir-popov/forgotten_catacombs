@@ -378,12 +378,12 @@ fn applyEffect(
     actor: g.Entity,
     source: g.Entity,
     effect_type: c.Effects.Type,
-    effect_range: p.Range,
+    effect_range: p.Range(u8),
     target: g.Entity,
     target_armor: *const c.Protection,
     target_health: *c.Health,
 ) !bool {
-    const target_defence: p.Range = target_armor.resistance.get(effect_type) orelse .zeros;
+    const target_defence: p.Range(u8) = target_armor.resistance.get(effect_type) orelse .zeros;
     switch (effect_type) {
         .physical => {
             const weapon_class =

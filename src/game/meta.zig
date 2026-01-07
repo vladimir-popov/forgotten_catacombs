@@ -141,7 +141,7 @@ pub fn fillShop(shop: *c.Shop, registry: *g.Registry, seed: u64) !void {
         const entity = try registry.addNewEntity(item.*);
         // Randomly modify a weapon:
         if (registry.has(entity, c.Weapon) and rand.uintAtMost(u8, 100) < 15) {
-            try modifyWeapon(registry, rand, entity, -5, 5);
+            try modifyWeapon(registry, rand, entity, -5, 5, null);
         }
         try shop.items.add(entity);
     }
@@ -157,19 +157,27 @@ const weighted_index: [c.Effects.TypesCount]u8 = blk: {
     break :blk wi;
 };
 
-/// Applies a random modification value from the range [`min`, `max`] using the weighted index:
+/// Applies a random modification value from the range [`min`, `max`] to the passed effect type,
+/// or chooses it randomly using the weighted index:
 ///   - physical = 20;
-///   - fire = 8;
 ///   - poison = 10;
+///   - fire = 8;
 ///   - acid = 5;
-pub fn modifyWeapon(registry: *g.Registry, rand: std.Random, weapon: g.Entity, min: i8, max: i8) !void {
+pub fn modifyWeapon(
+    registry: *g.Registry,
+    rand: std.Random,
+    weapon: g.Entity,
+    min: i8,
+    max: i8,
+    effect_type: ?c.Effects.Type,
+) !void {
     try registry.set(weapon, c.Sprite{ .codepoint = g.codepoints.weapon_melee_unknown });
-    const effect_type = rand.weightedIndex(u8, &weighted_index);
     const value = rand.intRangeAtMost(i8, min, max);
+    const effect_idx = if (effect_type) |et| @intFromEnum(et) else rand.weightedIndex(u8, &weighted_index);
     const modification = try registry.getOrSet(weapon, c.Modification, .{ .modificators = .initFull(0) });
-    modification.modificators.values[effect_type] +|= value;
+    modification.modificators.values[effect_idx] +|= value;
     log.debug(
         "Add modificator {t} = {d} for {d}",
-        .{ @as(c.Effects.Type, @enumFromInt(effect_type)), value, weapon.id },
+        .{ @as(c.Effects.Type, @enumFromInt(effect_idx)), value, weapon.id },
     );
 }

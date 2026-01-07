@@ -7,7 +7,7 @@ const w = g.windows;
 const log = std.log.scoped(.windows);
 
 /// The aria provides scrolling functionality to another inner aria.
-pub fn ScrollableAre(comptime Area: type) type {
+pub fn ScrollableArea(comptime Area: type) type {
     return struct {
         const Self = @This();
 
@@ -31,18 +31,20 @@ pub fn ScrollableAre(comptime Area: type) type {
             return self.content.totalLines() -| (self.region.rows);
         }
 
-        /// Returns a label for the right button handled by the content, 
+        /// Returns a label for the right button handled by the content,
         /// or null if the content doesn't handle the right button.
         pub fn button(self: Self) ?struct { []const u8, bool } {
             return self.content.button();
         }
 
-        pub fn handleButton(self: *Self, btn: g.Button) !void {
-            try self.content.handleButton(btn);
-            if (!self.isScrollRequired()) return;
+        pub fn handleButton(self: *Self, btn: g.Button) !bool {
+            if (try self.content.handleButton(btn))
+                return true;
+
+            if (!self.isScrollRequired()) return false;
             if (self.content.selectedLine()) |selected_line| {
                 if (self.region.rows + self.scrolled_lines > selected_line and selected_line >= self.scrolled_lines)
-                    return;
+                    return false;
             }
 
             switch (btn.game_button) {
@@ -56,6 +58,7 @@ pub fn ScrollableAre(comptime Area: type) type {
                 },
                 else => {},
             }
+            return false;
         }
 
         pub fn draw(self: *const Self, render: g.Render) !void {

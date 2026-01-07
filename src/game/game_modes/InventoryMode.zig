@@ -153,12 +153,12 @@ fn tabWithDrop(self: *Self) ?*w.WindowWithTabs.Tab {
 
 pub fn updateInventoryTab(self: *Self) !void {
     const tab = self.tabWithInventory();
-    const selected_line = tab.area.content.selected_line;
-    tab.area.content.clearRetainingCapacity();
+    const selected_line = tab.scrollable_area.content.selected_line;
+    tab.scrollable_area.content.clearRetainingCapacity();
     var itr = self.inventory.items.iterator();
     while (itr.next()) |item_ptr| {
         var buffer: w.TextArea.Line = undefined;
-        try tab.area.content.addOption(
+        try tab.scrollable_area.content.addOption(
             self.alloc,
             try self.formatInventoryLine(&buffer, item_ptr.*),
             item_ptr.*,
@@ -166,11 +166,11 @@ pub fn updateInventoryTab(self: *Self) !void {
             describeSelectedItem,
         );
     }
-    if (tab.area.content.options.items.len > 0) {
-        try tab.area.content.selectLine(if (selected_line < tab.area.content.options.items.len)
+    if (tab.scrollable_area.content.options.items.len > 0) {
+        try tab.scrollable_area.content.selectLine(if (selected_line < tab.scrollable_area.content.options.items.len)
             selected_line
         else
-            tab.area.content.options.items.len - 1);
+            tab.scrollable_area.content.options.items.len - 1);
     }
 }
 
@@ -195,10 +195,10 @@ fn formatInventoryLine(self: *Self, line: *w.TextArea.Line, item: g.Entity) ![]c
     return try std.fmt.bufPrint(line, inventory_line_fmt, .{ sprite.codepoint, name, using });
 }
 
-fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Buttons is helt. Show modal window for {any}", .{item});
-    var area = w.OptionsArea(g.Entity).center(self);
+    var area = w.OptionsArea(g.Entity).centered(self);
     if (self.isEquipped(item)) {
         try area.addOption(self.alloc, "Unequip", item, unequipItem, null);
     } else {
@@ -221,6 +221,8 @@ fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     try area.addOption(self.alloc, "Drop", item, dropSelectedItem, null);
     try area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
     self.actions_window = .modalWindow(area, MODAL_WINDOW_REGION);
+    // keep the main window opened
+    return false;
 }
 
 inline fn isEquipped(self: Self, item: g.Entity) bool {
@@ -230,7 +232,7 @@ inline fn isEquipped(self: Self, item: g.Entity) bool {
         item.eql(self.equipment.ammunition);
 }
 
-fn unequipItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+fn unequipItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Unequip the item {d}. (current equipment: {any})", .{ item.id, self.equipment });
     if (item.eql(self.equipment.light))
@@ -241,16 +243,18 @@ fn unequipItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         self.equipment.ammunition = null;
 
     try self.updateInventoryTab();
+    return true;
 }
 
-fn useAsLight(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+fn useAsLight(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Use the item {d} as a source of light. (current equipment: {any})", .{ item.id, self.equipment });
     self.equipment.light = item;
     try self.updateInventoryTab();
+    return true;
 }
 
-fn useAsWeapon(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+fn useAsWeapon(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Use the item {d} as weapon. (current equipment: {any})", .{ item.id, self.equipment });
     self.equipment.weapon = item;
@@ -261,23 +265,26 @@ fn useAsWeapon(ptr: *anyopaque, _: usize, item: g.Entity) !void {
     }
 
     try self.updateInventoryTab();
+    return true;
 }
 
-fn useAsArmor(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+fn useAsArmor(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Use the item {d} as armor. (current equipment: {any})", .{ item.id, self.equipment });
     self.equipment.armor = item;
     try self.updateInventoryTab();
+    return true;
 }
 
-fn putToQuiver(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+fn putToQuiver(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Use the item {d} as an ammunition. (current equipment: {any})", .{ item.id, self.equipment });
     self.equipment.ammunition = item;
     try self.updateInventoryTab();
+    return true;
 }
 
-fn consumeItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+fn consumeItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     if (self.session.registry.get(item, c.Consumable)) |consumable| {
         log.debug("Consume the item {d} {any}. (current equipment: {any})", .{ item.id, consumable, self.equipment });
@@ -292,14 +299,16 @@ fn consumeItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         _ = self.inventory.items.remove(item);
     }
     try self.updateInventoryTab();
+    return true;
 }
 
-fn takeFromPileOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+fn takeFromPileOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    var area = w.OptionsArea(g.Entity).center(self);
+    var area = w.OptionsArea(g.Entity).centered(self);
     try area.addOption(self.alloc, "Take", item, takeSelectedItem, null);
     try area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
     self.actions_window = .modalWindow(area, MODAL_WINDOW_REGION);
+    return true;
 }
 
 fn addDropTab(self: *Self, drop: g.Entity) !void {
@@ -313,8 +322,8 @@ fn addDropTab(self: *Self, drop: g.Entity) !void {
 fn updateDropTab(self: *Self, drop: g.Entity) !void {
     self.drop = drop;
     const tab = &self.main_window.tabs[1];
-    const selected_line = tab.area.content.selected_line;
-    tab.area.content.clearRetainingCapacity();
+    const selected_line = tab.scrollable_area.content.selected_line;
+    tab.scrollable_area.content.clearRetainingCapacity();
     if (self.session.registry.get(drop, c.Pile)) |pile| {
         var itr = pile.items.iterator();
         while (itr.next()) |item_ptr| {
@@ -323,11 +332,11 @@ fn updateDropTab(self: *Self, drop: g.Entity) !void {
     } else {
         try self.addDropOption(tab, drop);
     }
-    if (tab.area.content.options.items.len > 0) {
-        try tab.area.content.selectLine(if (selected_line < tab.area.content.options.items.len)
+    if (tab.scrollable_area.content.options.items.len > 0) {
+        try tab.scrollable_area.content.selectLine(if (selected_line < tab.scrollable_area.content.options.items.len)
             selected_line
         else
-            tab.area.content.options.items.len - 1);
+            tab.scrollable_area.content.options.items.len - 1);
     }
 }
 
@@ -335,23 +344,20 @@ fn addDropOption(self: *Self, tab: *w.WindowWithTabs.Tab, item: g.Entity) !void 
     var buffer: w.TextArea.Line = undefined;
     var len = (try std.fmt.bufPrint(&buffer, "{u} ", .{self.session.registry.getUnsafe(item, c.Sprite).codepoint})).len;
     len += (try g.descriptions.printName(buffer[len..], self.session.journal, item)).len;
-    try tab.area.content.addOption(self.alloc, buffer[0..len], item, takeFromPileOrDescribe, describeSelectedItem);
+    try tab.scrollable_area.content.addOption(self.alloc, buffer[0..len], item, takeFromPileOrDescribe, describeSelectedItem);
 }
 
-fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Show info about item {d}", .{item.id});
-    self.description_window = try w.entityDescription(.{
-        .alloc = self.alloc,
-        .session = self.session,
-        .entity = item,
-        .max_region = MODAL_WINDOW_REGION,
-    });
+    self.description_window = try w.entityDescription(self.alloc, self.session, item);
+    // keep the main window opened
+    return false;
 }
 
 /// Moves an item from the inventory to the player's position on the level.
 /// Add the Drop tab
-fn dropSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+fn dropSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const place = self.session.level.playerPosition().place;
     log.debug("Drop item {d} at {any}", .{ item.id, place });
@@ -369,11 +375,12 @@ fn dropSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         try self.addDropTab(item);
     }
     try self.updateInventoryTab();
+    return true;
 }
 
 /// Moves entity from the pile to the inventory.
 /// Removes the Pile tab if the item was the last in the pile.
-fn takeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+fn takeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     try self.inventory.items.add(item);
     const entity = self.drop orelse @panic("Attempt to take an undefined item");
@@ -394,4 +401,5 @@ fn takeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
         self.main_window.removeLastTab(self.alloc);
     }
     try self.updateInventoryTab();
+    return true;
 }

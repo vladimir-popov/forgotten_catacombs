@@ -6,8 +6,9 @@ test {
     _ = @import("battle_suite.zig");
     _ = @import("description_suite.zig");
     _ = @import("inventory_suite.zig");
-    _ = @import("notifications_suite.zig");
     _ = @import("moving_suite.zig");
+    _ = @import("notifications_suite.zig");
+    _ = @import("recognize_modify_suite.zig");
     _ = @import("save_load_suite.zig");
     _ = @import("trading_suite.zig");
     _ = @import("update_target_suite.zig");

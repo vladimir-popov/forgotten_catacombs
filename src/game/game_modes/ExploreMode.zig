@@ -220,7 +220,7 @@ fn windowWithEntities(
     self: *ExploreMode,
     variants: [3]?g.Entity,
 ) !w.ModalWindow(w.OptionsArea(g.Entity)) {
-    var area = w.OptionsArea(g.Entity).center(self);
+    var area = w.OptionsArea(g.Entity).centered(self);
     for (variants) |maybe_entity| {
         if (maybe_entity) |entity| {
             var buf: [32]u8 = undefined;
@@ -239,16 +239,17 @@ fn windowWithEntities(
     return .defaultModalWindow(area);
 }
 
-fn showEntityDescription(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!void {
+fn showEntityDescription(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!bool {
     const self: *ExploreMode = @ptrCast(@alignCast(ptr));
     self.entity_in_focus = entity;
     self.description_window = try self.windowWithDescription();
+    return false;
 }
 
 fn windowWithDescription(self: *ExploreMode) !w.ModalWindow(w.TextArea) {
-    return try w.entityDescription(.{
-        .alloc = self.arena.allocator(),
-        .session = self.session,
-        .entity = self.entity_in_focus,
-    });
+    return try w.entityDescription(
+        self.arena.allocator(),
+        self.session,
+        self.entity_in_focus,
+    );
 }

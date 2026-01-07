@@ -3,8 +3,6 @@ const std = @import("std");
 const g = @import("../game_pkg.zig");
 const p = g.primitives;
 
-const DijkstraMap = @This();
-
 pub const Vector = struct { direction: p.Direction, distance: u8 };
 pub const VectorsMap = std.AutoHashMapUnmanaged(p.Point, Vector);
 
@@ -54,7 +52,7 @@ pub fn calculate(
 pub fn dumpToLog(map: VectorsMap, region: p.Region) void {
     var buf: [2048]u8 = [_]u8{0} ** 2048;
     var writer = std.Io.Writer.fixed(&buf);
-    DijkstraMap.write(map, &writer, region) catch unreachable;
+    write(map, &writer, region) catch unreachable;
     std.log.debug("Dijkstra Map ({any}):\n{s}", .{ region, writer.buffered() });
 }
 
@@ -108,11 +106,11 @@ test "vectors for the middle of the empty region 5x5" {
 
     var map: VectorsMap = .empty;
     defer map.deinit(std.testing.allocator);
-    try DijkstraMap.calculate(std.testing.allocator, &map, region, obstacles, .{ .row = 3, .col = 3 });
+    try calculate(std.testing.allocator, &map, region, obstacles, .{ .row = 3, .col = 3 });
 
     var buf: [512]u8 = [1]u8{0} ** 512;
     var writer = std.Io.Writer.fixed(&buf);
-    try DijkstraMap.write(map, &writer, region);
+    try write(map, &writer, region);
     const expected =
         \\   |  1|  2|  3|  4|  5|
         \\  1|> 4|> 3|v 2|v 3|v 4|
@@ -145,11 +143,11 @@ test "vectors for the region with obstacles" {
     };
     var map: VectorsMap = .empty;
     defer map.deinit(std.testing.allocator);
-    try DijkstraMap.calculate(std.testing.allocator, &map, region, obstacles, .{ .row = 3, .col = 3 });
+    try calculate(std.testing.allocator, &map, region, obstacles, .{ .row = 3, .col = 3 });
 
     var buf: [512]u8 = [1]u8{0} ** 512;
     var writer = std.Io.Writer.fixed(&buf);
-    try DijkstraMap.write(map, &writer, region);
+    try write(map, &writer, region);
     const expected =
         \\   |  1|  2|  3|  4|  5|
         \\  1|v 8|? 0|v 2|v 3|v 4|

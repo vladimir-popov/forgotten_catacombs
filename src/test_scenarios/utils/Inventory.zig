@@ -27,25 +27,25 @@ pub fn close(self: Self) !void {
 /// If the item was found, the button is pressed and Options available for the item is returned.
 pub fn chooseItemByName(self: Self, name: []const u8) !Options {
     const options = Options{
-        .options_area = &self.inventoryMode().main_window.activeTab().area.content,
+        .options_area = &self.inventoryMode().main_window.activeTab().scrollable_area.content,
         .test_session = self.test_session,
     };
     try options.choose(name);
     return .{
         .test_session = self.test_session,
-        .options_area = &self.inventoryMode().actions_window.?.content.content,
+        .options_area = &self.inventoryMode().actions_window.?.scrollable_area.content,
     };
 }
 
 pub fn chooseItemById(self: Self, item: g.Entity) !Options {
     const options = Options{
-        .options_area = &self.inventoryMode().main_window.activeTab().area.content,
+        .options_area = &self.inventoryMode().main_window.activeTab().scrollable_area.content,
         .test_session = self.test_session,
     };
     try options.chooseById(item);
     return .{
         .test_session = self.test_session,
-        .options_area = &self.inventoryMode().actions_window.?.content.content,
+        .options_area = &self.inventoryMode().actions_window.?.scrollable_area.content,
     };
 }
 

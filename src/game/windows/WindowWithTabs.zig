@@ -38,10 +38,10 @@ pub const CONTENT_AREA_REGION: p.Region = .{
 
 pub const Tab = struct {
     title: []const u8,
-    area: w.ScrollableAre(w.OptionsArea(g.Entity)),
+    scrollable_area: w.ScrollableArea(w.OptionsArea(g.Entity)),
 
     fn deinit(self: *Tab, alloc: std.mem.Allocator) void {
-        self.area.deinit(alloc);
+        self.scrollable_area.deinit(alloc);
         self.title = undefined;
     }
 };
@@ -64,7 +64,7 @@ pub fn addTab(self: *Self, title: []const u8, context: *anyopaque) void {
     std.debug.assert(self.tabs_count < MAX_TABS);
     self.tabs[self.tabs_count] = .{
         .title = title,
-        .area = .init(w.OptionsArea(g.Entity).init(context, .left), CONTENT_AREA_REGION),
+        .scrollable_area = .init(w.OptionsArea(g.Entity).init(context, .left), CONTENT_AREA_REGION),
     };
     self.tabs_count += 1;
 }
@@ -85,9 +85,11 @@ pub fn activeTab(self: *Self) *Tab {
 /// true means the window should be closed
 pub fn handleButton(self: *Self, btn: g.Button) !bool {
     const tab = &self.tabs[self.active_tab_idx];
-    try tab.area.handleButton(btn);
+    if (try tab.scrollable_area.handleButton(btn))
+        return true;
+
     switch (btn.game_button) {
-        .a => return tab.area.button() == null,
+        .a => return tab.scrollable_area.button() == null,
         .b => return true,
         .left => if (self.active_tab_idx > 0) {
             self.active_tab_idx -= 1;
@@ -150,10 +152,10 @@ pub fn draw(self: Self, render: g.Render) !void {
     );
 
     // Draw the content
-    try self.tabs[self.active_tab_idx].area.draw(render);
+    try self.tabs[self.active_tab_idx].scrollable_area.draw(render);
 
     // Draw buttons
-    if (self.tabs[self.active_tab_idx].area.button()) |button| {
+    if (self.tabs[self.active_tab_idx].scrollable_area.button()) |button| {
         try render.drawRightButton(button[0], button[1]);
         try render.drawLeftButton("Close", false);
     } else {

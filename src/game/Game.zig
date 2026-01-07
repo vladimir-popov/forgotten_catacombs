@@ -92,7 +92,7 @@ pub fn deinit(self: *Self) void {
 pub fn tick(self: *Self) !void {
     switch (self.state) {
         .welcome => if (try self.runtime.readPushedButtons()) |btn| {
-            try self.state.welcome.menu.handleButton(btn);
+            _ = try self.state.welcome.menu.handleButton(btn);
             if (btn.game_button.isMove())
                 try self.state.welcome.menu.draw(self.render, WelcomeScreen.MENU_REGION, 0);
         },
@@ -148,7 +148,7 @@ pub fn welcome(self: *Self) !void {
     try self.drawWelcomeScreen();
 }
 
-fn newGame(ptr: *anyopaque, _: usize, _: void) !void {
+fn newGame(ptr: *anyopaque, _: usize, _: void) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     std.debug.assert(self.state == .welcome);
     self.state.welcome.menu.deinit(self.gpa);
@@ -156,6 +156,7 @@ fn newGame(ptr: *anyopaque, _: usize, _: void) !void {
     self.state = .{ .create_character = undefined };
     try self.state.create_character.init(self.gpa);
     try self.state.create_character.draw(self.render);
+    return false;
 }
 
 fn startGameSession(self: *Self, stats: c.Stats, skills: c.Skills, health: c.Health) !void {
@@ -173,7 +174,7 @@ fn startGameSession(self: *Self, stats: c.Stats, skills: c.Skills, health: c.Hea
     );
 }
 
-fn continueGame(ptr: *anyopaque, _: usize, _: void) !void {
+fn continueGame(ptr: *anyopaque, _: usize, _: void) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     std.debug.assert(self.state == .welcome);
     self.state.welcome.menu.deinit(self.gpa);
@@ -185,9 +186,12 @@ fn continueGame(ptr: *anyopaque, _: usize, _: void) !void {
         self.render,
     );
     try self.state.game_session.switchModeToLoadingSession();
+    return false;
 }
 
-fn showAbout(_: *anyopaque, _: usize, _: void) !void {}
+fn showAbout(_: *anyopaque, _: usize, _: void) !bool {
+    return false;
+}
 
 fn initSideMenu(self: *Self) void {
     _ = self.runtime.addMenuItem("Inventory", self, openInventory);

@@ -23,7 +23,7 @@ const log = std.log.scoped(.windows);
 
 /// A maximal region which can be occupied by the modal window.
 /// This region includes a space for borders.
-const DEFAULT_MAX_REGION: p.Region = p.Region.init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS);
+pub const DEFAULT_MAX_REGION: p.Region = p.Region.init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS);
 
 pub fn ModalWindow(comptime Area: type) type {
     return struct {
@@ -31,7 +31,7 @@ pub fn ModalWindow(comptime Area: type) type {
 
         title_buffer: [32]u8 = undefined,
         title_len: usize = 0,
-        content: w.ScrollableAre(Area),
+        scrollable_area: w.ScrollableArea(Area),
         /// An actual region occupied by this window (including borders)
         region: p.Region,
 
@@ -41,7 +41,19 @@ pub fn ModalWindow(comptime Area: type) type {
 
         pub fn modalWindow(content: Area, max_region: p.Region) Self {
             const region = calculateOccupiedRegion(content, max_region);
-            return .{ .content = .init(content, region.innerRegion(1, 1, 1, 1)), .region = region };
+            return .{ .scrollable_area = .init(content, region.innerRegion(1, 1, 1, 1)), .region = region };
+        }
+
+        pub fn modalWindowWithTitle(window_title: []const u8, content: Area, max_region: p.Region) Self {
+            var title_buffer: [32]u8 = undefined;
+            @memcpy(title_buffer[0..window_title.len], window_title);
+            const region = calculateOccupiedRegion(content, max_region);
+            return .{
+                .title_buffer = title_buffer,
+                .title_len = window_title.len,
+                .scrollable_area = .init(content, region.innerRegion(1, 1, 1, 1)),
+                .region = region,
+            };
         }
 
         fn calculateOccupiedRegion(content: Area, max_region: p.Region) p.Region {
@@ -58,22 +70,26 @@ pub fn ModalWindow(comptime Area: type) type {
         }
 
         pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
-            self.content.deinit(alloc);
+            self.scrollable_area.deinit(alloc);
         }
 
         inline fn title(self: Self) []const u8 {
             return self.title_buffer[0..self.title_len];
         }
 
-        /// Returns true if the 'close' button was pressed.
+        /// Returns true if the 'close' button was pressed, or the content requires closing after
+        /// handling the button.
         pub fn handleButton(self: *Self, btn: g.Button) !bool {
-            try self.content.handleButton(btn);
+            if (try self.scrollable_area.handleButton(btn))
+                return true;
+
             switch (btn.game_button) {
-                // pressing the right button is always lead to closing the window
-                .a => return true,
                 // if the aria has a special handler for the right button, then
-                // the left is 'Close' button
-                .b => return self.content.button() != null,
+                // pressing the right button should be handled by the content, or lead to closing
+                // this window
+                .a => return self.scrollable_area.button() == null,
+                // ...otherwise the left is 'Close' button
+                .b => return self.scrollable_area.button() != null,
                 else => {},
             }
             return false;
@@ -96,9 +112,9 @@ pub fn ModalWindow(comptime Area: type) type {
                 point.move(.right);
             }
             // Draw the content
-            try self.content.draw(render);
+            try self.scrollable_area.draw(render);
             // Draw buttons
-            if (self.content.button()) |button| {
+            if (self.scrollable_area.button()) |button| {
                 try render.drawRightButton(button[0], button[1]);
                 try render.drawLeftButton("Close", false);
             } else {

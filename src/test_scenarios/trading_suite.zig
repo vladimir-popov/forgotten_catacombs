@@ -46,7 +46,7 @@ test "Buy something" {
     try std.testing.expect(items_after > items_before);
 }
 
-test "Trying to buy when not enough money" {
+test "Trying to buy when NOT enough money" {
     // given:
     var test_session: TestSession = undefined;
     const shop = try initNearShopWithMoney(&test_session, 0);
@@ -65,10 +65,10 @@ test "Trying to buy when not enough money" {
         \\╔═══════════════════╗══════════════════╗
         \\║        Buy        ║      Sell        ║
         \\║                   ╚══════════════════║
-        \\┌──────────────────────────────────────┐
-        \\│          You have not enough         │
-        \\│                 money.               │
-        \\└──────────────────────────────────────┘
+        \\║┌────────────────────────────────────┐║
+        \\║│          You have not enough       │║
+        \\║│                 money.             │║
+        \\║└────────────────────────────────────┘║
         \\║/ Club                           42$ ░║
         \\║\ Short bow                      75$ ░║
         \\╚══════════════════════════════════════╝
@@ -118,10 +118,10 @@ test "Trying to sell when the trader doesn't have enough money" {
         \\╔══════════════════╔═══════════════════╗
         \\║        Buy       ║       Sell        ║
         \\║══════════════════╝                   ║
-        \\┌──────────────────────────────────────┐
-        \\│          Traider doesn't have        │
-        \\│              enough money            │
-        \\└──────────────────────────────────────┘
+        \\║┌────────────────────────────────────┐║
+        \\║│          Traider doesn't have      │║
+        \\║│              enough money          │║
+        \\║└────────────────────────────────────┘║
         \\║                                      ║
         \\║                                      ║
         \\╚══════════════════════════════════════╝

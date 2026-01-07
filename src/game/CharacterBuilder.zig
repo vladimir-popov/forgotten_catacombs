@@ -114,7 +114,7 @@ const BuildingStep = union(enum) {
         stats: c.Stats,
         skills: c.Skills,
         health: c.Health,
-        description: w.ScrollableAre(w.TextArea),
+        description: w.ScrollableArea(w.TextArea),
 
         fn init(description: w.TextArea, stats: c.Stats, skills: c.Skills, health: c.Health) @This() {
             return .{
@@ -216,13 +216,13 @@ pub fn handleButton(self: *Self, btn: g.Button, render: g.Render) anyerror!?stru
         switch (btn.game_button) {
             .up, .down => switch (self.step) {
                 .archetype => |*archetype_step| {
-                    try archetype_step.handleButton(btn);
+                    _ = try archetype_step.handleButton(btn);
                 },
                 .skills => |*skill_step| {
-                    try skill_step.options.handleButton(btn);
+                    _ = try skill_step.options.handleButton(btn);
                 },
                 .confirm => |*confirm_step| {
-                    try confirm_step.description.handleButton(btn);
+                    _ = try confirm_step.description.handleButton(btn);
                 },
             },
             .left, .right => if (self.step == .skills) {

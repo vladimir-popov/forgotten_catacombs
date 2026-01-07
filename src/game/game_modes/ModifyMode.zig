@@ -6,7 +6,7 @@
 //! ║ ║   Recognize     ║       Modify      ║║
 //! ║╔╝                 ╚═══════════════════║║
 //! ║║░\░Club░░░░░░░░░░░░░░░░░░░░░░░░░░100$░║║
-//! ║║ { Bow                           200$ ║║
+//! ║║ { Bow                           100$ ║║
 //! ║║                                      ║║
 //! ║║                                      ║║
 //! ║║                                      ║║
@@ -16,6 +16,21 @@
 //! ║════════════════════════════════════════║
 //! ║    000$             Close       Choose ║
 //! ╚════════════════════════════════════════╝
+//! ╔════════════════════════════════════════╗ ╔════════════════════════════════════════╗ ╔════════════════════════════════════════╗
+//! ║ ╔═════════════════╗═══════════════════╗║ ║ ╔═════════════════╔═══════════════════╗║ ║ ╔═════════════════╗═══════════════════╗║
+//! ║ ║   Recognize     ║       Modify      ║║ ║ ║   Recognize     ║       Modify      ║║ ║ ║   Recognize     ║       Modify      ║║
+//! ║╔╝═════════════════╝                   ║║ ║╔╝═════════════════╝                   ║║ ║╔╝═════════════════╝                   ║║
+//! ║║░\░Club░░░░░░░░░░░░░░░░░░░░░░░░░░100$░║║ ║║ ┌───────────────────────────────────┐║║ ║║ ┌───────────────────────────────────┐║║
+//! ║║ { Bow                           100$ ║║ ║║ │        Describe the item          │║║ ║║ │            Physic                 │║║
+//! ║║                                      ║║ ║║ │        Modify somehow    x1       │║║ ║║ │             Fire                  │║║
+//! ║║                                      ║║ ║║ │        Modify carefully  x2       │║║ ║║ │             Acid                  │║║
+//! ║║                                      ║║ ║║ │        Modify manually   x3       │║║ ║║ │            Poison                 │║║
+//! ║║                                      ║║ ║║ │              Help                 │║║ ║║ └───────────────────────────────────┘║║
+//! ║║                                      ║║ ║║ └───────────────────────────────────┘║║ ║║                                      ║║
+//! ║╚══════════════════════════════════════╝║ ║╚══════════════════════════════════════╝║ ║╚══════════════════════════════════════╝║
+//! ║════════════════════════════════════════║ ║════════════════════════════════════════║ ║════════════════════════════════════════║
+//! ║    000$             Close       Choose ║ ║    000$             Close       Choose ║ ║    000$             Close       Choose ║
+//! ╚════════════════════════════════════════╝ ╚════════════════════════════════════════╝ ╚════════════════════════════════════════╝
 //! ```
 const std = @import("std");
 const g = @import("../game_pkg.zig");
@@ -25,7 +40,7 @@ const w = g.windows;
 
 const log = std.log.scoped(.modify_mode);
 
-const MODAL_WINDOW_REGION: p.Region = p.Region.init(2, 2, g.DISPLAY_ROWS - 4, g.DISPLAY_COLS - 2);
+const MODAL_WINDOW_REGION: p.Region = p.Region.init(3, 2, g.DISPLAY_ROWS - 5, g.DISPLAY_COLS - 2);
 const BASE_MODIFICATION_PRICE = 100;
 const RECOGNITION_PRICE = 100;
 
@@ -75,14 +90,14 @@ pub fn tick(self: *Self) !void {
         if (self.modal_window) |*window| {
             if (try window.handleButton(btn)) {
                 log.debug("Close modal window", .{});
-                try window.hide(self.session.render, .fill_region);
+                try self.main_window.draw(self.session.render);
                 window.deinit(self.alloc);
                 self.modal_window = null;
             }
         } else if (self.actions_window) |*window| {
             if (try window.handleButton(btn)) {
                 log.debug("Close actions window", .{});
-                try window.hide(self.session.render, .fill_region);
+                try self.main_window.draw(self.session.render);
                 window.deinit(self.alloc);
                 self.actions_window = null;
             }
@@ -107,18 +122,18 @@ inline fn tabModify(self: *Self) *w.WindowWithTabs.Tab {
 
 pub fn updateTabs(self: *Self) !void {
     const active_tab = self.main_window.activeTab();
-    const selected_line = active_tab.area.content.selected_line;
+    const selected_line = active_tab.scrollable_area.content.selected_line;
 
-    self.tabRecognize().area.content.clearRetainingCapacity();
-    self.tabModify().area.content.clearRetainingCapacity();
+    self.tabRecognize().scrollable_area.content.clearRetainingCapacity();
+    self.tabModify().scrollable_area.content.clearRetainingCapacity();
     var itr = self.inventory.items.iterator();
     while (itr.next()) |item_ptr| {
         const item = item_ptr.*;
-        var buffer: w.TextArea.Line = undefined;
+        var buffer: [w.WindowWithTabs.CONTENT_AREA_REGION.cols + 4]u8 = undefined;
         if (self.session.journal.isKnown(item)) {
             if (self.canBeModified(item)) {
                 const price = self.calculateModificationPrice(item);
-                try self.tabModify().area.content.addOption(
+                try self.tabModify().scrollable_area.content.addOption(
                     self.alloc,
                     try self.formatLine(&buffer, item, price),
                     item,
@@ -127,7 +142,7 @@ pub fn updateTabs(self: *Self) !void {
                 );
             }
         } else {
-            try self.tabRecognize().area.content.addOption(
+            try self.tabRecognize().scrollable_area.content.addOption(
                 self.alloc,
                 try self.formatLine(&buffer, item, RECOGNITION_PRICE),
                 item,
@@ -136,26 +151,26 @@ pub fn updateTabs(self: *Self) !void {
             );
         }
     }
-    if (active_tab.area.content.options.items.len > 0) {
-        try active_tab.area.content.selectLine(
-            if (selected_line < active_tab.area.content.options.items.len)
+    if (active_tab.scrollable_area.content.options.items.len > 0) {
+        try active_tab.scrollable_area.content.selectLine(
+            if (selected_line < active_tab.scrollable_area.content.options.items.len)
                 selected_line
             else
-                active_tab.area.content.options.items.len - 1,
+                active_tab.scrollable_area.content.options.items.len - 1,
         );
     }
 }
 
 const line_fmt = std.fmt.comptimePrint(
-    "{{s:<{d}}}{{d:4}}$",
-    .{w.WindowWithTabs.CONTENT_AREA_REGION.cols - 7}, // "0000$".len == 5 + 2 for pads
+    "{{u}} {{s:<{d}}}{{d:4}}$",
+    .{w.WindowWithTabs.CONTENT_AREA_REGION.cols - 8}, // "{u} ".len == 2 + "0000$".len == 5 + 1 for the right pad
 );
 
-fn formatLine(self: *Self, line: *w.TextArea.Line, item: g.Entity, price: u16) ![]const u8 {
-    const description = self.session.registry.getUnsafe(item, c.Description);
-    const name = g.presets.Descriptions.get(description.preset).name;
-    log.debug("fromat line: {d}: {u}({d}) {s} {s}", .{ item.id, name, price });
-    return try std.fmt.bufPrint(line, line_fmt, .{ name, price });
+fn formatLine(self: *Self, buffer: []u8, item: g.Entity, price: u16) ![]const u8 {
+    const sprite = self.session.registry.getUnsafe(item, c.Sprite);
+    var name_buf: [24]u8 = undefined;
+    const name = try g.descriptions.printName(&name_buf, self.session.journal, item);
+    return try std.fmt.bufPrint(buffer, line_fmt, .{ sprite.codepoint, name, price });
 }
 
 fn calculateModificationPrice(self: Self, item: g.Entity) u16 {
@@ -183,54 +198,134 @@ inline fn canBeModified(self: *Self, item: g.Entity) bool {
     return self.session.registry.has(item, c.Weapon) or self.session.registry.has(item, c.Protection);
 }
 
-fn recognizeDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+fn recognizeDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    var area = w.OptionsArea(g.Entity).center(self);
+    var area = w.OptionsArea(g.Entity).centered(self);
     try area.addOption(self.alloc, "Recognize", item, recognizeItem, null);
     try area.addOption(self.alloc, "Describe", item, describeItem, null);
     self.actions_window = .modalWindow(area, MODAL_WINDOW_REGION);
+    // keep the main window opened
+    return false;
 }
 
-fn recognizeItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+fn recognizeItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    if (self.session.registry.has(item, c.Weapon))
-        try self.session.journal.markWeaponAsKnown(item)
-    else if (self.session.registry.has(item, c.Protection))
-        try self.session.journal.markArmorAsKnown(item)
-    else if (g.meta.getPotionType(&self.session.registry, item)) |potion_type|
-        try self.session.journal.markPotionAsKnown(potion_type);
+    const wallet = self.session.registry.getUnsafe(self.session.player, c.Wallet);
+    if (wallet.money > RECOGNITION_PRICE) {
+        if (self.session.registry.has(item, c.Weapon))
+            try self.session.journal.markWeaponAsKnown(item)
+        else if (self.session.registry.has(item, c.Protection))
+            try self.session.journal.markArmorAsKnown(item)
+        else if (g.meta.getPotionType(&self.session.registry, item)) |potion_type|
+            try self.session.journal.markPotionAsKnown(potion_type);
 
-    try self.updateTabs();
+        wallet.money -= RECOGNITION_PRICE;
+        try self.updateTabs();
+    } else {
+        self.modal_window = try w.notification(
+            self.alloc,
+            "You have not enough\nmoney.",
+            .{ .max_region = MODAL_WINDOW_REGION },
+        );
+    }
+    return true;
 }
 
-fn modifyDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+fn modifyDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    var area = w.OptionsArea(g.Entity).center(self);
-    try area.addOption(self.alloc, "Modify", item, modifyItem, null);
-    try area.addOption(self.alloc, "Describe", item, describeItem, null);
+    var area = w.OptionsArea(g.Entity).centered(self);
+    try area.addOption(self.alloc, "Describe the item", item, describeItem, null);
+    try area.addOption(self.alloc, " Modify somehow   x1$", item, modifySomehow, null);
+    try area.addOption(self.alloc, " Modify carefully x2$", item, modifyCarefully, null);
+    try area.addOption(self.alloc, " Modify manually  x3$", item, modifyManually, null);
+    try area.addOption(self.alloc, "Help", item, showHelp, null);
     self.actions_window = .modalWindow(area, MODAL_WINDOW_REGION);
+    // keep the main window opened
+    return false;
 }
 
-fn modifyItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+fn showHelp(ptr: *anyopaque, _: usize, _: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
+    self.modal_window = try w.notification(
+        self.alloc,
+        \\The  damage of  the chosen weapon
+        \\or  the  protection  provided  by  
+        \\armor will be altered. The  final 
+        \\outcome     depends    on     how
+        \\carefully  the   modification  is 
+        \\performed.
+        \\
+        \\An arbitrary  modification  has a 
+        \\50%    chance  of  worsening  the 
+        \\effect.
+        \\
+        \\A  careful  modification  reduces 
+        \\this risk to 10%.
+        \\
+        \\A manual modification allows  you  
+        \\to  choose  the  specific  effect 
+        \\that is guaranteed to be improved
+        \\
+        \\Every   additional   modification 
+        \\makes the next one more expensive
+    ,
+        .{ .title = "Help", .max_region = MODAL_WINDOW_REGION, .text_align = .left },
+    );
+    return false;
+}
+
+fn modifySomehow(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    try self.modify(item, 50, null);
+    return true;
+}
+
+fn modifyCarefully(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    try self.modify(item, 10, null);
+    return true;
+}
+fn modifyManually(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    const options = &self.actions_window.?.scrollable_area.content;
+    log.debug("Show the list of possible effects", .{});
+    options.clearRetainingCapacity();
+    for (0..c.Effects.TypesCount) |idx| {
+        const effect_type: c.Effects.Type = @enumFromInt(idx);
+        if (effect_type == .heal) continue;
+        try options.addOption(self.alloc, @tagName(effect_type), item, modifyManuallyEffect, null);
+    }
+    // Do not close the action_window, because we recreate it here
+    return false;
+}
+
+fn modifyManuallyEffect(ptr: *anyopaque, idx: usize, item: g.Entity) !bool {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    const effect_type: c.Effects.Type = @enumFromInt(idx);
+    try self.modify(item, 0, effect_type);
+    return true;
+}
+
+fn modify(self: *Self, item: g.Entity, worsen_chance: u8, effect_type: ?c.Effects.Type) !void {
     var prng = std.Random.DefaultPrng.init(self.session.seed);
+    const rand = prng.random();
+    const range: p.Range(i8) = if (worsen_chance > 0 and rand.uintAtMost(u8, 100) < worsen_chance)
+        .range(-5, -1)
+    else
+        .range(1, 5);
     if (self.session.registry.has(item, c.Weapon)) {
-        try g.meta.modifyWeapon(&self.session.registry, prng.random(), item, 1, 5);
+        try g.meta.modifyWeapon(&self.session.registry, prng.random(), item, range.min, range.max, effect_type);
         try self.session.journal.forgetWeapon(item);
     }
     // TODO: Modify an armor
     try self.updateTabs();
 }
 
-fn describeItem(ptr: *anyopaque, _: usize, item: g.Entity) !void {
+fn describeItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Show info about item {d}", .{item.id});
-    self.modal_window = try w.entityDescription(.{
-        .alloc = self.alloc,
-        .session = self.session,
-        .entity = item,
-        .max_region = MODAL_WINDOW_REGION,
-    });
+    self.modal_window = try w.entityDescription(self.alloc, self.session, item);
+    return false;
 }
 
 fn draw(self: *Self) !void {
@@ -243,8 +338,8 @@ fn draw(self: *Self) !void {
     } else {
         log.debug("Draw the main window tab {d}", .{self.main_window.active_tab_idx});
         try self.main_window.draw(self.session.render);
-        var buf: [10]u8 = undefined;
+        var buf: [20]u8 = undefined;
         const money = self.session.registry.getUnsafe(self.session.player, c.Wallet).money;
-        try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "{d}$", .{money}));
+        try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "Your money: {d:4}$", .{money}));
     }
 }

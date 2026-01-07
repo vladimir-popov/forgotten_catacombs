@@ -14,7 +14,7 @@ pub const std_options: std.Options = .{
         .{ .scope = .default, .level = .debug },
         .{ .scope = .cheats, .level = .debug },
         .{ .scope = .game_session, .level = .debug },
-        .{ .scope = .actions, .level = .debug },
+        // .{ .scope = .actions, .level = .debug },
         // .{ .scope = .registry, .level = .debug },
         // .{ .scope = .ai, .level = .debug },
         // .{ .scope = .cave, .level = .debug },
@@ -22,11 +22,12 @@ pub const std_options: std.Options = .{
         // .{ .scope = .events, .level = .debug },
         // .{ .scope = .game, .level = .debug },
         .{ .scope = .game_session, .level = .info },
-        .{ .scope = .inventory_mode, .level = .debug },
+        // .{ .scope = .inventory_mode, .level = .debug },
+        .{ .scope = .modify_mode, .level = .debug },
         // .{ .scope = .level, .level = .debug },
         // .{ .scope = .load_level_mode, .level = .debug },
         // .{ .scope = .looking_around_mode, .level = .debug },
-        .{ .scope = .play_mode, .level = .debug },
+        // .{ .scope = .play_mode, .level = .debug },
         // .{ .scope = .render, .level = .warn },
         // .{ .scope = .save_load_mode, .level = .debug },
         // .{ .scope = .visibility, .level = .debug },
@@ -48,8 +49,9 @@ pub fn handlePanic(
     std.debug.defaultPanic(msg, first_trace_addr);
 }
 
-pub fn main() !void {
-    const seed = try Args.int(u64, "seed") orelse std.crypto.random.int(u64);
+pub fn main(init: std.process.Init.Minimal) !void {
+    const args: Args = .{ .args = init.args };
+    const seed = try args.int(u64, "seed") orelse std.crypto.random.int(u64);
     log.info(
         "========================================\nSeed of the game is {d}\n========================================",
         .{seed},
@@ -61,9 +63,9 @@ pub fn main() !void {
 
     var single_threaded_io: std.Io.Threaded = .init_single_threaded;
 
-    const use_cheats = Args.flag("devmode");
-    const use_mouse = Args.flag("mouse");
-    const preset = if (Args.str("preset")) |preset| parsePreset(preset) else null;
+    const use_cheats = args.flag("devmode");
+    const use_mouse = args.flag("mouse");
+    const preset = if (args.str("preset")) |preset| parsePreset(preset) else null;
 
     var runtime = try TtyRuntime.TtyRuntime(g.DISPLAY_ROWS + 2, g.DISPLAY_COLS + 2)
         .init(alloc, single_threaded_io.ioBasic(), true, true, use_cheats, use_mouse);
@@ -71,7 +73,7 @@ pub fn main() !void {
 
     if (use_cheats) {
         log.warn("The Developer is in the room!", .{});
-        if (Args.str("cheat")) |value| {
+        if (args.str("cheat")) |value| {
             runtime.cheat = g.Cheat.parse(value);
         }
     }
