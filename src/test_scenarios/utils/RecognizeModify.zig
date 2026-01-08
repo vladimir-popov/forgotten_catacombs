@@ -23,6 +23,16 @@ pub fn close(self: Self) !void {
     try self.test_session.pressButton(.b);
 }
 
+pub fn chooseRecognizeTab(self: Self) !void {
+    if (self.modifyMode().main_window.active_tab_idx == 1)
+        try self.test_session.pressButton(.left);
+}
+
+pub fn chooseModifyTab(self: Self) !void {
+    if (self.modifyMode().main_window.active_tab_idx == 0)
+        try self.test_session.pressButton(.right);
+}
+
 /// Selects the item with passed name in the active tab, or throws an error.
 /// If the item was found, the button is pressed and Options available for the item is returned.
 pub fn chooseItemByName(self: Self, name: []const u8) !Options {

@@ -262,7 +262,7 @@ fn buySelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const price = self.actualPrice(self.session.registry.getUnsafe(item, c.Price), true);
     log.debug("Buying item {d}", .{item.id});
-    if (self.wallet.money > price) {
+    if (self.wallet.money >= price) {
         _ = self.shop.items.remove(item);
         try self.inventory.items.add(item);
         self.wallet.money -= price;
@@ -283,7 +283,7 @@ fn sellSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const price = self.actualPrice(self.session.registry.getUnsafe(item, c.Price), false);
     log.debug("Selling {d}", .{item.id});
-    if (self.shop.balance > price) {
+    if (self.shop.balance >= price) {
         _ = self.inventory.items.remove(item);
         try self.shop.items.add(item);
         self.wallet.money += price;

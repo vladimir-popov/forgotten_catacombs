@@ -41,7 +41,6 @@ const w = g.windows;
 const log = std.log.scoped(.modify_mode);
 
 const MODAL_WINDOW_REGION: p.Region = p.Region.init(3, 2, g.DISPLAY_ROWS - 5, g.DISPLAY_COLS - 2);
-const BASE_MODIFICATION_PRICE = 100;
 const RECOGNITION_PRICE = 100;
 
 const Self = @This();
@@ -132,7 +131,7 @@ pub fn updateTabs(self: *Self) !void {
         var buffer: [w.WindowWithTabs.CONTENT_AREA_REGION.cols + 4]u8 = undefined;
         if (self.session.journal.isKnown(item)) {
             if (self.canBeModified(item)) {
-                const price = self.calculateModificationPrice(item);
+                const price = self.calculateBaseModificationPrice(item);
                 try self.tabModify().scrollable_area.content.addOption(
                     self.alloc,
                     try self.formatLine(&buffer, item, price),
@@ -173,7 +172,8 @@ fn formatLine(self: *Self, buffer: []u8, item: g.Entity, price: u16) ![]const u8
     return try std.fmt.bufPrint(buffer, line_fmt, .{ sprite.codepoint, name, price });
 }
 
-fn calculateModificationPrice(self: Self, item: g.Entity) u16 {
+fn calculateBaseModificationPrice(self: Self, item: g.Entity) u16 {
+    const BASE_MODIFICATION_PRICE = 100;
     var price: u16 = BASE_MODIFICATION_PRICE;
     if (self.session.registry.get(item, c.Rarity)) |rarity| {
         switch (rarity.*) {
@@ -211,7 +211,7 @@ fn recognizeDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
 fn recognizeItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const wallet = self.session.registry.getUnsafe(self.session.player, c.Wallet);
-    if (wallet.money > RECOGNITION_PRICE) {
+    if (wallet.money >= RECOGNITION_PRICE) {
         if (self.session.registry.has(item, c.Weapon))
             try self.session.journal.markWeaponAsKnown(item)
         else if (self.session.registry.has(item, c.Protection))
@@ -276,13 +276,13 @@ fn showHelp(ptr: *anyopaque, _: usize, _: g.Entity) !bool {
 
 fn modifySomehow(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    try self.modify(item, 50, null);
+    try self.modify(item, 50, null, self.calculateBaseModificationPrice(item));
     return true;
 }
 
 fn modifyCarefully(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    try self.modify(item, 10, null);
+    try self.modify(item, 10, null, 2 * self.calculateBaseModificationPrice(item));
     return true;
 }
 fn modifyManually(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
@@ -302,23 +302,33 @@ fn modifyManually(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
 fn modifyManuallyEffect(ptr: *anyopaque, idx: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const effect_type: c.Effects.Type = @enumFromInt(idx);
-    try self.modify(item, 0, effect_type);
+    try self.modify(item, 0, effect_type, 3 * self.calculateBaseModificationPrice(item));
     return true;
 }
 
-fn modify(self: *Self, item: g.Entity, worsen_chance: u8, effect_type: ?c.Effects.Type) !void {
-    var prng = std.Random.DefaultPrng.init(self.session.seed);
-    const rand = prng.random();
-    const range: p.Range(i8) = if (worsen_chance > 0 and rand.uintAtMost(u8, 100) < worsen_chance)
-        .range(-5, -1)
-    else
-        .range(1, 5);
-    if (self.session.registry.has(item, c.Weapon)) {
-        try g.meta.modifyWeapon(&self.session.registry, prng.random(), item, range.min, range.max, effect_type);
-        try self.session.journal.forgetWeapon(item);
+fn modify(self: *Self, item: g.Entity, worsen_chance: u8, effect_type: ?c.Effects.Type, price: u16) !void {
+    const wallet = self.session.registry.getUnsafe(self.session.player, c.Wallet);
+    if (wallet.money >= price) {
+        var prng = std.Random.DefaultPrng.init(self.session.seed);
+        const rand = prng.random();
+        const range: p.Range(i8) = if (worsen_chance > 0 and rand.uintAtMost(u8, 100) < worsen_chance)
+            .range(-5, -1)
+        else
+            .range(1, 5);
+        if (self.session.registry.has(item, c.Weapon)) {
+            try g.meta.modifyWeapon(&self.session.registry, prng.random(), item, range.min, range.max, effect_type);
+            try self.session.journal.forgetWeapon(item);
+        }
+        wallet.money -= price;
+        // TODO: Modify an armor
+        try self.updateTabs();
+    } else {
+        self.modal_window = try w.notification(
+            self.alloc,
+            "You have not enough\nmoney.",
+            .{ .max_region = MODAL_WINDOW_REGION },
+        );
     }
-    // TODO: Modify an armor
-    try self.updateTabs();
 }
 
 fn describeItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
