@@ -12,7 +12,7 @@ const State = enum { pressed, released };
 const LastButton = @This();
 
 buttons: c_int = 0,
-pressed_at: u32 = 0,
+pressed_at: u64 = 0,
 was_repeated: bool = false,
 // dirty hack: playdate sends button events happened when the menu was opened
 // right after closing menu. But we have to ignore that events.
@@ -24,7 +24,7 @@ inline fn isReleased(self: LastButton) bool {
     return self.pressed_at == 0;
 }
 
-pub fn pop(self: *LastButton, now_ms: u32) ?g.Button {
+pub fn pop(self: *LastButton, now_ms: u64) ?g.Button {
     var button: ?g.Button = null;
     if (g.Button.GameButton.fromCode(self.buttons)) |game_button| {
         log.debug("Poping {any} at {d}", .{ self, now_ms });

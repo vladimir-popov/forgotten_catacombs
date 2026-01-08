@@ -12,7 +12,13 @@ pub const PlaydateAPI = extern struct {
     lua: *const PlaydateLua,
     json: *const PlaydateJSON,
     scoreboards: *const PlaydateScoreboards,
+    network: *const PlaydateNetwork,
 };
+
+/////////Zig Utility Functions///////////
+pub fn is_compiling_for_playdate_hardware() bool {
+    return builtin.os.tag == .freestanding and builtin.cpu.arch.isThumb();
+}
 
 ////////Buttons//////////////
 pub const PDButtons = c_int;
@@ -51,11 +57,18 @@ pub const PDLanguage = enum(c_int) {
     PDLanguageUnknown,
 };
 
+pub const AccessRequestCallback = ?*const fn (allowed: bool, userdata: ?*anyopaque) callconv(.c) void;
+pub const AccessReply = enum(c_int) {
+    AccessAsk = 0,
+    AccessDeny,
+    AccessAllow,
+};
+
 pub const PDPeripherals = c_int;
-const PERIPHERAL_NONE = 0;
-const PERIPHERAL_ACCELEROMETER = (1 << 0);
+pub const PERIPHERAL_NONE = 0;
+pub const PERIPHERAL_ACCELEROMETER = (1 << 0);
 // ...
-const PERIPHERAL_ALL = 0xFFFF;
+pub const PERIPHERAL_ALL = 0xFFFF;
 
 pub const PDStringEncoding = enum(c_int) {
     ASCIIEncoding,
@@ -73,11 +86,16 @@ pub const PDDateTime = extern struct {
     second: u8,
 };
 
+pub const PDInfo = extern struct {
+    osversion: u32,
+    language: PDLanguage,
+};
+
 pub const PlaydateSys = extern struct {
     realloc: *const fn (ptr: ?*anyopaque, size: usize) callconv(.c) ?*anyopaque,
-    formatString: *const fn (ret: ?*[*c]u8, fmt: [*c]const u8, ...) callconv(.c) c_int,
-    logToConsole: *const fn (fmt: [*c]const u8, ...) callconv(.c) void,
-    @"error": *const fn (fmt: [*c]const u8, ...) callconv(.c) void,
+    formatString: *const fn (ret: ?*[*c]u8, fmt: ?[*:0]const u8, ...) callconv(.c) c_int,
+    logToConsole: *const fn (fmt: ?[*:0]const u8, ...) callconv(.c) void,
+    @"error": *const fn (fmt: ?[*:0]const u8, ...) callconv(.c) void,
     getLanguage: *const fn () callconv(.c) PDLanguage,
     getCurrentTimeMilliseconds: *const fn () callconv(.c) c_uint,
     getSecondsSinceEpoch: *const fn (milliseconds: ?*c_uint) callconv(.c) c_uint,
@@ -96,15 +114,15 @@ pub const PlaydateSys = extern struct {
     setAutoLockDisabled: *const fn (disable: c_int) callconv(.c) void,
 
     setMenuImage: *const fn (bitmap: ?*LCDBitmap, xOffset: c_int) callconv(.c) void,
-    addMenuItem: *const fn (title: [*c]const u8, callback: ?PDMenuItemCallbackFunction, userdata: ?*anyopaque) callconv(.c) ?*PDMenuItem,
-    addCheckmarkMenuItem: *const fn (title: [*c]const u8, value: c_int, callback: ?PDMenuItemCallbackFunction, userdata: ?*anyopaque) callconv(.c) ?*PDMenuItem,
-    addOptionsMenuItem: *const fn (title: [*c]const u8, optionTitles: [*c][*c]const u8, optionsCount: c_int, f: ?PDMenuItemCallbackFunction, userdata: ?*anyopaque) callconv(.c) ?*PDMenuItem,
+    addMenuItem: *const fn (title: ?[*:0]const u8, callback: ?PDMenuItemCallbackFunction, userdata: ?*anyopaque) callconv(.c) ?*PDMenuItem,
+    addCheckmarkMenuItem: *const fn (title: ?[*:0]const u8, value: c_int, callback: ?PDMenuItemCallbackFunction, userdata: ?*anyopaque) callconv(.c) ?*PDMenuItem,
+    addOptionsMenuItem: *const fn (title: ?[*:0]const u8, optionTitles: [*c]?[*:0]const u8, optionsCount: c_int, f: ?PDMenuItemCallbackFunction, userdata: ?*anyopaque) callconv(.c) ?*PDMenuItem,
     removeAllMenuItems: *const fn () callconv(.c) void,
     removeMenuItem: *const fn (menuItem: ?*PDMenuItem) callconv(.c) void,
     getMenuItemValue: *const fn (menuItem: ?*PDMenuItem) callconv(.c) c_int,
     setMenuItemValue: *const fn (menuItem: ?*PDMenuItem, value: c_int) callconv(.c) void,
-    getMenuItemTitle: *const fn (menuItem: ?*PDMenuItem) callconv(.c) [*c]const u8,
-    setMenuItemTitle: *const fn (menuItem: ?*PDMenuItem, title: [*c]const u8) callconv(.c) void,
+    getMenuItemTitle: *const fn (menuItem: ?*PDMenuItem) callconv(.c) ?[*:0]const u8,
+    setMenuItemTitle: *const fn (menuItem: ?*PDMenuItem, title: ?[*:0]const u8) callconv(.c) void,
     getMenuItemUserdata: *const fn (menuItem: ?*PDMenuItem) callconv(.c) ?*anyopaque,
     setMenuItemUserdata: *const fn (menuItem: ?*PDMenuItem, ud: ?*anyopaque) callconv(.c) void,
 
@@ -134,24 +152,39 @@ pub const PlaydateSys = extern struct {
         queuesize: c_int,
     ) callconv(.c) void,
     setSerialMessageCallback: *const fn (
-        callback: *const fn (data: [*c]const u8) callconv(.c) void,
+        callback: *const fn (data: ?[*:0]const u8) callconv(.c) void,
     ) callconv(.c) void,
     vaFormatString: *const fn (
         outstr: [*c][*c]u8,
-        fmt: [*c]const u8,
+        fmt: ?[*:0]const u8,
         args: VaList,
     ) callconv(.c) c_int,
     parseString: *const fn (
-        str: [*c]const u8,
-        format: [*c]const u8,
+        str: ?[*:0]const u8,
+        format: ?[*:0]const u8,
         ...,
     ) callconv(.c) c_int,
 
-    //NOTE: std.builtin.VaList is not available when targeting Playdate hardware,
+    // ???
+    delay: *const fn (milliseconds: u32) callconv(.c) void,
+
+    // 2.7
+    getServerTime: *const fn (callback: *const fn (time: ?[*:0]const u8, err: ?[*:0]const u8) callconv(.c) void) callconv(.c) void,
+    restartGame: *const fn (launchargs: ?[*:0]const u8) callconv(.c) void,
+    getLaunchArgs: *const fn (outpath: [*c][*:0]const u8) callconv(.c) ?[*:0]const u8,
+    sendMirrorData: *const fn (command: u8, data: [*c]u8, len: c_int) callconv(.c) bool,
+
+    // 3.0
+    getSystemInfo: *const fn () callconv(.c) *const PDInfo,
+
+    //NOTE(Daniel Bokser): std.builtin.VaList is not available when targeting Windows,
     //      so we need to directly include it
-    const VaList = @cImport({
-        @cInclude("stdarg.h");
-    }).va_list;
+    const VaList = if (builtin.os.tag == .windows)
+        @cImport({
+            @cInclude("stdarg.h");
+        }).va_list
+    else
+        std.builtin.VaList;
 };
 
 ////////LCD and Graphics///////////////////////
@@ -160,13 +193,14 @@ pub const LCD_ROWS = 240;
 pub const LCD_ROWSIZE = 52;
 pub const LCDBitmap = opaque {};
 pub const LCDVideoPlayer = opaque {};
+pub const LCDStreamPlayer = opaque {};
 pub const PlaydateVideo = extern struct {
-    loadVideo: *const fn ([*c]const u8) callconv(.c) ?*LCDVideoPlayer,
+    loadVideo: *const fn (?[*:0]const u8) callconv(.c) ?*LCDVideoPlayer,
     freePlayer: *const fn (?*LCDVideoPlayer) callconv(.c) void,
     setContext: *const fn (?*LCDVideoPlayer, ?*LCDBitmap) callconv(.c) c_int,
     useScreenContext: *const fn (?*LCDVideoPlayer) callconv(.c) void,
     renderFrame: *const fn (?*LCDVideoPlayer, c_int) callconv(.c) c_int,
-    getError: *const fn (?*LCDVideoPlayer) callconv(.c) [*c]const u8,
+    getError: *const fn (?*LCDVideoPlayer) callconv(.c) ?[*:0]const u8,
     getInfo: *const fn (?*LCDVideoPlayer, [*c]c_int, [*c]c_int, [*c]f32, [*c]c_int, [*c]c_int) callconv(.c) void,
     getContext: *const fn (?*LCDVideoPlayer) callconv(.c) ?*LCDBitmap,
 };
@@ -207,11 +241,25 @@ pub const LCDBitmapFlip = enum(c_int) {
     BitmapFlippedY,
     BitmapFlippedXY,
 };
+
 pub const LCDPolygonFillRule = enum(c_int) {
     PolygonFillNonZero,
     PolygonFillEvenOdd,
 };
 
+pub const PDTextWrappingMode = enum(c_int) {
+    WrapClip,
+    WrapCharacter,
+    WrapWord,
+};
+
+pub const PDTextAlignment = enum(c_int) {
+    AlignTextLeft,
+    AlignTextCenter,
+    AlignTextRight,
+};
+
+pub const LCDTileMap = opaque {};
 pub const LCDBitmapTable = opaque {};
 pub const LCDFont = opaque {};
 pub const LCDFontPage = opaque {};
@@ -222,6 +270,51 @@ pub const LCDRect = extern struct {
     right: c_int,
     top: c_int,
     bottom: c_int,
+};
+
+pub const PlaydateVideostream = extern struct {
+    newPlayer: *const fn () callconv(.c) ?*LCDStreamPlayer,
+    freePlayer: *const fn (p: ?*LCDStreamPlayer) callconv(.c) void,
+
+    setBufferSize: *const fn (p: ?*LCDStreamPlayer, video: c_int, audio: c_int) callconv(.c) void,
+
+    setFile: *const fn (p: ?*LCDStreamPlayer, file: ?*SDFile) callconv(.c) void,
+
+    setHTTPConnection: *const fn (p: ?*LCDStreamPlayer, conn: ?*HTTPConnection) callconv(.c) void,
+
+    getFilePlayer: *const fn (p: ?*LCDStreamPlayer) callconv(.c) ?*FilePlayer,
+
+    getVideoPlayer: *const fn (p: ?*LCDStreamPlayer) callconv(.c) ?*LCDVideoPlayer,
+
+    // returns true if it drew a frame, else false
+    update: *const fn (p: ?*LCDStreamPlayer) callconv(.c) bool,
+
+    getBufferedFrameCount: *const fn (p: ?*LCDStreamPlayer) callconv(.c) c_int,
+
+    //     uint32_t (*getBytesRead)(LCDStreamPlayer* p);
+    getBytesRead: *const fn (p: ?*LCDStreamPlayer) callconv(.c) u32,
+
+    // 3.0
+    setTCPConnection: *const fn (p: ?*LCDStreamPlayer, conn: ?*TCPConnection) callconv(.c) void,
+};
+
+pub const PlaydateTilemap = extern struct {
+    newTilemap: *const fn () callconv(.c) ?*LCDTileMap,
+    freeTilemap: *const fn (m: ?*LCDTileMap) callconv(.c) void,
+
+    setImageTable: *const fn (m: ?*LCDTileMap, table: ?*LCDBitmapTable) callconv(.c) void,
+    getImageTable: *const fn (m: ?*LCDTileMap) callconv(.c) ?*LCDBitmapTable,
+
+    setSize: *const fn (m: ?*LCDTileMap, tilesWide: c_int, tilesHigh: c_int) callconv(.c) void,
+    getSize: *const fn (m: ?*LCDTileMap, tilesWide: ?*c_int, tilesHigh: ?*c_int) callconv(.c) void,
+    getPixelSize: *const fn (m: ?*LCDTileMap, outWidth: ?*u32, outHeight: ?*u32) callconv(.c) void,
+
+    setTiles: *const fn (m: ?*LCDTileMap, indexes: [*c]u16, count: c_int, rowwidth: c_int) callconv(.c) void,
+
+    setTileAtPosition: *const fn (m: ?*LCDTileMap, x: c_int, y: c_int, idx: u16) callconv(.c) void,
+    getTileAtPosition: *const fn (m: ?*LCDTileMap, x: c_int, y: c_int) callconv(.c) c_int,
+
+    drawAtPoint: *const fn (m: ?*LCDTileMap, x: f32, y: f32) callconv(.c) void,
 };
 
 pub const PlaydateGraphics = extern struct {
@@ -254,9 +347,9 @@ pub const PlaydateGraphics = extern struct {
     // LCDBitmap
     newBitmap: *const fn (width: c_int, height: c_int, color: LCDColor) callconv(.c) ?*LCDBitmap,
     freeBitmap: *const fn (bitmap: ?*LCDBitmap) callconv(.c) void,
-    loadBitmap: *const fn (path: [*c]const u8, outerr: ?*[*c]const u8) callconv(.c) ?*LCDBitmap,
+    loadBitmap: *const fn (path: ?[*:0]const u8, outerr: ?*?[*:0]const u8) callconv(.c) ?*LCDBitmap,
     copyBitmap: *const fn (bitmap: ?*LCDBitmap) callconv(.c) ?*LCDBitmap,
-    loadIntoBitmap: *const fn (path: [*c]const u8, bitmap: ?*LCDBitmap, outerr: ?*[*c]const u8) callconv(.c) void,
+    loadIntoBitmap: *const fn (path: ?[*:0]const u8, bitmap: ?*LCDBitmap, outerr: ?*?[*:0]const u8) callconv(.c) void,
     getBitmapData: *const fn (bitmap: ?*LCDBitmap, width: ?*c_int, height: ?*c_int, rowbytes: ?*c_int, mask: ?*[*c]u8, data: ?*[*c]u8) callconv(.c) void,
     clearBitmap: *const fn (bitmap: ?*LCDBitmap, bgcolor: LCDColor) callconv(.c) void,
     rotatedBitmap: *const fn (bitmap: ?*LCDBitmap, rotation: f32, xscale: f32, yscale: f32, allocedSize: ?*c_int) callconv(.c) ?*LCDBitmap,
@@ -264,12 +357,12 @@ pub const PlaydateGraphics = extern struct {
     // LCDBitmapTable
     newBitmapTable: *const fn (count: c_int, width: c_int, height: c_int) callconv(.c) ?*LCDBitmapTable,
     freeBitmapTable: *const fn (table: ?*LCDBitmapTable) callconv(.c) void,
-    loadBitmapTable: *const fn (path: [*c]const u8, outerr: ?*[*c]const u8) callconv(.c) ?*LCDBitmapTable,
-    loadIntoBitmapTable: *const fn (path: [*c]const u8, table: ?*LCDBitmapTable, outerr: ?*[*c]const u8) callconv(.c) void,
+    loadBitmapTable: *const fn (path: ?[*:0]const u8, outerr: ?*?[*:0]const u8) callconv(.c) ?*LCDBitmapTable,
+    loadIntoBitmapTable: *const fn (path: ?[*:0]const u8, table: ?*LCDBitmapTable, outerr: ?*?[*:0]const u8) callconv(.c) void,
     getTableBitmap: *const fn (table: ?*LCDBitmapTable, idx: c_int) callconv(.c) ?*LCDBitmap,
 
     // LCDFont
-    loadFont: *const fn (path: [*c]const u8, outErr: ?*[*c]const u8) callconv(.c) ?*LCDFont,
+    loadFont: *const fn (path: ?[*:0]const u8, outErr: ?*?[*:0]const u8) callconv(.c) ?*LCDFont,
     getFontPage: *const fn (font: ?*LCDFont, c: u32) callconv(.c) ?*LCDFontPage,
     getPageGlyph: *const fn (page: ?*LCDFontPage, c: u32, bitmap: ?**LCDBitmap, advance: ?*c_int) callconv(.c) ?*LCDFontGlyph,
     getGlyphKerning: *const fn (glyph: ?*LCDFontGlyph, glyphcode: u32, nextcode: u32) callconv(.c) c_int,
@@ -307,10 +400,27 @@ pub const PlaydateGraphics = extern struct {
     setStencilImage: *const fn (stencil: ?*LCDBitmap, tile: c_int) callconv(.c) void,
 
     // 1.12
-    makeFontFromData: *const fn (data: *LCDFontData, wide: c_int) callconv(.c) *LCDFont,
+    makeFontFromData: *const fn (data: ?*LCDFontData, wide: c_int) callconv(.c) *LCDFont,
 
     // 2.1
     getTextTracking: *const fn () callconv(.c) c_int,
+
+    // 2.5
+    setPixel: *const fn (x: c_int, y: c_int, c: LCDColor) callconv(.c) void,
+    getBitmapPixel: *const fn (bitmap: ?*LCDBitmap, x: c_int, y: c_int) callconv(.c) LCDSolidColor,
+    getBitmapTableInfo: *const fn (table: ?*LCDBitmapTable, count: ?*c_int, width: ?*c_int) callconv(.c) void,
+
+    // 2.6
+    drawTextInRect: *const fn (text: ?*const anyopaque, len: usize, encoding: PDStringEncoding, x: c_int, y: c_int, width: c_int, height: c_int, wrap: PDTextWrappingMode, @"align": PDTextAlignment) callconv(.c) void,
+
+    // 2.7
+    getTextHeightForMaxWidth: *const fn (font: ?*LCDFont, text: ?[*:0]const u8, len: usize, maxwidth: c_int, encoding: PDStringEncoding, wrap: PDTextWrappingMode, tracking: c_int, extraLeading: c_int) callconv(.c) c_int,
+    drawRoundRect: *const fn (x: c_int, y: c_int, width: c_int, height: c_int, radius: c_int, lineWidth: c_int, color: LCDColor) callconv(.c) void,
+    fillRoundRect: *const fn (x: c_int, y: c_int, width: c_int, height: c_int, radius: c_int, color: LCDColor) callconv(.c) void,
+
+    // 3.0
+    tilemap: *const PlaydateTilemap,
+    videostream: *const PlaydateVideostream,
 };
 pub const PlaydateDisplay = struct {
     getWidth: *const fn () callconv(.c) c_int,
@@ -321,8 +431,12 @@ pub const PlaydateDisplay = struct {
     setInverted: *const fn (flag: c_int) callconv(.c) void,
     setScale: *const fn (s: c_uint) callconv(.c) void,
     setMosaic: *const fn (x: c_uint, y: c_uint) callconv(.c) void,
-    setFlipped: *const fn (x: c_uint, y: c_uint) callconv(.c) void,
-    setOffset: *const fn (x: c_uint, y: c_uint) callconv(.c) void,
+    setFlipped: *const fn (x: c_int, y: c_int) callconv(.c) void,
+    setOffset: *const fn (x: c_int, y: c_int) callconv(.c) void,
+
+    // 2.7
+    getRefreshRate: *const fn () callconv(.c) f32,
+    getFPS: *const fn () callconv(.c) f32,
 };
 
 //////File System/////
@@ -338,7 +452,7 @@ pub const SEEK_SET = 0;
 pub const SEEK_CUR = 1;
 pub const SEEK_END = 2;
 
-const FileStat = extern struct {
+pub const FileStat = extern struct {
     isdir: c_int,
     size: c_uint,
     m_year: c_int,
@@ -349,21 +463,21 @@ const FileStat = extern struct {
     m_second: c_int,
 };
 
-const PlaydateFile = extern struct {
-    geterr: *const fn () callconv(.c) [*c]const u8,
+pub const PlaydateFile = extern struct {
+    geterr: *const fn () callconv(.c) ?[*:0]const u8,
 
     listfiles: *const fn (
-        path: [*c]const u8,
-        callback: *const fn (path: [*c]const u8, userdata: ?*anyopaque) callconv(.c) void,
+        path: ?[*:0]const u8,
+        callback: *const fn (path: ?[*:0]const u8, userdata: ?*anyopaque) callconv(.c) void,
         userdata: ?*anyopaque,
         showhidden: c_int,
     ) callconv(.c) c_int,
-    stat: *const fn (path: [*c]const u8, stat: ?*FileStat) callconv(.c) c_int,
-    mkdir: *const fn (path: [*c]const u8) callconv(.c) c_int,
-    unlink: *const fn (name: [*c]const u8, recursive: c_int) callconv(.c) c_int,
-    rename: *const fn (from: [*c]const u8, to: [*c]const u8) callconv(.c) c_int,
+    stat: *const fn (path: ?[*:0]const u8, stat: ?*FileStat) callconv(.c) c_int,
+    mkdir: *const fn (path: ?[*:0]const u8) callconv(.c) c_int,
+    unlink: *const fn (name: ?[*:0]const u8, recursive: c_int) callconv(.c) c_int,
+    rename: *const fn (from: ?[*:0]const u8, to: ?[*:0]const u8) callconv(.c) c_int,
 
-    open: *const fn (name: [*c]const u8, mode: FileOptions) callconv(.c) ?*SDFile,
+    open: *const fn (name: ?[*:0]const u8, mode: FileOptions) callconv(.c) ?*SDFile,
     close: *const fn (file: ?*SDFile) callconv(.c) c_int,
     read: *const fn (file: ?*SDFile, buf: ?*anyopaque, len: c_uint) callconv(.c) c_int,
     write: *const fn (file: ?*SDFile, buf: ?*const anyopaque, len: c_uint) callconv(.c) c_int,
@@ -373,7 +487,7 @@ const PlaydateFile = extern struct {
 };
 
 /////////Audio//////////////
-const MicSource = enum(c_int) {
+pub const MicSource = enum(c_int) {
     kMicInputAutodetect = 0,
     kMicInputInternal = 1,
     kMicInputHeadset = 2,
@@ -416,7 +530,7 @@ pub const PlaydateSound = extern struct {
     signal: *const PlaydateSoundSignal,
 
     // 2.2
-    getError: *const fn () callconv(.c) [*c]const u8,
+    getError: *const fn () callconv(.c) ?[*:0]const u8,
 };
 
 //data is mono
@@ -453,7 +567,7 @@ pub const FilePlayer = SoundSource;
 pub const PlaydateSoundFileplayer = extern struct {
     newPlayer: *const fn () callconv(.c) ?*FilePlayer,
     freePlayer: *const fn (player: ?*FilePlayer) callconv(.c) void,
-    loadIntoPlayer: *const fn (player: ?*FilePlayer, path: [*c]const u8) callconv(.c) c_int,
+    loadIntoPlayer: *const fn (player: ?*FilePlayer, path: ?[*:0]const u8) callconv(.c) c_int,
     setBufferLength: *const fn (player: ?*FilePlayer, bufferLen: f32) callconv(.c) void,
     play: *const fn (player: ?*FilePlayer, repeat: c_int) callconv(.c) c_int,
     isPlaying: *const fn (player: ?*FilePlayer) callconv(.c) c_int,
@@ -526,9 +640,9 @@ pub inline fn SoundFormat_bytesPerFrame(fmt: SoundFormat) u32 {
 
 pub const PlaydateSoundSample = extern struct {
     newSampleBuffer: *const fn (byteCount: c_int) callconv(.c) ?*AudioSample,
-    loadIntoSample: *const fn (sample: ?*AudioSample, path: [*c]const u8) callconv(.c) c_int,
-    load: *const fn (path: [*c]const u8) callconv(.c) ?*AudioSample,
-    newSampleFromData: *const fn (data: [*c]u8, format: SoundFormat, sampleRate: u32, byteCount: c_int) callconv(.c) ?*AudioSample,
+    loadIntoSample: *const fn (sample: ?*AudioSample, path: ?[*:0]const u8) callconv(.c) c_int,
+    load: *const fn (path: ?[*:0]const u8) callconv(.c) ?*AudioSample,
+    newSampleFromData: *const fn (data: [*c]u8, format: SoundFormat, sampleRate: u32, byteCount: c_int, shouldFreeData: c_int) callconv(.c) ?*AudioSample,
     getData: *const fn (sample: ?*AudioSample, data: ?*[*c]u8, format: [*c]SoundFormat, sampleRate: ?*u32, byteLength: ?*u32) callconv(.c) void,
     freeSample: *const fn (sample: ?*AudioSample) callconv(.c) void,
     getLength: *const fn (sample: ?*AudioSample) callconv(.c) f32,
@@ -671,6 +785,9 @@ pub const PlaydateSoundSynth = extern struct {
         userdata: ?*anyopaque,
     ) callconv(.c) void,
     copy: *const fn (synth: ?*PDSynth) callconv(.c) ?*PDSynth,
+
+    // 2.6
+    clearEnvelope: *const fn (synth: ?*PDSynth) callconv(.c) void,
 };
 
 pub const SequenceTrack = opaque {};
@@ -681,11 +798,11 @@ pub const PlaydateSoundSequence = extern struct {
     newSequence: *const fn () callconv(.c) ?*SoundSequence,
     freeSequence: *const fn (sequence: ?*SoundSequence) callconv(.c) void,
 
-    loadMidiFile: *const fn (seq: ?*SoundSequence, path: [*c]const u8) callconv(.c) c_int,
+    loadMidiFile: *const fn (seq: ?*SoundSequence, path: ?[*:0]const u8) callconv(.c) c_int,
     getTime: *const fn (seq: ?*SoundSequence) callconv(.c) u32,
     setTime: *const fn (seq: ?*SoundSequence, time: u32) callconv(.c) void,
     setLoops: *const fn (seq: ?*SoundSequence, loopstart: c_int, loopend: c_int, loops: c_int) callconv(.c) void,
-    getTempo: *const fn (seq: ?*SoundSequence) callconv(.c) c_int,
+    getTempo_deprecated: *const fn (seq: ?*SoundSequence) callconv(.c) c_int,
     setTempo: *const fn (seq: ?*SoundSequence, stepsPerSecond: c_int) callconv(.c) void,
     getTrackCount: *const fn (seq: ?*SoundSequence) callconv(.c) c_int,
     addTrack: *const fn (seq: ?*SoundSequence) callconv(.c) ?*SequenceTrack,
@@ -700,6 +817,9 @@ pub const PlaydateSoundSequence = extern struct {
     stop: *const fn (seq: ?*SoundSequence) callconv(.c) void,
     getCurrentStep: *const fn (seq: ?*SoundSequence, timeOffset: ?*c_int) callconv(.c) c_int,
     setCurrentStep: *const fn (seq: ?*SoundSequence, step: c_int, timeOffset: c_int, playNotes: c_int) callconv(.c) void,
+
+    // 2.5
+    getTempo: *const fn (seq: ?*SoundSequence) callconv(.c) f32,
 };
 
 pub const EffectProc = *const fn (e: ?*SoundEffect, left: [*c]i32, right: [*c]i32, nsamples: c_int, bufactive: c_int) callconv(.c) c_int;
@@ -865,8 +985,8 @@ pub const PlaydateSoundSignal = struct {
 
 // A SoundEffect processes the output of a channel's SoundSources
 
-const TwoPoleFilter = SoundEffect;
-const TwoPoleFilterType = enum(c_int) {
+pub const TwoPoleFilter = SoundEffect;
+pub const TwoPoleFilterType = enum(c_int) {
     FilterTypeLowPass,
     FilterTypeHighPass,
     FilterTypeBandPass,
@@ -875,7 +995,7 @@ const TwoPoleFilterType = enum(c_int) {
     FilterTypeLowShelf,
     FilterTypeHighShelf,
 };
-const PlaydateSoundEffectTwopolefilter = extern struct {
+pub const PlaydateSoundEffectTwopolefilter = extern struct {
     newFilter: *const fn () callconv(.c) ?*TwoPoleFilter,
     freeFilter: *const fn (filter: ?*TwoPoleFilter) callconv(.c) void,
     setType: *const fn (filter: ?*TwoPoleFilter, type: TwoPoleFilterType) callconv(.c) void,
@@ -1037,7 +1157,7 @@ pub const PlaydateSprite = extern struct {
     setZIndex: *const fn (s: ?*LCDSprite, zIndex: i16) callconv(.c) void,
     getZIndex: *const fn (sprite: ?*LCDSprite) callconv(.c) i16,
 
-    setDrawMode: *const fn (sprite: ?*LCDSprite, mode: LCDBitmapDrawMode) callconv(.c) void,
+    setDrawMode: *const fn (sprite: ?*LCDSprite, mode: LCDBitmapDrawMode) callconv(.c) LCDBitmapDrawMode,
     setImageFlip: *const fn (sprite: ?*LCDSprite, flip: LCDBitmapFlip) callconv(.c) void,
     getImageFlip: *const fn (sprite: ?*LCDSprite) callconv(.c) LCDBitmapFlip,
     setStencil: *const fn (sprite: ?*LCDSprite, mode: ?*LCDBitmap) callconv(.c) void, // deprecated in favor of setStencilImage()
@@ -1097,6 +1217,10 @@ pub const PlaydateSprite = extern struct {
     // 2.1
     setCenter: *const fn (s: ?*LCDSprite, x: f32, y: f32) callconv(.c) void,
     getCenter: *const fn (s: ?*LCDSprite, x: ?*f32, y: ?*f32) callconv(.c) void,
+
+    // 2.7
+    setTilemap: *const fn (s: ?*LCDSprite, tilemap: ?*LCDTileMap) callconv(.c) void,
+    getTilemap: *const fn (s: ?*LCDSprite) callconv(.c) ?*LCDTileMap,
 };
 
 ////////Lua///////
@@ -1111,7 +1235,7 @@ pub const LValType = enum(c_int) {
     Str = 2,
 };
 pub const LuaReg = extern struct {
-    name: [*c]const u8,
+    name: ?[*:0]const u8,
     func: LuaCFunction,
 };
 pub const LuaType = enum(c_int) {
@@ -1126,18 +1250,18 @@ pub const LuaType = enum(c_int) {
     TypeObject = 8,
 };
 pub const LuaVal = extern struct {
-    name: [*c]const u8,
+    name: ?[*:0]const u8,
     type: LValType,
     v: extern union {
         intval: c_uint,
         floatval: f32,
-        strval: [*c]const u8,
+        strval: ?[*:0]const u8,
     },
 };
 pub const PlaydateLua = extern struct {
     // these two return 1 on success, else 0 with an error message in outErr
-    addFunction: *const fn (f: LuaCFunction, name: [*c]const u8, outErr: ?*[*c]const u8) callconv(.c) c_int,
-    registerClass: *const fn (name: [*c]const u8, reg: ?*const LuaReg, vals: [*c]const LuaVal, isstatic: c_int, outErr: ?*[*c]const u8) callconv(.c) c_int,
+    addFunction: *const fn (f: LuaCFunction, name: ?[*:0]const u8, outErr: ?*?[*:0]const u8) callconv(.c) c_int,
+    registerClass: *const fn (name: ?[*:0]const u8, reg: ?*const LuaReg, vals: [*c]const LuaVal, isstatic: c_int, outErr: ?*?[*:0]const u8) callconv(.c) c_int,
 
     pushFunction: *const fn (f: LuaCFunction) callconv(.c) void,
     indexMetatable: *const fn () callconv(.c) c_int,
@@ -1147,13 +1271,13 @@ pub const PlaydateLua = extern struct {
 
     // stack operations
     getArgCount: *const fn () callconv(.c) c_int,
-    getArgType: *const fn (pos: c_int, outClass: ?*[*c]const u8) callconv(.c) LuaType,
+    getArgType: *const fn (pos: c_int, outClass: ?*?[*:0]const u8) callconv(.c) LuaType,
 
     argIsNil: *const fn (pos: c_int) callconv(.c) c_int,
     getArgBool: *const fn (pos: c_int) callconv(.c) c_int,
     getArgInt: *const fn (pos: c_int) callconv(.c) c_int,
     getArgFloat: *const fn (pos: c_int) callconv(.c) f32,
-    getArgString: *const fn (pos: c_int) callconv(.c) [*c]const u8,
+    getArgString: *const fn (pos: c_int) callconv(.c) ?[*:0]const u8,
     getArgBytes: *const fn (pos: c_int, outlen: ?*usize) callconv(.c) [*c]const u8,
     getArgObject: *const fn (pos: c_int, type: ?*i8, ?*?*LuaUDObject) callconv(.c) ?*anyopaque,
 
@@ -1165,7 +1289,7 @@ pub const PlaydateLua = extern struct {
     pushBool: *const fn (val: c_int) callconv(.c) void,
     pushInt: *const fn (val: c_int) callconv(.c) void,
     pushFloat: *const fn (val: f32) callconv(.c) void,
-    pushString: *const fn (str: [*c]const u8) callconv(.c) void,
+    pushString: *const fn (str: ?[*:0]const u8) callconv(.c) void,
     pushBytes: *const fn (str: [*c]const u8, len: usize) callconv(.c) void,
     pushBitmap: *const fn (bitmap: ?*LCDBitmap) callconv(.c) void,
     pushSprite: *const fn (sprite: ?*LCDSprite) callconv(.c) void,
@@ -1178,8 +1302,8 @@ pub const PlaydateLua = extern struct {
     getObjectValue: *const fn (obj: ?*LuaUDObject, slot: c_int) callconv(.c) c_int,
 
     // calling lua from C has some overhead. use sparingly!
-    callFunction_deprecated: *const fn (name: [*c]const u8, nargs: c_int) callconv(.c) void,
-    callFunction: *const fn (name: [*c]const u8, nargs: c_int, outerr: ?*[*c]const u8) callconv(.c) c_int,
+    callFunction_deprecated: *const fn (name: ?[*:0]const u8, nargs: c_int) callconv(.c) void,
+    callFunction: *const fn (name: ?[*:0]const u8, nargs: c_int, outerr: ?*?[*:0]const u8) callconv(.c) c_int,
 };
 
 ///////JSON///////
@@ -1237,28 +1361,28 @@ pub inline fn json_stringValue(value: JSONValue) [*c]u8 {
 // decoder
 
 pub const JSONDecoder = extern struct {
-    decodeError: *const fn (decoder: ?*JSONDecoder, @"error": [*c]const u8, linenum: c_int) callconv(.c) void,
+    decodeError: *const fn (decoder: ?*JSONDecoder, @"error": ?[*:0]const u8, linenum: c_int) callconv(.c) void,
 
     // the following functions are each optional
-    willDecodeSublist: ?*const fn (decoder: ?*JSONDecoder, name: [*c]const u8, type: JSONValueType) callconv(.c) void,
-    shouldDecodeTableValueForKey: ?*const fn (decoder: ?*JSONDecoder, key: [*c]const u8) callconv(.c) c_int,
-    didDecodeTableValue: ?*const fn (decoder: ?*JSONDecoder, key: [*c]const u8, value: JSONValue) callconv(.c) void,
+    willDecodeSublist: ?*const fn (decoder: ?*JSONDecoder, name: ?[*:0]const u8, type: JSONValueType) callconv(.c) void,
+    shouldDecodeTableValueForKey: ?*const fn (decoder: ?*JSONDecoder, key: ?[*:0]const u8) callconv(.c) c_int,
+    didDecodeTableValue: ?*const fn (decoder: ?*JSONDecoder, key: ?[*:0]const u8, value: JSONValue) callconv(.c) void,
     shouldDecodeArrayValueAtIndex: ?*const fn (decoder: ?*JSONDecoder, pos: c_int) callconv(.c) c_int,
     didDecodeArrayValue: ?*const fn (decoder: ?*JSONDecoder, pos: c_int, value: JSONValue) callconv(.c) void,
-    didDecodeSublist: ?*const fn (decoder: ?*JSONDecoder, name: [*c]const u8, type: JSONValueType) callconv(.c) ?*anyopaque,
+    didDecodeSublist: ?*const fn (decoder: ?*JSONDecoder, name: ?[*:0]const u8, type: JSONValueType) callconv(.c) ?*anyopaque,
 
     userdata: ?*anyopaque,
     returnString: c_int, // when set, the decoder skips parsing and returns the current subtree as a string
-    path: [*c]const u8, // updated during parsing, reflects current position in tree
+    path: ?[*:0]const u8, // updated during parsing, reflects current position in tree
 };
 
 // convenience functions for setting up a table-only or array-only decoder
 
 pub inline fn json_setTableDecode(
     decoder: ?*JSONDecoder,
-    willDecodeSublist: ?*const fn (decoder: ?*JSONDecoder, name: [*c]const u8, type: JSONValueType) callconv(.c) void,
-    didDecodeTableValue: ?*const fn (decoder: ?*JSONDecoder, key: [*c]const u8, value: JSONValue) callconv(.c) void,
-    didDecodeSublist: ?*const fn (decoder: ?*JSONDecoder, name: [*c]const u8, name: JSONValueType) callconv(.c) ?*anyopaque,
+    willDecodeSublist: ?*const fn (decoder: ?*JSONDecoder, name: ?[*:0]const u8, type: JSONValueType) callconv(.c) void,
+    didDecodeTableValue: ?*const fn (decoder: ?*JSONDecoder, key: ?[*:0]const u8, value: JSONValue) callconv(.c) void,
+    didDecodeSublist: ?*const fn (decoder: ?*JSONDecoder, name: ?[*:0]const u8, name: JSONValueType) callconv(.c) ?*anyopaque,
 ) void {
     decoder.?.didDecodeTableValue = didDecodeTableValue;
     decoder.?.didDecodeArrayValue = null;
@@ -1268,9 +1392,9 @@ pub inline fn json_setTableDecode(
 
 pub inline fn json_setArrayDecode(
     decoder: ?*JSONDecoder,
-    willDecodeSublist: ?*const fn (decoder: ?*JSONDecoder, name: [*c]const u8, type: JSONValueType) callconv(.c) void,
+    willDecodeSublist: ?*const fn (decoder: ?*JSONDecoder, name: ?[*:0]const u8, type: JSONValueType) callconv(.c) void,
     didDecodeArrayValue: ?*const fn (decoder: ?*JSONDecoder, pos: c_int, value: JSONValue) callconv(.c) void,
-    didDecodeSublist: ?*const fn (decoder: ?*JSONDecoder, name: [*c]const u8, type: JSONValueType) callconv(.c) ?*anyopaque,
+    didDecodeSublist: ?*const fn (decoder: ?*JSONDecoder, name: ?[*:0]const u8, type: JSONValueType) callconv(.c) ?*anyopaque,
 ) void {
     decoder.?.didDecodeTableValue = null;
     decoder.?.didDecodeArrayValue = didDecodeArrayValue;
@@ -1308,7 +1432,7 @@ pub const PlaydateJSON = extern struct {
     initEncoder: *const fn (encoder: ?*JSONEncoder, write: writeFunc, userdata: ?*anyopaque, pretty: c_int) callconv(.c) void,
 
     decode: *const fn (functions: ?*JSONDecoder, reader: JSONReader, outval: ?*JSONValue) callconv(.c) c_int,
-    decodeString: *const fn (functions: ?*JSONDecoder, jsonString: [*c]const u8, outval: ?*JSONValue) callconv(.c) c_int,
+    decodeString: *const fn (functions: ?*JSONDecoder, jsonString: ?[*:0]const u8, outval: ?*JSONValue) callconv(.c) c_int,
 };
 
 ///////Scoreboards///////////
@@ -1334,19 +1458,124 @@ pub const PDBoardsList = extern struct {
     lastUpdated: u32,
     boards: [*c]PDBoard,
 };
-pub const AddScoreCallback = ?*const fn (score: ?*PDScore, errorMessage: [*c]const u8) callconv(.c) void;
-pub const PersonalBestCallback = ?*const fn (score: ?*PDScore, errorMessage: [*c]const u8) callconv(.c) void;
-pub const BoardsListCallback = ?*const fn (boards: ?*PDBoardsList, errorMessage: [*c]const u8) callconv(.c) void;
-pub const ScoresCallback = ?*const fn (scores: ?*PDScoresList, errorMessage: [*c]const u8) callconv(.c) void;
+pub const AddScoreCallback = ?*const fn (score: ?*PDScore, errorMessage: ?[*:0]const u8) callconv(.c) void;
+pub const PersonalBestCallback = ?*const fn (score: ?*PDScore, errorMessage: ?[*:0]const u8) callconv(.c) void;
+pub const BoardsListCallback = ?*const fn (boards: ?*PDBoardsList, errorMessage: ?[*:0]const u8) callconv(.c) void;
+pub const ScoresCallback = ?*const fn (scores: ?*PDScoresList, errorMessage: ?[*:0]const u8) callconv(.c) void;
 
 pub const PlaydateScoreboards = extern struct {
-    addScore: *const fn (boardId: [*c]const u8, value: u32, callback: AddScoreCallback) callconv(.c) c_int,
-    getPersonalBest: *const fn (boardId: [*c]const u8, callback: PersonalBestCallback) callconv(.c) c_int,
+    addScore: *const fn (boardId: ?[*:0]const u8, value: u32, callback: AddScoreCallback) callconv(.c) c_int,
+    getPersonalBest: *const fn (boardId: ?[*:0]const u8, callback: PersonalBestCallback) callconv(.c) c_int,
     freeScore: *const fn (score: ?*PDScore) callconv(.c) void,
 
     getScoreboards: *const fn (callback: BoardsListCallback) callconv(.c) c_int,
     freeBoardsList: *const fn (boards: ?*PDBoardsList) callconv(.c) void,
 
-    getScores: *const fn (boardId: [*c]const u8, callback: ScoresCallback) callconv(.c) c_int,
+    getScores: *const fn (boardId: ?[*:0]const u8, callback: ScoresCallback) callconv(.c) c_int,
     freeScoresList: *const fn (scores: ?*PDScoresList) callconv(.c) void,
+};
+
+///////Network///////////
+pub const HTTPConnection = opaque {};
+pub const TCPConnection = opaque {};
+
+pub const PDNetErr = enum(c_int) {
+    NET_OK = 0,
+    NET_NO_DEVICE = -1,
+    NET_BUSY = -2,
+    NET_WRITE_ERROR = -3,
+    NET_WRITE_BUSY = -4,
+    NET_WRITE_TIMEOUT = -5,
+    NET_READ_ERROR = -6,
+    NET_READ_BUSY = -7,
+    NET_READ_TIMEOUT = -8,
+    NET_READ_OVERFLOW = -9,
+    NET_FRAME_ERROR = -10,
+    NET_BAD_RESPONSE = -11,
+    NET_ERROR_RESPONSE = -12,
+    NET_RESET_TIMEOUT = -13,
+    NET_BUFFER_TOO_SMALL = -14,
+    NET_UNEXPECTED_RESPONSE = -15,
+    NET_NOT_CONNECTED_TO_AP = -16,
+    NET_NOT_IMPLEMENTED = -17,
+    NET_CONNECTION_CLOSED = -18,
+};
+
+pub const WifiStatus = enum(c_int) {
+    WifiNotConnected = 0, //< Not connected to an AP
+    WifiConnected, //< Device is connected to an AP
+    WifiNotAvailable, //< A connection has been attempted and no configured AP was available
+};
+
+pub const HTTPConnectionCallback = ?*const fn (connection: ?*HTTPConnection) callconv(.c) void;
+pub const HTTPHeaderCallback = ?*const fn (conn: ?*HTTPConnection, key: ?[*:0]const u8, value: ?[*:0]const u8) callconv(.c) void;
+
+pub const PlaydateHTTP = extern struct {
+    requestAccess: *const fn (server: ?[*:0]const u8, port: c_int, usessl: bool, purpose: ?[*:0]const u8, requestCallback: AccessRequestCallback, userdata: ?*anyopaque) callconv(.c) AccessReply,
+
+    newConnection: *const fn (server: ?[*:0]const u8, port: c_int, usessl: bool) callconv(.c) ?*HTTPConnection,
+    retain: *const fn (http: ?*HTTPConnection) callconv(.c) ?*HTTPConnection,
+    release: *const fn (http: ?*HTTPConnection) callconv(.c) void,
+
+    setConnectTimeout: *const fn (connection: ?*HTTPConnection, ms: c_int) callconv(.c) void,
+    setKeepAlive: *const fn (connection: ?*HTTPConnection, keepalive: bool) callconv(.c) void,
+    setByteRange: *const fn (connection: ?*HTTPConnection, start: c_int, end: c_int) callconv(.c) void,
+    setUserdata: *const fn (connection: ?*HTTPConnection, userdata: ?*anyopaque) callconv(.c) void,
+    getUserdata: *const fn (connection: ?*HTTPConnection) callconv(.c) ?*anyopaque,
+
+    get: *const fn (connection: ?*HTTPConnection, path: ?[*:0]const u8, headers: ?[*:0]const u8, headerlen: usize) callconv(.c) PDNetErr,
+    post: *const fn (connection: ?*HTTPConnection, path: ?[*:0]const u8, headers: ?[*:0]const u8, headerlen: usize, body: ?[*:0]const u8, bodylen: usize) callconv(.c) PDNetErr,
+    query: *const fn (connection: ?*HTTPConnection, method: ?[*:0]const u8, path: ?[*:0]const u8, headers: ?[*:0]const u8, headerlen: usize, body: ?[*:0]const u8, bodylen: usize) callconv(.c) PDNetErr,
+    getError: *const fn (connection: ?*HTTPConnection) callconv(.c) PDNetErr,
+    getProgress: *const fn (connection: ?*HTTPConnection, read: ?*c_int, total: ?*c_int) callconv(.c) void,
+    getResponseStatus: *const fn (connection: ?*HTTPConnection) callconv(.c) c_int,
+    getBytesAvailable: *const fn (connection: ?*HTTPConnection) callconv(.c) usize,
+    setReadTimeout: *const fn (connection: ?*HTTPConnection, ms: c_int) callconv(.c) void,
+    setReadBufferSize: *const fn (connection: ?*HTTPConnection, bytes: c_int) callconv(.c) void,
+    read: *const fn (connection: ?*HTTPConnection, buf: [*c]u8, buflen: c_uint) callconv(.c) c_int,
+    close: *const fn (connection: ?*HTTPConnection) callconv(.c) void,
+
+    setHeaderReceivedCallback: *const fn (connection: ?*HTTPConnection, headercb: HTTPHeaderCallback) callconv(.c) void,
+    setHeadersReadCallback: *const fn (connection: ?*HTTPConnection, callback: HTTPConnectionCallback) callconv(.c) void,
+    setResponseCallback: *const fn (connection: ?*HTTPConnection, callback: HTTPConnectionCallback) callconv(.c) void,
+    setRequestCompleteCallback: *const fn (connection: ?*HTTPConnection, callback: HTTPConnectionCallback) callconv(.c) void,
+    setConnectionClosedCallback: *const fn (connection: ?*HTTPConnection, callback: HTTPConnectionCallback) callconv(.c) void,
+};
+
+pub const TCPConnectionCallback = ?*const fn (connection: ?*TCPConnection, err: PDNetErr) callconv(.c) void;
+pub const TCPOpenCallback = ?*const fn (connection: ?*TCPConnection, err: PDNetErr, ud: ?*anyopaque) callconv(.c) void;
+
+pub const PlaydateTCP = extern struct {
+    requestAccess: *const fn (server: ?[*:0]const u8, port: c_int, usessl: bool, purpose: ?[*:0]const u8, requestCallback: AccessRequestCallback, userdata: ?*anyopaque) callconv(.c) AccessReply,
+
+    newConnection: *const fn (server: ?[*:0]const u8, port: c_int, usessl: bool) callconv(.c) ?*TCPConnection,
+    retain: *const fn (tcp: ?*TCPConnection) callconv(.c) ?*TCPConnection,
+    release: *const fn (tcp: ?*TCPConnection) callconv(.c) void,
+    getError: *const fn (connection: ?*TCPConnection) callconv(.c) PDNetErr,
+
+    setConnectTimeout: *const fn (connection: ?*TCPConnection, ms: c_int) callconv(.c) void,
+    setUserdata: *const fn (connection: ?*TCPConnection, userdata: ?*anyopaque) callconv(.c) void,
+    getUserdata: *const fn (connection: ?*TCPConnection) callconv(.c) ?*anyopaque,
+
+    open: *const fn (connection: ?*TCPConnection, cb: TCPOpenCallback, ud: ?*anyopaque) callconv(.c) PDNetErr,
+    close: *const fn (connection: ?*TCPConnection) callconv(.c) PDNetErr,
+
+    setConnectionClosedCallback: *const fn (connection: ?*TCPConnection, callback: TCPConnectionCallback) callconv(.c) void,
+
+    setReadTimeout: *const fn (connection: ?*TCPConnection, ms: c_int) callconv(.c) void,
+    setReadBufferSize: *const fn (connection: ?*TCPConnection, bytes: c_int) callconv(.c) void,
+    getBytesAvailable: *const fn (connection: ?*TCPConnection) callconv(.c) usize,
+
+    read: *const fn (connection: ?*TCPConnection, buffer: [*c]u8, length: usize) callconv(.c) c_int, // returns # of bytes read, or PDNetErr on error
+    write: *const fn (connection: ?*TCPConnection, buffer: [*c]const u8, length: usize) callconv(.c) c_int, // returns # of bytes read, or PDNetErr on error
+};
+
+pub const PlaydateNetwork = extern struct {
+    playdate_http: *const PlaydateHTTP,
+    playdate_tcp: *const PlaydateTCP,
+
+    getStatus: *const fn () callconv(.c) WifiStatus,
+    setEnabled: *const fn (flag: bool, callback: ?*const fn (err: PDNetErr) callconv(.c) void) callconv(.c) void,
+
+    reserved: [3]usize,
 };

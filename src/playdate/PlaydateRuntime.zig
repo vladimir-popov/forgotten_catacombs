@@ -103,7 +103,7 @@ fn addMenuItem(
     callback: g.Runtime.MenuItemCallback,
 ) ?*anyopaque {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    return self.playdate.system.addMenuItem(title.ptr, callback, game_object).?;
+    return self.playdate.system.addMenuItem(title[0.. :0], callback, game_object).?;
 }
 
 fn removeAllMenuItems(ptr: *anyopaque) void {
@@ -212,10 +212,10 @@ fn openFile(ptr: *anyopaque, file_path: []const u8, mode: g.Runtime.FileMode, bu
     var path_buf: [50]u8 = undefined;
     const full_path = try std.fmt.bufPrint(&path_buf, "{s}/{s}", .{ save_dir, file_path });
     path_buf[full_path.len] = 0;
-    const file_ptr = self.playdate.file.open(full_path.ptr, file_options) orelse {
+    const file_ptr = self.playdate.file.open(full_path[0.. :0], file_options) orelse {
         log.err(
             "Error on opening file {s} in mode {s}: {s}",
-            .{ full_path, @tagName(mode), self.playdate.file.geterr() },
+            .{ full_path, @tagName(mode), self.playdate.file.geterr() orelse "" },
         );
         return error.IOError;
     };
@@ -237,7 +237,7 @@ fn closeFile(ptr: *anyopaque, file: *anyopaque) void {
             std.debug.panic("Error on flushing file {any}: {any}", .{ file, err });
         };
     if (self.playdate.file.close(file_wrapper.sdfile()) < 0) {
-        std.debug.panic("Error on closing file {any}: {s}", .{ file, self.playdate.file.geterr() });
+        std.debug.panic("Error on closing file {any}: {s}", .{ file, self.playdate.file.geterr() orelse "" });
     }
     self.alloc.destroy(file_wrapper);
 }
@@ -258,7 +258,7 @@ fn isFileExists(ptr: *anyopaque, file_path: []const u8) anyerror!bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     var result = ExpectedFile{ .file_name = file_path };
     if (self.playdate.file.listfiles(save_dir, validateFile, &result, 0) < 0) {
-        log.err("Error on listing files inside {s}: {s}", .{ save_dir, self.playdate.file.geterr() });
+        log.err("Error on listing files inside {s}: {s}", .{ save_dir, self.playdate.file.geterr() orelse "" });
         return error.IOError;
     }
 
@@ -272,8 +272,8 @@ fn deleteFileIfExists(ptr: *anyopaque, file_path: []const u8) !void {
     var buf: [50]u8 = undefined;
     const full_path = try std.fmt.bufPrint(&buf, "{s}/{s}", .{ save_dir, file_path });
     buf[full_path.len] = 0;
-    if (self.playdate.file.unlink(full_path.ptr, 0) < 0) {
-        log.err("Error on deleting file {s}: {s}", .{ file_path, self.playdate.file.geterr() });
+    if (self.playdate.file.unlink(full_path[0.. :0], 0) < 0) {
+        log.err("Error on deleting file {s}: {s}", .{ file_path, self.playdate.file.geterr() orelse "" });
         return error.IOError;
     }
 }

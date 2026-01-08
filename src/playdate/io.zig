@@ -39,7 +39,7 @@ pub const FileReader = struct {
         const buffer = limit.slice(try io_w.writableSliceGreedy(1));
         const len = self.playdate.file.read(self.file, buffer.ptr, @intCast(buffer.len));
         if (len < 0) {
-            log.err("Error on reading from the file {any}: {s}", .{ self.file, self.playdate.file.geterr() });
+            log.err("Error on reading from the file {any}: {s}", .{ self.file, self.playdate.file.geterr() orelse "" });
             return error.ReadFailed;
         }
         io_w.advance(@intCast(len));
@@ -64,7 +64,7 @@ pub const FileWriter = struct {
         const self: *FileWriter = @fieldParentPtr("interface", io_w);
         defer {
             if (self.playdate.file.flush(self.file) < 0) {
-                std.debug.panic("Error on flushing file {any}: {s}", .{ self.file, self.playdate.file.geterr() });
+                std.debug.panic("Error on flushing file {any}: {s}", .{ self.file, self.playdate.file.geterr() orelse "" });
             }
         }
 
@@ -74,7 +74,7 @@ pub const FileWriter = struct {
         if (buffered.len != 0) {
             const len = self.playdate.file.write(self.file, buffered.ptr, @intCast(buffered.len));
             if (len < 0) {
-                log.err("Error on writing to the file {any}: {s}", .{ self.file, self.playdate.file.geterr() });
+                log.err("Error on writing to the file {any}: {s}", .{ self.file, self.playdate.file.geterr() orelse "" });
                 return error.WriteFailed;
             }
             return io_w.consume(@intCast(len));
@@ -83,7 +83,7 @@ pub const FileWriter = struct {
             if (buf.len == 0) continue;
             const len = self.playdate.file.write(self.file, buf.ptr, @intCast(buf.len));
             if (len < 0) {
-                log.err("Error on writing to the file {any}: {s}", .{ self.file, self.playdate.file.geterr() });
+                log.err("Error on writing to the file {any}: {s}", .{ self.file, self.playdate.file.geterr() orelse "" });
                 return error.WriteFailed;
             }
             return io_w.consume(@intCast(len));
@@ -92,7 +92,7 @@ pub const FileWriter = struct {
         if (pattern.len == 0 or splat == 0) return 0;
         const len = self.playdate.file.write(self.file, pattern.ptr, @intCast(pattern.len));
         if (len < 0) {
-            log.err("Error on writing to the file {any}: {s}", .{ self.file, self.playdate.file.geterr() });
+            log.err("Error on writing to the file {any}: {s}", .{ self.file, self.playdate.file.geterr() orelse "" });
             return error.WriteFailed;
         }
         return io_w.consume(@intCast(len));
