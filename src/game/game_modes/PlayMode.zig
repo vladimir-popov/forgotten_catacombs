@@ -8,7 +8,7 @@ const w = g.windows;
 const log = std.log.scoped(.play_mode);
 
 /// How long a notification should be shown by default
-const SHOW_NOTIFICATION_MS = 700;
+const SHOW_NOTIFICATION_MS = 800;
 
 const Self = @This();
 

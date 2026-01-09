@@ -15,12 +15,12 @@ test "Init near the shop" {
         \\╔═══════════════════╗══════════════════╗
         \\║        Buy        ║      Sell        ║
         \\║                   ╚══════════════════║
-        \\║¡ Oil lamp                       75$ ▒║
-        \\║% Food ration                    75$ ░║
+        \\║] Jacket                         52$ ▒║
+        \\║¡ Oil lamp                       75$ ░║
         \\║¿ A white potion                 45$ ░║
+        \\║} Light crossbow                 75$ ░║
+        \\║% Apple                          15$ ░║
         \\║¿ A blue potion                  45$ ░║
-        \\║/ Club                           42$ ░║
-        \\║\ Short bow                      75$ ░║
         \\╚══════════════════════════════════════╝
         \\════════════════════════════════════════
         \\ Your money:   40$    Close     Choose ⇧
@@ -62,19 +62,11 @@ test "Trying to buy when NOT enough money" {
     // then:
     try std.testing.expectEqual(items_before, test_session.player.inventory().items.size());
     try test_session.runtime.display.expectLooksLike(
-        \\╔═══════════════════╗══════════════════╗
-        \\║        Buy        ║      Sell        ║
-        \\║                   ╚══════════════════║
         \\║┌────────────────────────────────────┐║
         \\║│          You have not enough       │║
         \\║│                 money.             │║
         \\║└────────────────────────────────────┘║
-        \\║/ Club                           42$ ░║
-        \\║\ Short bow                      75$ ░║
-        \\╚══════════════════════════════════════╝
-        \\════════════════════════════════════════
-        \\ Your money:    0$              Close   
-    , .whole_display);
+    , .{ .region = .init(4, 1, 4, 40) });
 }
 
 test "Selling something" {

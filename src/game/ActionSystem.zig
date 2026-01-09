@@ -91,14 +91,15 @@ pub fn onTurnCompleted(self: *Self) !void {
     while (hunger_itr.next()) |tuple| {
         const entity, const hunger = tuple;
         hunger.turns_after_eating +|= 1;
-        const turns_to_damage: u8 = switch (hunger.level()) {
+        // how often the entity should be damaged by hunger
+        const damage_every_turn: u8 = switch (hunger.level()) {
             .well_fed => 0,
             .hunger => 8,
             .severe_hunger => 5,
             .critical_starvation => 3,
         };
 
-        if (turns_to_damage == 0 or hunger.turns_after_eating % turns_to_damage != 0) continue;
+        if (damage_every_turn == 0 or hunger.turns_after_eating % damage_every_turn != 0) continue;
 
         const health = self.session().registry.get(entity, c.Health) orelse
             std.debug.panic("Entity {d} has Hunger, but doesn't have a Health component", .{entity.id});

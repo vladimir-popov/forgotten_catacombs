@@ -5,15 +5,6 @@ const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
-food_ration: c.Components = archetype.food(.{
-    .description = .{ .preset = .food_ration },
-    .rarity = .common,
-    .sprite = .{ .codepoint = cp.food },
-    .weight = .{ .value = 50 },
-    .price = .{ .value = 50 },
-    .consumable = .{ .consumable_type = .food, .calories = 150 },
-}),
-
 oil_lamp: c.Components = archetype.item(.{
     .description = .{ .preset = .oil_lamp },
     .rarity = .rare,
@@ -122,7 +113,16 @@ pub const Food = struct {
         .sprite = .{ .codepoint = cp.food },
         .weight = .{ .value = 5 },
         .price = .{ .value = 10 },
-        .consumable = .{ .consumable_type = .food, .calories = 50 },
+        .consumable = .{ .consumable_type = .food, .calories = 150 },
+    }),
+
+    food_ration: c.Components = archetype.food(.{
+        .description = .{ .preset = .food_ration },
+        .rarity = .common,
+        .sprite = .{ .codepoint = cp.food },
+        .weight = .{ .value = 50 },
+        .price = .{ .value = 50 },
+        .consumable = .{ .consumable_type = .food, .calories = 750 },
     }),
 };
 
@@ -134,7 +134,7 @@ pub const Potions = struct {
         .effects = .init(.{ .heal = .range(20, 25) }),
         .weight = .{ .value = 10 },
         .price = .{ .value = 50 },
-        .consumable = .{ .consumable_type = .potion, .calories = 10 },
+        .consumable = .{ .consumable_type = .potion, .calories = 50 },
     }),
 
     poisoning_potion: c.Components = archetype.potion(.{
@@ -144,7 +144,7 @@ pub const Potions = struct {
         .effects = .init(.{ .poison = .range(10, 20) }),
         .weight = .{ .value = 10 },
         .price = .{ .value = 30 },
-        .consumable = .{ .consumable_type = .potion, .calories = 0 },
+        .consumable = .{ .consumable_type = .potion, .calories = 10 },
     }),
 
     oil_potion: c.Components = archetype.potion(.{
@@ -154,6 +154,6 @@ pub const Potions = struct {
         .effects = .init(.{ .poison = .range(20, 25) }),
         .weight = .{ .value = 10 },
         .price = .{ .value = 30 },
-        .consumable = .{ .consumable_type = .potion, .calories = 0 },
+        .consumable = .{ .consumable_type = .potion, .calories = 10 },
     }),
 };

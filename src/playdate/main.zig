@@ -5,7 +5,7 @@ const g = @import("game");
 const PlaydateRuntime = @import("PlaydateRuntime.zig");
 
 pub const std_options = std.Options{
-    .log_level = .info,
+    .log_level = .warn,
     .logFn = writeLog,
     .log_scope_levels = &[_]std.log.ScopeLevel{
         // .{ .scope = .default, .level = .debug },

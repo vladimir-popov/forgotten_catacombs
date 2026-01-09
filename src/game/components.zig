@@ -235,14 +235,16 @@ pub const Effects = struct {
     /// ```
     /// .init(.{ .fire = .{ .min = 0, .max = 3 } });
     /// ```
-    pub fn init(values: std.enums.EnumFieldStruct(Type, p.Range(u8), .zeros)) Effects {
-        return .{ .values = .initFullWithDefault(.zeros, values) };
+    pub fn init(values: std.enums.EnumFieldStruct(Type, ?p.Range(u8), @as(?p.Range(u8), null))) Effects {
+        return .{ .values = .init(values) };
     }
 
     pub fn modify(self: *Effects, effect_type: Type, modificator: i8) void {
         if (self.values.getPtr(effect_type)) |values| {
-            values.min = @max(0, modificator + @as(i8, @intCast(values.min)));
-            values.max = @max(0, modificator + @as(i8, @intCast(values.max)));
+            values.min = @max(0, @as(i8, @intCast(values.min)) + modificator);
+            values.max = @max(0, @as(i8, @intCast(values.max)) + modificator);
+        } else if (modificator > 0) {
+            self.values.put(effect_type, .range(0, @intCast(modificator)));
         }
     }
 
@@ -265,8 +267,8 @@ pub const Protection = struct {
     /// ```
     /// .init(.{ .fire = .{ .min = 0, .max = 3 } });
     /// ```
-    pub fn init(values: std.enums.EnumFieldStruct(Effects.Type, p.Range(u8), .zeros)) Protection {
-        return .{ .resistance = .initFullWithDefault(.zeros, values) };
+    pub fn init(values: std.enums.EnumFieldStruct(Effects.Type, ?p.Range(u8), @as(?p.Range(u8), null))) Protection {
+        return .{ .resistance = .init(values) };
     }
 
     pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
@@ -286,8 +288,8 @@ pub const Modification = struct {
     /// ```
     /// .init(.{ .fire = -3 });
     /// ```
-    pub fn init(modificators: std.enums.EnumFieldStruct(Effects.Type, i8, 0)) Modification {
-        return .{ .modificators = .initFullWithDefault(0, modificators) };
+    pub fn init(modificators: std.enums.EnumFieldStruct(Effects.Type, ?i8, @as(?i8, null))) Modification {
+        return .{ .modificators = .init(modificators) };
     }
 
     pub fn applyTo(self: *Modification, effects: *Effects) void {
@@ -310,7 +312,7 @@ pub const Modification = struct {
 pub const Consumable = struct {
     pub const Type = enum { food, potion };
     consumable_type: Type,
-    calories: u8,
+    calories: u16,
 };
 
 pub const Hunger = struct {
@@ -336,9 +338,9 @@ pub const Hunger = struct {
 
     pub fn level(self: Hunger) Level {
         return switch (self.turns_after_eating) {
-            0...200 => .well_fed,
-            201...350 => .hunger,
-            351...400 => .severe_hunger,
+            0...500 => .well_fed,
+            501...850 => .hunger,
+            851...1000 => .severe_hunger,
             else => .critical_starvation,
         };
     }

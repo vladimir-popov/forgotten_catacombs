@@ -42,7 +42,7 @@ test "Describe an unknown potion" {
         \\│                                      │
         \\│ Effects:                             │
         \\│     ?                                │
-        \\│ Calories: 10                         │
+        \\│ Calories: 50                         │
         \\│                                      │
         \\│ Weight: 10                           │
         \\└──────────────────────────────────────┘
@@ -74,7 +74,7 @@ test "Describe a known potion (after drinking a similar)" {
         \\│                                     ░│
         \\│ Effects:                            ░│
         \\│   heal 20-25                        ░│
-        \\│ Calories: 10                        ░│
+        \\│ Calories: 50                        ░│
         \\│                                     ░│
         \\└──────────────────────────────────────┘
     , .game_area);
