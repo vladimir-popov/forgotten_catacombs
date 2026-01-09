@@ -36,8 +36,9 @@ fn writeLog(
     args: anytype,
 ) void {
     var buffer: [256]u8 = @splat(0);
-    _ = std.fmt.bufPrint(&buffer, format, args) catch |err|
-        std.debug.panic("Unhandled error {any} on log {s}", .{ err, format });
+    _ = std.fmt.bufPrint(&buffer, format, args) catch |err| {
+        std.debug.panic("Unhandled error {t} on log {s}", .{ err, format });
+    };
     playdate_log_to_console("%s (%s) %s", @tagName(lvl), @tagName(scope), (&buffer).ptr);
 }
 
@@ -49,7 +50,8 @@ pub fn panic(
     _ = error_return_trace;
     _ = return_address;
     playdate_error_to_console("%s", msg.ptr);
-    while (true) {}
+    @breakpoint();
+    @trap();
 }
 
 var playdate_error_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.c) void = undefined;

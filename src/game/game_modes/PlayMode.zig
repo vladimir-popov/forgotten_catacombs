@@ -34,8 +34,6 @@ const NotificationMessage = struct {
     start_showing_at: u64,
     /// where to place the first latter of the notification
     pp: p.Point,
-    /// which mode should be used to show the notification
-    mode: g.DrawingMode,
 
     /// The region of the display occupied by the notification
     pub fn region(self: NotificationMessage) p.Region {
@@ -49,10 +47,6 @@ const NotificationMessage = struct {
             // Start calculation of the place to show from the player place on the screen
             .pp = session.viewport.relative(session.level.playerPosition().place) orelse unreachable,
             .start_showing_at = session.runtime.currentMillis(),
-            .mode = switch (notification) {
-                .exp => .inverted,
-                else => .normal,
-            },
         };
         msg.len = @intCast((try std.fmt.bufPrint(&msg.buffer, "{f}", .{notification})).len);
         const display_region = p.Region.init(1, 1, session.viewport.region.rows, session.viewport.region.cols);
@@ -382,8 +376,7 @@ fn showNotifications(self: *Self) !bool {
             self.notification = null;
             return false;
         } else {
-            try self.session.render.drawText(msg.buffer[0..msg.len], msg.pp, msg.mode);
-            // try self.session.render.drawInfo(msg.buffer[0..msg.len]);
+            try self.session.render.drawText(msg.buffer[0..msg.len], msg.pp, .inverted);
             return true;
         }
     }
