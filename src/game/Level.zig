@@ -517,8 +517,8 @@ pub fn addEnemy(self: *g.Level, state: c.EnemyState, enemy: c.Components) !g.Ent
 }
 
 pub fn addRandomEnemy(self: *g.Level, rand: std.Random, place: p.Point) !g.Entity {
-    const idx = rand.uintLessThan(usize, g.presets.Enemies.fields.values.len);
-    var enemy = g.presets.Enemies.fields.values[idx].*;
+    const idx = rand.uintLessThan(usize, g.entities.presets.Enemies.fields.values.len);
+    var enemy = g.entities.presets.Enemies.fields.values[idx].*;
     enemy.position = .{ .place = place, .zorder = .obstacle };
     enemy.state = if (rand.uintLessThan(u8, 5) == 0) .sleeping else .walking;
     const id = try self.registry.addNewEntity(enemy);

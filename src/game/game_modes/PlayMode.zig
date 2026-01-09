@@ -242,6 +242,10 @@ fn handleInput(self: *Self) !?g.actions.Action {
                 self.session.level.dijkstra_map,
                 self.session.viewport.region,
             ),
+            .get_item => |item| {
+                const entity = try self.session.registry.addNewEntity(g.entities.presets.Items.get(item));
+                try self.session.registry.getUnsafe(self.session.player, c.Inventory).items.add(entity);
+            },
             .turn_light_on => g.visibility.turn_light_on = true,
             .turn_light_off => g.visibility.turn_light_on = false,
             .set_health => |hp| {
@@ -405,7 +409,7 @@ fn drawInfoBar(self: *const Self) !void {
             }
         }
         var buf: [32]u8 = undefined;
-        try self.session.render.drawInfo(try g.descriptions.printName(&buf, self.session.journal, entity));
+        try self.session.render.drawInfo(try g.meta.printName(&buf, self.session.journal, entity));
     } else if (self.session.registry.get(self.session.player, c.Hunger)) |hunger| {
         // Draw the hunger level
         switch (hunger.level()) {

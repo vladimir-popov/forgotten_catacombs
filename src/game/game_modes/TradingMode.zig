@@ -172,7 +172,7 @@ fn formatProduct(self: *Self, line: *w.TextArea.Line, item: g.Entity, for_buying
     if (self.session.registry.get2(item, c.Price, c.Sprite)) |tuple| {
         const price, const sprite = tuple;
         var buf: [16]u8 = undefined;
-        const name = try g.descriptions.printName(&buf, self.session.journal, item);
+        const name = try g.meta.printName(&buf, self.session.journal, item);
         return try std.fmt.bufPrint(
             line,
             product_fmt,

@@ -5,6 +5,7 @@ const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
+
 food_ration: c.Components = archetype.food(.{
     .description = .{ .preset = .food_ration },
     .rarity = .common,
@@ -19,7 +20,7 @@ oil_lamp: c.Components = archetype.item(.{
     .rarity = .rare,
     .sprite = .{ .codepoint = cp.source_of_light },
     .weight = .{ .value = 80 },
-    .source_of_light = .{ .radius = 5 },
+    .source_of_light = .{ .radius = 4 },
     .price = .{ .value = 50 },
 }),
 
@@ -88,7 +89,7 @@ pub const Weapons = struct {
         .rarity = .common,
         .sprite = .{ .codepoint = cp.source_of_light },
         .weight = .{ .value = 20 },
-        .source_of_light = .{ .radius = 3 },
+        .source_of_light = .{ .radius = 2 },
         .price = .{ .value = 5 },
         .effects = .init(.{ .physical = .range(1, 1), .fire = .range(1, 1) }),
         .weapon = .melee(.primitive),

@@ -36,12 +36,6 @@ pub const Runtime = @import("Runtime.zig");
 pub const TextAlign = Runtime.TextAlign;
 pub const Viewport = @import("Viewport.zig");
 
-pub const presets = struct {
-    pub const Descriptions = utils.Preset(descriptions.Description, descriptions);
-    pub const Items = utils.Preset(components.Components, entities.Items);
-    pub const Enemies = utils.Preset(components.Components, entities.Enemies);
-};
-
 /// How many move points should spent player to increase a turns counter
 pub const MOVE_POINTS_IN_TURN = 10;
 

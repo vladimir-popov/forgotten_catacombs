@@ -129,7 +129,7 @@ test "Show a notification near an enemy" {
     errdefer test_session.printDisplay();
 
     const pp = test_session.player.position().place.movedTo(.up).movedTo(.left);
-    const rat = try test_session.session.level.addEnemy(.sleeping, g.entities.Enemies.atPlace(.rat, pp));
+    const rat = try test_session.session.level.addEnemy(.sleeping, g.entities.enemyAtPlace(.rat, pp));
     test_session.session.mode.play.target = rat;
 
     try test_session.session.notify(.{ .hit = .{ .target = rat, .damage = 5 } });

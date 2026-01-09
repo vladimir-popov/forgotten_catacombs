@@ -137,7 +137,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                         try self.menu.handleKeyboardButton(btn);
                     }
                 } else if (self.cmd.cursor_idx > 0) {
-                    self.cheat = try self.cmd.readCheat();
+                    self.cheat = self.cmd.readCheat();
                     try self.cmd.display_buffer.writeBuffer(
                         &stdout.interface,
                         rows_pad + display_rows - 2,

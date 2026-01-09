@@ -78,12 +78,13 @@ pub fn showInRadiusOfSourceOfLight(level: *const g.Level, place: p.Point) g.Rend
     if (turn_light_on) return .visible;
 
     _, const radius = g.meta.getLight(level.registry, level.player_equipment);
+    const pp = level.playerPosition().place;
 
-    if (level.playerPosition().place.distanceTo(place) > radius) {
+    if (place.isInsideElipse(pp, radius, radius * 0.7)) {
+        return .visible;
+    } else {
         log.debug("The place {any} is out of the light radius {d:.2}", .{ place, radius });
         return chechKnownPlaces(level, place);
-    } else {
-        return .visible;
     }
 }
 

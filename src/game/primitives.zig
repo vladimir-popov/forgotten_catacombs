@@ -151,6 +151,16 @@ pub const Point = struct {
         const y2: i16 = @intCast(line_end.row);
         return (x - x1) * (y2 - y1) - (y - y1) * (x2 - x1);
     }
+
+    pub fn isInsideElipse(self: Point, center: Point, rx: f16, ry: f16) bool {
+        const x0: f16 = @floatFromInt(center.col);
+        const y0: f16 = @floatFromInt(center.row);
+        const x: f16 = @floatFromInt(self.col);
+        const y: f16 = @floatFromInt(self.row);
+        const x2 = x - x0;
+        const y2 = y - y0;
+        return (x2 * x2) / (rx * rx) + (y2 * y2) / (ry * ry) <= 1;
+    }
 };
 
 // The range from the `min` value inclusive to the `max` value inclusive.

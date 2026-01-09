@@ -21,6 +21,9 @@ pub const Cheat = union(enum) {
     /// Prints to log a Dijkstra map
     dump_vector_field,
 
+    /// Creates a new item and put it to player's inventory
+    get_item: g.entities.presets.Items.Tag,
+
     // Moves the player to the point on the screen (1-based).
     goto: p.Point,
 
@@ -52,8 +55,14 @@ pub const Cheat = union(enum) {
     /// Replaces a current visibility strategy to appropriate for a current level.
     turn_light_off,
 
-    pub fn init(tag: Tag, args: []const u8) ?Cheat {
+    pub fn parseArgs(tag: Tag, args_str: []const u8) ?Cheat {
+        const args = std.mem.trim(u8, args_str, " ");
         switch (tag) {
+            .get_item => if (std.meta.stringToEnum(g.entities.presets.Items.Tag, args)) |item| {
+                return .{ .get_item = item };
+            } else {
+                log.warn("Wrong arguments '{s}' for 'get' command.", .{args});
+            },
             .goto => {
                 var itr = std.mem.tokenizeScalar(u8, args, ' ');
                 if (itr.next()) |a_str|
@@ -139,6 +148,7 @@ pub const Cheat = union(enum) {
             return switch (self) {
                 .dump_entity => "dump entity",
                 .dump_vector_field => "dump vectors",
+                .get_item => "get",
                 .goto => "goto",
                 .move_player_to_ladder_down => "down ladder",
                 .move_player_to_ladder_up => "up ladder",
@@ -157,7 +167,7 @@ pub const Cheat = union(enum) {
             const tag: Tag = @enumFromInt(f.value);
             const tag_str = toString(tag);
             if (std.mem.startsWith(u8, str, tag_str)) {
-                return Cheat.init(tag, str[tag_str.len..]);
+                return Cheat.parseArgs(tag, str[tag_str.len..]);
             }
         }
         return null;

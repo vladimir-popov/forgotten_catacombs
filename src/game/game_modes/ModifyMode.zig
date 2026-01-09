@@ -168,7 +168,7 @@ const line_fmt = std.fmt.comptimePrint(
 fn formatLine(self: *Self, buffer: []u8, item: g.Entity, price: u16) ![]const u8 {
     const sprite = self.session.registry.getUnsafe(item, c.Sprite);
     var name_buf: [24]u8 = undefined;
-    const name = try g.descriptions.printName(&name_buf, self.session.journal, item);
+    const name = try g.meta.printName(&name_buf, self.session.journal, item);
     return try std.fmt.bufPrint(buffer, line_fmt, .{ sprite.codepoint, name, price });
 }
 

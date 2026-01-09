@@ -31,7 +31,7 @@ test "Describe an unknown potion" {
     defer test_session.deinit();
 
     const inventory = try test_session.openInventory();
-    const potion = try inventory.add(g.presets.Items.get(.healing_potion));
+    const potion = try inventory.add(g.entities.presets.Items.get(.healing_potion));
     const options = try inventory.chooseItemById(potion);
     try options.choose("Describe");
 
@@ -56,13 +56,13 @@ test "Describe a known potion (after drinking a similar)" {
 
     // Drink a potion:
     var inventory = try test_session.openInventory();
-    const potion_to_drink = try inventory.add(g.presets.Items.get(.healing_potion));
+    const potion_to_drink = try inventory.add(g.entities.presets.Items.get(.healing_potion));
     var options = try inventory.chooseItemById(potion_to_drink);
     try options.choose("Drink");
 
     // Check the description:
     inventory = try test_session.openInventory();
-    const potion_to_describe = try inventory.add(g.presets.Items.get(.healing_potion));
+    const potion_to_describe = try inventory.add(g.entities.presets.Items.get(.healing_potion));
     options = try inventory.chooseItemById(potion_to_describe);
     try options.choose("Describe");
 
@@ -88,7 +88,7 @@ test "Describe an unknown enemy" {
 
     // Prepare a game session:
     const pp = test_session.player.position().place.movedTo(.up);
-    const rat = try test_session.session.level.addEnemy(.sleeping, g.entities.Enemies.atPlace(.rat, pp));
+    const rat = try test_session.session.level.addEnemy(.sleeping, g.entities.enemyAtPlace(.rat, pp));
     try test_session.tick();
 
     try test_session.exploreMode();
@@ -118,12 +118,12 @@ test "Describe a known enemy (after killing a similar creature)" {
 
     // Prepare a game session:
     const pp = test_session.player.position().place.movedTo(.up);
-    var rat_to_kick_components = g.entities.Enemies.atPlace(.rat, pp);
+    var rat_to_kick_components = g.entities.enemyAtPlace(.rat, pp);
     rat_to_kick_components.health.?.current = 1;
     const rat_to_kick_id = try test_session.session.level.addEnemy(.sleeping, rat_to_kick_components);
     const rat_to_describe = try test_session.session.level.addEnemy(
         .sleeping,
-        g.entities.Enemies.atPlace(.rat, pp.movedToNTimes(.up, 5)),
+        g.entities.enemyAtPlace(.rat, pp.movedToNTimes(.up, 5)),
     );
     try test_session.tick();
 

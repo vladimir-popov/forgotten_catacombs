@@ -7,7 +7,7 @@
 const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
-const descriptions = g.presets.Descriptions;
+const descriptions = g.components.Description.Preset;
 const p = g.primitives;
 const w = g.windows;
 
@@ -194,13 +194,13 @@ fn initConfirmStep(self: *Self, stats: c.Stats, skills: c.Skills) !void {
     const health: c.Health = g.meta.initialHealth(stats.constitution);
     const alloc = self.arena.allocator();
     var text_area: w.TextArea = .empty;
-    try g.descriptions.describeProgression(alloc, 1, 0, &text_area);
+    try g.meta.describeProgression(alloc, 1, 0, &text_area);
     _ = try text_area.addEmptyLine(alloc);
-    try g.descriptions.describeHealth(alloc, &health, &text_area);
+    try g.meta.describeHealth(alloc, &health, &text_area);
     _ = try text_area.addEmptyLine(alloc);
-    try g.descriptions.describeSkills(alloc, &skills, &text_area);
+    try g.meta.describeSkills(alloc, &skills, &text_area);
     _ = try text_area.addEmptyLine(alloc);
-    try g.descriptions.describeStats(alloc, &stats, &text_area);
+    try g.meta.describeStats(alloc, &stats, &text_area);
     self.step = .{ .confirm = .init(text_area, stats, skills, health) };
 }
 

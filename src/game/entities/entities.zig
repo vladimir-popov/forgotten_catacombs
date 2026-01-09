@@ -5,8 +5,15 @@ const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
-pub const Items = @import("Items.zig");
-pub const Enemies = @import("Enemies.zig");
+const entities = @This();
+
+const items = @import("items.zig");
+const enemies = @import("enemies.zig");
+
+pub const presets = struct {
+    pub const Items = g.utils.Preset(g.components.Components, entities.items);
+    pub const Enemies = g.utils.Preset(g.components.Components, entities.enemies);
+};
 
 /// Creates components for the player with empty inventory and nothing equipped.
 ///
@@ -32,6 +39,14 @@ pub fn player(
         .stats = stats,
         .wallet = .{ .money = rand.uintAtMost(u16, 20) + 30 },
     };
+}
+
+/// Gets a Components from the preset `item`, adds a Position component with the `place`,
+/// and returns completed structure.
+pub fn enemyAtPlace(item: anytype, place: p.Point) c.Components {
+    var enemy = g.entities.presets.Enemies.get(item);
+    enemy.position = .{ .place = place, .zorder = .obstacle };
+    return enemy;
 }
 
 pub fn openedDoor(place: p.Point) c.Components {

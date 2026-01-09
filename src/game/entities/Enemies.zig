@@ -34,11 +34,3 @@ snake: c.Components = archetype.enemy(.{
     .speed = .{ .move_points = 9 },
     .state = .sleeping,
 }),
-
-/// Gets a Components from the preset `item`, adds a Position component with the `place`,
-/// and returns completed structure.
-pub fn atPlace(item: anytype, place: p.Point) c.Components {
-    var enemy = g.presets.Enemies.get(item);
-    enemy.position = .{ .place = place, .zorder = .obstacle };
-    return enemy;
-}

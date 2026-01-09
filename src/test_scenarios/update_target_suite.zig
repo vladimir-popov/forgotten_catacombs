@@ -12,11 +12,11 @@ test "Change a target to an atacked enemy" {
     const pp = test_session.player.position().place.movedTo(.up);
     const rat_left = try test_session.session.level.addEnemy(
         .sleeping,
-        g.entities.Enemies.atPlace(.rat, pp.movedTo(.left)),
+        g.entities.enemyAtPlace(.rat, pp.movedTo(.left)),
     );
     const rat_top = try test_session.session.level.addEnemy(
         .sleeping,
-        g.entities.Enemies.atPlace(.rat, pp.movedTo(.up)),
+        g.entities.enemyAtPlace(.rat, pp.movedTo(.up)),
     );
     errdefer std.debug.print("Left rat {d}; Top rat {d}\n", .{ rat_left.id, rat_top.id });
 

@@ -74,6 +74,7 @@ pub fn DisplayBuffer(comptime ROWS: u8, comptime COLS: u8) type {
             }
         }
 
+        /// Flashes the buffer to the `writer`.
         pub fn writeBuffer(self: Self, writer: *std.Io.Writer, rows_pad: u8, cols_pad: u8) !void {
             var buf: [4]u8 = undefined;
             for (self.lines, rows_pad..) |line, i| {

@@ -195,7 +195,7 @@ fn initNearScientistWithMoney(test_session: *TestSession, money: u16) !struct { 
     std.testing.random_seed = 100500;
     try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
     const known_weapon_id = test_session.player.equipment().weapon.?;
-    const unknown_item = g.presets.Items.fields.get(.healing_potion).*;
+    const unknown_item = g.entities.presets.Items.fields.get(.healing_potion).*;
     const unknown_item_id = try test_session.session.registry.addNewEntity(unknown_item);
     try test_session.player.inventory().items.add(unknown_item_id);
     test_session.player.position().place = g.dungeon.FirstLocation.scientist_place.movedTo(.right);
