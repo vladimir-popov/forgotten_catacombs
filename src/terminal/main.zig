@@ -74,7 +74,10 @@ pub fn main(init: std.process.Init.Minimal) !void {
     if (use_cheats) {
         log.warn("The Developer is in the room!", .{});
         if (args.str("cheat")) |value| {
-            runtime.cheat = g.Cheat.parse(value);
+            if (g.Cheat.parse(value)) |cheat_or_tag| {
+                if (cheat_or_tag == .cheat)
+                    runtime.cheat = cheat_or_tag.cheat;
+            }
         }
     }
     var game = try alloc.create(g.Game);

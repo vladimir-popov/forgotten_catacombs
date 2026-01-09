@@ -53,7 +53,7 @@ pub fn getLight(registry: *const g.Registry, equipment: *const c.Equipment) stru
             return .{ id, sol.radius };
         }
     }
-    return .{ null, 1.5 };
+    return .{ null, 1.0 };
 }
 
 /// Returns an id of the equipped weapon, or the `actor`, because any enemy must be able to provide

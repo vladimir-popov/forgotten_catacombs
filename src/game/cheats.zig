@@ -7,6 +7,15 @@ const log = std.log.scoped(.cheats);
 
 var global_debug_shop: ?*c.Shop = null;
 
+const items_suggestions: [g.entities.presets.Items.fields.values.len][]const u8 = blk: {
+    var suggestions: [g.entities.presets.Items.fields.values.len][]const u8 = undefined;
+    const items = std.enums.values(g.entities.presets.Items.Tag);
+    for (items, 0..) |item, i| {
+        suggestions[i] = @tagName(item);
+    }
+    break :blk suggestions;
+};
+
 pub const Cheat = union(enum) {
     /// Tag is a name of the cheat.
     /// For some cheats it's enough, but some cheats have additional arguments.
@@ -143,31 +152,33 @@ pub const Cheat = union(enum) {
         return std.mem.order(u8, lhs, rhs) == .lt;
     }
 
-    pub inline fn toString(comptime self: Cheat.Tag) []const u8 {
-        comptime {
-            return switch (self) {
-                .dump_entity => "dump entity",
-                .dump_vector_field => "dump vectors",
-                .get_item => "get",
-                .goto => "goto",
-                .move_player_to_ladder_down => "down ladder",
-                .move_player_to_ladder_up => "up ladder",
-                .recognize => "recognize",
-                .set_health => "set health",
-                .set_money => "set money",
-                .trade => "trade",
-                .turn_light_off => "light off",
-                .turn_light_on => "light on",
-            };
-        }
+    pub inline fn toString(self: Cheat.Tag) []const u8 {
+        return switch (self) {
+            .dump_entity => "dump entity",
+            .dump_vector_field => "dump vectors",
+            .get_item => "get",
+            .goto => "goto",
+            .move_player_to_ladder_down => "down ladder",
+            .move_player_to_ladder_up => "up ladder",
+            .recognize => "recognize",
+            .set_health => "set health",
+            .set_money => "set money",
+            .trade => "trade",
+            .turn_light_off => "light off",
+            .turn_light_on => "light on",
+        };
     }
 
-    pub fn parse(str: []const u8) ?Cheat {
+    pub fn parse(str: []const u8) ?union(enum) { cheat: Cheat, tag: Tag } {
+        const tstr = std.mem.trim(u8, str, " ");
         inline for (std.meta.fields(Tag)) |f| {
             const tag: Tag = @enumFromInt(f.value);
             const tag_str = toString(tag);
-            if (std.mem.startsWith(u8, str, tag_str)) {
-                return Cheat.parseArgs(tag, str[tag_str.len..]);
+            if (std.mem.startsWith(u8, tstr, tag_str)) {
+                if (Cheat.parseArgs(tag, tstr[tag_str.len..])) |cheat|
+                    return .{ .cheat = cheat }
+                else if (tstr.len == tag_str.len)
+                    return .{ .tag = tag };
             }
         }
         return null;
@@ -214,6 +225,13 @@ pub const Cheat = union(enum) {
         return null;
     }
 
+    pub fn suggestions(tag: Tag) ?[]const []const u8 {
+        return switch (tag) {
+            .get_item => &items_suggestions,
+            else => null,
+        };
+    }
+
     inline fn movePlayerToPoint(place: p.Point) g.actions.Action {
         return .{ .move = g.actions.Action.Move{ .target = .{ .new_place = place } } };
     }
@@ -226,13 +244,13 @@ test "list of all cheats in string form" {
 }
 
 test "light on" {
-    try std.testing.expectEqual(.turn_light_on, Cheat.parse("light on"));
+    try std.testing.expectEqual(.turn_light_on, Cheat.parse("light on").?.cheat);
 }
 
 test "goto" {
-    try std.testing.expectEqual(Cheat{ .goto = p.Point.init(2, 3) }, Cheat.parse("goto 2 3"));
+    try std.testing.expectEqual(Cheat{ .goto = p.Point.init(2, 3) }, Cheat.parse("goto 2 3").?.cheat);
 }
 
 test "set health" {
-    try std.testing.expectEqual(Cheat{ .set_health = 42 }, Cheat.parse("set health  42"));
+    try std.testing.expectEqual(Cheat{ .set_health = 42 }, Cheat.parse("set health  42").?.cheat);
 }

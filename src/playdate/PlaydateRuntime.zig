@@ -199,7 +199,10 @@ fn popCheat(_: *anyopaque) ?g.Cheat {
 }
 
 fn serialMessageCallback(data: [*c]const u8) callconv(.c) void {
-    cheat = g.Cheat.parse(std.mem.span(data));
+    if (g.Cheat.parse(std.mem.span(data))) |cheat_or_tag| {
+        if (cheat_or_tag == .cheat)
+            cheat = cheat_or_tag.cheat;
+    }
 }
 
 fn openFile(ptr: *anyopaque, file_path: []const u8, mode: g.Runtime.FileMode, buffer: []u8) anyerror!*anyopaque {
