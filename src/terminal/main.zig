@@ -51,11 +51,6 @@ pub fn handlePanic(
 
 pub fn main(init: std.process.Init.Minimal) !void {
     const args: Args = .{ .args = init.args };
-    const seed = try args.int(u64, "seed") orelse std.crypto.random.int(u64);
-    log.info(
-        "========================================\nSeed of the game is {d}\n========================================",
-        .{seed},
-    );
 
     var gpa = std.heap.DebugAllocator(.{}){};
     defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK DETECTED!");
@@ -63,6 +58,12 @@ pub fn main(init: std.process.Init.Minimal) !void {
 
     var single_threaded_io: std.Io.Threaded = .init_single_threaded;
 
+    const seed: u64 = try args.int(u64, "seed") orelse
+        @intCast((try std.Io.Clock.awake.now(single_threaded_io.io())).toMilliseconds());
+    log.info(
+        "========================================\nSeed of the game is {d}\n========================================",
+        .{seed},
+    );
     const use_cheats = args.flag("devmode");
     const use_mouse = args.flag("mouse");
     const preset = if (args.str("preset")) |preset| parsePreset(preset) else null;

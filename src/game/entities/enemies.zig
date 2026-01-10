@@ -5,6 +5,7 @@ const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
+
 rat: c.Components = archetype.enemy(.{
     .description = .{ .preset = .rat },
     .effects = .init(.{ .physical = .range(1, 3) }),

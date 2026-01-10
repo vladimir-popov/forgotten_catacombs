@@ -726,11 +726,13 @@ test "find a random place for the door on the left side" {
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
+    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
+
     var dung = try Catacomb.parse(&arena, str);
     const region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 4, .cols = 5 };
 
     // when:
-    const place_left = try dung.findPlaceForDoorInRegionRnd(&stack_arena, std.crypto.random, region, .left);
+    const place_left = try dung.findPlaceForDoorInRegionRnd(&stack_arena, prng.random(), region, .left);
 
     // then:
     errdefer std.debug.print("place left {any}\n", .{place_left});
@@ -753,11 +755,13 @@ test "find a random place for the door on the bottom side" {
 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
+    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
+
     var dung = try Catacomb.parse(&arena, str);
     const region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 4, .cols = 5 };
 
     // when:
-    const place_bottom = try dung.findPlaceForDoorInRegionRnd(&stack_arena, std.crypto.random, region, .down);
+    const place_bottom = try dung.findPlaceForDoorInRegionRnd(&stack_arena, prng.random(), region, .down);
 
     // then:
     errdefer std.debug.print("place bottom {any}\n", .{place_bottom});
@@ -776,6 +780,8 @@ test "create passage between two rooms" {
     errdefer std.debug.print("{s}\n", .{str});
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
+    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
+
     var dung = try Catacomb.parse(&arena, str);
     const room1 = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 4, .cols = 4 };
     const room2 = p.Region{ .top_left = .{ .row = 1, .col = 7 }, .rows = 4, .cols = 4 };
@@ -785,7 +791,7 @@ test "create passage between two rooms" {
     const expected_region = room1.unionWith(room2);
 
     // when:
-    const region = try dung.createAndAddPassageBetweenRegions(std.crypto.random, room1, room2);
+    const region = try dung.createAndAddPassageBetweenRegions(prng.random(), room1, room2);
 
     // then:
     try std.testing.expectEqualDeep(expected_region, region);
