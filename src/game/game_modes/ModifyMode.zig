@@ -16,21 +16,36 @@
 //! ║════════════════════════════════════════║
 //! ║    000$             Close       Choose ║
 //! ╚════════════════════════════════════════╝
-//! ╔════════════════════════════════════════╗ ╔════════════════════════════════════════╗ ╔════════════════════════════════════════╗
-//! ║ ╔═════════════════╗═══════════════════╗║ ║ ╔═════════════════╔═══════════════════╗║ ║ ╔═════════════════╗═══════════════════╗║
-//! ║ ║   Recognize     ║       Modify      ║║ ║ ║   Recognize     ║       Modify      ║║ ║ ║   Recognize     ║       Modify      ║║
-//! ║╔╝═════════════════╝                   ║║ ║╔╝═════════════════╝                   ║║ ║╔╝═════════════════╝                   ║║
-//! ║║░\░Club░░░░░░░░░░░░░░░░░░░░░░░░░░100$░║║ ║║ ┌───────────────────────────────────┐║║ ║║ ┌───────────────────────────────────┐║║
-//! ║║ { Bow                           100$ ║║ ║║ │        Describe the item          │║║ ║║ │            Physic                 │║║
-//! ║║                                      ║║ ║║ │        Modify somehow    x1       │║║ ║║ │             Fire                  │║║
-//! ║║                                      ║║ ║║ │        Modify carefully  x2       │║║ ║║ │             Acid                  │║║
-//! ║║                                      ║║ ║║ │        Modify manually   x3       │║║ ║║ │            Poison                 │║║
-//! ║║                                      ║║ ║║ │              Help                 │║║ ║║ └───────────────────────────────────┘║║
-//! ║║                                      ║║ ║║ └───────────────────────────────────┘║║ ║║                                      ║║
-//! ║╚══════════════════════════════════════╝║ ║╚══════════════════════════════════════╝║ ║╚══════════════════════════════════════╝║
-//! ║════════════════════════════════════════║ ║════════════════════════════════════════║ ║════════════════════════════════════════║
-//! ║    000$             Close       Choose ║ ║    000$             Close       Choose ║ ║    000$             Close       Choose ║
-//! ╚════════════════════════════════════════╝ ╚════════════════════════════════════════╝ ╚════════════════════════════════════════╝
+//! 1════════════════════════════════════════╗ 2════════════════════════════════════════╗
+//! ║ ╔═════════════════╗═══════════════════╗║ ║ ╔═════════════════╔═══════════════════╗║
+//! ║ ║   Recognize     ║       Modify      ║║ ║ ║   Recognize     ║       Modify      ║║
+//! ║╔╝═════════════════╝                   ║║ ║╔╝═════════════════╝                   ║║
+//! ║║░\░Club░░░░░░░░░░░░░░░░░░░░░░░░░░100$░║║ ║║ ┌───────────────────────────────────┐║║
+//! ║║ { Bow                           100$ ║║ ║║ │                                   │║║
+//! ║║                                      ║║ ║║ │             Describe              │║║
+//! ║║                                      ║║ ║║ │              Modify               │║║
+//! ║║                                      ║║ ║║ │               Help                │║║
+//! ║║                                      ║║ ║║ │                                   │║║
+//! ║║                                      ║║ ║║ └───────────────────────────────────┘║║
+//! ║╚══════════════════════════════════════╝║ ║╚══════════════════════════════════════╝║
+//! ║════════════════════════════════════════║ ║════════════════════════════════════════║
+//! ║    000$             Close       Choose ║ ║    000$             Close       Choose ║
+//! ╚════════════════════════════════════════╝ ╚════════════════════════════════════════╝
+//! 3════════════════════════════════════════╗ 4════════════════════════════════════════╗
+//! ║ ╔═════════════════╔═══════════════════╗║ ║ ╔═════════════════╗═══════════════════╗║
+//! ║ ║   Recognize     ║       Modify      ║║ ║ ║   Recognize     ║       Modify      ║║
+//! ║╔╝═════════════════╝                   ║║ ║╔╝═════════════════╝                   ║║
+//! ║║ ┌───────────────────────────────────┐║║ ║║ ┌───────────────────────────────────┐║║
+//! ║║ │                                   │║║ ║║ │            Physic                 │║║
+//! ║║ │           Somehow    x1           │║║ ║║ │             Fire                  │║║
+//! ║║ │           Carefully  x2           │║║ ║║ │             Acid                  │║║
+//! ║║ │           Manually   x3           │║║ ║║ │            Poison                 │║║
+//! ║║ │                                   │║║ ║║ └───────────────────────────────────┘║║
+//! ║║ └───────────────────────────────────┘║║ ║║                                      ║║
+//! ║╚══════════════════════════════════════╝║ ║╚══════════════════════════════════════╝║
+//! ║════════════════════════════════════════║ ║════════════════════════════════════════║
+//! ║    000$             Close       Choose ║ ║    000$             Close       Choose ║
+//! ╚════════════════════════════════════════╝ ╚════════════════════════════════════════╝
 //! ```
 const std = @import("std");
 const g = @import("../game_pkg.zig");
@@ -41,7 +56,13 @@ const w = g.windows;
 const log = std.log.scoped(.modify_mode);
 
 const MODAL_WINDOW_REGION: p.Region = p.Region.init(3, 2, g.DISPLAY_ROWS - 5, g.DISPLAY_COLS - 2);
+
 const RECOGNITION_PRICE = 100;
+
+const BASE_MODIFICATION_PRICE = 100;
+
+const CAREFUL_MULTIPLAYER = 1.5;
+const MANUAL_MULTIPLAYER = 2.0;
 
 const Self = @This();
 
@@ -131,7 +152,7 @@ pub fn updateTabs(self: *Self) !void {
         var buffer: [w.WindowWithTabs.CONTENT_AREA_REGION.cols + 4]u8 = undefined;
         if (self.session.journal.isKnown(item)) {
             if (self.canBeModified(item)) {
-                const price = self.calculateBaseModificationPrice(item);
+                const price = self.calculateModificationPrice(item, 1.0);
                 try self.tabModify().scrollable_area.content.addOption(
                     self.alloc,
                     try self.formatLine(&buffer, item, price),
@@ -172,8 +193,7 @@ fn formatLine(self: *Self, buffer: []u8, item: g.Entity, price: u16) ![]const u8
     return try std.fmt.bufPrint(buffer, line_fmt, .{ sprite.codepoint, name, price });
 }
 
-fn calculateBaseModificationPrice(self: Self, item: g.Entity) u16 {
-    const BASE_MODIFICATION_PRICE = 100;
+fn calculateModificationPrice(self: Self, item: g.Entity, multiplayer: f16) u16 {
     var price: u16 = BASE_MODIFICATION_PRICE;
     if (self.session.registry.get(item, c.Rarity)) |rarity| {
         switch (rarity.*) {
@@ -191,7 +211,8 @@ fn calculateBaseModificationPrice(self: Self, item: g.Entity) u16 {
                 price +|= BASE_MODIFICATION_PRICE;
         }
     }
-    return price;
+    const pf: f16 = @floatFromInt(price);
+    return @intFromFloat(multiplayer * pf);
 }
 
 inline fn canBeModified(self: *Self, item: g.Entity) bool {
@@ -234,10 +255,8 @@ fn recognizeItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
 fn modifyDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     var area = w.OptionsArea(g.Entity).centered(self);
-    try area.addOption(self.alloc, "Describe the item", item, describeItem, null);
-    try area.addOption(self.alloc, " Modify somehow   x1$", item, modifySomehow, null);
-    try area.addOption(self.alloc, " Modify carefully x2$", item, modifyCarefully, null);
-    try area.addOption(self.alloc, " Modify manually  x3$", item, modifyManually, null);
+    try area.addOption(self.alloc, "Describe", item, describeItem, null);
+    try area.addOption(self.alloc, "Modify", item, modificationMode, null);
     try area.addOption(self.alloc, "Help", item, showHelp, null);
     self.actions_window = .modalWindow(area, MODAL_WINDOW_REGION);
     // keep the main window opened
@@ -274,17 +293,51 @@ fn showHelp(ptr: *anyopaque, _: usize, _: g.Entity) !bool {
     return false;
 }
 
+fn modificationMode(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    self.actions_window.?.deinit(self.alloc);
+    var area = w.OptionsArea(g.Entity).centered(self);
+    try area.addOptionFmt(
+        self.alloc,
+        "Somehow   {d}$",
+        .{self.calculateModificationPrice(item, 1.0)},
+        item,
+        modifySomehow,
+        null,
+    );
+    try area.addOptionFmt(
+        self.alloc,
+        "Carefully {d}$",
+        .{self.calculateModificationPrice(item, CAREFUL_MULTIPLAYER)},
+        item,
+        modifyCarefully,
+        null,
+    );
+    try area.addOptionFmt(
+        self.alloc,
+        "Manually  {d}$",
+        .{self.calculateModificationPrice(item, MANUAL_MULTIPLAYER)},
+        item,
+        modifyManually,
+        null,
+    );
+    self.actions_window = .modalWindow(area, MODAL_WINDOW_REGION);
+    // keep the main window opened
+    return false;
+}
+
 fn modifySomehow(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    try self.modify(item, 50, null, self.calculateBaseModificationPrice(item));
+    try self.modify(item, 50, null, self.calculateModificationPrice(item, 1.0));
     return true;
 }
 
 fn modifyCarefully(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    try self.modify(item, 10, null, 2 * self.calculateBaseModificationPrice(item));
+    try self.modify(item, 10, null, self.calculateModificationPrice(item, CAREFUL_MULTIPLAYER));
     return true;
 }
+
 fn modifyManually(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const options = &self.actions_window.?.scrollable_area.content;
@@ -302,7 +355,7 @@ fn modifyManually(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
 fn modifyManuallyEffect(ptr: *anyopaque, idx: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const effect_type: c.Effects.Type = @enumFromInt(idx);
-    try self.modify(item, 0, effect_type, 3 * self.calculateBaseModificationPrice(item));
+    try self.modify(item, 0, effect_type, self.calculateModificationPrice(item, MANUAL_MULTIPLAYER));
     return true;
 }
 

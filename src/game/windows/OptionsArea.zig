@@ -117,6 +117,26 @@ pub fn OptionsArea(comptime Item: type) type {
             @memmove(line.label_buffer[0..line.label_len], label);
         }
 
+        pub fn addOptionFmt(
+            self: *Self,
+            alloc: std.mem.Allocator,
+            comptime fmt: []const u8,
+            args: anytype,
+            item: Item,
+            onReleaseButtonFn: OnReleaseButton,
+            onHoldButtonFn: ?OnHoldButton,
+        ) !void {
+            const line = try self.options.addOne(alloc);
+            line.* = .{
+                .item = item,
+                .label_len = 0,
+                .label_buffer = undefined,
+                .onReleaseButtonFn = onReleaseButtonFn,
+                .onHoldButtonFn = onHoldButtonFn,
+            };
+            line.label_len = (try std.fmt.bufPrint(&line.label_buffer, fmt, args)).len;
+        }
+
         pub fn addEmptyOption(
             self: *Self,
             alloc: std.mem.Allocator,

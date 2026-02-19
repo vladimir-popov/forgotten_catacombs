@@ -112,7 +112,8 @@ test "Modify an item somehow when enough money" {
     try std.testing.expect(!test_session.session.registry.has(known_weapon_id, c.Modification));
 
     const options = try recognize_modify.chooseItemById(known_weapon_id);
-    try options.choose("Modify somehow");
+    try options.choose("Modify");
+    try options.choose("Somehow");
 
     try std.testing.expect(!test_session.session.journal.isKnown(known_weapon_id));
     try std.testing.expect(test_session.session.registry.has(known_weapon_id, c.Modification));
@@ -141,7 +142,8 @@ test "Modify an item when NOT enough money" {
 
     try recognize_modify.chooseModifyTab();
     const options = try recognize_modify.chooseItemById(known_weapon_id);
-    try options.choose("Modify somehow");
+    try options.choose("Modify");
+    try options.choose("Somehow");
 
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════╔═══════════════════╗
@@ -169,7 +171,8 @@ test "The price should grow after modification" {
     try std.testing.expect(!test_session.session.registry.has(known_weapon_id, c.Modification));
 
     var options = try recognize_modify.chooseItemById(known_weapon_id);
-    try options.choose("Modify somehow");
+    try options.choose("Modify");
+    try options.choose("Somehow");
     try recognize_modify.chooseRecognizeTab();
     options = try recognize_modify.chooseItemById(known_weapon_id);
     try options.choose("Recognize");

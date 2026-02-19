@@ -7,6 +7,8 @@ on:
       - develop
   pull_request:
     paths-ignore:
+      - docs
+      - misc
       - 'LICENSE'
       - 'README.md'
 
