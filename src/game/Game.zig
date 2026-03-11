@@ -142,6 +142,7 @@ pub fn welcome(self: *Self) !void {
     if (try self.isSessionFileExists())
         try self.state.welcome.menu.addOption(self.gpa, " Continue ", {}, continueGame, null);
     try self.state.welcome.menu.addOption(self.gpa, " New game ", {}, newGame, null);
+    try self.state.welcome.menu.addOption(self.gpa, "  Manual  ", {}, showManual, null);
     try self.state.welcome.menu.addOption(self.gpa, "  About   ", {}, showAbout, null);
 
     try self.render.clearDisplay();
@@ -186,6 +187,10 @@ fn continueGame(ptr: *anyopaque, _: usize, _: void) !bool {
         self.render,
     );
     try self.state.game_session.switchModeToLoadingSession();
+    return false;
+}
+
+fn showManual(_: *anyopaque, _: usize, _: void) !bool {
     return false;
 }
 

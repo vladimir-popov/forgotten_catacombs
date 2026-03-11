@@ -1,5 +1,6 @@
 const std = @import("std");
 
+pub var enabled: bool = false;
 var threaded: std.Io.Threaded = .init_single_threaded;
 var buffer: [128]u8 = undefined;
 var log_writer: ?std.Io.File.Writer = null;
@@ -10,6 +11,8 @@ pub fn writeLog(
     comptime format: []const u8,
     args: anytype,
 ) void {
+    if (!enabled) return;
+
     if (log_writer) |*writer| {
         const level_txt = comptime message_level.asText();
         const prefix2 = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";

@@ -64,15 +64,16 @@ pub fn main(init: std.process.Init.Minimal) !void {
         "========================================\nSeed of the game is {d}\n========================================",
         .{seed},
     );
-    const use_cheats = args.flag("devmode");
-    const use_mouse = args.flag("mouse");
+    const devmode = args.flag("devmode");
+    Logger.enabled = devmode;
+    const use_mouse = devmode and args.flag("mouse");
     const preset = if (args.str("preset")) |preset| parsePreset(preset) else null;
 
     var runtime = try TtyRuntime.TtyRuntime(g.DISPLAY_ROWS + 2, g.DISPLAY_COLS + 2)
-        .init(alloc, single_threaded_io.io(), true, true, use_cheats, use_mouse);
+        .init(alloc, single_threaded_io.io(), true, true, devmode, use_mouse);
     defer runtime.deinit();
 
-    if (use_cheats) {
+    if (devmode) {
         log.warn("The Developer is in the room!", .{});
         if (args.str("cheat")) |value| {
             if (g.Cheat.parse(value)) |cheat_or_tag| {
