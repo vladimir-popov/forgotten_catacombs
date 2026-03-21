@@ -119,7 +119,7 @@ test "Describe a known enemy (after killing a similar creature)" {
     // Prepare a game session:
     const pp = test_session.player.position().place.movedTo(.up);
     var rat_to_kick_components = g.entities.enemyAtPlace(.rat, pp);
-    rat_to_kick_components.health.?.current = 1;
+    rat_to_kick_components.health.?.current_hp = 1;
     const rat_to_kick_id = try test_session.session.level.addEnemy(.sleeping, rat_to_kick_components);
     const rat_to_describe = try test_session.session.level.addEnemy(
         .sleeping,
@@ -130,7 +130,7 @@ test "Describe a known enemy (after killing a similar creature)" {
     // kill the rat
     var attempt: usize = 0;
     while (test_session.session.registry.get(rat_to_kick_id, g.components.Health)) |health| {
-        if (health.current == 0) break;
+        if (health.current_hp == 0) break;
 
         try test_session.pressButton(.up);
         // wait when notification disappears

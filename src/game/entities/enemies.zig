@@ -9,7 +9,7 @@ rat: c.Components = archetype.enemy(.{
     .description = .{ .preset = .rat },
     .effects = .init(.{ .physical = .range(1, 3) }),
     .experience = .reward(10),
-    .health = .{ .max = 10, .current = 10 },
+    .health = .{ .max = 10, .current_hp = 10 },
     .initiative = .empty,
     .protection = .init(.{ .physical = .range(0, 1) }),
     .regeneration = .regular,

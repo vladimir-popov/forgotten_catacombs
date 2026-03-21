@@ -258,7 +258,7 @@ pub fn describeHealth(
     text_area: *g.windows.TextArea,
 ) !void {
     const line = try text_area.addEmptyLine(alloc);
-    _ = try std.fmt.bufPrint(line, "Health: {d}/{d}", .{ health.current, health.max });
+    _ = try std.fmt.bufPrint(line, "Health: {d}/{d}", .{ health.current_hp, health.max });
 }
 
 /// Writes skills to a text area:

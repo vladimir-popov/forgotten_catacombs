@@ -20,8 +20,8 @@ test "Shoot at the target" {
 
     // Hit the target
     const rat_health = test_session.session.registry.getUnsafe(rat_id, c.Health);
-    const initial_health = rat_health.current;
-    while (rat_health.current == initial_health) {
+    const initial_health = rat_health.current_hp;
+    while (rat_health.current_hp == initial_health) {
         try test_session.pressButton(.a);
     }
 }

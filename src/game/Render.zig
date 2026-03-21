@@ -265,11 +265,11 @@ pub fn drawHorizontalLine(self: Render, codepoint: u21, left_point: p.Point, len
 // directly on the screen.
 pub fn drawPlayerHp(self: Render, health: *const cm.Health) !void {
     var buf = [_]u8{0} ** BUTTON_ZONE_LENGTH;
-    const text = if (health.current > 0)
+    const text = if (health.current_hp > 0)
         // hack to avoid showing '+'
-        try std.fmt.bufPrint(&buf, "{d:2}", .{@abs(health.current)})
+        try std.fmt.bufPrint(&buf, "{d:2}", .{@abs(health.current_hp)})
     else
-        try std.fmt.bufPrint(&buf, "{d:2}", .{health.current});
+        try std.fmt.bufPrint(&buf, "{d:2}", .{health.current_hp});
     try self.drawText(text, .{ .row = 1, .col = g.DISPLAY_COLS - @as(u8, @intCast(text.len)) + 1 }, .inverted);
 }
 
@@ -281,7 +281,7 @@ pub fn drawEnemyHealth(self: Render, codepoint: g.Codepoint, health: *const cm.H
 
     buf[len] = ':';
     len += 1;
-    const hp = @max(health.current, 0);
+    const hp = @max(health.current_hp, 0);
     const free_length = INFO_ZONE_LENGTH - 3; // padding + codepoint (usually 1 byte for enemies) + ':'
     const hp_length = @divFloor(free_length * hp, health.max);
     for (0..hp_length) |i| {

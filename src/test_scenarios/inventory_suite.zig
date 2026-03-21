@@ -135,7 +135,7 @@ test "Drink a healing potion" {
     try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
 
-    test_session.player.health().current = 5;
+    test_session.player.health().current_hp = 5;
     var inventory = try test_session.openInventory();
     const potion = try inventory.add(g.entities.presets.Items.get(.healing_potion));
     const options = try inventory.chooseItemById(potion);
@@ -144,6 +144,6 @@ test "Drink a healing potion" {
 
     try std.testing.expect(!test_session.session.registry.contains(potion));
     try std.testing.expect(!test_session.player.inventory().items.contains(potion));
-    try std.testing.expect(test_session.player.health().current > 5);
+    try std.testing.expect(test_session.player.health().current_hp > 5);
     try std.testing.expect(test_session.session.journal.known_potions.contains(.healing_potion));
 }

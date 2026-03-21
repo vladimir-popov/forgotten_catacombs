@@ -334,19 +334,23 @@ fn tryToHit(
     }
 
     // Calculate and apply the damage
-    const target_health_before = target_health.current;
+    const target_health_before = target_health.current_hp;
     const target_armor = self.session().registry.get(target, c.Protection) orelse &c.Protection.zeros;
     const actor_experience: *c.Experience = self.session().registry.getUnsafe(actor, c.Experience);
+
     // we have to copy the whole component, because the enemy can be removed,
-    // and the pointer becomes invalid.
+    // and the pointer becomes invalid:
     const enemy_experience: c.Experience = self.session().registry.getUnsafe(target, c.Experience).*;
+
+    // Getting an actual effect after applying possible modifications:
     var effects = g.meta.getActualEffects(&self.session().registry, weapon_id);
+
     var itr = effects.values.iterator();
     while (itr.next()) |tuple| {
         const is_target_dead =
             try self.applyEffect(actor, weapon_id, tuple.key, tuple.value.*, target, target_armor, target_health);
 
-        // Give experience to player
+        // Give an experience to player
         if (is_target_dead and actor.eql(self.session().player)) {
             const level_before = actor_experience.level;
             actor_experience.add(enemy_experience.asReward());
@@ -361,11 +365,11 @@ fn tryToHit(
     }
     if (actor.eql(self.session().player))
         try self.session().notify(
-            .{ .hit = .{ .target = target, .damage = target_health_before - target_health.current } },
+            .{ .hit = .{ .target = target, .damage = target_health_before - target_health.current_hp } },
         )
     else if (target.eql(self.session().player))
         try self.session().notify(
-            .{ .damage = .{ .actor = actor, .damage = target_health_before - target_health.current } },
+            .{ .damage = .{ .actor = actor, .damage = target_health_before - target_health.current_hp } },
         );
     return true;
 }
@@ -386,7 +390,17 @@ fn applyEffect(
 ) !bool {
     const target_defence: p.Range(u8) = target_armor.resistance.get(effect_type) orelse .zeros;
     switch (effect_type) {
-        .physical => {
+        .heal => {
+            const value = self.session().prng.random().intRangeAtMost(u8, effect_range.min, effect_range.max);
+            target_health.current_hp += value;
+            target_health.current_hp = @min(target_health.max, target_health.current_hp);
+            const is_blocked_animation = actor.eql(self.session().player) or target.eql(self.session().player);
+            try self.session().registry.set(target, c.Animation{ .preset = .healing, .is_blocked = is_blocked_animation });
+
+            log.debug("Entity {d} recovered up to {d} hp", .{ target.id, value });
+            return false;
+        },
+        else => {
             const weapon_class =
                 if (self.session().registry.get(source, c.Weapon)) |weapon| weapon.class else .primitive;
             const actor_stats = if (self.session().registry.get(actor, c.Stats)) |st| st.* else c.Stats.zeros;
@@ -405,31 +419,6 @@ fn applyEffect(
                 .{ base_damage, character_factor, damage, absorbed_damage },
             );
             return self.applyDamage(actor, target, target_health, damage_value, effect_type);
-        },
-        .fire, .acid, .poison => {
-            const base_damage = self.session().prng.random().intRangeAtMost(u8, effect_range.min, effect_range.max);
-            const absorbed_damage: u8 = self.session().prng.random().intRangeAtMost(
-                u8,
-                target_defence.min,
-                target_defence.max,
-            );
-            return self.applyDamage(
-                actor,
-                target,
-                target_health,
-                base_damage -| absorbed_damage,
-                effect_type,
-            );
-        },
-        .heal => {
-            const value = self.session().prng.random().intRangeAtMost(u8, effect_range.min, effect_range.max);
-            target_health.current += value;
-            target_health.current = @min(target_health.max, target_health.current);
-            const is_blocked_animation = actor.eql(self.session().player) or target.eql(self.session().player);
-            try self.session().registry.set(target, c.Animation{ .preset = .healing, .is_blocked = is_blocked_animation });
-
-            log.debug("Entity {d} recovered up to {d} hp", .{ target.id, value });
-            return false;
         },
     }
 }
@@ -455,30 +444,31 @@ fn applyDamage(
     effect_type: c.Effects.Type,
 ) !bool {
     if (damage_value == 0) return false;
-    const orig_health = target_health.current;
-    target_health.current -|= damage_value;
-    log.debug(
-        "Entity {d} received {t} damage {d}. HP: {d} -> {d}",
-        .{ target.id, effect_type, damage_value, orig_health, target_health.current },
+    const orig_health = target_health.current_hp;
+    target_health.current_hp -|= damage_value;
+    log.info(
+        "Entity {d} received {d} {t} damage. HP: {d} -> {d}",
+        .{ target.id, damage_value, effect_type, orig_health, target_health.current_hp },
     );
 
     if (self.session().registry.get(target, c.EnemyState)) |_| {
         try self.session().registry.set(target, c.EnemyState.aggressive);
     }
 
-    if (target_health.current == 0) {
-        // If the enemy was killed by the player, we should mark it as known
-        if (actor.eql(self.session().player))
-            if (g.meta.getEnemyType(&self.session().registry, target)) |enemy_type|
-                try self.session().journal.markEnemyAsKnown(enemy_type);
-
-        try self.session().onEntityDied(target);
-        return true;
-    } else {
+    if (target_health.current_hp > 0) {
         // a special case to give to the player a chance to notice what happened
         const is_blocked_animation = actor.eql(self.session().player) or target.eql(self.session().player);
         try self.session().registry.set(target, c.Animation{ .preset = .hit, .is_blocked = is_blocked_animation });
         return false;
+    } else {
+        // handle the death
+        if (actor.eql(self.session().player))
+            if (g.meta.getEnemyType(&self.session().registry, target)) |enemy_type|
+                // If the enemy was killed by the player, we should mark it as known
+                try self.session().journal.markEnemyAsKnown(enemy_type);
+
+        try self.session().onEntityDied(target);
+        return true;
     }
 }
 

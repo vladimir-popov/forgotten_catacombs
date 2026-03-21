@@ -418,7 +418,7 @@ test "All components should be serializable" {
             .armor = .{ .id = 15 },
         },
         .experience = .zero,
-        .health = c.Health{ .current = 42, .max = 100 },
+        .health = c.Health{ .current_hp = 42, .max = 100 },
         .hunger = .well_fed,
         .initiative = c.Initiative{ .move_points = 5 },
         .inventory = inventory,

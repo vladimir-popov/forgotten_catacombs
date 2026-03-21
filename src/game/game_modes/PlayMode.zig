@@ -244,7 +244,7 @@ fn handleInput(self: *Self) !?g.actions.Action {
             .turn_light_off => g.visibility.turn_light_on = false,
             .set_health => |hp| {
                 if (self.session.registry.get(self.session.player, c.Health)) |health| {
-                    health.current = hp;
+                    health.current_hp = hp;
                 }
             },
             .set_money => |money| {

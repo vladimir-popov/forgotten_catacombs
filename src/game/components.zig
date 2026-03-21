@@ -92,18 +92,18 @@ pub const Ladder = struct {
 };
 
 pub const Health = struct {
-    // The count of maximum hp
+    // The count of maximum hit points
     max: u8,
-    // The count of the current hp
-    current: u8,
+    // The count of the current hit points
+    current_hp: u8,
 
     pub fn init(max: u8) Health {
-        return .{ .current = max, .max = max };
+        return .{ .current_hp = max, .max = max };
     }
 
     pub fn add(self: *Health, value: u8) void {
-        self.current += value;
-        self.current = @min(self.current, self.max);
+        self.current_hp += value;
+        self.current_hp = @min(self.current_hp, self.max);
     }
 };
 
