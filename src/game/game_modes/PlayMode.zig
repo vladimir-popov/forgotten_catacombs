@@ -551,19 +551,21 @@ const TargetsIterator = struct {
     }
 };
 
+/// Builds a window with quick actions list
 fn windowWithQuickActions(self: *Self) !w.ModalWindow(w.OptionsArea(void)) {
     var area = w.OptionsArea(void).centered(self);
     for (self.quick_actions.actions.items, 0..) |qa, idx| {
-        try area.addOption(self.arena.allocator(), qa.toString(), {}, chooseEntity, null);
+        try area.addOption(self.arena.allocator(), qa.toString(), {}, chooseQuickAction, null);
         if (idx == self.quick_actions.selected_idx)
             try area.selectLine(idx);
     }
     return .defaultModalWindow(area);
 }
 
-fn chooseEntity(ptr: *anyopaque, line_idx: usize, _: void) anyerror!bool {
+/// Sets the index of the current quick action to the currently selected item in the window
+fn chooseQuickAction(ptr: *anyopaque, line_idx: usize, _: void) anyerror!bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     self.quick_actions.selected_idx = line_idx;
     log.debug("Choosen option {d}: {t}", .{ line_idx, self.quickAction() });
-    return false;
+    return true;
 }
