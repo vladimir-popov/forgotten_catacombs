@@ -368,8 +368,20 @@ fn modify(self: *Self, item: g.Entity, worsen_chance: u8, effect_type: ?c.Effect
             .range(-5, -1)
         else
             .range(1, 5);
-        if (self.session.registry.has(item, c.Weapon)) {
-            try g.meta.modifyWeapon(&self.session.registry, prng.random(), item, range.min, range.max, effect_type);
+        if (self.session.registry.get(item, c.Weapon)) |weapon| {
+            const codepoint: g.Codepoint = if (weapon.ammunition_type) |_|
+                g.codepoints.weapon_ranged_unknown
+            else
+                g.codepoints.weapon_melee_unknown;
+            try g.meta.modifyEntity(
+                &self.session.registry,
+                prng.random(),
+                item,
+                codepoint,
+                range.min,
+                range.max,
+                effect_type,
+            );
             try self.session.journal.forgetWeapon(item);
         }
         wallet.money -= price;

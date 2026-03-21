@@ -343,12 +343,12 @@ fn tryToHit(
     const enemy_experience: c.Experience = self.session().registry.getUnsafe(target, c.Experience).*;
 
     // Getting an actual effect after applying possible modifications:
-    var effects = g.meta.getActualEffects(&self.session().registry, weapon_id);
+    var effects = g.meta.getActualDamage(&self.session().registry, weapon_id, weapon);
 
     var itr = effects.values.iterator();
     while (itr.next()) |tuple| {
         const is_target_dead =
-            try self.applyEffect(actor, weapon_id, tuple.key, tuple.value.*, target, target_armor, target_health);
+            try self.applyEffect(actor, weapon_id, tuple.key, tuple.value.*, target, target_armor.*, target_health);
 
         // Give an experience to player
         if (is_target_dead and actor.eql(self.session().player)) {
@@ -385,10 +385,10 @@ fn applyEffect(
     effect_type: c.Effects.Type,
     effect_range: p.Range(u8),
     target: g.Entity,
-    target_armor: *const c.Protection,
+    target_protection: c.Protection,
     target_health: *c.Health,
 ) !bool {
-    const target_defence: p.Range(u8) = target_armor.resistance.get(effect_type) orelse .zeros;
+    const target_defence: p.Range(u8) = target_protection.resistance.values.get(effect_type) orelse .empty;
     switch (effect_type) {
         .heal => {
             const value = self.session().prng.random().intRangeAtMost(u8, effect_range.min, effect_range.max);
@@ -473,19 +473,22 @@ fn applyDamage(
 }
 
 fn drinkPotion(self: *Self, actor: g.Entity, potion_id: g.Entity, potion_type: g.meta.PotionType) !void {
-    if (self.session().registry.get(potion_id, c.Effects)) |effects| {
-        var itr = effects.values.iterator();
-        while (itr.next()) |tuple| {
+    if (self.session().registry.get(potion_id, c.Consumable)) |potion| {
+        var itr = potion.effects.values.iterator();
+        while (itr.next()) |entry| {
+            const effect_type: c.Effects.Type = entry.key;
+            const range: p.Range(u8) = entry.value.*;
             if (self.session().registry.get(actor, c.Health)) |health| {
-                const armor = self.session().registry.get(actor, c.Protection) orelse &c.Protection.zeros;
+                const armor_id, const protection = g.meta.getArmor(&self.session().registry, actor);
+                const actual_protection = g.meta.getActualProtection(&self.session().registry, armor_id, protection);
                 try self.session().journal.markPotionAsKnown(potion_type);
                 const is_actor_dead = try self.applyEffect(
                     actor,
                     potion_id,
-                    tuple.key,
-                    tuple.value.*,
+                    effect_type,
+                    range,
                     actor,
-                    armor,
+                    actual_protection,
                     health,
                 );
                 if (is_actor_dead) break;

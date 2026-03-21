@@ -130,6 +130,42 @@ test "Put arrows to quiver" {
     , .game_area);
 }
 
+test "Wear an armor" {
+    var test_session: TestSession = undefined;
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
+    defer test_session.deinit();
+
+    const inventory = try test_session.openInventory();
+    const jacket = try inventory.add(g.entities.presets.Items.get(.jacket));
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║                                      ║
+        \\║/ Pickaxe                     weapon  ║
+        \\║] Jacket                              ║
+        \\║¡ Torch                        light  ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+
+    var options = try inventory.chooseItemById(jacket);
+    try options.choose("Wear");
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║                                      ║
+        \\║/ Pickaxe                     weapon  ║
+        \\║] Jacket                       armor  ║
+        \\║¡ Torch                        light  ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+}
+
 test "Drink a healing potion" {
     var test_session: TestSession = undefined;
     try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);

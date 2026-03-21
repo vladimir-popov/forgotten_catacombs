@@ -57,7 +57,7 @@ pub fn getLight(registry: *const g.Registry, equipment: *const c.Equipment) stru
 }
 
 /// Returns an id of the equipped weapon, or the `actor`, because any enemy must be able to provide
-/// a damage without weapon. The player and humanoid enemies should be able to damage by hands,
+/// a damage without equipment. The player and humanoid enemies should be able to damage by hands,
 /// animal should bite (but, hands and tooth are not equipped as a weapon).
 pub fn getWeapon(registry: *const g.Registry, actor: g.Entity) struct { g.Entity, c.Weapon } {
     if (registry.get(actor, c.Equipment)) |equipment| {
@@ -69,7 +69,25 @@ pub fn getWeapon(registry: *const g.Registry, actor: g.Entity) struct { g.Entity
     }
     // "tooth" and "bare hands" are not equipped weapon,
     // just emulate them
-    return .{ actor, .melee(.primitive) };
+    return .{ actor, registry.getUnsafe(actor, c.Weapon).* };
+}
+
+/// If the actor has equipped armor, this method returns id of the equipped armor and its
+/// protection;
+/// If the actor has a protection directly (as many enemies do), this method returns the `actor` and
+/// its protection;
+/// Otherwise the `actor` and null will be returned.
+pub fn getArmor(registry: *const g.Registry, actor: g.Entity) struct { g.Entity, ?c.Protection } {
+    if (registry.get(actor, c.Equipment)) |equipment| {
+        if (equipment.armor) |armor_id| {
+            const protection = registry.getUnsafe(armor_id, c.Protection);
+            return .{ armor_id, protection.* };
+        }
+    }
+    if (registry.get(actor, c.Protection)) |protection|
+        return .{ actor, protection.* };
+
+    return .{ actor, null };
 }
 
 pub fn getAmmunition(registry: *const g.Registry, actor: g.Entity) ?struct { g.Entity, *c.Ammunition } {
@@ -89,14 +107,31 @@ pub fn getAmmunition(registry: *const g.Registry, actor: g.Entity) ?struct { g.E
     return null;
 }
 
-pub fn getActualEffects(registry: *const g.Registry, weapon_id: g.Entity) c.Effects {
-    const effects: *c.Effects = registry.getUnsafe(weapon_id, c.Effects);
+/// Merges the original weapon's effects with modifications possibly applied to the weapon
+pub fn getActualDamage(registry: *const g.Registry, weapon_id: g.Entity, weapon: c.Weapon) c.Effects {
+    var effects: c.Effects = weapon.damage;
+    // TODO: summarize effects with ammo
     // Merge with modifications
     if (registry.get(weapon_id, c.Modification)) |modifications| {
-        modifications.applyTo(effects);
+        modifications.applyTo(&effects);
     }
     // Return a copy of the merged effects
-    return effects.*;
+    return effects;
+}
+
+/// Merges the original armor's effects with modifications possibly applied to the armor
+pub fn getActualProtection(registry: *const g.Registry, armor_id: g.Entity, protection: ?c.Protection) c.Protection {
+    if (protection) |p| {
+        var effects: c.Effects = p.resistance;
+        // Merge with modifications
+        if (registry.get(armor_id, c.Modification)) |modifications| {
+            modifications.applyTo(&effects);
+        }
+        // Return a copy of the merged effects
+        return .{ .resistance = effects };
+    } else {
+        return .zeros;
+    }
 }
 
 pub fn statsFromArchetype(archetype: PlayerArchetype) c.Stats {
@@ -140,8 +175,14 @@ pub fn fillShop(shop: *c.Shop, registry: *g.Registry, seed: u64) !void {
         const item = g.entities.presets.Items.fields.values[rand.weightedIndex(u8, &proportions)];
         const entity = try registry.addNewEntity(item.*);
         // Randomly modify a weapon:
-        if (registry.has(entity, c.Weapon) and rand.uintAtMost(u8, 100) < 15) {
-            try modifyWeapon(registry, rand, entity, -5, 5, null);
+        if (registry.get(entity, c.Weapon)) |weapon| {
+            if (rand.uintAtMost(u8, 100) < 15) {
+                const codepoint: g.Codepoint = if (weapon.ammunition_type) |_|
+                    g.codepoints.weapon_ranged_unknown
+                else
+                    g.codepoints.weapon_melee_unknown;
+                try modifyEntity(registry, rand, entity, codepoint, -5, 5, null);
+            }
         }
         try shop.items.add(entity);
     }
@@ -157,29 +198,32 @@ const weighted_index: [c.Effects.TypesCount]u8 = blk: {
     break :blk wi;
 };
 
-/// Applies a random modification value from the range [`min`, `max`] to the passed effect type,
-/// or chooses it randomly using the weighted index:
+/// Adds a random modification to the entity.
+/// The value can be taken randomly from the range [`min`, `max`] if the effect is passed explicitly,
+/// or the effect selecting randomly using the weighted index:
 ///   - physical = 20;
 ///   - poison = 10;
 ///   - fire = 8;
 ///   - acid = 5;
-pub fn modifyWeapon(
+/// Finally, the codepoint of the entity is changed to its "unknown" version.
+pub fn modifyEntity(
     registry: *g.Registry,
     rand: std.Random,
-    weapon: g.Entity,
+    entity: g.Entity,
+    unknown_codepoint: g.Codepoint,
     min: i8,
     max: i8,
-    effect_type: ?c.Effects.Type,
+    modified_effect: ?c.Effects.Type,
 ) !void {
-    try registry.set(weapon, c.Sprite{ .codepoint = g.codepoints.weapon_melee_unknown });
     const value = rand.intRangeAtMost(i8, min, max);
-    const effect_idx = if (effect_type) |et| @intFromEnum(et) else rand.weightedIndex(u8, &weighted_index);
-    const modification = try registry.getOrSet(weapon, c.Modification, .{ .modificators = .initFull(0) });
+    const effect_idx = if (modified_effect) |eff| @intFromEnum(eff) else rand.weightedIndex(u8, &weighted_index);
+    const modification = try registry.getOrSet(entity, c.Modification, .{ .modificators = .initFull(0) });
     modification.modificators.values[effect_idx] +|= value;
     log.debug(
         "Add modificator {t} = {d} for {d}",
-        .{ @as(c.Effects.Type, @enumFromInt(effect_idx)), value, weapon.id },
+        .{ @as(c.Effects.Type, @enumFromInt(effect_idx)), value, entity.id },
     );
+    try registry.set(entity, c.Sprite{ .codepoint = unknown_codepoint });
 }
 
 /// Writes an actual name of the entity according to its "known" status in the journal
@@ -322,6 +366,7 @@ pub fn describeEntity(
     entity: g.Entity,
     text_area: *g.windows.TextArea,
 ) !void {
+    log.debug("Describe an entity {d}", .{entity.id});
     // Write the text of description at first:
     try writeActualDescription(alloc, journal, entity, text_area);
     // Then write properties:
@@ -365,9 +410,17 @@ pub fn describeItem(
     entity: g.Entity,
     text_area: *g.windows.TextArea,
 ) !void {
+    log.debug("Describe an item {d}", .{entity.id});
     if (journal.registry.get(entity, c.Consumable)) |consumable| {
         _ = try text_area.addEmptyLine(alloc);
-        try describeEffects(alloc, journal, entity, "Effects", text_area);
+        try describeEffects(
+            alloc,
+            journal,
+            entity,
+            consumable.effects,
+            "Effects",
+            text_area,
+        );
 
         const line = try text_area.addEmptyLine(alloc);
         _ = try std.fmt.bufPrint(line, "Calories: {d}", .{consumable.calories});
@@ -376,6 +429,11 @@ pub fn describeItem(
     if (journal.registry.get(entity, c.Weapon)) |weapon| {
         _ = try text_area.addEmptyLine(alloc);
         try describeWeapon(alloc, journal, entity, weapon, text_area);
+    }
+
+    if (journal.registry.has(entity, c.Protection)) {
+        _ = try text_area.addEmptyLine(alloc);
+        try describeArmor(alloc, journal, entity, text_area);
     }
 
     if (journal.registry.get(entity, c.SourceOfLight)) |light| {
@@ -391,7 +449,7 @@ pub fn describeItem(
     }
 }
 
-/// Shows the damage of existed effects. If the weapon has modification,
+/// Shows the damage of existed effects. If the weapon has a modification,
 /// and is known, then the modification is applied to the effects, otherwise
 /// a line with "It looks unusual(!)" text is appended.
 ///
@@ -418,10 +476,11 @@ fn describeWeapon(
     weapon: *const c.Weapon,
     text_area: *g.windows.TextArea,
 ) !void {
+    log.debug("Describe a weapon {d} {any}", .{ entity.id, weapon });
     var line = try text_area.addEmptyLine(alloc);
     const article = if (weapon.class == .ancient) "an" else "a";
     _ = try std.fmt.bufPrint(line, "This is {s} {t} weapon.", .{ article, weapon.class });
-    try describeEffects(alloc, journal, entity, "Damage", text_area);
+    try describeEffects(alloc, journal, entity, weapon.damage, "Damage", text_area);
 
     if (weapon.max_distance > 1) {
         _ = try text_area.addEmptyLine(alloc);
@@ -431,6 +490,47 @@ fn describeWeapon(
     if (!journal.isKnown(entity) and journal.registry.has(entity, c.Modification)) {
         _ = try text_area.addEmptyLine(alloc);
         line = try text_area.addEmptyLine(alloc);
+        @memcpy(line[0..20], "It looks modified...");
+    }
+}
+
+/// Shows the protection of the armor. If the armor has a modification,
+/// and is known, then the modification is applied to the armor's effects, otherwise
+/// a line with "It looks unusual(!)" text is appended.
+///
+/// Example of a known armor:
+/// ```
+/// Protection:
+///   physical 3-5
+///   fire 1-2
+/// ```
+/// Example of unknown armor:
+/// ```
+/// Protection:
+///   physical 1-3
+///   ?
+///
+/// It looks unusual(!)
+/// ```
+fn describeArmor(
+    alloc: std.mem.Allocator,
+    journal: g.Journal,
+    armor_entity: g.Entity,
+    text_area: *g.windows.TextArea,
+) !void {
+    log.debug("Describe an armor {d}", .{armor_entity.id});
+    try describeEffects(
+        alloc,
+        journal,
+        armor_entity,
+        journal.registry.getUnsafe(armor_entity, c.Protection).resistance,
+        "Protection",
+        text_area,
+    );
+
+    if (!journal.isKnown(armor_entity) and journal.registry.has(armor_entity, c.Modification)) {
+        _ = try text_area.addEmptyLine(alloc);
+        const line = try text_area.addEmptyLine(alloc);
         @memcpy(line[0..20], "It looks modified...");
     }
 }
@@ -458,36 +558,36 @@ fn describeEffects(
     alloc: std.mem.Allocator,
     journal: g.Journal,
     source: g.Entity,
+    effects: c.Effects,
     title: []const u8,
     text_area: *g.windows.TextArea,
 ) !void {
-    if (journal.registry.get(source, c.Effects)) |effs| {
-        var effects: c.Effects = effs.*;
-        const is_known_source = journal.isKnown(source);
-        if (is_known_source) {
-            if (journal.registry.get(source, c.Modification)) |modification| {
-                modification.applyTo(&effects);
-            }
+    // make a copy to apply modifications
+    var modified_effects: c.Effects = effects;
+    const is_known_source = journal.isKnown(source);
+    if (is_known_source) {
+        if (journal.registry.get(source, c.Modification)) |modification| {
+            modification.applyTo(&modified_effects);
         }
-        var line = try text_area.addEmptyLine(alloc);
-        @memcpy(line[0..title.len], title);
-        line[title.len] = ':';
+    }
+    var line = try text_area.addEmptyLine(alloc);
+    @memcpy(line[0..title.len], title);
+    line[title.len] = ':';
 
-        var itr = effects.values.iterator();
-        while (itr.next()) |tuple| {
-            if (tuple.value.min == 0 and tuple.value.max == 0)
-                continue;
+    var itr = modified_effects.values.iterator();
+    while (itr.next()) |tuple| {
+        if (tuple.value.min == 0 and tuple.value.max == 0)
+            continue;
 
-            line = try text_area.addEmptyLine(alloc);
-            if (is_known_source or tuple.key == .physical) {
-                if (tuple.value.min == tuple.value.max) {
-                    _ = try std.fmt.bufPrint(line[2..], "{t} {d}", .{ tuple.key, tuple.value.min });
-                } else {
-                    _ = try std.fmt.bufPrint(line[2..], "{t} {d}-{d}", .{ tuple.key, tuple.value.min, tuple.value.max });
-                }
+        line = try text_area.addEmptyLine(alloc);
+        if (is_known_source or tuple.key == .physical) {
+            if (tuple.value.min == tuple.value.max) {
+                _ = try std.fmt.bufPrint(line[2..], "{t} {d}", .{ tuple.key, tuple.value.min });
             } else {
-                line[4] = '?';
+                _ = try std.fmt.bufPrint(line[2..], "{t} {d}-{d}", .{ tuple.key, tuple.value.min, tuple.value.max });
             }
+        } else {
+            line[4] = '?';
         }
     }
 }
@@ -506,6 +606,13 @@ pub fn describeEquipedItems(
             try describeWeapon(alloc, journal, weapon_id, weapon, text_area);
     } else {
         _ = try std.fmt.bufPrint(line, "Equiped weapon: none", .{});
+    }
+    if (equipment.armor) |armor_id| {
+        _ = try text_area.addEmptyLine(alloc);
+        line = try text_area.addEmptyLine(alloc);
+        @memcpy(line[0..15], "Equiped armor: ");
+        _ = try printName(line[15..], journal, armor_id);
+        try describeArmor(alloc, journal, armor_id, text_area);
     }
     const light_id, const light_radius = g.meta.getLight(journal.registry, equipment);
     if (light_id) |id| {
@@ -532,9 +639,9 @@ pub fn describeEnemy(
         }
         if (journal.registry.get(enemy, c.Equipment)) |equipment| {
             try describeEquipedItems(alloc, journal, equipment, text_area);
-        } else if (journal.registry.has(enemy, c.Effects)) {
+        } else if (journal.registry.get(enemy, c.Weapon)) |weapon| {
             _ = try text_area.addEmptyLine(alloc);
-            try describeEffects(alloc, journal, enemy, "Damage", text_area);
+            try describeEffects(alloc, journal, enemy, weapon.damage, "Damage", text_area);
         }
         if (journal.registry.get(enemy, c.Speed)) |speed| {
             _ = try text_area.addEmptyLine(alloc);
@@ -579,6 +686,7 @@ test "Describe a player" {
     const player = try registry.addNewEntity(try g.entities.player(alloc, prng.random(), .zeros, .zeros, .init(30)));
     const equipmen = registry.getUnsafe(player, c.Equipment);
     equipmen.weapon = try registry.addNewEntity(g.entities.presets.Items.fields.get(.torch).*);
+    equipmen.armor = try registry.addNewEntity(g.entities.presets.Items.fields.get(.jacket).*);
 
     // when:
     try describePlayer(alloc, journal, player, &text_area);
@@ -595,6 +703,11 @@ test "Describe a player" {
         \\Damage:
         \\  physical 1
         \\  fire 1
+        \\
+        \\Equiped armor: Jacket
+        \\Protection:
+        \\  physical 0-5
+        \\  fire 0-2
         \\
         \\Source of light: Torch
         \\       distance: 3
@@ -669,7 +782,7 @@ test "Describe a known rat" {
     );
 }
 
-test "Describe a torch" {
+test "Describe a melee weapon" {
     // given:
     var registry = try g.Registry.init(std.testing.allocator);
     defer registry.deinit();
@@ -728,6 +841,36 @@ test "Describe a bow" {
         \\Max distance: 5
         \\
         \\Weight: 50
+    );
+}
+
+test "Describe an armor" {
+    // given:
+    var registry = try g.Registry.init(std.testing.allocator);
+    defer registry.deinit();
+    var journal = try g.Journal.init(std.testing.allocator, &registry, std.testing.random_seed);
+    defer journal.deinit(std.testing.allocator);
+
+    const id = try registry.addNewEntity(g.entities.presets.Items.fields.get(.jacket).*);
+    var text_area: g.windows.TextArea = .empty;
+    defer text_area.deinit(std.testing.allocator);
+
+    // when:
+    try describeEntity(std.testing.allocator, journal, id, &text_area);
+
+    // then:
+    try expectContent(text_area,
+        \\A sturdy, time-worn leather jacket.
+        \\Despite its worn  look, the  jacket
+        \\offers     surprising    resilience
+        \\against  scrapes   and  gives minor
+        \\resistance to fire and heat.
+        \\
+        \\Protection:
+        \\  physical 0-5
+        \\  fire 0-2
+        \\
+        \\Weight: 10
     );
 }
 

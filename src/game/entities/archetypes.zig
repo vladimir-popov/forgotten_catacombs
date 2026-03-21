@@ -35,6 +35,7 @@ pub fn enemy(components: c.Components) c.Components {
         defined(components, "sprite");
         defined(components, "state");
         defined(components, "stats");
+        defined(components, "weapon");
         hasType(g.meta.EnemyType, components);
         return components;
     }
@@ -79,7 +80,6 @@ pub inline fn ammo(components: c.Components) c.Components {
 pub inline fn weapon(components: c.Components) c.Components {
     comptime {
         _ = item(components);
-        defined(components, "effects");
         defined(components, "weapon");
         if (components.weapon) |wpn| {
             std.debug.assert(wpn.max_distance > 0);

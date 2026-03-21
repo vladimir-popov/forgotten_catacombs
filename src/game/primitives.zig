@@ -166,7 +166,7 @@ pub const Point = struct {
 // The range from the `min` value inclusive to the `max` value inclusive.
 pub fn Range(comptime T: type) type {
     return struct {
-        pub const zeros: @This() = .{ .min = 0, .max = 0 };
+        pub const empty: @This() = .{ .min = 0, .max = 0 };
 
         min: T,
         max: T,

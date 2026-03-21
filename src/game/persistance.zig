@@ -408,7 +408,6 @@ test "All components should be serializable" {
         .ammunition = .{ .amount = 42, .ammunition_type = .arrows },
         .animation = c.Animation{ .preset = .hit },
         .consumable = .{ .calories = 12, .consumable_type = .food },
-        .effects = .init(.{ .physical = .range(1, 2) }),
         .description = c.Description{ .preset = .player },
         .door = c.Door{ .state = .opened },
         .equipment = c.Equipment{
@@ -437,7 +436,7 @@ test "All components should be serializable" {
         .state = .walking,
         .stats = .init(1, 2, 3, 4, 5),
         .wallet = .{ .money = 321 },
-        .weapon = .ranged(5, .arrows, .tricky),
+        .weapon = .ranged(5, .arrows, .tricky, .effects(.{ .physical = .range(1, 2) })),
         .weight = .{ .value = 55 },
     };
 

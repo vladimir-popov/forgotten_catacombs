@@ -151,6 +151,7 @@ fn tabWithDrop(self: *Self) ?*w.WindowWithTabs.Tab {
         null;
 }
 
+/// Rebuilds a list of items
 pub fn updateInventoryTab(self: *Self) !void {
     const tab = self.tabWithInventory();
     const selected_line = tab.scrollable_area.content.selected_line;
@@ -189,6 +190,8 @@ fn formatInventoryLine(self: *Self, line: *w.TextArea.Line, item: g.Entity) ![]c
         " light"
     else if (item.eql(self.equipment.ammunition))
         "  ammo"
+    else if (item.eql(self.equipment.armor))
+        " armor"
     else
         "      ";
     log.debug("fromat line: {d}: {u}({d}) {s} {s}", .{ item.id, sprite.codepoint, sprite.codepoint, name, using });
@@ -210,6 +213,9 @@ fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
         }
         if (self.session.registry.has(item, c.Ammunition)) {
             try area.addOption(self.alloc, "Put to quiver", item, putToQuiver, null);
+        }
+        if (self.session.registry.has(item, c.Protection)) {
+            try area.addOption(self.alloc, "Wear", item, useAsArmor, null);
         }
         if (self.session.registry.get(item, c.Consumable)) |consumable| {
             switch (consumable.consumable_type) {
@@ -241,6 +247,8 @@ fn unequipItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
         self.equipment.weapon = null;
     if (item.eql(self.equipment.ammunition))
         self.equipment.ammunition = null;
+    if (item.eql(self.equipment.armor))
+        self.equipment.armor = null;
 
     try self.updateInventoryTab();
     return true;

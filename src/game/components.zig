@@ -214,20 +214,29 @@ pub const Weapon = struct {
     /// The null means that the weapon is melee.
     ammunition_type: ?Ammunition.Type,
     max_distance: u8,
+    damage: Effects,
 
-    pub fn melee(class: Class) Weapon {
-        return .{ .max_distance = 1, .ammunition_type = null, .class = class };
+    pub fn melee(class: Class, damage: Effects) Weapon {
+        return .{ .max_distance = 1, .ammunition_type = null, .class = class, .damage = damage };
     }
 
-    pub fn ranged(max_distance: u8, ammunition_type: Ammunition.Type, class: Class) Weapon {
+    pub fn ranged(max_distance: u8, ammunition_type: Ammunition.Type, class: Class, damage: Effects) Weapon {
         std.debug.assert(max_distance > 1);
-        return .{ .max_distance = max_distance, .ammunition_type = ammunition_type, .class = class };
+        return .{ .max_distance = max_distance, .ammunition_type = ammunition_type, .class = class, .damage = damage };
     }
 };
 
+// THIS IS NOT A COMPONENT!
 pub const Effects = struct {
     pub const Type = enum { physical, fire, acid, poison, heal };
     pub const TypesCount = @typeInfo(Type).@"enum".fields.len;
+    /// Example:
+    /// ```
+    /// .{ .fire = .{ .min = 0, .max = 3 } };
+    /// ```
+    pub const InitStruct = std.enums.EnumFieldStruct(Type, ?p.Range(u8), @as(?p.Range(u8), null));
+
+    pub const no_effects: Effects = .{ .values = .initFull(.empty) };
 
     values: std.EnumMap(Type, p.Range(u8)),
 
@@ -235,7 +244,7 @@ pub const Effects = struct {
     /// ```
     /// .init(.{ .fire = .{ .min = 0, .max = 3 } });
     /// ```
-    pub fn init(values: std.enums.EnumFieldStruct(Type, ?p.Range(u8), @as(?p.Range(u8), null))) Effects {
+    pub fn effects(values: std.enums.EnumFieldStruct(Type, ?p.Range(u8), @as(?p.Range(u8), null))) Effects {
         return .{ .values = .init(values) };
     }
 
@@ -259,25 +268,12 @@ pub const Effects = struct {
 };
 
 pub const Protection = struct {
-    pub const zeros: Protection = .{ .resistance = .initFull(.zeros) };
+    pub const zeros: Protection = .{ .resistance = .no_effects };
 
-    resistance: std.EnumMap(Effects.Type, p.Range(u8)),
+    resistance: Effects,
 
-    /// Example:
-    /// ```
-    /// .init(.{ .fire = .{ .min = 0, .max = 3 } });
-    /// ```
-    pub fn init(values: std.enums.EnumFieldStruct(Effects.Type, ?p.Range(u8), @as(?p.Range(u8), null))) Protection {
-        return .{ .resistance = .init(values) };
-    }
-
-    pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
-        _ = try writer.write("Protection{ ");
-        const effect_types = std.enums.values(Effects.Type);
-        for (effect_types) |effect_type| {
-            try writer.print("{t}={any}, ", .{ effect_type, self.resistance.get(effect_type) });
-        }
-        _ = try writer.write(" }");
+    pub fn init(values: Effects.InitStruct) Protection {
+        return .{ .resistance = .effects(values) };
     }
 };
 
@@ -313,6 +309,15 @@ pub const Consumable = struct {
     pub const Type = enum { food, potion };
     consumable_type: Type,
     calories: u16,
+    effects: Effects = .no_effects,
+
+    pub fn food(calories: u16) Consumable {
+        return .{ .consumable_type = .food, .calories = calories };
+    }
+
+    pub fn potion(effects: Effects.InitStruct, calories: u16) Consumable {
+        return .{ .consumable_type = .potion, .calories = calories, .effects = .effects(effects) };
+    }
 };
 
 pub const Hunger = struct {
@@ -507,7 +512,6 @@ pub const Components = struct {
     consumable: ?Consumable = null,
     description: ?Description, // must be provided for every entity
     door: ?Door = null,
-    effects: ?Effects = null,
     equipment: ?Equipment = null,
     experience: ?Experience = null,
     health: ?Health = null,

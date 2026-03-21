@@ -7,7 +7,6 @@ const p = g.primitives;
 
 rat: c.Components = archetype.enemy(.{
     .description = .{ .preset = .rat },
-    .effects = .init(.{ .physical = .range(1, 3) }),
     .experience = .reward(10),
     .health = .{ .max = 10, .current_hp = 10 },
     .initiative = .empty,
@@ -18,6 +17,7 @@ rat: c.Components = archetype.enemy(.{
     .sprite = .{ .codepoint = 'r' },
     .state = .sleeping,
     .stats = .zeros,
+    .weapon = .melee(.primitive, .effects(.{ .physical = .range(1, 3) })),
 }),
 
 snake: c.Components = archetype.enemy(.{
@@ -29,8 +29,8 @@ snake: c.Components = archetype.enemy(.{
     .initiative = .empty,
     .sprite = .{ .codepoint = 's' },
     .health = .init(8),
-    .effects = .init(.{ .poison = .range(1, 3) }),
     .regeneration = .regular,
     .speed = .{ .move_points = 9 },
     .state = .sleeping,
+    .weapon = .melee(.tricky, .effects(.{ .poison = .range(1, 3) })),
 }),

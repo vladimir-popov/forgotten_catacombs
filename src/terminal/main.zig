@@ -13,7 +13,7 @@ pub const std_options: std.Options = .{
     .log_scope_levels = &[_]std.log.ScopeLevel{
         .{ .scope = .default, .level = .debug },
         .{ .scope = .cheats, .level = .debug },
-        .{ .scope = .game_session, .level = .debug },
+        // .{ .scope = .game_session, .level = .debug },
         // .{ .scope = .actions, .level = .debug },
         // .{ .scope = .registry, .level = .debug },
         // .{ .scope = .ai, .level = .debug },
@@ -21,7 +21,7 @@ pub const std_options: std.Options = .{
         // .{ .scope = .events, .level = .debug },
         // .{ .scope = .game, .level = .debug },
         .{ .scope = .game_session, .level = .info },
-        // .{ .scope = .inventory_mode, .level = .debug },
+        .{ .scope = .inventory_mode, .level = .debug },
         // .{ .scope = .modify_mode, .level = .debug },
         // .{ .scope = .level, .level = .debug },
         // .{ .scope = .load_level_mode, .level = .debug },
@@ -33,7 +33,7 @@ pub const std_options: std.Options = .{
         .{ .scope = .meta, .level = .debug },
         .{ .scope = .journal, .level = .debug },
         .{ .scope = .cmd, .level = .debug },
-        // .{ .scope = .windows, .level = .debug },
+        .{ .scope = .windows, .level = .debug },
     },
 };
 

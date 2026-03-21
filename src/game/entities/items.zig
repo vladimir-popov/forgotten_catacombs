@@ -49,18 +49,16 @@ pub const Weapons = struct {
         .rarity = .common,
         .sprite = .{ .codepoint = cp.weapon_melee },
         .weight = .{ .value = 80 },
-        .effects = .init(.{ .physical = .range(5, 8) }),
         .price = .{ .value = 28 },
-        .weapon = .melee(.primitive),
+        .weapon = .melee(.primitive, .effects(.{ .physical = .range(5, 8) })),
     }),
 
     light_crossbow: c.Components = archetype.weapon(.{
         .description = .{ .preset = .light_crossbow },
-        .effects = .init(.{ .physical = .range(2, 3) }),
         .price = .{ .value = 50 },
         .rarity = .common,
         .sprite = .{ .codepoint = cp.weapon_ranged },
-        .weapon = .ranged(5, .bolts, .primitive),
+        .weapon = .ranged(5, .bolts, .primitive, .effects(.{ .physical = .range(2, 3) })),
         .weight = .{ .value = 70 },
     }),
 
@@ -69,9 +67,8 @@ pub const Weapons = struct {
         .rarity = .common,
         .sprite = .{ .codepoint = cp.weapon_melee },
         .weight = .{ .value = 100 },
-        .effects = .init(.{ .physical = .range(3, 5) }),
         .price = .{ .value = 15 },
-        .weapon = .melee(.primitive),
+        .weapon = .melee(.primitive, .effects(.{ .physical = .range(3, 5) })),
     }),
 
     torch: c.Components = archetype.weapon(.{
@@ -81,8 +78,7 @@ pub const Weapons = struct {
         .weight = .{ .value = 20 },
         .source_of_light = .{ .radius = 3 },
         .price = .{ .value = 5 },
-        .effects = .init(.{ .physical = .range(1, 1), .fire = .range(1, 1) }),
-        .weapon = .melee(.primitive),
+        .weapon = .melee(.primitive, .effects(.{ .physical = .range(1, 1), .fire = .range(1, 1) })),
     }),
 
     poisoned_dagger: c.Components = archetype.weapon(.{
@@ -91,17 +87,15 @@ pub const Weapons = struct {
         .sprite = .{ .codepoint = cp.weapon_melee },
         .weight = .{ .value = 50 },
         .price = .{ .value = 50 },
-        .effects = .init(.{ .physical = .range(2, 3), .poison = .range(1, 3) }),
-        .weapon = .melee(.tricky),
+        .weapon = .melee(.tricky, .effects(.{ .physical = .range(2, 3), .poison = .range(1, 3) })),
     }),
 
     short_bow: c.Components = archetype.weapon(.{
         .description = .{ .preset = .short_bow },
-        .effects = .init(.{ .physical = .range(2, 3) }),
         .price = .{ .value = 50 },
         .rarity = .common,
         .sprite = .{ .codepoint = cp.weapon_ranged },
-        .weapon = .ranged(5, .arrows, .tricky),
+        .weapon = .ranged(5, .arrows, .tricky, .effects(.{ .physical = .range(2, 3) })),
         .weight = .{ .value = 50 },
     }),
 };
@@ -131,29 +125,26 @@ pub const Potions = struct {
         .description = .{ .preset = .healing_potion },
         .rarity = .rare,
         .sprite = .{ .codepoint = cp.potion },
-        .effects = .init(.{ .heal = .range(20, 25) }),
         .weight = .{ .value = 10 },
         .price = .{ .value = 50 },
-        .consumable = .{ .consumable_type = .potion, .calories = 50 },
+        .consumable = .potion(.{ .heal = .range(20, 25) }, 50),
     }),
 
     poisoning_potion: c.Components = archetype.potion(.{
         .description = .{ .preset = .poisoning_potion },
         .rarity = .rare,
         .sprite = .{ .codepoint = cp.potion },
-        .effects = .init(.{ .poison = .range(10, 20) }),
         .weight = .{ .value = 10 },
         .price = .{ .value = 30 },
-        .consumable = .{ .consumable_type = .potion, .calories = 10 },
+        .consumable = .potion(.{ .poison = .range(10, 20) }, 10),
     }),
 
     oil_potion: c.Components = archetype.potion(.{
         .description = .{ .preset = .oil_potion },
         .rarity = .rare,
         .sprite = .{ .codepoint = cp.potion },
-        .effects = .init(.{ .poison = .range(20, 25) }),
         .weight = .{ .value = 10 },
         .price = .{ .value = 30 },
-        .consumable = .{ .consumable_type = .potion, .calories = 10 },
+        .consumable = .potion(.{ .poison = .range(20, 25) }, 100),
     }),
 };
