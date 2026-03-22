@@ -236,7 +236,7 @@ pub fn tryGenerateNew(
     // Add items
     var proportions: [g.entities.presets.Items.fields.values.len]u8 = undefined;
     const player_level = self.registry.getUnsafe(self.player, c.Experience).level;
-    g.meta.itemsChanceProportions(&proportions, self.depth, .dungeon, player_level);
+    g.entities.random.itemsChanceProportions(&proportions, self.depth, .dungeon, player_level);
     for (0..rand.uintLessThan(u8, 5) + 1) |_| {
         if (self.randomEmptyPlace(rand)) |place| {
             _ = try self.addRandomItem(rand, place, &proportions);
@@ -528,18 +528,14 @@ pub fn addEnemy(self: *g.Level, state: c.EnemyState, enemy: c.Components) !g.Ent
 }
 
 pub fn addRandomEnemy(self: *g.Level, rand: std.Random, place: p.Point) !g.Entity {
-    // TODO: move to the meta and add tier for enemies
-    const idx = rand.uintLessThan(usize, g.entities.presets.Enemies.fields.values.len);
-    var enemy = g.entities.presets.Enemies.fields.values[idx].*;
-    enemy.position = .{ .place = place, .zorder = .obstacle };
-    enemy.state = if (rand.uintLessThan(u8, 5) == 0) .sleeping else .walking;
-    const id = try self.registry.addNewEntity(enemy);
-    try self.entities_on_level.append(self.arena.allocator(), id);
-    return id;
+    const entity = try g.entities.random.generateEnemy(self.registry, rand, self.depth);
+    try self.registry.set(entity, c.Position{ .place = place, .zorder = .obstacle });
+    try self.entities_on_level.append(self.arena.allocator(), entity);
+    return entity;
 }
 
 fn addRandomItem(self: *g.Level, rand: std.Random, place: p.Point, proportions: []const u8) !g.Entity {
-    const entity = try g.meta.generateItem(self.registry, rand, proportions);
+    const entity = try g.entities.random.generateItem(self.registry, rand, proportions);
     try self.registry.set(entity, c.Position{ .place = place, .zorder = .item });
     try self.entities_on_level.append(self.arena.allocator(), entity);
     return entity;

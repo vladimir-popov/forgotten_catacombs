@@ -9,6 +9,7 @@ const entities = @This();
 
 const items = @import("items.zig");
 const enemies = @import("enemies.zig");
+pub const random = @import("random.zig");
 
 pub const presets = struct {
     pub const Items = g.utils.Preset(g.components.Components, entities.items);

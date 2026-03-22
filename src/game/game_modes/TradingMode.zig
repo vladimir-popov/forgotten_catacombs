@@ -70,7 +70,7 @@ pub fn init(
         .inventory = session.registry.getUnsafe(session.player, c.Inventory),
         .shop = shop,
     };
-    try g.meta.fillShop(
+    try g.entities.random.fillShop(
         &session.registry,
         shop,
         session.level.depth,
