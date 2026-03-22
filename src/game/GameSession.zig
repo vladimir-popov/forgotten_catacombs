@@ -241,7 +241,7 @@ pub fn movePlayerToLevel(self: *Self, by_ladder: c.Ladder) !void {
 }
 
 /// Removes the entity or returns `error.GameOver`.
-pub fn onEntityDied(self: *Self, entity: g.Entity) !void {
+pub fn removeDeadEntity(self: *Self, entity: g.Entity) !void {
     if (entity.eql(self.player)) {
         log.info("Player is dead. Game is over.", .{});
         // return error for break the game loop:

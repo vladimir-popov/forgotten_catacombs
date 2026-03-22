@@ -395,7 +395,10 @@ fn applyEffect(
             target_health.current_hp += value;
             target_health.current_hp = @min(target_health.max, target_health.current_hp);
             const is_blocked_animation = actor.eql(self.session().player) or target.eql(self.session().player);
-            try self.session().registry.set(target, c.Animation{ .preset = .healing, .is_blocked = is_blocked_animation });
+            try self.session().registry.set(
+                target,
+                c.Animation{ .preset = .healing, .is_blocked = is_blocked_animation },
+            );
 
             log.debug("Entity {d} recovered up to {d} hp", .{ target.id, value });
             return false;
@@ -462,12 +465,28 @@ fn applyDamage(
         return false;
     } else {
         // handle the death
-        if (actor.eql(self.session().player))
-            if (g.meta.getEnemyType(&self.session().registry, target)) |enemy_type|
-                // If the enemy was killed by the player, we should mark it as known
-                try self.session().journal.markEnemyAsKnown(enemy_type);
 
-        try self.session().onEntityDied(target);
+        // If the enemy was killed by the player...
+        if (actor.eql(self.session().player)) {
+            // ... we should mark it as known
+            if (g.meta.getEnemyType(&self.session().registry, target)) |enemy_type|
+                try self.session().journal.markEnemyAsKnown(enemy_type);
+            // ...and try to generate a reward
+            const optional_reward = try g.entities.random.generateReward(
+                &self.session().registry,
+                self.session().prng.random(),
+                .dungeon,
+                self.session().level.depth,
+                self.session().registry.getUnsafe(self.session().player, c.Experience).level,
+            );
+            if (optional_reward) |reward| {
+                const place = self.session().registry.getUnsafe(target, c.Position).place;
+                try self.session().registry.set(reward, c.Position{ .place = place, .zorder = .item });
+                try self.session().level.entities_on_level.append(self.session().level.arena.allocator(), reward);
+            }
+        }
+
+        try self.session().removeDeadEntity(target);
         return true;
     }
 }

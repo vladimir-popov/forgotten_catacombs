@@ -32,7 +32,7 @@ pub inline fn getPotionType(registry: *const g.Registry, entity: g.Entity) ?Poti
         null;
 }
 
-/// Returns a type of an enemy if it has description preset from appropriate namespace.
+/// Returns a type of the enemy if it has a description preset from an appropriate namespace.
 pub inline fn getEnemyType(registry: *const g.Registry, entity: g.Entity) ?EnemyType {
     return if (registry.get(entity, c.Description)) |descr|
         std.meta.stringToEnum(EnemyType, @tagName(descr.preset))

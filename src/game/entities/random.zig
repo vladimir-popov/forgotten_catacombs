@@ -20,6 +20,21 @@ pub fn generateEnemy(registry: *g.Registry, rand: std.Random, depth: u8) !g.Enti
     return try registry.addNewEntity(enemy);
 }
 
+/// Generates optional reward for killing an enemy.
+pub fn generateReward(
+    registry: *g.Registry,
+    rand: std.Random,
+    target: GeneratingTarget,
+    depth: u8,
+    player_level: u8,
+) !?g.Entity {
+    if (rand.uintLessThan(u8, 10) < 4) return null;
+
+    var proportions: [g.entities.presets.Items.fields.values.len]u8 = undefined;
+    itemsChanceProportions(&proportions, depth, target, player_level);
+    return try generateItem(registry, rand, &proportions);
+}
+
 /// Chooses a random item from the preset using the weighted index and adds that item
 /// as a new entity to the registry. If the item is a weapon or an armor, this method adds a random
 /// modification with 20% chance.
