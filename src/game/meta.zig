@@ -153,7 +153,9 @@ pub fn movePointsForAction(registry: *const g.Registry, actor: g.Entity, _: g.Ac
     return registry.getUnsafe(actor, c.Speed).move_points;
 }
 
-const GeneratingTarget = union(enum) {
+// TODO: move everything for choosing random items to a separate file
+
+pub const GeneratingTarget = union(enum) {
     shop,
     dungeon,
     reward: struct { enemy_level: u8 },
@@ -192,43 +194,58 @@ fn itemChanceProportion(rarity: c.Rarity, tier: c.Tier, depth: u8, target: Gener
     return @intFromFloat(@round(proportion * tier_difference_penalty));
 }
 
+/// Builds a weighted index for all items.
+pub fn itemsChanceProportions(
+    proportions: *[g.entities.presets.Items.fields.values.len]u8,
+    depth: u8,
+    target: GeneratingTarget,
+    player_level: u8,
+) void {
+    var i: usize = 0;
+    var itr = g.entities.presets.Items.iterator();
+    while (itr.next()) |item| {
+        proportions[i] = itemChanceProportion(item.rarity.?, item.tier.?, depth, target, player_level);
+        i += 1;
+    }
+}
+
+/// Chooses an item for the target using the weighted index and adds that item as a new entity to
+/// the registry. If the item is a weapon or an armor, adds a random modification with 20% chance.
+/// Returns the id of the generated item.
+pub fn generateItem(registry: *g.Registry, rand: std.Random, proportions: []const u8) !g.Entity {
+    const item = g.entities.presets.Items.fields.values[rand.weightedIndex(u8, proportions)];
+    const entity = try registry.addNewEntity(item.*);
+    // Randomly modify a weapon:
+    if (registry.get(entity, c.Weapon)) |weapon| {
+        if (rand.uintAtMost(u8, 100) < 15) {
+            const codepoint: g.Codepoint = if (weapon.ammunition_type) |_|
+                g.codepoints.weapon_ranged_unknown
+            else
+                g.codepoints.weapon_melee_unknown;
+            try modifyEntity(registry, rand, entity, codepoint, -5, 5, null);
+        }
+    }
+    // Randomly modify an armor:
+    else if (registry.has(entity, c.Protection)) {
+        if (rand.uintAtMost(u8, 100) < 15) {
+            try modifyEntity(registry, rand, entity, g.codepoints.armor_unknown, -5, 5, null);
+        }
+    }
+    return entity;
+}
+
 /// Algorithm of filling a shop:
 /// 1. Build a weighted index for all defined in `g.entities.Items` items according to their tier;
 /// 2. Randomly choose a count of items in the shop: [10, 15]
 /// 3. Randomly getting items
-///    3.1. If the item is a weapon or an armor, adds a random modification with 20% chance.
 pub fn fillShop(registry: *g.Registry, shop: *c.Shop, depth: u8, player_level: u8) !void {
     var prng = std.Random.DefaultPrng.init(shop.seed);
     const rand = prng.random();
     const count = rand.uintAtMost(usize, 5) + 10;
-    // Build a weighted index for all items according to their rarity:
     var proportions: [g.entities.presets.Items.fields.values.len]u8 = undefined;
-    var i: usize = 0;
-    var itr = g.entities.presets.Items.iterator();
-    while (itr.next()) |item| {
-        proportions[i] = itemChanceProportion(item.rarity.?, item.tier.?, depth, .shop, player_level);
-        i += 1;
-    }
+    itemsChanceProportions(&proportions, depth, .shop, player_level);
     for (0..count) |_| {
-        // Choose an item for the shop using the weighted index:
-        const item = g.entities.presets.Items.fields.values[rand.weightedIndex(u8, &proportions)];
-        const entity = try registry.addNewEntity(item.*);
-        // Randomly modify a weapon:
-        if (registry.get(entity, c.Weapon)) |weapon| {
-            if (rand.uintAtMost(u8, 100) < 15) {
-                const codepoint: g.Codepoint = if (weapon.ammunition_type) |_|
-                    g.codepoints.weapon_ranged_unknown
-                else
-                    g.codepoints.weapon_melee_unknown;
-                try modifyEntity(registry, rand, entity, codepoint, -5, 5, null);
-            }
-        }
-        // Randomly modify an armor:
-        else if (registry.has(entity, c.Protection)) {
-            if (rand.uintAtMost(u8, 100) < 15) {
-                try modifyEntity(registry, rand, entity, g.codepoints.armor_unknown, -5, 5, null);
-            }
-        }
+        const entity = try generateItem(registry, rand, &proportions);
         try shop.items.add(entity);
     }
 }

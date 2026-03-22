@@ -9,21 +9,20 @@ test "Init near the shop" {
     var test_session: TestSession = undefined;
     _ = try initNearShopWithMoney(&test_session, 40);
     defer test_session.deinit();
-    errdefer test_session.printDisplay();
 
     try test_session.runtime.display.expectLooksLike(
         \\╔═══════════════════╗══════════════════╗
         \\║        Buy        ║      Sell        ║
         \\║                   ╚══════════════════║
-        \\║] Jacket                         52$ ▒║
-        \\║¡ Oil lamp                       75$ ░║
-        \\║¿ A white potion                 45$ ░║
-        \\║} Light crossbow                 75$ ░║
-        \\║% Apple                          15$ ░║
+        \\║¿ A blue potion                  45$ ▒║
+        \\║] Jacket                         52$ ░║
         \\║¿ A blue potion                  45$ ░║
+        \\║¡ Oil lamp                       75$ ░║
+        \\║} Light crossbow                 75$ ░║
+        \\║} Short bow                      75$ ░║
         \\╚══════════════════════════════════════╝
         \\════════════════════════════════════════
-        \\ Your money:   40$    Close     Choose ⇧
+        \\ Your money:   40$    Close  �� Choose ⇧
     , .whole_display);
 }
 

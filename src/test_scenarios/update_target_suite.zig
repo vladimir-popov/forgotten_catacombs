@@ -70,7 +70,7 @@ test "Lose target on moving away" {
         \\════════════════════════════════════════
         \\    Closed door     ⇧Explore ��  Open  ⇧
     , .whole_display);
-    const door = g.Entity{ .id = 24 };
+    const door = g.Entity{ .id = 13 };
     try std.testing.expectEqual(door, test_session.player.target());
 
     std.log.debug("Move the player away from the door", .{});
