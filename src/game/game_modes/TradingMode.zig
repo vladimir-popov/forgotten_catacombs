@@ -70,6 +70,12 @@ pub fn init(
         .inventory = session.registry.getUnsafe(session.player, c.Inventory),
         .shop = shop,
     };
+    try g.meta.fillShop(
+        &session.registry,
+        shop,
+        session.level.depth,
+        session.registry.getUnsafe(session.player, c.Experience).level,
+    );
     self.main_window.addTab("Buy", self);
     try self.updateBuyingTab();
 

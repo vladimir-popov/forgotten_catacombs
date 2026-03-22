@@ -255,8 +255,8 @@ fn recognizeItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
 fn modifyDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     var area = w.OptionsArea(g.Entity).centered(self);
-    try area.addOption(self.alloc, "Describe", item, describeItem, null);
     try area.addOption(self.alloc, "Modify", item, modificationMode, null);
+    try area.addOption(self.alloc, "Describe", item, describeItem, null);
     try area.addOption(self.alloc, "Help", item, showHelp, null);
     self.actions_window = .modalWindow(area, MODAL_WINDOW_REGION);
     // keep the main window opened

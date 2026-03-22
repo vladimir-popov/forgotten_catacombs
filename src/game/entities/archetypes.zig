@@ -46,6 +46,7 @@ pub inline fn item(components: c.Components) c.Components {
         defined(components, "description");
         defined(components, "price");
         defined(components, "rarity");
+        defined(components, "tier");
         defined(components, "sprite");
         defined(components, "weight");
         return components;

@@ -116,12 +116,10 @@ pub fn trader(
     balance: u16,
     seed: u64,
 ) !c.Components {
-    var shop = try c.Shop.empty(registry.allocator(), price_multiplier, balance);
-    try g.meta.fillShop(&shop, registry, seed);
     return .{
         .position = .{ .place = place, .zorder = .obstacle },
         .sprite = .{ .codepoint = cp.human },
         .description = .{ .preset = .traider },
-        .shop = shop,
+        .shop = try c.Shop.empty(registry.allocator(), price_multiplier, balance, seed),
     };
 }

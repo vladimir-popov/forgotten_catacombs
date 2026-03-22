@@ -216,8 +216,8 @@ pub const Cheat = union(enum) {
                 } else {
                     global_debug_shop = try session.arena.allocator().create(c.Shop);
                 }
-                global_debug_shop.?.* = try c.Shop.empty(session.arena.allocator(), 1.0, 200);
-                try g.meta.fillShop(global_debug_shop.?, &session.registry, session.prng.next());
+                const seed = session.prng.next();
+                global_debug_shop.?.* = try c.Shop.empty(session.arena.allocator(), 1.0, 200, seed);
                 return .{ .trade = global_debug_shop.? };
             },
             else => return null,

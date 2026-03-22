@@ -255,8 +255,10 @@ fn handleInput(self: *Self) !?g.actions.Action {
                     try self.session.journal.markEnemyAsKnown(enemy_type);
                 } else if (g.meta.getPotionType(&self.session.registry, entity)) |potion_type| {
                     try self.session.journal.markPotionAsKnown(potion_type);
-                } else {
+                } else if (self.session.registry.has(entity, c.Weapon)) {
                     try self.session.journal.markWeaponAsKnown(entity);
+                } else if (self.session.registry.has(entity, c.Protection)) {
+                    try self.session.journal.markArmorAsKnown(entity);
                 }
             },
             else => if (try cheat.toAction(self.session)) |action| {

@@ -158,15 +158,23 @@ pub const Shop = struct {
     // multiplier, and that multiplier would depends on player's characteristics.
     price_multiplier: f16,
     items: u.EntitiesSet,
+    /// This seed is used to generate items for selling.
+    seed: u64,
     balance: u16 = 0,
 
-    pub fn empty(alloc: std.mem.Allocator, price_multiplier: f16, balance: u16) !Shop {
-        return .{ .items = try u.EntitiesSet.init(alloc), .price_multiplier = price_multiplier, .balance = balance };
+    pub fn empty(alloc: std.mem.Allocator, price_multiplier: f16, balance: u16, seed: u64) !Shop {
+        return .{
+            .items = try u.EntitiesSet.init(alloc),
+            .price_multiplier = price_multiplier,
+            .balance = balance,
+            .seed = seed,
+        };
     }
 
     pub fn deinit(self: *Shop) void {
         self.items.deinit();
         self.price_multiplier = undefined;
+        self.seed = undefined;
     }
 };
 
@@ -358,6 +366,17 @@ pub const Hunger = struct {
     }
 };
 
+/// The chance of appearing an item somewhere (shop, dungeon, reward) depends on its tear and
+/// player's level. The high level tiers are for high level players. But, items with zero tear can
+/// appear at any moment. It makes possible to find something like arrows during the whole game.
+/// An approximate correlation between player's level and item's tear looks like this:
+/// tier 1 is for player with level between 1 and 4;
+/// tier 2 is for player with level between 5 and 9;
+/// and so on.
+pub const Tier = struct {
+    value: u4,
+};
+
 pub const Rarity = enum(u8) {
     common = 15,
     rare = 10,
@@ -365,7 +384,7 @@ pub const Rarity = enum(u8) {
     legendary = 1,
     unique = 0,
 
-    pub const proportions: [std.meta.fields(Rarity).len]u8 = blk: {
+    const proportions: [std.meta.fields(Rarity).len]u8 = blk: {
         var result: [std.meta.fields(Rarity).len]u8 = undefined;
         for (std.meta.fields(Rarity), 0..) |f, i| {
             result[i] = f.value;
@@ -533,6 +552,7 @@ pub const Components = struct {
     sprite: ?Sprite, // must be provided for every entity
     state: ?EnemyState = null,
     stats: ?Stats = null,
+    tier: ?Tier = null,
     wallet: ?Wallet = null,
     weapon: ?Weapon = null,
     weight: ?Weight = null,

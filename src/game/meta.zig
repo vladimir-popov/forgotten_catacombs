@@ -121,8 +121,8 @@ pub fn getActualDamage(registry: *const g.Registry, weapon_id: g.Entity, weapon:
 
 /// Merges the original armor's effects with modifications possibly applied to the armor
 pub fn getActualProtection(registry: *const g.Registry, armor_id: g.Entity, protection: ?c.Protection) c.Protection {
-    if (protection) |p| {
-        var effects: c.Effects = p.resistance;
+    if (protection) |pr| {
+        var effects: c.Effects = pr.resistance;
         // Merge with modifications
         if (registry.get(armor_id, c.Modification)) |modifications| {
             modifications.applyTo(&effects);
@@ -153,13 +153,52 @@ pub fn movePointsForAction(registry: *const g.Registry, actor: g.Entity, _: g.Ac
     return registry.getUnsafe(actor, c.Speed).move_points;
 }
 
+const GeneratingTarget = union(enum) {
+    shop,
+    dungeon,
+    reward: struct { enemy_level: u8 },
+};
+
+/// Returns a chance for the item to appear at the target (shop, dungeon, or as a reward).
+fn itemChanceProportion(rarity: c.Rarity, tier: c.Tier, depth: u8, target: GeneratingTarget, player_level: u8) u8 {
+    const actual_tier: i8 = @intCast(switch (target) {
+        // The actual tier depends on the player level and the target's depth.
+        // No high level items too earlier or  for low level player
+        .shop, .dungeon => @max(player_level / 5, depth / 15) + 1,
+
+        // The actual tier depends on the player level and the level of the killed enemy.
+        // A high level items for high level player or as a reward for killing a high level enemy
+        .reward => |reward| @max(player_level / 5, reward.enemy_level / 5) + 1,
+    });
+
+    const tier_difference: i8 = if (tier.value == 0) 0 else actual_tier - tier.value;
+
+    // Do not generate too weak or too powerful items:
+    if (tier_difference > 1) return 0;
+    if (tier_difference < -1) return 0;
+
+    const tier_difference_penalty: f16 = switch (tier_difference) {
+        // the player level is to low for the item's tier.
+        // the chance for the item should be decreased
+        -1 => 0.5,
+        // the player level is to high for the item's tier
+        // the chance for the item should be increased
+        1 => 2.0,
+        // otherwise the chance should not be changed
+        else => 1.0,
+    };
+
+    const proportion: f16 = @floatFromInt(@intFromEnum(rarity));
+    return @intFromFloat(@round(proportion * tier_difference_penalty));
+}
+
 /// Algorithm of filling a shop:
-/// 1. Build a weighted index for all defined in `g.entities.Items` items according to their rarity;
+/// 1. Build a weighted index for all defined in `g.entities.Items` items according to their tier;
 /// 2. Randomly choose a count of items in the shop: [10, 15]
-/// 3. Randomly get items
-///    3.1. If the item is a weapon, add a random modification with 20% chance.
-pub fn fillShop(shop: *c.Shop, registry: *g.Registry, seed: u64) !void {
-    var prng = std.Random.DefaultPrng.init(seed);
+/// 3. Randomly getting items
+///    3.1. If the item is a weapon or an armor, adds a random modification with 20% chance.
+pub fn fillShop(registry: *g.Registry, shop: *c.Shop, depth: u8, player_level: u8) !void {
+    var prng = std.Random.DefaultPrng.init(shop.seed);
     const rand = prng.random();
     const count = rand.uintAtMost(usize, 5) + 10;
     // Build a weighted index for all items according to their rarity:
@@ -167,7 +206,7 @@ pub fn fillShop(shop: *c.Shop, registry: *g.Registry, seed: u64) !void {
     var i: usize = 0;
     var itr = g.entities.presets.Items.iterator();
     while (itr.next()) |item| {
-        proportions[i] = @intFromEnum(item.rarity.?);
+        proportions[i] = itemChanceProportion(item.rarity.?, item.tier.?, depth, .shop, player_level);
         i += 1;
     }
     for (0..count) |_| {
@@ -184,18 +223,24 @@ pub fn fillShop(shop: *c.Shop, registry: *g.Registry, seed: u64) !void {
                 try modifyEntity(registry, rand, entity, codepoint, -5, 5, null);
             }
         }
+        // Randomly modify an armor:
+        else if (registry.has(entity, c.Protection)) {
+            if (rand.uintAtMost(u8, 100) < 15) {
+                try modifyEntity(registry, rand, entity, g.codepoints.armor_unknown, -5, 5, null);
+            }
+        }
         try shop.items.add(entity);
     }
 }
 
-const weighted_index: [c.Effects.TypesCount]u8 = blk: {
-    var wi: [c.Effects.TypesCount]u8 = undefined;
-    @memset(&wi, 0);
-    wi[@intFromEnum(c.Effects.Type.physical)] = 20;
-    wi[@intFromEnum(c.Effects.Type.fire)] = 8;
-    wi[@intFromEnum(c.Effects.Type.poison)] = 10;
-    wi[@intFromEnum(c.Effects.Type.acid)] = 5;
-    break :blk wi;
+const modifications_proportions: [c.Effects.TypesCount]u8 = blk: {
+    var arr: [c.Effects.TypesCount]u8 = undefined;
+    @memset(&arr, 0);
+    arr[@intFromEnum(c.Effects.Type.physical)] = 20;
+    arr[@intFromEnum(c.Effects.Type.fire)] = 8;
+    arr[@intFromEnum(c.Effects.Type.poison)] = 10;
+    arr[@intFromEnum(c.Effects.Type.acid)] = 5;
+    break :blk arr;
 };
 
 /// Adds a random modification to the entity.
@@ -216,7 +261,7 @@ pub fn modifyEntity(
     modified_effect: ?c.Effects.Type,
 ) !void {
     const value = rand.intRangeAtMost(i8, min, max);
-    const effect_idx = if (modified_effect) |eff| @intFromEnum(eff) else rand.weightedIndex(u8, &weighted_index);
+    const effect_idx = if (modified_effect) |eff| @intFromEnum(eff) else rand.weightedIndex(u8, &modifications_proportions);
     const modification = try registry.getOrSet(entity, c.Modification, .{ .modificators = .initFull(0) });
     modification.modificators.values[effect_idx] +|= value;
     log.debug(

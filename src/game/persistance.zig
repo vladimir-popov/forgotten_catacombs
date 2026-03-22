@@ -399,7 +399,7 @@ test "All components should be serializable" {
     try pile.items.add(.{ .id = 9 });
     defer pile.deinit();
 
-    var shop: c.Shop = try .empty(std.testing.allocator, 1.2, 42);
+    var shop: c.Shop = try .empty(std.testing.allocator, 1.2, 42, 0);
     defer shop.deinit();
 
     // Random components to check serialization:

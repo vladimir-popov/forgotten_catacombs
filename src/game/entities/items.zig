@@ -8,6 +8,7 @@ const p = g.primitives;
 oil_lamp: c.Components = archetype.item(.{
     .description = .{ .preset = .oil_lamp },
     .rarity = .rare,
+    .tier = .{ .value = 0 },
     .sprite = .{ .codepoint = cp.source_of_light },
     .weight = .{ .value = 80 },
     .source_of_light = .{ .radius = 4 },
@@ -19,6 +20,7 @@ pub const Armor = struct {
         .protection = .init(.{ .physical = .range(0, 5), .fire = .range(0, 2) }),
         .description = .{ .preset = .jacket },
         .rarity = .common,
+        .tier = .{ .value = 1 },
         .sprite = .{ .codepoint = cp.armor },
         .weight = .{ .value = 10 },
         .price = .{ .value = 35 },
@@ -30,6 +32,7 @@ pub const Weapons = struct {
         .ammunition = .arrows(10),
         .description = .{ .preset = .arrows },
         .rarity = .common,
+        .tier = .{ .value = 0 },
         .sprite = .{ .codepoint = cp.ammunition },
         .weight = .{ .value = 10 },
         .price = .{ .value = 10 },
@@ -39,6 +42,7 @@ pub const Weapons = struct {
         .ammunition = .bolts(10),
         .description = .{ .preset = .bolts },
         .rarity = .common,
+        .tier = .{ .value = 0 },
         .sprite = .{ .codepoint = cp.ammunition },
         .weight = .{ .value = 10 },
         .price = .{ .value = 10 },
@@ -47,6 +51,7 @@ pub const Weapons = struct {
     club: c.Components = archetype.weapon(.{
         .description = .{ .preset = .club },
         .rarity = .common,
+        .tier = .{ .value = 1 },
         .sprite = .{ .codepoint = cp.weapon_melee },
         .weight = .{ .value = 80 },
         .price = .{ .value = 28 },
@@ -57,6 +62,7 @@ pub const Weapons = struct {
         .description = .{ .preset = .light_crossbow },
         .price = .{ .value = 50 },
         .rarity = .common,
+        .tier = .{ .value = 1 },
         .sprite = .{ .codepoint = cp.weapon_ranged },
         .weapon = .ranged(5, .bolts, .primitive, .effects(.{ .physical = .range(2, 3) })),
         .weight = .{ .value = 70 },
@@ -65,6 +71,7 @@ pub const Weapons = struct {
     pickaxe: c.Components = archetype.weapon(.{
         .description = .{ .preset = .pickaxe },
         .rarity = .common,
+        .tier = .{ .value = 1 },
         .sprite = .{ .codepoint = cp.weapon_melee },
         .weight = .{ .value = 100 },
         .price = .{ .value = 15 },
@@ -74,6 +81,7 @@ pub const Weapons = struct {
     torch: c.Components = archetype.weapon(.{
         .description = .{ .preset = .torch },
         .rarity = .common,
+        .tier = .{ .value = 0 },
         .sprite = .{ .codepoint = cp.source_of_light },
         .weight = .{ .value = 20 },
         .source_of_light = .{ .radius = 3 },
@@ -84,6 +92,7 @@ pub const Weapons = struct {
     poisoned_dagger: c.Components = archetype.weapon(.{
         .description = .{ .preset = .dagger },
         .rarity = .rare,
+        .tier = .{ .value = 1 },
         .sprite = .{ .codepoint = cp.weapon_melee },
         .weight = .{ .value = 50 },
         .price = .{ .value = 50 },
@@ -94,6 +103,7 @@ pub const Weapons = struct {
         .description = .{ .preset = .short_bow },
         .price = .{ .value = 50 },
         .rarity = .common,
+        .tier = .{ .value = 1 },
         .sprite = .{ .codepoint = cp.weapon_ranged },
         .weapon = .ranged(5, .arrows, .tricky, .effects(.{ .physical = .range(2, 3) })),
         .weight = .{ .value = 50 },
@@ -104,6 +114,7 @@ pub const Food = struct {
     apple: c.Components = archetype.food(.{
         .description = .{ .preset = .apple },
         .rarity = .common,
+        .tier = .{ .value = 1 },
         .sprite = .{ .codepoint = cp.food },
         .weight = .{ .value = 5 },
         .price = .{ .value = 10 },
@@ -113,6 +124,7 @@ pub const Food = struct {
     food_ration: c.Components = archetype.food(.{
         .description = .{ .preset = .food_ration },
         .rarity = .common,
+        .tier = .{ .value = 0 },
         .sprite = .{ .codepoint = cp.food },
         .weight = .{ .value = 50 },
         .price = .{ .value = 50 },
@@ -124,6 +136,7 @@ pub const Potions = struct {
     healing_potion: c.Components = archetype.potion(.{
         .description = .{ .preset = .healing_potion },
         .rarity = .rare,
+        .tier = .{ .value = 0 },
         .sprite = .{ .codepoint = cp.potion },
         .weight = .{ .value = 10 },
         .price = .{ .value = 50 },
@@ -133,6 +146,7 @@ pub const Potions = struct {
     poisoning_potion: c.Components = archetype.potion(.{
         .description = .{ .preset = .poisoning_potion },
         .rarity = .rare,
+        .tier = .{ .value = 0 },
         .sprite = .{ .codepoint = cp.potion },
         .weight = .{ .value = 10 },
         .price = .{ .value = 30 },
@@ -142,6 +156,7 @@ pub const Potions = struct {
     oil_potion: c.Components = archetype.potion(.{
         .description = .{ .preset = .oil_potion },
         .rarity = .rare,
+        .tier = .{ .value = 0 },
         .sprite = .{ .codepoint = cp.potion },
         .weight = .{ .value = 10 },
         .price = .{ .value = 30 },
