@@ -2,6 +2,7 @@
 const std = @import("std");
 const g = @import("../game_pkg.zig");
 const c = g.components;
+const p = g.primitives;
 
 pub const GeneratingTarget = union(enum) {
     shop,
@@ -18,6 +19,12 @@ pub fn generateEnemy(registry: *g.Registry, rand: std.Random, depth: u8) !g.Enti
     var enemy = g.entities.presets.Enemies.fields.values[idx].*;
     enemy.state = if (rand.uintLessThan(u8, 5) == 0) .sleeping else .walking;
     return try registry.addNewEntity(enemy);
+}
+
+pub fn generateTrap(registry: *g.Registry, rand: std.Random, place: p.Point) !g.Entity {
+    return try registry.addNewEntity(
+        g.entities.trap(place, rand.int(u3), c.Effects.chooseRandomType(rand)),
+    );
 }
 
 /// Generates optional reward for killing an enemy.

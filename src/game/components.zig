@@ -246,6 +246,16 @@ pub const Effects = struct {
 
     pub const no_effects: Effects = .{ .values = .initFull(.empty) };
 
+    pub const proportions: [TypesCount]u8 = blk: {
+        var arr: [TypesCount]u8 = undefined;
+        @memset(&arr, 0);
+        arr[@intFromEnum(Type.physical)] = 20;
+        arr[@intFromEnum(Type.fire)] = 8;
+        arr[@intFromEnum(Type.poison)] = 10;
+        arr[@intFromEnum(Type.acid)] = 5;
+        break :blk arr;
+    };
+
     values: std.EnumMap(Type, p.Range(u8)),
 
     /// Example:
@@ -256,6 +266,7 @@ pub const Effects = struct {
         return .{ .values = .init(values) };
     }
 
+    /// Adds the modificator to min and max values of the effect with specified type.
     pub fn modify(self: *Effects, effect_type: Type, modificator: i8) void {
         if (self.values.getPtr(effect_type)) |values| {
             values.min = @max(0, @as(i8, @intCast(values.min)) + modificator);
@@ -263,6 +274,10 @@ pub const Effects = struct {
         } else if (modificator > 0) {
             self.values.put(effect_type, .range(0, @intCast(modificator)));
         }
+    }
+
+    pub fn chooseRandomType(rand: std.Random) Type {
+        return @enumFromInt(rand.weightedIndex(u8, &proportions));
     }
 
     pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
@@ -521,6 +536,13 @@ pub const Stats = struct {
     }
 };
 
+pub const Trap = struct {
+    /// The likelihood of detecting and disarming the trap depend on how powerful the trap is.
+    /// The trap with power 0 is always visible and easy to disarm.
+    power: u3,
+    effect: Effects.Type,
+};
+
 pub const Weight = struct {
     value: u8,
 };
@@ -553,6 +575,7 @@ pub const Components = struct {
     state: ?EnemyState = null,
     stats: ?Stats = null,
     tier: ?Tier = null,
+    trap: ?Trap = null,
     wallet: ?Wallet = null,
     weapon: ?Weapon = null,
     weight: ?Weight = null,

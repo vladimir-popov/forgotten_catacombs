@@ -117,24 +117,37 @@ test "Describe a known enemy (after killing a similar creature)" {
     errdefer test_session.printDisplay();
 
     // Prepare a game session:
-    const pp = test_session.player.position().place.movedTo(.up);
-    var rat_to_kick_components = g.entities.enemyAtPlace(.rat, pp);
+    test_session.player.position().place.move(.up);
+    const p1 = test_session.player.position().place.movedTo(.up);
+    const p2 = test_session.player.position().place.movedTo(.left);
+
+    var rat_to_kick_components = g.entities.enemyAtPlace(.rat, p1);
     rat_to_kick_components.health.?.current_hp = 1;
     const rat_to_kick_id = try test_session.session.level.addEnemy(.sleeping, rat_to_kick_components);
-    const rat_to_describe = try test_session.session.level.addEnemy(
-        .sleeping,
-        g.entities.enemyAtPlace(.rat, pp.movedToNTimes(.up, 5)),
-    );
+
+    const rat_to_describe = try test_session.session.level.addEnemy(.sleeping, g.entities.enemyAtPlace(.rat, p2));
     try test_session.tick();
+    try test_session.runtime.display.expectLooksLike(
+        \\######################################30
+        \\#•••••••••••••#     #••••••••••••••••••#
+        \\#•••┌───┐•••••###+###•••••••••••┌───┐••#
+        \\#•••│   +•••••••••••••••••••••••+   │••#
+        \\#•••└───┘•••••••••••••••••••••••└───┘••#
+        \\#•••┌───┐••••••••••••••••••••••••••••••#
+        \\#•••│   +•••••••••••r••••••••••••••••••#
+        \\#•••└───┘••••••••••r@••••••••••••••••••#
+        \\~~~~~~~~~~~~~~~~~~~│<│~~~~~~~~~~~~~~~~~~
+        \\~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    , .game_area);
 
     // kill the rat
     var attempt: usize = 0;
     while (test_session.session.registry.get(rat_to_kick_id, g.components.Health)) |health| {
+        // wait when notification disappears
+        test_session.runtime.current_millis += 3000;
         if (health.current_hp == 0) break;
 
         try test_session.pressButton(.up);
-        // wait when notification disappears
-        test_session.runtime.current_millis += 3000;
 
         if (attempt > 15) return error.ToManyAttemptsToKick;
         attempt += 1;
@@ -142,7 +155,7 @@ test "Describe a known enemy (after killing a similar creature)" {
 
     // Check description of the second rat
     try test_session.exploreMode();
-    try test_session.pressButton(.up);
+    try test_session.pressButton(.left);
     try std.testing.expectEqual(rat_to_describe, test_session.player.target());
     try test_session.pressButton(.b);
 

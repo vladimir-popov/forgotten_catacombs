@@ -436,6 +436,7 @@ test "All components should be serializable" {
         .state = .walking,
         .stats = .init(1, 2, 3, 4, 5),
         .tier = .{ .value = 12 },
+        .trap = .{ .power = 3, .effect = .fire },
         .wallet = .{ .money = 321 },
         .weapon = .ranged(5, .arrows, .tricky, .effects(.{ .physical = .range(1, 2) })),
         .weight = .{ .value = 55 },

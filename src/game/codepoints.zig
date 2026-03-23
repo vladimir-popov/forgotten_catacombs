@@ -22,6 +22,7 @@ pub const potion = '¿';
 pub const rock = '#';
 pub const source_of_light = '¡';
 pub const teleport = '_';
+pub const trap = '^';
 pub const unknown = '�';
 pub const variants = '⇧';
 pub const wall_known = '░';

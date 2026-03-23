@@ -124,3 +124,18 @@ pub fn trader(
         .shop = try c.Shop.empty(registry.allocator(), price_multiplier, balance, seed),
     };
 }
+
+pub fn trap(place: p.Point, power: u3, effect: c.Effects.Type) c.Components {
+    return .{
+        .description = .{ .preset = switch (effect) {
+            .physical => .trap,
+            .fire => .fire_trap,
+            .acid => .acid_trap,
+            .poison => .poison_trap,
+            .heal => .healing_trap,
+        } },
+        .sprite = .{ .codepoint = cp.trap },
+        .trap = .{ .power = power, .effect = effect },
+        .position = .{ .place = place, .zorder = .item },
+    };
+}

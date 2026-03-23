@@ -255,6 +255,14 @@ pub fn tryGenerateNew(
             );
         }
     }
+
+    // Add traps
+    for (0..(rand.uintLessThan(u8, 10) + 2 * self.depth)) |_| {
+        if (self.randomEmptyPlace(rand)) |place| {
+            _ = try self.addRandomTrap(rand, place);
+        }
+    }
+
     try self.completeInitialization(from_ladder.direction);
     return true;
 }
@@ -537,6 +545,12 @@ pub fn addRandomEnemy(self: *g.Level, rand: std.Random, place: p.Point) !g.Entit
 fn addRandomItem(self: *g.Level, rand: std.Random, place: p.Point, proportions: []const u8) !g.Entity {
     const entity = try g.entities.random.generateItem(self.registry, rand, proportions);
     try self.registry.set(entity, c.Position{ .place = place, .zorder = .item });
+    try self.entities_on_level.append(self.arena.allocator(), entity);
+    return entity;
+}
+
+fn addRandomTrap(self: *g.Level, rand: std.Random, place: p.Point) !g.Entity {
+    const entity = try g.entities.random.generateTrap(self.registry, rand, place);
     try self.entities_on_level.append(self.arena.allocator(), entity);
     return entity;
 }

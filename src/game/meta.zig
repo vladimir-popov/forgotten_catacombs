@@ -153,23 +153,9 @@ pub fn movePointsForAction(registry: *const g.Registry, actor: g.Entity, _: g.Ac
     return registry.getUnsafe(actor, c.Speed).move_points;
 }
 
-const modifications_proportions: [c.Effects.TypesCount]u8 = blk: {
-    var arr: [c.Effects.TypesCount]u8 = undefined;
-    @memset(&arr, 0);
-    arr[@intFromEnum(c.Effects.Type.physical)] = 20;
-    arr[@intFromEnum(c.Effects.Type.fire)] = 8;
-    arr[@intFromEnum(c.Effects.Type.poison)] = 10;
-    arr[@intFromEnum(c.Effects.Type.acid)] = 5;
-    break :blk arr;
-};
-
 /// Adds a random modification to the entity.
 /// The value can be taken randomly from the range [`min`, `max`] if the effect is passed explicitly,
-/// or the effect selecting randomly using the weighted index:
-///   - physical = 20;
-///   - poison = 10;
-///   - fire = 8;
-///   - acid = 5;
+/// or the effect selecting randomly.
 /// Finally, the codepoint of the entity is changed to its "unknown" version.
 pub fn modifyEntity(
     registry: *g.Registry,
@@ -181,13 +167,13 @@ pub fn modifyEntity(
     modified_effect: ?c.Effects.Type,
 ) !void {
     const value = rand.intRangeAtMost(i8, min, max);
-    const effect_idx = if (modified_effect) |eff| @intFromEnum(eff) else rand.weightedIndex(u8, &modifications_proportions);
+    const effect: c.Effects.Type = if (modified_effect) |eff|
+        eff
+    else
+        c.Effects.chooseRandomType(rand);
     const modification = try registry.getOrSet(entity, c.Modification, .{ .modificators = .initFull(0) });
-    modification.modificators.values[effect_idx] +|= value;
-    log.debug(
-        "Add modificator {t} = {d} for {d}",
-        .{ @as(c.Effects.Type, @enumFromInt(effect_idx)), value, entity.id },
-    );
+    modification.modificators.getPtr(effect).?.* +|= value;
+    log.debug("Add modificator {t} = {d} for {d}", .{ effect, value, entity.id });
     try registry.set(entity, c.Sprite{ .codepoint = unknown_codepoint });
 }
 

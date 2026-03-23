@@ -264,7 +264,48 @@ pub const Food = struct {
     },
 };
 
-closed_door: Description = .{ .name = "Closed door" },
+pub const Traps = struct {
+    trap: Description = .{
+        .name = "Trap",
+        .description = &.{
+            "Hidden spikes burst from the ground",
+            "impaling anything standing above.",
+        },
+    },
+    fire_trap: Description = .{
+        .name = "Fire trap",
+        .description = &.{
+            "A  sudden  burst  of  flame  erupts",
+            "without      warning,     engulfing",
+            "everything nearby in searing heat.",
+        },
+    },
+    acid_trap: Description = .{
+        .name = "Acid trap",
+        .description = &.{
+            "A  pressurized  jet of  acid bursts",
+            "forth, leaving sizzling  scars.",
+        },
+    },
+    poison_trap: Description = .{
+        .name = "Poison trap",
+        .description = &.{
+            "A   nearly   invisible   mechanism",
+            "releases a cloud of toxic gas that",
+            "slowly poisons its victim.",
+        },
+    },
+    healing_trap: Description = .{ .name = "Healing trap" },
+};
+
+closed_door: Description = .{
+    .name = "Closed door",
+    .description = &.{
+        "The  door  stands shut, silent  and",
+        "uninviting,  hidding  whatever lies",
+        "beyond.",
+    },
+},
 food_ration: Description = .{
     .name = "Food ration",
     .description = &.{
@@ -304,7 +345,14 @@ oil_lamp: Description = .{
         "light into the darkest corners.",
     },
 },
-opened_door: Description = .{ .name = "Opened door" },
+opened_door: Description = .{
+    .name = "Opened door",
+    .description = &.{
+        "A  doorway  stands open, offering a",
+        "glimpse  intothe  space  that  lies",
+        "ahead.",
+    },
+},
 pile: Description = .{
     .name = "Pile of items",
     .description = &.{
