@@ -9,8 +9,7 @@ test "Show a notification from the center" {
     defer test_session.deinit();
 
     try test_session.session.notify(.{ .exp = 100 });
-    try test_session.tick();
-    try test_session.tick();
+    try test_session.tick(.{ .count = 2, .duration_ms = 100 });
 
     try test_session.runtime.display.expectLooksLike(
         \\••••••••••••••••••••••••••••••••••••••30
@@ -33,8 +32,7 @@ test "Show a notification from the top left corner" {
 
     test_session.player.position().place = .init(1, 1);
     try test_session.session.notify(.{ .exp = 100 });
-    try test_session.tick();
-    try test_session.tick();
+    try test_session.tick(.{ .count = 2, .duration_ms = 100 });
 
     try test_session.runtime.display.expectLooksLike(
         \\@•••••••••••••••••••••••••••••••••••••30
@@ -57,8 +55,7 @@ test "Show a notification near the left border" {
 
     test_session.player.position().place = .init(2, 2);
     try test_session.session.notify(.{ .exp = 100 });
-    try test_session.tick();
-    try test_session.tick();
+    try test_session.tick(.{ .count = 2, .duration_ms = 100 });
 
     try test_session.runtime.display.expectLooksLike(
         \\+100 EXP••••••••••••••••••••••••••••••30
@@ -81,8 +78,7 @@ test "Show a notification from the bottom right corner" {
 
     test_session.player.position().place = .init(10, 40);
     try test_session.session.notify(.{ .exp = 100 });
-    try test_session.tick();
-    try test_session.tick();
+    try test_session.tick(.{ .count = 2, .duration_ms = 100 });
 
     try test_session.runtime.display.expectLooksLike(
         \\••••••••••••••••••••••••••••••••••••••30
@@ -105,8 +101,7 @@ test "Show a notification near the right border" {
 
     test_session.player.position().place = .init(10, 39);
     try test_session.session.notify(.{ .exp = 100 });
-    try test_session.tick();
-    try test_session.tick();
+    try test_session.tick(.{ .count = 2, .duration_ms = 100 });
 
     try test_session.runtime.display.expectLooksLike(
         \\••••••••••••••••••••••••••••••••••••••30
@@ -133,8 +128,7 @@ test "Show a notification near an enemy" {
     test_session.session.mode.play.target = rat;
 
     try test_session.session.notify(.{ .hit = .{ .target = rat, .damage = 5 } });
-    try test_session.tick();
-    try test_session.tick();
+    try test_session.tick(.{ .count = 2, .duration_ms = 100 });
 
     try test_session.runtime.display.expectLooksLike(
         \\••••••••••••••••••••••••••••••••••••••30

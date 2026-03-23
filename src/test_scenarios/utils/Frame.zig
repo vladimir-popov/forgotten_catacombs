@@ -123,6 +123,10 @@ pub fn expectLooksLike(self: Self, expectation: []const u8, area: ComparingArea)
     }
 }
 
+pub fn isEqualToString(self: Self, expectation: []const u8, area: ComparingArea) !bool {
+    return try self.diffInArea(try parse(expectation, area.toRegion()), area) == null;
+}
+
 fn diffInArea(self: Self, expected_frame: Self, area: ComparingArea) !?Self {
     var has_difference = false;
     var diff: Self = .empty;

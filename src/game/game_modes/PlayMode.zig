@@ -159,24 +159,38 @@ pub fn doTurn(
     actor: g.Entity,
     action: g.actions.Action,
     initiative: g.MovePoints,
-) !struct { ?g.Action, g.MovePoints } {
+) !g.actions.ActionResult {
     log.info("The turn of the entity {d}.", .{actor.id});
     defer log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
 
     // Do Actions
-    const actual_action, const mp = try self.session.actions.doAction(actor, action, initiative);
-    log.info("Entity {d} spent {d} move points", .{ actor.id, mp });
+    const action_result = try self.session.actions.doAction(actor, action, initiative);
+    switch (action_result) {
+        .done => |success| {
+            const mp = success.spent_move_points;
+            log.info("Entity {d} spent {d} move points", .{ actor.id, mp });
 
-    // Handle Initiative
-    if (self.is_player_turn and mp > 0) {
-        // Add initiative points to enemies
-        var itr = self.session.registry.query(c.Initiative);
-        while (itr.next()) |tuple| {
-            tuple[1].move_points += mp;
-        }
-        try self.session.events.sendEvent(.{ .player_turn_completed = .{ .spent_move_points = mp } });
+            // Handle Initiative
+            if (self.is_player_turn and mp > 0) {
+                // Add initiative points to enemies
+                var itr = self.session.registry.query(c.Initiative);
+                while (itr.next()) |tuple| {
+                    tuple[1].move_points += mp;
+                }
+                try self.session.events.sendEvent(.{ .player_turn_completed = .{ .spent_move_points = mp } });
+            }
+        },
+        .actor_is_dead => {
+            log.info("Entity {d} is dead after action {t}", .{ actor.id, action });
+        },
+        .not_enough_points => {
+            log.debug("Entity {d} has not enough move points for action {t}", .{ actor.id, action });
+        },
+        .declined => {
+            log.debug("The action {t} was declined for the entity {d}", .{ action, actor.id });
+        },
     }
-    return .{ actual_action, mp };
+    return action_result;
 }
 
 fn handleInput(self: *Self) !?g.actions.Action {
@@ -275,41 +289,47 @@ pub fn tick(self: *Self) !void {
     if (self.is_player_turn) {
         // break this function if no input
         const action = (try self.handleInput()) orelse return;
-        const tuple = try self.doTurn(self.session.player, action, std.math.maxInt(g.MovePoints));
-        if (tuple[0]) |actual_action| {
-            // Force change the target
-            switch (actual_action) {
-                .hit => |enemy| {
-                    self.setTarget(enemy);
-                },
-                .open => |door| {
-                    self.setTarget(door.id);
-                },
-                else => {},
-            }
-            // Update counters of unknown equipments
-            try self.session.journal.onTurnCompleted();
-            self.is_player_turn = false;
+        const action_result = try self.doTurn(self.session.player, action, std.math.maxInt(g.MovePoints));
+        switch (action_result) {
+            .done => |success| {
+                // Force change the target
+                switch (success.actual_action) {
+                    .hit => |enemy| {
+                        self.setTarget(enemy);
+                    },
+                    .open => |door| {
+                        self.setTarget(door.id);
+                    },
+                    else => {},
+                }
+                // Update counters of unknown equipments
+                try self.session.journal.onTurnCompleted();
+                self.is_player_turn = false;
+            },
+            else => {},
         }
     } else {
         var itr = self.session.registry.query(c.Initiative);
         while (itr.next()) |tuple| {
             const npc, const initiative = tuple;
+            // repeat doing something until move points are over
             loop: while (true) {
                 // TODO: compare initiative with minimal required mp to prevent calculating an action
                 const action = self.session.ai.action(npc);
-                const actual_action, const mp = self.doTurn(npc, action, initiative.move_points) catch |err| {
-                    switch (err) {
-                        error.NotEnoughMovePoints => break :loop,
-                        else => return err,
-                    }
-                };
-                g.utils.assert(
-                    mp <= initiative.move_points,
-                    "Entity {d} spent more MP {d} than initiative has {any}. Actin was {any}",
-                    .{ npc.id, mp, initiative, actual_action },
-                );
-                initiative.move_points -= mp;
+                const action_result = try self.doTurn(npc, action, initiative.move_points);
+                switch (action_result) {
+                    .done => |success| {
+                        const mp = success.spent_move_points;
+                        g.utils.assert(
+                            mp <= initiative.move_points,
+                            "Entity {d} spent more MP {d} than initiative has {any}. Action was {any}",
+                            .{ npc.id, mp, initiative, success.actual_action },
+                        );
+                        initiative.move_points -= mp;
+                    },
+                    .not_enough_points, .actor_is_dead => break :loop,
+                    .declined => {},
+                }
             }
         }
         self.is_player_turn = true;
@@ -404,7 +424,7 @@ fn drawInfoBar(self: *const Self) !void {
             }
         }
         var buf: [32]u8 = undefined;
-        try self.session.render.drawInfo(try g.meta.printName(&buf, self.session.journal, entity));
+        try self.session.render.drawInfo(try g.meta.printActualName(&buf, self.session.journal, entity));
     } else if (self.session.registry.get(self.session.player, c.Hunger)) |hunger| {
         // Draw the hunger level
         switch (hunger.level()) {

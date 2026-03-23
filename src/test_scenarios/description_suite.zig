@@ -89,7 +89,7 @@ test "Describe an unknown enemy" {
     // Prepare a game session:
     const pp = test_session.player.position().place.movedTo(.up);
     const rat = try test_session.session.level.addEnemy(.sleeping, g.entities.enemyAtPlace(.rat, pp));
-    try test_session.tick();
+    try test_session.tick(.{});
 
     try test_session.exploreMode();
     try test_session.pressButton(.up);
@@ -126,7 +126,7 @@ test "Describe a known enemy (after killing a similar creature)" {
     const rat_to_kick_id = try test_session.session.level.addEnemy(.sleeping, rat_to_kick_components);
 
     const rat_to_describe = try test_session.session.level.addEnemy(.sleeping, g.entities.enemyAtPlace(.rat, p2));
-    try test_session.tick();
+    try test_session.tick(.{});
     try test_session.runtime.display.expectLooksLike(
         \\######################################30
         \\#•••••••••••••#     #••••••••••••••••••#

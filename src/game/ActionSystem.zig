@@ -108,26 +108,21 @@ pub fn onTurnCompleted(self: *Self) !void {
 }
 
 /// Handles intentions to do some actions.
-/// Returns an optional happened action and a count of used move points.
-/// Returned null and 0 mp mean that the action was declined (moving to the wall as example).
-/// In some cases (like moving to another level) it's possible to return some action and zero mp.
-/// When action requires more move points than limit, the `error.NotEnoughMovePoints` will be
-/// returned.
 pub fn doAction(
     self: *Self,
     actor: g.Entity,
     action: g.Action,
     move_points_limit: g.MovePoints,
-) !struct { ?g.Action, g.MovePoints } {
+) !g.actions.ActionResult {
     if (std.log.logEnabled(.debug, .actions) and action != .do_nothing) {
         log.debug("Do action {any} by the entity {d}", .{ action, actor.id });
     }
     const move_points_for_action = g.meta.movePointsForAction(&self.session().registry, actor, action);
     if (move_points_for_action > move_points_limit)
-        return error.NotEnoughMovePoints;
+        return .not_enough_points;
 
     switch (action) {
-        .do_nothing => return .{ null, 0 },
+        .do_nothing => return .declined,
         .drink => |potion_id| if (g.meta.getPotionType(&self.session().registry, potion_id)) |potion_type| {
             try self.drinkPotion(actor, potion_id, potion_type);
         },
@@ -139,16 +134,25 @@ pub fn doAction(
         },
         .move => |move| {
             if (self.session().registry.get(actor, c.Position)) |position|
-                return doMove(self, actor, position, move, move_points_for_action, move_points_limit);
+                return self.tryToMove(actor, position, move, move_points_for_action, move_points_limit);
+        },
+        .step_in_trap => |step| {
+            // If the actor not dead, moving
+            if (!try self.handleTrap(actor, step.trap_entity, step.trap)) {
+                const from_position = self.session().registry.get(actor, c.Position).?;
+                try self.doMove(actor, from_position, step.place);
+            } else {
+                return .actor_is_dead;
+            }
         },
         .move_to_level => |ladder| {
             try self.session().movePlayerToLevel(ladder);
-            return .{ action, 0 };
+            return .{ .done = .{ .actual_action = action, .spent_move_points = 0 } };
         },
         .hit => |target| if (self.session().registry.get(target, c.Health)) |target_health| {
-            if (!try self.tryToHit(actor, target, target_health)) return .{ null, 0 };
+            if (!try self.tryToHit(actor, target, target_health)) return .declined;
         } else {
-            return .{ null, 0 };
+            return .declined;
         },
         .open => |door| {
             try self.session().registry.setComponentsToEntity(door.id, g.entities.openedDoor(door.place));
@@ -200,38 +204,46 @@ pub fn doAction(
             );
         },
     }
-    return .{ action, move_points_for_action };
+    return .{ .done = .{ .actual_action = action, .spent_move_points = move_points_for_action } };
 }
 
-fn doMove(
+fn tryToMove(
     self: *Self,
     entity: g.Entity,
     from_position: *c.Position,
     move: g.Action.Move,
     move_speed: g.MovePoints,
     move_points_limit: g.MovePoints,
-) anyerror!struct { ?g.Action, g.MovePoints } {
+) anyerror!g.actions.ActionResult {
     const new_place = switch (move.target) {
         .direction => |direction| from_position.place.movedTo(direction),
         .new_place => |place| place,
     };
-    if (from_position.place.eql(new_place)) return .{ null, 0 };
+    if (from_position.place.eql(new_place)) return .declined;
 
     if (checkCollision(self, new_place)) |action| {
         log.debug("Collision lead to {s}", .{@tagName(action)});
         return try doAction(self, entity, action, move_points_limit);
     }
-    const entity_moved_event = g.events.Event{
+    try self.doMove(entity, from_position, new_place);
+    return .{ .done = .{ .actual_action = .{ .move = move }, .spent_move_points = move_speed } };
+}
+
+fn doMove(
+    self: *Self,
+    entity: g.Entity,
+    from_position: *c.Position,
+    to_place: p.Point,
+) !void {
+    from_position.place = to_place;
+    try self.session().events.sendEvent(.{
         .entity_moved = .{
             .entity = entity,
             .is_player = (entity.eql(self.session().player)),
             .moved_from = from_position.place,
-            .target = move.target,
+            .target = .{ .new_place = to_place },
         },
-    };
-    try self.session().events.sendEvent(entity_moved_event);
-    from_position.place = new_place;
-    return .{ .{ .move = move }, move_speed };
+    });
 }
 
 /// Returns an action that should be done because of collision.
@@ -245,6 +257,7 @@ fn checkCollision(self: *Self, place: p.Point) ?g.Action {
             return null,
 
         .entities => |entities| {
+            // Check obstacles
             if (entities[2]) |entity| {
                 if (self.session().registry.get(entity, c.Door)) |_|
                     return .{ .open = .{ .id = entity, .place = place } };
@@ -265,6 +278,12 @@ fn checkCollision(self: *Self, place: p.Point) ?g.Action {
                 // the player should not step on the place with entity with z-order = 2
                 return .do_nothing;
             }
+            // Check traps
+            if (entities[1]) |entity| {
+                if (self.session().registry.get(entity, c.Trap)) |trap| {
+                    return .{ .step_in_trap = .{ .trap_entity = entity, .trap = trap.*, .place = place } };
+                }
+            }
             // it's possible to step on the ladder, opened door, teleport, dropped item and
             // other entities with z_order < 2
             return null;
@@ -273,7 +292,31 @@ fn checkCollision(self: *Self, place: p.Point) ?g.Action {
     return .do_nothing;
 }
 
-/// Returns `true` if the hit or evasion happens.
+// actor - is who is stepping in the trap
+// returns true if the actor is dead.
+pub fn handleTrap(self: *Self, actor: g.Entity, trap_id: g.Entity, trap: c.Trap) !bool {
+    log.debug("The entity {d} stepped to the trap {d} {any}", .{ actor.id, trap_id.id, trap });
+    const protection = self.session().registry.get(actor, c.Protection) orelse &c.Protection.zeros;
+    const health = self.session().registry.getUnsafe(actor, c.Health);
+    const health_before = health.current_hp;
+    const damage = p.Range(u8){
+        .min = health.max / 10,
+        .max = (health.max + trap.power * health.max) / 10,
+    };
+
+    const is_actor_dead = try self.applyEffect(trap_id, trap_id, trap.effect, damage, actor, protection.*, health);
+
+    // Show pop-up notifications about hit/damage
+    if (actor.eql(self.session().player)) {
+        const name = try g.meta.rawName(&self.session().registry, trap_id);
+        try self.session().notify(.{ .trap = .{ .name = name, .damage = health_before - health.current_hp } });
+    }
+
+    return is_actor_dead;
+}
+
+/// Returns `true` if the hit or evasion happens. Otherwise returns `false` (as example, because of
+/// not enough ammo).
 fn tryToHit(
     self: *Self,
     actor: g.Entity,
@@ -363,6 +406,7 @@ fn tryToHit(
         // Break the function because the target is dead
         if (is_target_dead) return true;
     }
+    // Show pop-up notifications about hit/damage
     if (actor.eql(self.session().player))
         try self.session().notify(
             .{ .hit = .{ .target = target, .damage = target_health_before - target_health.current_hp } },
@@ -380,10 +424,13 @@ fn tryToHit(
 /// Returns `true` if the target is dead.
 fn applyEffect(
     self: *Self,
+    /// who applies the effect
     actor: g.Entity,
+    /// what is a source of the effect
     source: g.Entity,
     effect_type: c.Effects.Type,
     effect_range: p.Range(u8),
+    /// to whom the effect should be applied
     target: g.Entity,
     target_protection: c.Protection,
     target_health: *c.Health,

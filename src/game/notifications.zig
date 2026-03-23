@@ -6,12 +6,19 @@ const c = g.components;
 pub const Notification = union(enum) {
     /// The player successfully hit a target.
     hit: struct {
+        /// An enemy hit by the player
         target: g.Entity,
         damage: u8,
     },
     /// The player was hit
     damage: struct {
+        /// An enemy hit the player
         actor: g.Entity,
+        damage: u8,
+    },
+    /// An entity step in a trap
+    trap: struct {
+        name: []const u8,
         damage: u8,
     },
     /// The player received experience points
@@ -34,6 +41,7 @@ pub const Notification = union(enum) {
             .miss => _ = try writer.write("Miss"),
             .dodge => _ = try writer.write("Dodge"),
             .no_ammo => _ = try writer.write("No ammo!"),
+            .trap => |trap| try writer.print("{s} -{d}", .{ trap.name, trap.damage }),
             .wrong_ammo => _ = try writer.write("Wrong ammo!"),
         }
     }

@@ -40,6 +40,7 @@ pub fn initOnFirstLevel(self: *Self, gpa: std.mem.Allocator, io: std.Io) !void {
     self.runtime.display.merge(self.runtime.last_frame);
 }
 
+/// Creates a new game session with TestRuntime and the level with test area:
 /// ```
 ///••••••••••••••••••••••••••••••••••••••30
 ///••••••••••••••••••••••••••••••••••••••••
@@ -92,10 +93,26 @@ pub fn deinit(self: *Self) void {
     self.arena.deinit();
 }
 
-/// Creates a new empty last_frame buffer, runs the method `session.tick()`,
+pub const TickOptions = struct {
+    /// How many times repeat the tick. Default is 1.
+    count: u8 = 1,
+    /// How many milliseconds add to the clock on one tick. Default = 1000.
+    duration_ms: u16 = 1000,
+};
+
+/// Creates a new empty last_frame buffer,
+/// increase a clock on 1 second,
+/// runs the method `session.tick(.{})`,
 /// and merges the last_frame into the display buffer.
-pub fn tick(self: *Self) !void {
+pub fn tick(self: *Self, opts: TickOptions) !void {
+    for (0..opts.count) |_| {
+        try self.singleTick(opts.duration_ms);
+    }
+}
+
+fn singleTick(self: *Self, duration: u16) !void {
     self.runtime.last_frame = .empty;
+    self.runtime.current_millis += duration;
     try self.session.tick();
     self.runtime.display.merge(self.runtime.last_frame);
 }
@@ -103,7 +120,7 @@ pub fn tick(self: *Self) !void {
 pub fn completeRound(self: *Self) !void {
     std.debug.assert(self.session.mode == .play);
     while (!self.session.mode.play.is_player_turn) {
-        try self.tick();
+        try self.tick(.{});
     }
 }
 
@@ -117,16 +134,16 @@ pub fn printDisplay(self: Self) void {
 pub fn pressButton(self: *Self, button: g.Button.GameButton) !void {
     log.debug("Emulate pressing button {any}", .{button});
     try self.runtime.pushed_buttons.append(self.arena.allocator(), .{ .game_button = button, .state = .released });
-    try self.tick();
+    try self.tick(.{});
 }
 
 pub fn openInventory(self: *Self) !Inventory {
     try self.session.manageInventory();
-    try self.tick();
+    try self.tick(.{});
     return .{ .test_session = self };
 }
 
 pub fn exploreMode(self: *Self) !void {
     try self.session.lookAround();
-    try self.tick();
+    try self.tick(.{});
 }

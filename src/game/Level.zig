@@ -523,6 +523,8 @@ fn updatePlacement(self: *Self, player_moved_from: p.Point, player_moved_to: p.P
     log.err("It looks like the player at {any} is outside of any placement", .{player_moved_to});
 }
 
+// Note: next methods are public for test
+
 fn addLadder(self: *g.Level, ladder: c.Ladder, place: p.Point) !void {
     try self.registry.setComponentsToEntity(ladder.id, g.entities.ladder(ladder, place));
     try self.entities_on_level.append(self.arena.allocator(), ladder.id);
@@ -549,7 +551,7 @@ fn addRandomItem(self: *g.Level, rand: std.Random, place: p.Point, proportions: 
     return entity;
 }
 
-fn addRandomTrap(self: *g.Level, rand: std.Random, place: p.Point) !g.Entity {
+pub fn addRandomTrap(self: *g.Level, rand: std.Random, place: p.Point) !g.Entity {
     const entity = try g.entities.random.generateTrap(self.registry, rand, place);
     try self.entities_on_level.append(self.arena.allocator(), entity);
     return entity;

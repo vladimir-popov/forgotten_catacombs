@@ -179,22 +179,27 @@ pub fn modifyEntity(
 
 /// Writes an actual name of the entity according to its "known" status in the journal
 /// to the `dest` buffer and returns a slice with result.
-pub fn printName(dest: []u8, journal: g.Journal, entity: g.Entity) ![]u8 {
+pub fn printActualName(dest: []u8, journal: g.Journal, entity: g.Entity) ![]u8 {
     if (g.meta.getPotionType(journal.registry, entity)) |potion_type| {
         if (journal.unknownPotionColor(potion_type)) |color|
             return try std.fmt.bufPrint(dest, "A {t} potion", .{color});
     }
-    if (journal.registry.get2(entity, c.Description, c.Ammunition)) |tuple| {
+    if (journal.registry.get(entity, c.Ammunition)) |ammo| {
         return try std.fmt.bufPrint(
             dest,
             "{s} {d}",
-            .{ g.components.Description.Preset.fields.get(tuple[0].preset).name, tuple[1].amount },
+            .{ try rawName(journal.registry, entity), ammo.amount },
         );
     }
-    if (journal.registry.get(entity, c.Description)) |description| {
-        return try std.fmt.bufPrint(dest, "{s}", .{g.components.Description.Preset.fields.get(description.preset).name});
+    return try std.fmt.bufPrint(dest, "{s}", .{try rawName(journal.registry, entity)});
+}
+
+pub fn rawName(registry: *g.Registry, entity: g.Entity) ![]const u8 {
+    if (registry.get(entity, c.Description)) |description| {
+        return g.components.Description.Preset.fields.get(description.preset).name;
+    } else {
+        return "Unknown";
     }
-    return try std.fmt.bufPrint(dest, "Unknown", .{});
 }
 
 pub fn describePlayer(
@@ -552,7 +557,7 @@ pub fn describeEquipedItems(
     var line = try text_area.addEmptyLine(alloc);
     if (equipment.weapon) |weapon_id| {
         @memcpy(line[0..16], "Equiped weapon: ");
-        _ = try printName(line[16..], journal, weapon_id);
+        _ = try printActualName(line[16..], journal, weapon_id);
         if (journal.registry.get(weapon_id, c.Weapon)) |weapon|
             try describeWeapon(alloc, journal, weapon_id, weapon, text_area);
     } else {
@@ -562,7 +567,7 @@ pub fn describeEquipedItems(
         _ = try text_area.addEmptyLine(alloc);
         line = try text_area.addEmptyLine(alloc);
         @memcpy(line[0..15], "Equiped armor: ");
-        _ = try printName(line[15..], journal, armor_id);
+        _ = try printActualName(line[15..], journal, armor_id);
         try describeArmor(alloc, journal, armor_id, text_area);
     }
     const light_id, const light_radius = g.meta.getLight(journal.registry, equipment);
@@ -570,7 +575,7 @@ pub fn describeEquipedItems(
         _ = try text_area.addEmptyLine(alloc);
         line = try text_area.addEmptyLine(alloc);
         @memcpy(line[0..17], "Source of light: ");
-        _ = try g.meta.printName(line[17..], journal, id);
+        _ = try g.meta.printActualName(line[17..], journal, id);
         line = try text_area.addEmptyLine(alloc);
         _ = try std.fmt.bufPrint(line, "       distance: {d}", .{light_radius});
     }

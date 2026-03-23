@@ -240,6 +240,11 @@ pub fn movePlayerToLevel(self: *Self, by_ladder: c.Ladder) !void {
     try self.events.sendEvent(.{ .level_changed = .{ .by_ladder = by_ladder } });
 }
 
+pub fn removeEntity(self: *Self, entity: g.Entity) !void {
+    try self.registry.removeEntity(entity);
+    try self.level.removeEntity(entity);
+}
+
 /// Removes the entity or returns `error.GameOver`.
 pub fn removeDeadEntity(self: *Self, entity: g.Entity) !void {
     if (entity.eql(self.player)) {
@@ -249,8 +254,7 @@ pub fn removeDeadEntity(self: *Self, entity: g.Entity) !void {
     } else {
         log.debug("NPC {d} is dead", .{entity.id});
         // Handle death and remove the entity here, within the current tick
-        try self.registry.removeEntity(entity);
-        try self.level.removeEntity(entity);
+        try self.removeEntity(entity);
         try self.events.sendEvent(.{ .entity_died = entity });
     }
 }
@@ -356,21 +360,4 @@ pub inline fn tick(self: *Self) !void {
         .trading => try self.mode.trading.tick(),
     }
     try self.events.notifySubscribers();
-}
-
-fn showNotifications(self: *Self) !void {
-    var i: usize = 0;
-    while (true) {
-        if (i >= self.notifications.items.len) break;
-
-        const msg = self.notifications.items[i];
-        if (self.runtime.currentMillis() - msg.start_showing_at > msg.show_for_ms) {
-            try self.render.redrawRegionFromSceneBuffer(msg.region());
-            _ = self.notifications.swapRemove(i);
-        } else {
-            try self.render.drawText(msg.buffer[0..msg.len], msg.pp, msg.mode);
-            // try self.render.drawInfo(msg.buffer[0..msg.len]);
-            i += 1;
-        }
-    }
 }

@@ -59,7 +59,7 @@ fn initFirstLevelWithRat(test_session: *TestSession) !g.Entity {
     const rat = try test_session.session.level.addEnemy(.sleeping, g.entities.enemyAtPlace(.rat, pp));
 
     // The initial game state:
-    try test_session.tick();
+    try test_session.tick(.{});
     try test_session.runtime.display.expectLooksLike(
         \\######################################30
         \\#•••••••••••••#     #••••••••••••••••••#

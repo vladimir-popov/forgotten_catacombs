@@ -11,6 +11,7 @@ test {
     _ = @import("recognize_modify_suite.zig");
     _ = @import("save_load_suite.zig");
     _ = @import("trading_suite.zig");
+    _ = @import("traps_suite.zig");
     _ = @import("update_target_suite.zig");
 }
 
@@ -19,7 +20,7 @@ test "Hello world!" {
     try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
 
-    try test_session.tick();
+    try test_session.tick(.{});
 
     try test_session.runtime.display.expectLooksLike(
         \\######################################30

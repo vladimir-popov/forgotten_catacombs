@@ -8,6 +8,17 @@ const log = std.log.scoped(.actions);
 
 pub const MovePoints = u8;
 
+pub const ActionResult = union(enum) {
+    /// Action successfully happened and move points were spent
+    done: struct { actual_action: g.Action, spent_move_points: g.MovePoints },
+    /// As example, because of moving to the wall
+    declined,
+    /// Means that action requires more move points than limit
+    not_enough_points,
+    /// An action lead to the death of the actor
+    actor_is_dead,
+};
+
 /// The intension to perform an action.
 /// Describes what some entity is going to do.
 pub const Action = union(enum) {
@@ -51,6 +62,8 @@ pub const Action = union(enum) {
     //
     modify_recognize,
     //
+    step_in_trap: struct { trap_entity: g.Entity, trap: c.Trap, place: p.Point },
+    //
     trade: *c.Shop,
 
     pub fn priority(self: Action) u8 {
@@ -80,7 +93,7 @@ pub const Action = union(enum) {
             .trade => "Trade",
             .wait => "Wait",
             .modify_recognize => "Mod/Rec",
-            .get_angry, .chill, .go_sleep, .do_nothing, .move => "???",
+            .get_angry, .chill, .go_sleep, .do_nothing, .move, .step_in_trap => "???",
         };
     }
 
