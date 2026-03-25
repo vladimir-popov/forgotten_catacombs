@@ -226,24 +226,8 @@ pub fn tryGenerateNew(
     var prng = std.Random.DefaultPrng.init(dungeon.seed);
     const rand = prng.random();
 
-    // Add enemies
-    for (0..rand.uintLessThan(u8, 10) + 10) |_| {
-        if (self.randomEmptyPlace(rand)) |place| {
-            _ = try self.addRandomEnemy(rand, place);
-        }
-    }
-
-    // Add items
-    var proportions: [g.entities.presets.Items.fields.values.len]u8 = undefined;
-    const player_level = self.registry.getUnsafe(self.player, c.Experience).level;
-    g.entities.random.itemsChanceProportions(&proportions, self.depth, .dungeon, player_level);
-    for (0..rand.uintLessThan(u8, 5) + 1) |_| {
-        if (self.randomEmptyPlace(rand)) |place| {
-            _ = try self.addRandomItem(rand, place, &proportions);
-        }
-    }
-
     // Add doors
+    log.debug("Creating doors", .{});
     if (self.dungeon.doorways) |doorways| {
         var doors = doorways.iterator();
         while (doors.next()) |entry| {
@@ -256,7 +240,27 @@ pub fn tryGenerateNew(
         }
     }
 
+    // Add enemies
+    log.debug("Generate enemies", .{});
+    for (0..rand.uintLessThan(u8, 10) + 10) |_| {
+        if (self.randomEmptyPlace(rand)) |place| {
+            _ = try self.addRandomEnemy(rand, place);
+        }
+    }
+
+    // Add items
+    log.debug("Generate items", .{});
+    var proportions: [g.entities.presets.Items.fields.values.len]u8 = undefined;
+    const player_level = self.registry.getUnsafe(self.player, c.Experience).level;
+    g.entities.random.itemsChanceProportions(&proportions, self.depth, .dungeon, player_level);
+    for (0..rand.uintLessThan(u8, 5) + 1) |_| {
+        if (self.randomEmptyPlace(rand)) |place| {
+            _ = try self.addRandomItem(rand, place, &proportions);
+        }
+    }
+
     // Add traps
+    log.debug("Generate traps", .{});
     for (0..(rand.uintLessThan(u8, 10) + 2 * self.depth)) |_| {
         if (self.randomEmptyPlace(rand)) |place| {
             _ = try self.addRandomTrap(rand, place);
