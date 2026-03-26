@@ -281,7 +281,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             self.buffer.setSymbol(symbol, position_on_display.row, position_on_display.col, mode);
         }
 
-        fn openFile(ptr: *anyopaque, file_path: []const u8, mode: g.Runtime.FileMode, buffer: []u8) anyerror!*anyopaque {
+        fn openFile(ptr: *anyopaque, file_path: [:0]const u8, mode: g.Runtime.FileMode, buffer: []u8) anyerror!*anyopaque {
             const self: *Self = @ptrCast(@alignCast(ptr));
             const file_wrapper = try self.alloc.create(FileWrapper);
             file_wrapper.* = switch (mode) {
@@ -320,7 +320,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             return &file.writer.interface;
         }
 
-        fn isFileExists(ptr: *anyopaque, file_path: []const u8) !bool {
+        fn isFileExists(ptr: *anyopaque, file_path: [:0]const u8) !bool {
             const self: *Self = @ptrCast(@alignCast(ptr));
             if (self.saves_dir.access(self.io, file_path, .{})) |_| {
                 return true;
@@ -330,7 +330,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             }
         }
 
-        fn deleteFileIfExists(ptr: *anyopaque, file_path: []const u8) !void {
+        fn deleteFileIfExists(ptr: *anyopaque, file_path: [:0]const u8) !void {
             const self: *Self = @ptrCast(@alignCast(ptr));
             self.saves_dir.deleteFile(self.io, file_path) catch |err| {
                 switch (err) {

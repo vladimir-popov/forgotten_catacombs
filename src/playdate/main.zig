@@ -9,7 +9,7 @@ pub const std_options = std.Options{
     .logFn = writeLog,
     .log_scope_levels = &[_]std.log.ScopeLevel{
         // .{ .scope = .default, .level = .debug },
-        // .{ .scope = .playdate_runtime, .level = .debug },
+        .{ .scope = .playdate, .level = .debug },
         // .{ .scope = .playdate_io, .level = .debug },
         // .{ .scope = .last_button, .level = .debug },
         // .{ .scope = .runtime, .level = .debug },
@@ -17,12 +17,12 @@ pub const std_options = std.Options{
         // .{ .scope = .visibility, .level = .debug },
         // .{ .scope = .game, .level = .debug },
         // .{ .scope = .game_session, .level = .debug },
-        .{ .scope = .play_mode, .level = .debug },
+        // .{ .scope = .play_mode, .level = .debug },
         // .{ .scope = .ai, .level = .debug },
         // .{ .scope = .explore_mode, .level = .debug },
         // .{ .scope = .looking_around_mode, .level = .debug },
-        // .{ .scope = .save_load_mode, .level = .debug },
-        .{ .scope = .level, .level = .debug },
+        .{ .scope = .save_load_mode, .level = .debug },
+        // .{ .scope = .level, .level = .debug },
         // .{ .scope = .cmd, .level = .debug },
         // .{ .scope = .events, .level = .debug },
         // .{ .scope = .action_system, .level = .debug },
@@ -30,16 +30,21 @@ pub const std_options = std.Options{
 };
 
 fn writeLog(
-    comptime lvl: std.log.Level,
+    comptime _: std.log.Level,
     comptime scope: @TypeOf(.enum_literal),
     comptime format: []const u8,
     args: anytype,
 ) void {
-    var buffer: [256]u8 = @splat(0);
-    _ = std.fmt.bufPrint(&buffer, format, args) catch |err| {
-        std.debug.panic("Unhandled error {t} on log {s}", .{ err, format });
-    };
-    playdate_log_to_console("%s (%s) %s", @tagName(lvl), @tagName(scope), (&buffer).ptr);
+    var buffer: [64]u8 = undefined;
+    const prefix = std.fmt.comptimePrint("({t}) ", .{scope});
+    const msg = std.fmt.bufPrint(&buffer, prefix ++ format, args) catch |err|
+        switch (err) {
+            // Let's write as much as possible
+            error.NoSpaceLeft => &buffer,
+        };
+    const end = @min(msg.len, buffer.len - 1);
+    buffer[end] = 0;
+    playdate_log_to_console(msg.ptr);
 }
 
 pub fn panic(
@@ -49,7 +54,7 @@ pub fn panic(
 ) noreturn {
     _ = error_return_trace;
     _ = return_address;
-    playdate_error_to_console("%s", msg.ptr);
+    playdate_error_to_console(msg.ptr);
     @breakpoint();
     @trap();
 }

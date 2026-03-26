@@ -443,8 +443,9 @@ const Saving = struct {
 
     /// Returns `true` when saving is completed.
     pub fn tick(self: *Saving) !bool {
-        log.debug("Continue saving: {s}", .{@tagName(self.progress)});
+        log.debug("Continue saving: {t}", .{self.progress});
         try self.draw();
+        log.debug("Drawn", .{});
         switch (self.progress) {
             .inited => {
                 self.file = try self.session.runtime.openFile(
@@ -452,6 +453,7 @@ const Saving = struct {
                     .write,
                     &self.io_buffer,
                 );
+                log.debug("File opened", .{});
                 self.state = .{
                     .writing = .init(&self.session.registry, self.session.runtime.writeToFile(self.file)),
                 };

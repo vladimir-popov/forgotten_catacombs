@@ -8,16 +8,13 @@ const p = g.primitives;
 const Allocator = @import("Allocator.zig");
 const LastButton = @import("LastButton.zig");
 
-const log = std.log.scoped(.playdate_runtime);
+const log = std.log.scoped(.playdate);
 
 const Self = @This();
 
 // This is a global var because the
 // serialMessageCallback doesn't receive custom data
 var cheat: ?g.Cheat = null;
-
-// The path to the dir with save files
-const save_dir: [:0]const u8 = "save";
 
 playdate: *api.PlaydateAPI,
 alloc: std.mem.Allocator,
@@ -45,8 +42,6 @@ pub fn init(playdate: *api.PlaydateAPI) !Self {
 
     playdate.system.setSerialMessageCallback(serialMessageCallback);
     playdate.system.setButtonCallback(LastButton.handleEvent, last_button, 1);
-    if (playdate.file.mkdir(save_dir.ptr) < 0)
-        std.debug.panic("Error on creating dir {s}", .{save_dir});
 
     return .{
         .playdate = playdate,
@@ -205,20 +200,17 @@ fn serialMessageCallback(data: [*c]const u8) callconv(.c) void {
     }
 }
 
-fn openFile(ptr: *anyopaque, file_path: []const u8, mode: g.Runtime.FileMode, buffer: []u8) anyerror!*anyopaque {
-    log.debug("Open file {s} to {t}", .{ file_path, mode });
+fn openFile(ptr: *anyopaque, file_path: [:0]const u8, mode: g.Runtime.FileMode, buffer: []u8) anyerror!*anyopaque {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    const file_options: c_int = switch (mode) {
+    const file_options: api.FileOptions = switch (mode) {
         .read => api.FILE_READ_DATA,
         .write => api.FILE_WRITE,
     };
-    var path_buf: [50]u8 = undefined;
-    const full_path = try std.fmt.bufPrint(&path_buf, "{s}/{s}", .{ save_dir, file_path });
-    path_buf[full_path.len] = 0;
-    const file_ptr = self.playdate.file.open(full_path[0.. :0], file_options) orelse {
+    log.debug("Open file '{s}' to {t} ({d})", .{ file_path, mode, file_options });
+    const file_ptr = self.playdate.file.open(file_path, file_options) orelse {
         log.err(
-            "Error on opening file {s} in mode {s}: {s}",
-            .{ full_path, @tagName(mode), self.playdate.file.geterr() orelse "" },
+            "Error on opening file {s} in mode {t}: {s}",
+            .{ file_path, mode, self.playdate.file.geterr() orelse "" },
         );
         return error.IOError;
     };
@@ -253,30 +245,28 @@ fn readFile(_: *anyopaque, file: *anyopaque) *std.Io.Reader {
 
 fn writeToFile(_: *anyopaque, file: *anyopaque) *std.Io.Writer {
     const file_wrapper: *io.FileWrapper = @ptrCast(@alignCast(file));
-    log.debug("Prepare a writer to write to the file {*}", .{file_wrapper});
+    log.debug("Prepare a writer for the file {*}", .{file});
     return &file_wrapper.writer.interface;
 }
 
-fn isFileExists(ptr: *anyopaque, file_path: []const u8) anyerror!bool {
+fn isFileExists(ptr: *anyopaque, file_path: [:0]const u8) anyerror!bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     var result = ExpectedFile{ .file_name = file_path };
-    if (self.playdate.file.listfiles(save_dir, validateFile, &result, 0) < 0) {
-        log.err("Error on listing files inside {s}: {s}", .{ save_dir, self.playdate.file.geterr() orelse "" });
+    if (self.playdate.file.listfiles("", validateFile, &result, 0) < 0) {
+        log.err("Error on listing files: {s}", .{self.playdate.file.geterr() orelse ""});
         return error.IOError;
     }
-
+    log.debug("Is '{s}' exists: {}", .{ file_path, result.is_found });
     return result.is_found;
 }
 
-fn deleteFileIfExists(ptr: *anyopaque, file_path: []const u8) !void {
+fn deleteFileIfExists(ptr: *anyopaque, file_path: [:0]const u8) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     if (!try isFileExists(ptr, file_path)) return;
 
-    var buf: [50]u8 = undefined;
-    const full_path = try std.fmt.bufPrint(&buf, "{s}/{s}", .{ save_dir, file_path });
-    buf[full_path.len] = 0;
-    if (self.playdate.file.unlink(full_path[0.. :0], 0) < 0) {
-        log.err("Error on deleting file {s}: {s}", .{ file_path, self.playdate.file.geterr() orelse "" });
+    log.debug("Delete file {s}", .{file_path});
+    if (self.playdate.file.unlink(file_path, 0) < 0) {
+        log.err("Error on deleting file '{s}': {s}", .{ file_path, self.playdate.file.geterr() orelse "" });
         return error.IOError;
     }
 }
