@@ -184,91 +184,110 @@ pub fn initAsFirstLevel(
     try self.completeInitialization(.down);
 }
 
-/// Tries to generate a new level with passed seed.
+pub const GeneratingProgress = enum {
+    start,
+    generate_dungeon,
+    generate_doors_and_ladders,
+    generate_enemies,
+    generate_items,
+    generate_traps,
+    complete,
+    done,
+};
+
+/// This is FSM to generate a new level.
 /// The level should be preinited before run this method.
-/// In successful case the level becomes completely initialized and true is returned.
-/// Otherwise the inner arena is cleaned up and false is returned.
-pub fn tryGenerateNew(
+/// Caller should continue invoke this method until it returns `.done`.
+pub fn generateNew(
     self: *Self,
+    rand: std.Random,
     player: g.Entity,
     depth: u8,
     from_ladder: c.Ladder,
-    seed: u64,
-) !bool {
-    const dungeon: d.Dungeon = (try generateDungeon(&self.arena, depth, seed)) orelse {
-        self.reset();
-        return false;
-    };
-    log.debug("A {s} has been generated on depth {d}.", .{ @tagName(dungeon.type), depth });
+    progress: GeneratingProgress,
+) !GeneratingProgress {
+    switch (progress) {
+        .start, .generate_dungeon => {
+            const dungeon: d.Dungeon = (try generateDungeon(&self.arena, depth, rand.int(u64))) orelse {
+                self.reset();
+                return .generate_dungeon;
+            };
+            log.debug("A {s} has been generated on depth {d}.", .{ @tagName(dungeon.type), depth });
+            try self.setupDungeon(depth, dungeon, player);
+            return .generate_doors_and_ladders;
+        },
+        .generate_doors_and_ladders => {
+            log.debug("Creating doors and ladders", .{});
+            const arena_alloc = self.arena.allocator();
 
-    const arena_alloc = self.arena.allocator();
+            const init_place = switch (from_ladder.direction) {
+                .down => self.dungeon.entrance,
+                .up => self.dungeon.exit,
+            };
+            const exit_place = switch (from_ladder.direction) {
+                .up => self.dungeon.entrance,
+                .down => self.dungeon.exit,
+            };
+            // Add ladder by which the player has come to this level
+            try self.addLadder(from_ladder.inverted(), init_place);
 
-    try self.setupDungeon(depth, dungeon, player);
+            // Add ladder to the next level
+            try self.addLadder(.{
+                .direction = from_ladder.direction,
+                .id = self.registry.newEntity(),
+                .target_ladder = self.registry.newEntity(),
+            }, exit_place);
 
-    const init_place = switch (from_ladder.direction) {
-        .down => self.dungeon.entrance,
-        .up => self.dungeon.exit,
-    };
-    const exit_place = switch (from_ladder.direction) {
-        .up => self.dungeon.entrance,
-        .down => self.dungeon.exit,
-    };
-    // Add ladder by which the player has come to this level
-    try self.addLadder(from_ladder.inverted(), init_place);
-
-    // Add ladder to the next level
-    try self.addLadder(.{
-        .direction = from_ladder.direction,
-        .id = self.registry.newEntity(),
-        .target_ladder = self.registry.newEntity(),
-    }, exit_place);
-
-    var prng = std.Random.DefaultPrng.init(dungeon.seed);
-    const rand = prng.random();
-
-    // Add doors
-    log.debug("Creating doors", .{});
-    if (self.dungeon.doorways) |doorways| {
-        var doors = doorways.iterator();
-        while (doors.next()) |entry| {
-            entry.value_ptr.door_id = try self.registry.addNewEntity(g.entities.closedDoor(entry.key_ptr.*));
-            try self.entities_on_level.append(arena_alloc, entry.value_ptr.door_id);
-            log.debug(
-                "For the doorway on {any} added closed door with id {d}",
-                .{ entry.key_ptr.*, entry.value_ptr.door_id.id },
-            );
-        }
+            if (self.dungeon.doorways) |doorways| {
+                var doors = doorways.iterator();
+                while (doors.next()) |entry| {
+                    entry.value_ptr.door_id = try self.registry.addNewEntity(g.entities.closedDoor(entry.key_ptr.*));
+                    try self.entities_on_level.append(arena_alloc, entry.value_ptr.door_id);
+                    log.debug(
+                        "For the doorway on {any} added closed door with id {d}",
+                        .{ entry.key_ptr.*, entry.value_ptr.door_id.id },
+                    );
+                }
+            }
+            return .generate_enemies;
+        },
+        .generate_enemies => {
+            log.debug("Generate enemies", .{});
+            for (0..rand.uintLessThan(u8, 10) + 10) |_| {
+                if (self.randomEmptyPlace(rand)) |place| {
+                    _ = try self.addRandomEnemy(rand, place);
+                }
+            }
+            return .generate_items;
+        },
+        .generate_items => {
+            log.debug("Generate items", .{});
+            var proportions: [g.entities.presets.Items.fields.values.len]u8 = undefined;
+            const player_level = self.registry.getUnsafe(self.player, c.Experience).level;
+            g.entities.random.itemsChanceProportions(&proportions, self.depth, .dungeon, player_level);
+            for (0..rand.uintLessThan(u8, 5) + 1) |_| {
+                if (self.randomEmptyPlace(rand)) |place| {
+                    _ = try self.addRandomItem(rand, place, &proportions);
+                }
+            }
+            return .generate_traps;
+        },
+        .generate_traps => {
+            log.debug("Generate traps", .{});
+            for (0..(rand.uintLessThan(u8, 10) + 2 * self.depth)) |_| {
+                if (self.randomEmptyPlace(rand)) |place| {
+                    _ = try self.addRandomTrap(rand, place);
+                }
+            }
+            return .complete;
+        },
+        .complete => {
+            log.debug("Complete generating a new level", .{});
+            try self.completeInitialization(from_ladder.direction);
+            return .done;
+        },
+        .done => return .done,
     }
-
-    // Add enemies
-    log.debug("Generate enemies", .{});
-    for (0..rand.uintLessThan(u8, 10) + 10) |_| {
-        if (self.randomEmptyPlace(rand)) |place| {
-            _ = try self.addRandomEnemy(rand, place);
-        }
-    }
-
-    // Add items
-    log.debug("Generate items", .{});
-    var proportions: [g.entities.presets.Items.fields.values.len]u8 = undefined;
-    const player_level = self.registry.getUnsafe(self.player, c.Experience).level;
-    g.entities.random.itemsChanceProportions(&proportions, self.depth, .dungeon, player_level);
-    for (0..rand.uintLessThan(u8, 5) + 1) |_| {
-        if (self.randomEmptyPlace(rand)) |place| {
-            _ = try self.addRandomItem(rand, place, &proportions);
-        }
-    }
-
-    // Add traps
-    log.debug("Generate traps", .{});
-    for (0..(rand.uintLessThan(u8, 10) + 2 * self.depth)) |_| {
-        if (self.randomEmptyPlace(rand)) |place| {
-            _ = try self.addRandomTrap(rand, place);
-        }
-    }
-
-    try self.completeInitialization(from_ladder.direction);
-    return true;
 }
 
 /// Sets up id of the doors to the doorways in the dungeon.

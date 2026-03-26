@@ -18,7 +18,9 @@
 //!
 //!                                       load level - done
 //!                                     /
-//! `loadOrGenerateLevel`: save session - generate level - done
+//! `loadOrGenerateLevel`: save session
+//!                                     \
+//!                                       generate level - done
 //!
 //! ```
 const std = @import("std");
@@ -87,23 +89,23 @@ pub fn deinit(self: *Self) void {
 pub fn tick(self: *Self) !void {
     switch (self.process) {
         .saving => |*saving| {
-            const is_continue = saving.tick() catch |err| {
+            const is_done = saving.tick() catch |err| {
                 log.err("Error on saving a level on depth {d}", .{saving.session.level.depth});
                 return err;
             };
-            if (!is_continue) {
+            if (is_done) {
                 const session = self.process.saving.session;
                 log.debug("Saving completed. Next process is {s}", .{@tagName(saving.next_process)});
                 switch (saving.next_process) {
                     .generate_level => |generate| {
                         saving.deinit();
                         self.process = .{
-                            .generating = Generating{
-                                .session = session,
-                                .prng = generate.prng,
-                                .depth = generate.depth,
-                                .from_ladder = generate.from_ladder,
-                            },
+                            .generating = .initGenerating(
+                                session,
+                                generate.prng,
+                                generate.depth,
+                                generate.from_ladder,
+                            ),
                         };
                     },
                     .load_level => |load| {
@@ -119,42 +121,29 @@ pub fn tick(self: *Self) !void {
             }
         },
         .loading => |*loading| {
-            const is_continue = loading.tick() catch |err| {
+            const is_done = loading.tick() catch |err| {
                 log.err(
                     "Error on loading level on depth {d}. Progress before error: '{t}'",
                     .{ loading.level_depth, loading.progress },
                 );
                 return err;
             };
-            if (!is_continue) {
+            if (is_done) {
                 // the deinit will be invoked for the whole SaveLoadMode here:
                 try loading.session.playerMovedToLevel();
             }
         },
         .generating => |*generating| {
-            try generating.draw();
-            const seed = generating.prng.next();
-            log.debug(
-                "Start {d} attempt of generating a level {s} on depth {d} from the ladder {any}. Seed is {d}",
-                .{
-                    generating.attempt,
-                    @tagName(generating.from_ladder.direction),
-                    generating.depth,
-                    generating.from_ladder,
-                    seed,
-                },
-            );
-            generating.session.level.reset();
-            const is_success = try generating.session.level.tryGenerateNew(
-                generating.session.player,
-                generating.depth,
-                generating.from_ladder,
-                seed,
-            );
-            if (is_success) {
+            const is_done = generating.tick() catch |err| {
+                log.err(
+                    "Error on generating a new level on depth {d}. Progress before error:  {t} {d}%",
+                    .{ generating.level_depth, generating.generating_progress, generating.progress() },
+                );
+                return err;
+            };
+            if (is_done) {
+                // the deinit will be invoked for the whole SaveLoadMode here:
                 try generating.session.playerMovedToLevel();
-            } else {
-                try generating.incrementProgress();
             }
         },
     }
@@ -162,32 +151,55 @@ pub fn tick(self: *Self) !void {
 
 const Generating = struct {
     // How many times try to generate a new level before panic
-    pub const max_attempts = 10;
+    const max_attempts = 10;
 
     session: *g.GameSession,
     /// PRNG based on the global game session's seed and level's depth
     prng: std.Random.DefaultPrng,
-    depth: u8,
+    level_depth: u8,
     from_ladder: c.Ladder,
-    attempt: u8 = 1,
+    generating_progress: g.Level.GeneratingProgress = .start,
+    generate_level_attempt: u8 = 0,
 
-    fn progress(self: Generating) Percent {
-        return self.attempt * 10;
+    fn initGenerating(
+        session: *g.GameSession,
+        /// PRNG based on the global game session's seed and level's depth
+        prng: std.Random.DefaultPrng,
+        depth: u8,
+        from_ladder: c.Ladder,
+    ) Generating {
+        session.level.reset();
+        return .{ .session = session, .prng = prng, .level_depth = depth, .from_ladder = from_ladder };
     }
 
-    fn incrementProgress(self: *Generating) !void {
-        self.attempt += 1;
-        if (self.attempt > max_attempts) {
-            log.err("Generating level has been failed after {d} attempts", .{self.attempt - 1});
-            return error.GeneratingLevelFailed;
+    /// Returns `true` when the generating is completed.
+    fn tick(self: *Generating) !bool {
+        try self.draw();
+        self.generating_progress = try self.session.level.generateNew(
+            self.prng.random(),
+            self.session.player,
+            self.level_depth,
+            self.from_ladder,
+            self.generating_progress,
+        );
+        if (self.generating_progress == .generate_dungeon) {
+            self.generate_level_attempt += 1;
+        } else {
+            self.generate_level_attempt = 0;
         }
+        return self.generating_progress == .done;
+    }
+
+    fn progress(self: Generating) Percent {
+        const percent_multiplier: u8 = 10;
+        return percent_multiplier * (@intFromEnum(self.generating_progress) + 1) + self.generate_level_attempt;
     }
 
     fn draw(self: *Generating) !void {
         //        |
         // Generat|ing XXX%
         //        |
-        if (self.attempt == 1) {
+        if (self.generating_progress == .start) {
             try self.session.render.drawTextWithAlign(
                 10,
                 "Generating",
@@ -252,6 +264,7 @@ const Loading = struct {
         }
     }
 
+    /// Returns `true` when the loading is completed.
     pub fn tick(self: *Loading) !bool {
         log.debug("Continue loading: {t}", .{self.progress});
         try self.draw();
@@ -364,9 +377,9 @@ const Loading = struct {
                 self.state = .file_closed;
                 self.progress = .completed;
             },
-            .completed => return false,
+            .completed => return true,
         }
-        return true;
+        return false;
     }
 
     fn draw(self: Loading) !void {
@@ -428,6 +441,7 @@ const Saving = struct {
         }
     }
 
+    /// Returns `true` when saving is completed.
     pub fn tick(self: *Saving) !bool {
         log.debug("Continue saving: {s}", .{@tagName(self.progress)});
         try self.draw();
@@ -519,9 +533,9 @@ const Saving = struct {
                 self.state = .file_closed;
                 self.progress = .completed;
             },
-            .completed => return false,
+            .completed => return true,
         }
-        return true;
+        return false;
     }
 
     fn draw(self: Saving) !void {
