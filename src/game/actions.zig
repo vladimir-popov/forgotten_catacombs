@@ -29,7 +29,6 @@ pub const Action = union(enum) {
             direction: p.Direction,
         };
         target: Target,
-        keep_moving: bool = false,
     };
     /// Do nothing, as example, when trying to move to the wall
     do_nothing,
@@ -62,7 +61,7 @@ pub const Action = union(enum) {
     //
     modify_recognize,
     //
-    step_in_trap: struct { trap_entity: g.Entity, trap: c.Trap, place: p.Point },
+    step_in_trap: struct { trap_entity: g.Entity, trap: c.Trap, moving_target: Move.Target },
     //
     trade: *c.Shop,
 

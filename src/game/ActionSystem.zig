@@ -140,7 +140,7 @@ pub fn doAction(
             // If the actor not dead, moving
             if (!try self.handleTrap(actor, step.trap_entity, step.trap)) {
                 const from_position = self.session().registry.get(actor, c.Position).?;
-                try self.doMove(actor, from_position, step.place);
+                try self.doMove(actor, from_position, step.moving_target);
             } else {
                 return .actor_is_dead;
             }
@@ -221,11 +221,11 @@ fn tryToMove(
     };
     if (from_position.place.eql(new_place)) return .declined;
 
-    if (checkCollision(self, new_place)) |action| {
+    if (checkCollision(self, new_place, move)) |action| {
         log.debug("Collision lead to {s}", .{@tagName(action)});
         return try doAction(self, entity, action, move_points_limit);
     }
-    try self.doMove(entity, from_position, new_place);
+    try self.doMove(entity, from_position, move.target);
     return .{ .done = .{ .actual_action = .{ .move = move }, .spent_move_points = move_speed } };
 }
 
@@ -233,17 +233,20 @@ fn doMove(
     self: *Self,
     entity: g.Entity,
     from_position: *c.Position,
-    to_place: p.Point,
+    target: g.actions.Action.Move.Target,
 ) !void {
-    from_position.place = to_place;
     try self.session().events.sendEvent(.{
         .entity_moved = .{
             .entity = entity,
             .is_player = (entity.eql(self.session().player)),
             .moved_from = from_position.place,
-            .target = .{ .new_place = to_place },
+            .target = target,
         },
     });
+    from_position.place = switch (target) {
+        .direction => |direction| from_position.place.movedTo(direction),
+        .new_place => |place| place,
+    };
 }
 
 /// Returns an action that should be done because of collision.
@@ -251,7 +254,7 @@ fn doMove(
 /// .do_nothing or any other action means that the move should be aborted, and the action handled;
 ///
 /// {place} a place in the dungeon with which collision should be checked.
-fn checkCollision(self: *Self, place: p.Point) ?g.Action {
+fn checkCollision(self: *Self, place: p.Point, move: g.Action.Move) ?g.Action {
     switch (self.session().level.cellAt(place)) {
         .landscape => |cl| if (cl == .floor or cl == .doorway)
             return null,
@@ -281,7 +284,7 @@ fn checkCollision(self: *Self, place: p.Point) ?g.Action {
             // Check traps
             if (entities[1]) |entity| {
                 if (self.session().registry.get(entity, c.Trap)) |trap| {
-                    return .{ .step_in_trap = .{ .trap_entity = entity, .trap = trap.*, .place = place } };
+                    return .{ .step_in_trap = .{ .trap_entity = entity, .trap = trap.*, .moving_target = move.target } };
                 }
             }
             // it's possible to step on the ladder, opened door, teleport, dropped item and

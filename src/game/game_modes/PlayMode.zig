@@ -232,7 +232,6 @@ fn handleInput(self: *Self) !?g.actions.Action {
                     return g.actions.Action{
                         .move = .{
                             .target = .{ .direction = btn.toDirection().? },
-                            .keep_moving = false,
                         },
                     };
                 },
