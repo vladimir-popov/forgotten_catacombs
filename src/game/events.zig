@@ -70,8 +70,8 @@ pub const EventBus = struct {
     pub fn init(arena: *std.heap.ArenaAllocator) EventBus {
         return .{
             .arena = arena,
-            .subscribers = std.AutoHashMapUnmanaged(Ptr, Subscriber){},
-            .events = std.ArrayListUnmanaged(Event){},
+            .subscribers = .empty,
+            .events = .empty,
         };
     }
 

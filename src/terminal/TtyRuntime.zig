@@ -181,7 +181,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
 
         fn currentMillis(ptr: *anyopaque) u64 {
             const self: *Self = @ptrCast(@alignCast(ptr));
-            const now = std.Io.Clock.awake.now(self.io) catch unreachable;
+            const now = std.Io.Clock.awake.now(self.io);
             return @as(u64, @intCast(now.toMilliseconds()));
         }
 

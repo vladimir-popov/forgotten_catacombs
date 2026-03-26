@@ -24,7 +24,7 @@ pub fn init(alloc: std.mem.Allocator, io: std.Io, working_dir: std.Io.Dir) !Self
     return .{
         .alloc = alloc,
         .io = io,
-        .current_millis = @as(u64, @intCast((try std.Io.Clock.awake.now(io)).toMilliseconds())),
+        .current_millis = @as(u64, @intCast(std.Io.Clock.awake.now(io).toMilliseconds())),
         .test_dir = working_dir,
         .menu = try Menu(g.DISPLAY_ROWS, g.DISPLAY_COLS).init(alloc),
     };

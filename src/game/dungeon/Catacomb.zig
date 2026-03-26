@@ -74,8 +74,8 @@ pub fn init(self: *Catacomb, alloc: std.mem.Allocator, opts: Options) !void {
     self.* = .{
         .arena = std.heap.ArenaAllocator.init(alloc),
         .opts = opts,
-        .placements = std.ArrayListUnmanaged(Placement){},
-        .doorways = std.AutoHashMapUnmanaged(p.Point, Doorway){},
+        .placements = .empty,
+        .doorways = .empty,
         .floor = try u.BitMap(rows, cols).initEmpty(self.arena.allocator()),
         .walls = try u.BitMap(rows, cols).initEmpty(self.arena.allocator()),
     };

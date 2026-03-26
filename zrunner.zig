@@ -229,13 +229,12 @@ fn runTests(
 ) !void {
     if (tests.len == 0) return;
 
-    var total_timer: std.time.Timer = try std.time.Timer.start();
-    var test_timer: std.time.Timer = try std.time.Timer.start();
+    var start_time = std.Io.Clock.real.now(io);
     for (tests, 0..) |test_fn, idx| {
         const t = Test.wrap(test_fn);
 
         // Run tests:
-        report.test_results[idx] = try t.run(arena, io, environ, &test_timer, no_stack_trace);
+        report.test_results[idx] = try t.run(arena, io, environ, no_stack_trace);
 
         switch (report.test_results[idx]) {
             .passed => {
@@ -250,7 +249,7 @@ fn runTests(
         }
         report.is_mem_leak = report.is_mem_leak or report.test_results[idx].isMemoryLeak();
     }
-    report.total_duration = Duration.fromNanos(total_timer.lap());
+    report.total_duration = start_time.untilNow(io, .real);
 }
 
 fn writeTestResults(
@@ -318,7 +317,6 @@ const Test = struct {
         arena: *std.heap.ArenaAllocator,
         io: std.Io,
         environ: std.process.Environ,
-        timer: *std.time.Timer,
         no_stack_trace: bool,
     ) !TestResult {
         var is_mem_leak: bool = false;
@@ -329,10 +327,10 @@ const Test = struct {
             is_mem_leak = (std.testing.allocator_instance.deinit() == .leak);
         }
         var test_result: TestResult = undefined;
-        timer.reset();
 
+        const start_time = std.Io.Clock.real.now(io);
         const result = self.test_fn.func();
-        const duration = Duration.fromNanos(timer.read());
+        const duration = start_time.untilNow(io, .real);
 
         if (result) |_| {
             test_result = .{
@@ -348,9 +346,8 @@ const Test = struct {
                     if (@errorReturnTrace()) |trace| {
                         var stack_trace_writer = std.Io.Writer.Allocating.init(arena.allocator());
                         if (std.debug.getSelfDebugInfo()) |di| {
-                            const di_gpa = std.debug.getDebugInfoAllocator();
                             // skip frame from the testing.zig:
-                            while (isTestingZig(di_gpa, io, di, trace.instruction_addresses[0])) {
+                            while (isTestingZig(io, di, trace.instruction_addresses[0])) {
                                 trace.index -= 1;
                                 trace.instruction_addresses = trace.instruction_addresses[1..];
                             }
@@ -377,11 +374,10 @@ const Test = struct {
     }
 
     /// Returns true only if the address is point on some place inside `testing.zig` file.
-    fn isTestingZig(alloc: std.mem.Allocator, io: std.Io, debug_info: *std.debug.SelfInfo, address: usize) bool {
-        const symbol = debug_info.getSymbol(alloc, io, address) catch return false;
+    fn isTestingZig(io: std.Io, debug_info: *std.debug.SelfInfo, address: usize) bool {
+        const symbol = debug_info.getSymbol(io, address) catch return false;
         if (symbol.source_location) |sl| {
             const result = std.mem.endsWith(u8, sl.file_name, "testing.zig");
-            alloc.free(sl.file_name);
             return result;
         }
         return false;
@@ -390,8 +386,8 @@ const Test = struct {
 
 /// A report about run a single test
 pub const TestResult = union(enum) {
-    passed: struct { @"test": Test, duration: Duration, is_mem_leak: bool },
-    failed: struct { @"test": Test, duration: Duration, err: anyerror, stack_trace: []const u8, is_mem_leak: bool },
+    passed: struct { @"test": Test, duration: std.Io.Duration, is_mem_leak: bool },
+    failed: struct { @"test": Test, duration: std.Io.Duration, err: anyerror, stack_trace: []const u8, is_mem_leak: bool },
     skipped: Test,
 
     pub fn @"test"(self: TestResult) Test {
@@ -426,21 +422,25 @@ const Report = struct {
     passed_count: u8 = 0,
     failed_count: u8 = 0,
     skipped_count: u8 = 0,
-    total_duration: Duration = .zero,
+    total_duration: std.Io.Duration = .zero,
     is_mem_leak: bool = false,
 };
 
 /// A representation of the time duration with human readable format.
-const Duration = struct {
+const AltDuration = struct {
     minutes: u6 = 0,
     seconds: u6 = 0,
     millis: u10 = 0,
     nanos: u30 = 0,
 
-    pub const zero: Duration = .{};
+    pub const zero: AltDuration = .{};
 
-    pub fn fromNanos(ns: u64) Duration {
-        var result: Duration = .zero;
+    pub fn fromDuration(duration: std.Io.Duration) AltDuration {
+        return fromNanos(@intCast(duration.toNanoseconds()));
+    }
+
+    pub fn fromNanos(ns: u64) AltDuration {
+        var result: AltDuration = .zero;
         result.addNs(ns);
         return result;
     }
@@ -469,25 +469,25 @@ const Duration = struct {
         try writer.print("< 1 ms", .{});
     }
 
-    fn addNs(self: *Duration, count: u64) void {
+    fn addNs(self: *AltDuration, count: u64) void {
         if (count == 0) return;
         self.nanos += @intCast(count % 1_000_000);
         self.addMillis(@intCast(count / 1_000_000));
     }
 
-    fn addMillis(self: *Duration, count: u64) void {
+    fn addMillis(self: *AltDuration, count: u64) void {
         if (count == 0) return;
         self.millis += @intCast(count % 1_000);
         self.addSeconds(@intCast(count / 1_000));
     }
 
-    fn addSeconds(self: *Duration, count: u64) void {
+    fn addSeconds(self: *AltDuration, count: u64) void {
         if (count == 0) return;
         self.seconds += @intCast(count % 60);
         self.addMinutes(@intCast(count / 60));
     }
 
-    fn addMinutes(self: *Duration, count: u6) void {
+    fn addMinutes(self: *AltDuration, count: u6) void {
         if (count == 0) return;
         std.debug.assert(count < 60);
         self.minutes += count;
@@ -574,14 +574,14 @@ const FileReporter = struct {
                 try self.colorize(
                     self.colors.passed,
                     " PASSED in {f}",
-                    .{result.duration},
+                    .{AltDuration.fromDuration(result.duration)},
                 );
             },
             .failed => |result| {
                 try self.colorize(
                     self.colors.failed,
                     " FAILED in {f}: {s}",
-                    .{ result.duration, @errorName(result.err) },
+                    .{ AltDuration.fromDuration(result.duration), @errorName(result.err) },
                 );
             },
             .skipped => {
@@ -603,7 +603,7 @@ const FileReporter = struct {
         passed: u8,
         failed: u8,
         skipped: u8,
-        total_duration: Duration,
+        total_duration: std.Io.Duration,
         is_mem_leak: bool,
     ) anyerror!void {
         if (passed + skipped + failed == 0 and !is_mem_leak)
@@ -612,7 +612,7 @@ const FileReporter = struct {
         try self.colorize(
             self.colors.summary,
             border ++ "\nTotal {d} tests were run in {f}: ",
-            .{ passed + failed + skipped, total_duration },
+            .{ passed + failed + skipped, AltDuration.fromDuration(total_duration) },
         );
         if (passed > 0)
             try self.colorize(self.colors.passed, "{d} passed; ", .{passed});

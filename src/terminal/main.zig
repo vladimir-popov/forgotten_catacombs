@@ -59,7 +59,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
     var single_threaded_io: std.Io.Threaded = .init_single_threaded;
 
     const seed: u64 = try args.int(u64, "seed") orelse
-        @intCast((try std.Io.Clock.awake.now(single_threaded_io.io())).toMilliseconds());
+        @intCast(std.Io.Clock.awake.now(single_threaded_io.io()).toMilliseconds());
     log.info(
         "========================================\nSeed of the game is {d}\n========================================",
         .{seed},
@@ -69,7 +69,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
     const preset = if (args.str("preset")) |preset| parsePreset(preset) else null;
 
     var runtime = try TtyRuntime.TtyRuntime(g.DISPLAY_ROWS + 2, g.DISPLAY_COLS + 2)
-        .init(alloc, single_threaded_io.ioBasic(), true, true, use_cheats, use_mouse);
+        .init(alloc, single_threaded_io.io(), true, true, use_cheats, use_mouse);
     defer runtime.deinit();
 
     if (use_cheats) {
