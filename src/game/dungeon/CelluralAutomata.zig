@@ -80,7 +80,7 @@ fn neighbors(bitmap: anytype, row_idx: usize, col_idx: usize) [2]u8 {
 
             if (!bitmap.isSet0(r0, c0)) {
                 counts[1] -= 1;
-                if (p.diff(usize, r0, row_idx) < 2 and p.diff(usize, c0, col_idx) < 2)
+                if (p.diff(r0, row_idx) < 2 and p.diff(c0, col_idx) < 2)
                     counts[0] -= 1;
             }
         }

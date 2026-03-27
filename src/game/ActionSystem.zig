@@ -21,7 +21,7 @@ pub fn calculateQuickActionForTarget(
     const target_position =
         self.session().registry.get(target_entity, c.Position) orelse return null;
 
-    if (self.session().level.checkVisibility(target_position.place) != .visible)
+    if (self.session().level.checkPlaceVisibility(target_position.place) != .visible)
         return null;
 
     if (player_place.eql(target_position.place)) {
@@ -229,7 +229,7 @@ fn tryToMove(
     return .{ .done = .{ .actual_action = .{ .move = move }, .spent_move_points = move_speed } };
 }
 
-fn doMove(
+inline fn doMove(
     self: *Self,
     entity: g.Entity,
     from_position: *c.Position,
@@ -254,14 +254,14 @@ fn doMove(
 /// .do_nothing or any other action means that the move should be aborted, and the action handled;
 ///
 /// {place} a place in the dungeon with which collision should be checked.
-fn checkCollision(self: *Self, place: p.Point, move: g.Action.Move) ?g.Action {
+inline fn checkCollision(self: *Self, place: p.Point, move: g.Action.Move) ?g.Action {
     switch (self.session().level.cellAt(place)) {
         .landscape => |cl| if (cl == .floor or cl == .doorway)
             return null,
 
         .entities => |entities| {
             // Check obstacles
-            if (entities[2]) |entity| {
+            if (entities[c.Position.ZOrder.obstacle.index()]) |entity| {
                 if (self.session().registry.get(entity, c.Door)) |_|
                     return .{ .open = .{ .id = entity, .place = place } };
 
@@ -282,7 +282,7 @@ fn checkCollision(self: *Self, place: p.Point, move: g.Action.Move) ?g.Action {
                 return .do_nothing;
             }
             // Check traps
-            if (entities[1]) |entity| {
+            if (entities[c.Position.ZOrder.trap.index()]) |entity| {
                 if (self.session().registry.get(entity, c.Trap)) |trap| {
                     return .{ .step_in_trap = .{ .trap_entity = entity, .trap = trap.*, .moving_target = move.target } };
                 }
@@ -425,7 +425,7 @@ fn tryToHit(
 /// `healing` effect.
 ///
 /// Returns `true` if the target is dead.
-fn applyEffect(
+inline fn applyEffect(
     self: *Self,
     /// who applies the effect
     actor: g.Entity,
@@ -531,8 +531,9 @@ fn applyDamage(
             );
             if (optional_reward) |reward| {
                 const place = self.session().registry.getUnsafe(target, c.Position).place;
-                try self.session().registry.set(reward, c.Position{ .place = place, .zorder = .item });
-                try self.session().level.entities_on_level.append(self.session().level.arena.allocator(), reward);
+                const is_dropped = try self.session().level.tryToPutItem(reward, place);
+                if (is_dropped)
+                    log.debug("Dropped reward {d} at {any}", .{ reward.id, place });
             }
         }
 

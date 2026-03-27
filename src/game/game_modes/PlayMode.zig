@@ -154,7 +154,7 @@ fn setTarget(self: *Self, target: g.Entity) void {
 /// Returns the actual action and the count of spent move points.
 /// When an action requires more move points than initiative, `error.NotEnoughMovePoints` will be
 /// returned.
-pub fn doTurn(
+pub inline fn doTurn(
     self: *Self,
     actor: g.Entity,
     action: g.actions.Action,
@@ -343,7 +343,13 @@ fn draw(self: *Self) !bool {
         try self.drawInfoBar();
         const level = &self.session.level;
         try self.session.render.drawDungeonToBuffer(self.session.viewport, level);
-        try self.session.render.drawSpritesToBuffer(self.session.viewport, level, self.target);
+        try self.session.render.drawEntitiesToBuffer(
+            self.session.viewport,
+            &self.session.journal,
+            self.session.prng.random(),
+            level,
+            self.target,
+        );
         const blocked_animation = try self.drawAnimationsFramesToBuffer();
         try self.session.render.drawChangedSymbols();
         const notification_shown = try self.showNotifications();
@@ -380,7 +386,7 @@ pub fn drawAnimationsFramesToBuffer(self: Self) !bool {
                     position.place,
                     3, // animations have max z order
                     mode,
-                    self.session.level.checkVisibility(position.place),
+                    self.session.level.checkPlaceVisibility(position.place),
                 );
             }
         } else {
@@ -508,7 +514,7 @@ pub fn updateQuickActions(self: *Self) anyerror!void {
     const cell_under_feet = self.session.level.cellAt(player_position.place);
     switch (cell_under_feet) {
         .entities => |entities| {
-            for (0..2) |i| {
+            for (c.Position.ZOrder.indexes) |i| {
                 if (entities[i]) |entity| {
                     const maybe_action = self.session.actions.calculateQuickActionForTarget(
                         player_position.place,

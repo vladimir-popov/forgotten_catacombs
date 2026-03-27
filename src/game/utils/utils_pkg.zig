@@ -25,6 +25,15 @@ pub inline fn ff32(n: anytype) f32 {
     return @floatFromInt(n);
 }
 
+pub inline fn reverse(array: anytype) @TypeOf(array) {
+    comptime {
+        const T = @typeInfo(@TypeOf(array)).array.child;
+        var copy = array;
+        std.mem.reverse(T, &copy);
+        return copy;
+    }
+}
+
 pub fn toStringWithListOf(tagged_unions: anytype) ToString.List(@typeInfo(@TypeOf(tagged_unions)).pointer.child) {
     return ToString.List(@typeInfo(@TypeOf(tagged_unions)).pointer.child){ .values = tagged_unions };
 }

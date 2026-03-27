@@ -9,7 +9,7 @@ const w = g.windows;
 const log = std.log.scoped(.explore_mode);
 
 const ExploreMode = @This();
-const EntitiesOnScreen = std.AutoHashMapUnmanaged(p.Point, [3]?g.Entity);
+const EntitiesOnScreen = std.AutoHashMapUnmanaged(p.Point, [c.Position.ZOrder.size]?g.Entity);
 
 arena: std.heap.ArenaAllocator,
 session: *g.GameSession,
@@ -134,18 +134,18 @@ fn updateEntitiesOnScreen(self: *ExploreMode) !void {
 
         // we should follow the same logic as the render:
         // only entities, which should be drawn, can be in focus
-        if (level.checkVisibility(place) != .invisible) {
+        if (level.checkPlaceVisibility(place) != .invisible) {
             const gop = try self.entities_on_screen.getOrPut(alloc, place);
             if (!gop.found_existing) {
                 gop.value_ptr.* = @splat(null);
             }
-            gop.value_ptr[@intFromEnum(zorder)] = entity;
+            gop.value_ptr[zorder.index()] = entity;
         }
     }
     log.debug("ExploreMode has been refreshed. Entities on screen:\n{any}", .{self.entities_on_screen});
 }
 
-fn entitiesInFocus(self: ExploreMode) ?[3]?g.Entity {
+fn entitiesInFocus(self: ExploreMode) ?[c.Position.ZOrder.size]?g.Entity {
     if (self.entities_on_screen.get(self.place_in_focus)) |entities|
         return entities;
     return null;
@@ -177,7 +177,7 @@ fn moveFocus(self: *ExploreMode, direction: p.Direction) void {
     }
     self.place_in_focus = nearest_place;
     const entities = self.entities_on_screen.get(nearest_place).?;
-    for (&[3]u8{ 2, 1, 0 }) |idx| {
+    for (g.utils.reverse(c.Position.ZOrder.indexes)) |idx| {
         if (entities[idx]) |entity| {
             self.entity_in_focus = entity;
             return;
@@ -218,7 +218,7 @@ inline fn sub(x: u8, y: u8) u8 {
 
 fn windowWithEntities(
     self: *ExploreMode,
-    variants: [3]?g.Entity,
+    variants: [c.Position.ZOrder.size]?g.Entity,
 ) !w.ModalWindow(w.OptionsArea(g.Entity)) {
     var area = w.OptionsArea(g.Entity).centered(self);
     for (variants) |maybe_entity| {

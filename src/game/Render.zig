@@ -75,7 +75,7 @@ pub fn deinit(self: *Render) void {
 pub fn drawScene(self: Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
     const level = &session.level;
     try self.drawDungeonToBuffer(session.viewport, level);
-    try self.drawSpritesToBuffer(session.viewport, level, entity_in_focus);
+    try self.drawEntitiesToBuffer(session.viewport, &session.journal, session.prng.random(), level, entity_in_focus);
     try self.drawChangedSymbols();
 }
 
@@ -96,7 +96,7 @@ pub fn drawDungeonToBuffer(self: Render, viewport: g.Viewport, level: *g.Level) 
     var itr = level.dungeon.cellsInRegion(viewport.region);
     var place = viewport.region.top_left;
     while (itr.next()) |cell| {
-        const visibility = level.checkVisibility(place);
+        const visibility = level.checkPlaceVisibility(place);
         if (visibility == .visible and !level.isVisited(place))
             try level.addVisitedPlace(place);
         const codepoint = switch (cell) {
@@ -126,21 +126,38 @@ fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order
     else
         return .gt;
 }
-/// Draw sprites inside the screen
-pub fn drawSpritesToBuffer(self: Render, viewport: g.Viewport, level: *const g.Level, entity_in_focus: ?g.Entity) !void {
+/// Draw entities inside the screen
+pub fn drawEntitiesToBuffer(
+    self: Render,
+    viewport: g.Viewport,
+    journal: *g.Journal,
+    /// Used to decide visibility of some objects
+    rand: std.Random,
+    level: *const g.Level,
+    entity_in_focus: ?g.Entity,
+) !void {
     var itr = level.registry.query2(cm.Position, cm.Sprite);
     while (itr.next()) |tuple| {
         const entity, const position, const sprite = tuple;
         if (!viewport.region.containsPoint(position.place)) continue;
         const mode: g.DrawingMode = if (entity.eql(entity_in_focus)) .inverted else .normal;
-        const visibility = level.checkVisibility(tuple[1].place);
+        const place_visibility = level.checkPlaceVisibility(position.place);
+        const is_entity_visible = try g.visibility.isEntityVisibile(
+            journal,
+            rand,
+            entity,
+            sprite.codepoint,
+            position.place,
+            place_visibility,
+            level.player,
+        );
         try self.drawSpriteToBuffer(
             viewport,
-            sprite.codepoint,
+            if (is_entity_visible) sprite.codepoint else cp.floor_visible,
             position.place,
             @intFromEnum(position.zorder),
             mode,
-            visibility,
+            place_visibility,
         );
     }
 }
@@ -283,7 +300,7 @@ pub fn drawEnemyHealth(self: Render, codepoint: g.Codepoint, health: *const cm.H
     len += 1;
     const hp = @max(health.current_hp, 0);
     const free_length = INFO_ZONE_LENGTH - 3; // padding + codepoint (usually 1 byte for enemies) + ':'
-    const hp_length = @divFloor(free_length * hp, health.max);
+    const hp_length = @divTrunc(free_length * hp, health.max);
     for (0..hp_length) |i| {
         buf[len + i] = '|';
     }

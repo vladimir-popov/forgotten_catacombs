@@ -136,6 +136,6 @@ pub fn trap(place: p.Point, power: u3, effect: c.Effects.Type) c.Components {
         } },
         .sprite = .{ .codepoint = cp.trap },
         .trap = .{ .power = power, .effect = effect },
-        .position = .{ .place = place, .zorder = .item },
+        .position = .{ .place = place, .zorder = .trap },
     };
 }

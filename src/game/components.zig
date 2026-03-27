@@ -8,17 +8,29 @@ const u = g.utils;
 /// **NOTE:** do not replace the whole position. Only the place should be changed during the game,
 /// because z-order is a constant property of the entity.
 pub const Position = struct {
-    place: p.Point,
-    /// The vertical order of the entities on the same place.
-    /// The sprite with bigger order should be rendered over the sprite with lower.
-    zorder: enum {
+    pub const ZOrder = enum {
+        pub const size = @typeInfo(ZOrder).@"enum".fields.len;
+
+        pub const indexes: [size]u8 = .{ 0, 1, 2, 3 };
+
         /// opened doors, ladders, teleports...
         floor,
+        /// Traps are between floor and dropped item
+        trap,
         /// any dropped items, piles...
         item,
         /// player, enemies, npc, closed doors...
         obstacle,
-    },
+
+        pub inline fn index(self: ZOrder) u4 {
+            return @intFromEnum(self);
+        }
+    };
+
+    place: p.Point,
+    /// The vertical order of the entities on the same place.
+    /// The sprite with bigger order should be rendered over the sprite with lower.
+    zorder: ZOrder,
 };
 
 pub const Door = struct { state: enum { opened, closed } };

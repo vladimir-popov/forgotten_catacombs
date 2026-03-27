@@ -99,8 +99,8 @@ pub fn notification(
         const width = g.DISPLAY_COLS - 2;
         const pad = switch (opts.text_align) {
             .left => 0,
-            .center => p.diff(usize, msg_line.len, width) / 2,
-            .right => p.diff(usize, msg_line.len, width),
+            .center => p.diff(msg_line.len, width) / 2,
+            .right => p.diff(msg_line.len, width),
         };
         _ = try std.fmt.bufPrint(line[pad..], "{s}", .{msg_line});
     }

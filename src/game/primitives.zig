@@ -8,7 +8,7 @@ const std = @import("std");
 const log = std.log.scoped(.primitives);
 
 /// The absolute difference between two numbers
-pub inline fn diff(comptime T: type, a: T, b: T) T {
+pub inline fn diff(a: anytype, b: anytype) @TypeOf(a) {
     return @max(a, b) - @min(a, b);
 }
 
@@ -117,9 +117,8 @@ pub const Point = struct {
     ///   3
     /// ```
     pub inline fn near4(self: Point, other: Point) bool {
-        const case1 = self.row == other.row and (@max(self.col, other.col) - @min(self.col, other.col) < 2);
-        const case2 = self.col == other.col and (@max(self.row, other.row) - @min(self.row, other.row) < 2);
-        return case1 or case2;
+        return (self.row == other.row and diff(self.col, other.col) < 2) or
+            (self.col == other.col and diff(self.row, other.row) < 2);
     }
 
     /// Returns true if the `other` point is one of 8 neighbors:
@@ -134,8 +133,8 @@ pub const Point = struct {
     }
 
     pub fn distanceTo(self: Point, other: Point) f32 {
-        const a: f32 = @floatFromInt(diff(u8, self.row, other.row));
-        const b: f32 = @floatFromInt(diff(u8, self.col, other.col));
+        const a: f32 = @floatFromInt(diff(self.row, other.row));
+        const b: f32 = @floatFromInt(diff(self.col, other.col));
         return @sqrt(a * a + b * b);
     }
 

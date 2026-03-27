@@ -24,8 +24,8 @@ potion_colors: [potions_count]g.Color,
 /// When the counter become 0, the entity is moved to the `known_equipment` set.
 unknown_equipment: std.AutoHashMapUnmanaged(g.Entity, u8) = .empty,
 
-/// A set of already known equipments
-known_equipment: std.AutoHashMapUnmanaged(g.Entity, void) = .empty,
+/// A set of already known entities
+known_entities: std.AutoHashMapUnmanaged(g.Entity, void) = .empty,
 
 /// A set of known effect of potions.
 known_potions: std.AutoHashMapUnmanaged(g.meta.PotionType, void) = .empty,
@@ -50,13 +50,14 @@ pub fn init(alloc: std.mem.Allocator, registry: *g.Registry, seed: u64) !Self {
 
 pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
     self.unknown_equipment.deinit(alloc);
-    self.known_equipment.deinit(alloc);
+    self.known_entities.deinit(alloc);
     self.known_potions.deinit(alloc);
     self.known_enemies.deinit(alloc);
 }
 
+/// Try to guess a type of the entity to check its known status correctly.
 pub fn isKnown(self: Self, entity: g.Entity) bool {
-    if (self.known_equipment.contains(entity)) {
+    if (self.known_entities.contains(entity)) {
         return true;
     }
     if (g.meta.getPotionType(self.registry, entity)) |potion_type| {
@@ -72,7 +73,7 @@ pub fn isKnown(self: Self, entity: g.Entity) bool {
 }
 
 pub fn addUnknownEquipment(self: *Self, entity: g.Entity) !void {
-    if (!self.known_equipment.contains(entity))
+    if (!self.known_entities.contains(entity))
         try self.unknown_equipment.put(self.alloc, entity, TURNS_TO_KNOW);
 }
 
@@ -95,13 +96,18 @@ pub fn markPotionAsKnown(self: *Self, potion_type: g.meta.PotionType) !void {
 
 pub fn markArmorAsKnown(self: *Self, armor: g.Entity) !void {
     log.debug("Mark the armor {d} as known", .{armor.id});
-    try self.known_equipment.put(self.alloc, armor, {});
+    try self.known_entities.put(self.alloc, armor, {});
     try self.registry.set(armor, c.Sprite{ .codepoint = g.codepoints.armor });
+}
+
+pub fn markTrapAsKnown(self: *Self, trap: g.Entity) !void {
+    log.debug("Mark the trap {d} as known", .{trap.id});
+    try self.known_entities.put(self.alloc, trap, {});
 }
 
 pub fn markWeaponAsKnown(self: *Self, weapon: g.Entity) !void {
     log.debug("Mark the weapon {d} as known", .{weapon.id});
-    try self.known_equipment.put(self.alloc, weapon, {});
+    try self.known_entities.put(self.alloc, weapon, {});
     const sprite = self.registry.getUnsafe(weapon, c.Sprite);
     sprite.codepoint = if (self.registry.getUnsafe(weapon, c.Weapon).ammunition_type == null)
         g.codepoints.weapon_melee
@@ -111,7 +117,7 @@ pub fn markWeaponAsKnown(self: *Self, weapon: g.Entity) !void {
 
 pub fn forgetWeapon(self: *Self, weapon: g.Entity) !void {
     log.debug("Mark the weapon {d} as unknown", .{weapon.id});
-    _ = self.known_equipment.remove(weapon);
+    _ = self.known_entities.remove(weapon);
     const sprite = self.registry.getUnsafe(weapon, c.Sprite);
     sprite.codepoint = if (self.registry.getUnsafe(weapon, c.Weapon).ammunition_type == null)
         g.codepoints.weapon_melee_unknown
@@ -157,5 +163,5 @@ test "Move unknown equipment to known after N turns" {
 
     // then:
     try std.testing.expect(!journal.unknown_equipment.contains(equipment));
-    try std.testing.expect(journal.known_equipment.contains(equipment));
+    try std.testing.expect(journal.known_entities.contains(equipment));
 }

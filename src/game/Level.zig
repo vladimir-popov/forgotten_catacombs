@@ -20,9 +20,10 @@ pub const Cell = union(enum) {
 
     /// An array of the entities on the place:
     ///   0 - opened doors, ladders, teleports;
-    ///   1 - any dropped items;
-    ///   2 - player, enemies, npc, closed doors;
-    entities: [3]?g.Entity,
+    ///   1 - trap
+    ///   2 - any dropped items;
+    ///   3 - player, enemies, npc, closed doors;
+    entities: [4]?g.Entity,
 };
 
 pub const DijkstraMapRegion = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 12, .cols = 25 };
@@ -407,7 +408,7 @@ pub fn addItemAtPlace(self: *Self, item: g.Entity, place: p.Point) !?g.Entity {
     return null;
 }
 
-pub inline fn checkVisibility(self: *const g.Level, place: p.Point) g.Render.Visibility {
+pub inline fn checkPlaceVisibility(self: *const g.Level, place: p.Point) g.Render.Visibility {
     return self.visibility_strategy(self, place);
 }
 
@@ -452,7 +453,7 @@ pub fn isObstacle(self: *const Self, place: p.Point) bool {
             .floor, .doorway => {},
             else => return true,
         },
-        .entities => |entities| if (entities[2]) |entity|
+        .entities => |entities| if (entities[c.Position.ZOrder.obstacle.index()]) |entity|
             // an entity with health points is overcoming obstacle
             return self.registry.get(entity, c.Health) == null
         else
@@ -466,17 +467,18 @@ pub fn isObstacle(self: *const Self, place: p.Point) bool {
 ///   - `.landscape` - any kind of the walls or the empty floor/doorway;
 ///   - `.entities` - an array of the entities on the place:
 ///       0 - opened doors, ladders, teleports;
-///       1 - any dropped items;
-///       2 - player, enemies, npc, closed doors;
+///       1 - trap
+///       2 - any dropped items;
+///       3 - player, enemies, npc, closed doors;
 pub fn cellAt(self: Self, place: p.Point) Cell {
     const landscape = switch (self.dungeon.cellAt(place)) {
         .floor, .doorway => |cl| cl,
         else => |cl| return .{ .landscape = cl },
     };
-    // OPTIMIZE IT
+    // TODO: OPTIMIZE IT!
     var found_entity = false;
-    // up to 3 entities with different z-orders may exists at same position
-    var result = [3]?g.Entity{ null, null, null };
+    // up to 4 entities with different z-orders may exists at same position
+    var result = [c.Position.ZOrder.size]?g.Entity{ null, null, null, null };
     var itr = self.registry.query(c.Position);
     while (itr.next()) |tuple| {
         const entity, const position = tuple;
@@ -494,6 +496,18 @@ pub fn cellAt(self: Self, place: p.Point) Cell {
         }
     }
     return if (found_entity) .{ .entities = result } else .{ .landscape = landscape };
+}
+
+/// Puts an item on the place in the level if no other item on that place.
+/// Otherwise do nothing and returns `false`.
+pub fn tryToPutItem(self: *Self, item: g.Entity, place: p.Point) !bool {
+    switch (self.cellAt(place)) {
+        .landscape => |landscape| if (landscape == .doorway) return false,
+        .entities => |entities| if (entities[c.Position.ZOrder.item.index()]) |_| return false,
+    }
+    try self.registry.set(item, c.Position{ .place = place, .zorder = .item });
+    try self.entities_on_level.append(self.arena.allocator(), item);
+    return true;
 }
 
 // OPTIMIZE IT

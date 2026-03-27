@@ -13,7 +13,7 @@ pub const notifications = @import("notifications.zig");
 pub const persistance = @import("persistance.zig");
 pub const primitives = @import("primitives.zig");
 pub const utils = @import("utils/utils_pkg.zig");
-pub const visibility = @import("visibility_strategies.zig");
+pub const visibility = @import("visibility.zig");
 pub const windows = @import("windows/windows_pkg.zig");
 
 pub const Action = actions.Action;

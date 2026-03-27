@@ -2,6 +2,7 @@
 const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
+const cp = g.codepoints;
 
 const log = std.log.scoped(.meta);
 
