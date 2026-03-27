@@ -1,15 +1,15 @@
 //! In this mode the current level is saving to the file and a new one either generating or
-//! This is a mode in which save/load happens.
+//! loading.
 //!
 //! The purposes of this mode can be:
 //!
-//! - loading an existed game session;
+//! - loading an existing game session;
 //! - saving the current game session;
 //! - generating a new level;
 //! - loading a new level;
 //!
-//! Before load or generate a level, the current one should be saved.
-//! Saving a session should not lead to the loading a level.
+//! Before loading or generating a level, the current one should be saved.
+//! Saving a session should not lead to the loading of a level.
 //!
 //! ```
 //! `loadSession`: load session - load level - done
@@ -21,7 +21,6 @@
 //! `loadOrGenerateLevel`: save session
 //!                                     \
 //!                                       generate level - done
-//!
 //! ```
 const std = @import("std");
 const g = @import("../game_pkg.zig");
@@ -33,6 +32,9 @@ const log = std.log.scoped(.save_load_mode);
 
 const Percent = u8;
 
+/// Possible processes in progress.
+/// Every process is a FSM implemented the process in few steps.
+/// It made for keeping every step faster the timeout for playdate loop (approximately 10 seconds).
 const Process = union(enum) {
     saving: Saving,
     loading: Loading,

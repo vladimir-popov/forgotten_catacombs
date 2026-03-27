@@ -1,6 +1,6 @@
 //! This is the root object for a single game session. The GameSession has different modes such as:
-//! the `PlayMode`, `ExploreMode`, `ExploreLevelMode` and so on. That modes are part of the
-//! GameSession extracted to the separate files to make their maintenance easier.
+//! the `PlayMode`, `ExploreMode`, `ExploreLevelMode` and so on. These modes are extracted
+//! to separate files to make their maintenance easier.
 const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
@@ -46,7 +46,7 @@ arena: std.heap.ArenaAllocator,
 /// This seed should help to make all levels of a single game session reproducible.
 seed: u64,
 /// The PRNG initialized with the current time.
-/// This prng should be used to make any dynamic decision by AI, or game events,
+/// This PRNG should be used to make any dynamic decision by AI or game events,
 /// and should not be used to generate any level objects, to keep the levels reproducible.
 prng: std.Random.DefaultPrng,
 ai: g.AI,
@@ -79,16 +79,16 @@ notifications: std.Deque(g.notifications.Notification),
 
 /// Two cases of initialization exists:
 ///  1. Creating a new Game Session;
-///  2. Loading existed Game Session;
-/// To create a fully initialized new session the `initNew` method should be used.
-/// To load session the follow steps should be passed:
+///  2. Loading an existing Game Session;
+/// To create a fully initialized new session, the `initNew` method should be used.
+/// To load a session, the following steps should be passed:
 ///  1. `preInit` sets up external dependencies, initializes inner containers and the viewport.
 ///  2. the seed should be set up;
 ///  4. the player should be added to the session;
 ///  5. the max depth should be set up;
 ///  6. the level should be completely initialized;
-///  7. `completeInitialization` subscribes the viewport and the game session itself on events;
-///    move the viewport to the player; changes the inner state to the `play` mode.
+///  7. `completeInitialization` subscribes the viewport and the game session itself to events;
+///    moves the viewport to the player; changes the inner state to the `play` mode.
 ///
 pub fn preInit(
     self: *Self,
@@ -116,7 +116,7 @@ pub fn preInit(
         .level = undefined,
         .mode = undefined,
     };
-    log.debug("The game session is preinited", .{});
+    log.debug("The game session is pre-initialized", .{});
 }
 
 /// This method is idempotent. It does the following:
@@ -170,7 +170,7 @@ pub fn initNew(
 
     self.mode = .{ .play = undefined };
     try self.mode.play.init(self.arena.allocator(), self, null);
-    // hack  for the first level only
+    // hack for the first level only
     self.viewport.region.top_left.moveNTimes(.up, 3);
 }
 
@@ -180,7 +180,7 @@ pub fn deinit(self: *Self) void {
     // free memory
     self.arena.deinit();
     self.* = undefined;
-    log.debug("The game session is deinited", .{});
+    log.debug("The game session is de-initialized", .{});
 }
 
 pub fn switchModeToLoadingSession(self: *Self) !void {
@@ -190,7 +190,7 @@ pub fn switchModeToLoadingSession(self: *Self) !void {
 
 /// Changes the mode to the SaveLoadMode.
 /// The next process after saving the session will be `.go_to_welcome_screen`.
-/// That means that the `error.GoToMainMenu` will be returned on next tick.
+/// This means that the `error.GoToMainMenu` will be returned on the next tick.
 pub fn switchModeToSavingSession(self: *Self) void {
     self.mode.deinit();
     self.mode = .{ .save_load = SaveLoadMode.saveSession(self) };
@@ -198,9 +198,9 @@ pub fn switchModeToSavingSession(self: *Self) void {
 
 /// Produces an event to change the mode to `PlayMode`.
 /// Receives continuations: arguments to recover the previous state of the `PlayMode`.
-///  - `entity_in_focus` - an entity that should be targeted in focus; This is either previous
-///    target, or a new target from the `Explore` mode.
-///  - `action` - an action to perform; Usually is an action initiated during managing the inventory.
+///  - `entity_in_focus` - an entity that should be targeted in focus; This is either the previous
+///    target or a new target from the `Explore` mode.
+///  - `action` - an action to perform; Usually an action initiated during managing the inventory.
 pub fn continuePlay(self: *Self, entity_in_focus: ?g.Entity, action: ?g.actions.Action) !void {
     log.debug("Continue playing with entity_in_focus {any}, action {any}", .{ entity_in_focus, action });
     try self.events.sendEvent(
@@ -249,7 +249,7 @@ pub fn removeEntity(self: *Self, entity: g.Entity) !void {
 pub fn removeDeadEntity(self: *Self, entity: g.Entity) !void {
     if (entity.eql(self.player)) {
         log.info("Player is dead. Game is over.", .{});
-        // return error for break the game loop:
+        // return error to break the game loop:
         return error.GameOver;
     } else {
         log.debug("NPC {d} is dead", .{entity.id});
@@ -320,7 +320,7 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
             }
         },
         .entity_died => |entity| {
-            log.debug("The enemy {d} has been died", .{entity.id});
+            log.debug("The enemy {d} has died", .{entity.id});
         },
     }
 }

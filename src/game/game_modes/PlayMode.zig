@@ -25,14 +25,14 @@ pub const QuickActions = struct {
 };
 
 /// A notification about important event.
-/// Should be show for some time.
+/// Should be shown for some time.
 const NotificationMessage = struct {
     /// the buffer for the text of the notification
     buffer: [20]u8 = undefined,
     len: u8 = 0,
     /// when the notification appears on a screen
     start_showing_at: u64,
-    /// where to place the first latter of the notification
+    /// where to place the first letter of the notification
     pp: p.Point,
 
     /// The region of the display occupied by the notification
@@ -41,7 +41,7 @@ const NotificationMessage = struct {
     }
 
     /// Precalculates a notification message from a notification.
-    /// Text, position and mode will be calculate once to show the message every tick for the whole delay.
+    /// Text, position and mode will be calculated once to show the message every tick for the whole delay.
     pub fn init(notification: g.notifications.Notification, session: *const g.GameSession) !NotificationMessage {
         var msg: NotificationMessage = .{
             // Start calculation of the place to show from the player place on the screen
@@ -85,7 +85,7 @@ const NotificationMessage = struct {
                 .dodge => |dodge| session.registry.get(dodge.actor, c.Position),
                 else => null,
             };
-            const is_hide_the_target = if (maybe_enemy_position) |pos|
+            const is_hiding_the_target = if (maybe_enemy_position) |pos|
                 if (session.viewport.relative(pos.place)) |enemy_pp|
                     msg.region().containsPoint(enemy_pp)
                 else
@@ -95,7 +95,7 @@ const NotificationMessage = struct {
             const is_first_letter_on_screen = display_region.containsPoint(msg.pp);
             const is_last_letter_on_screen = display_region.containsPoint(msg.pp.movedToNTimes(.right, msg.len - 1));
 
-            if (is_first_letter_on_screen and is_last_letter_on_screen and !is_hide_the_target) {
+            if (is_first_letter_on_screen and is_last_letter_on_screen and !is_hiding_the_target) {
                 // all done
                 break;
             } else {
@@ -109,12 +109,12 @@ const NotificationMessage = struct {
 
 arena: std.heap.ArenaAllocator,
 session: *g.GameSession,
-// The entity to which a quick actions can be applied
+// The entity to which quick actions can be applied
 target: ?g.Entity = null,
 quick_actions: QuickActions,
 is_player_turn: bool = true,
 quick_actions_window: ?w.ModalWindow(w.OptionsArea(void)) = null,
-// If defined then all input should be ignored.
+// If defined, then all input should be ignored.
 notification: ?NotificationMessage = null,
 
 pub fn init(
@@ -148,11 +148,11 @@ fn setTarget(self: *Self, target: g.Entity) void {
     self.quick_actions.reset();
 }
 
-/// Trying to do an action. Action can be changed, or ignored.
-/// For example, moving can lead to a collision with an enemy, or with a wall. In first case the
-/// action will be changed to `hit` and completely ignored in another.
-/// Returns an actual action and a count of spent move points.
-/// When action requires more move points than initiative, the `error.NotEnoughMovePoints` will be
+/// Trying to do an action. An action can be changed or ignored.
+/// For example, moving can lead to a collision with an enemy or a wall. In the first case,
+/// the action will be changed to `hit`, and completely ignored in the latter.
+/// Returns the actual action and the count of spent move points.
+/// When an action requires more move points than initiative, `error.NotEnoughMovePoints` will be
 /// returned.
 pub fn doTurn(
     self: *Self,
@@ -301,7 +301,7 @@ pub fn tick(self: *Self) !void {
                     },
                     else => {},
                 }
-                // Update counters of unknown equipments
+                // Update counters of unknown equipment
                 try self.session.journal.onTurnCompleted();
                 self.is_player_turn = false;
             },
@@ -336,8 +336,8 @@ pub fn tick(self: *Self) !void {
     try self.updateQuickActions();
 }
 
-/// If returns true then the input should be ignored
-/// until all notifications and all frames from all blocked animations will be drawn.
+/// If returns true, then the input should be ignored
+/// until all notifications and all frames from all blocked animations have been drawn.
 fn draw(self: *Self) !bool {
     if (self.quick_actions_window == null) {
         try self.drawInfoBar();
@@ -360,7 +360,7 @@ fn draw(self: *Self) !bool {
 
 /// Draws a single frame from every animation.
 /// Removes the animation if the last frame was drawn.
-/// Returns true if one of animation is blocked.
+/// Returns true if any animation is blocked.
 pub fn drawAnimationsFramesToBuffer(self: Self) !bool {
     const now: u64 = self.session.runtime.currentMillis();
     var was_blocked_animation: bool = false;
@@ -445,8 +445,8 @@ fn quickAction(self: Self) g.actions.Action {
         return .wait;
 }
 
-/// Checks that the target is exists, or find another.
-/// Recalculates a list of available quick actions applicable to the target.
+/// Checks that the target exists, or finds another.
+/// Recalculates the list of available quick actions applicable to the target.
 pub fn updateQuickActions(self: *Self) anyerror!void {
     defer {
         log.debug(
@@ -461,7 +461,7 @@ pub fn updateQuickActions(self: *Self) anyerror!void {
     }
 
     const alloc = self.arena.allocator();
-    // Remember the previously selected action to trying to keep it selected
+    // Remember the previously selected action to try to keep it selected
     const prev_selected_action = self.quickAction();
     log.debug(
         "Updating selected actions. Current selected action is {any}; target is {any}",
@@ -504,7 +504,7 @@ pub fn updateQuickActions(self: *Self) anyerror!void {
         self.target = null;
     }
 
-    // Entities under the player's feet should be additionally included to the possible actions
+    // Entities under the player's feet should be additionally included in the possible actions
     const cell_under_feet = self.session.level.cellAt(player_position.place);
     switch (cell_under_feet) {
         .entities => |entities| {
@@ -529,9 +529,9 @@ pub fn updateQuickActions(self: *Self) anyerror!void {
         else => {},
     }
 
-    // player should always be able to wait...
+    // The player should always be able to wait...
     try self.quick_actions.actions.append(alloc, .wait);
-    // ...and  manage its inventory.
+    // ...and manage its inventory.
     try self.quick_actions.actions.append(alloc, .open_inventory);
 }
 
@@ -587,6 +587,6 @@ fn windowWithQuickActions(self: *Self) !w.ModalWindow(w.OptionsArea(void)) {
 fn chooseQuickAction(ptr: *anyopaque, line_idx: usize, _: void) anyerror!bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     self.quick_actions.selected_idx = line_idx;
-    log.debug("Choosen option {d}: {t}", .{ line_idx, self.quickAction() });
+    log.debug("Chosen option {d}: {t}", .{ line_idx, self.quickAction() });
     return true;
 }

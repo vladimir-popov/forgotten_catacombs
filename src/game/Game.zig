@@ -1,3 +1,6 @@
+//! This is the root object for a single game session. The GameSession has different modes such as:
+//! the `PlayMode`, `ExploreMode`, `ExploreLevelMode` and so on. These modes are extracted
+//! to separate files to make their maintenance easier.
 const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
@@ -41,7 +44,7 @@ runtime: g.Runtime,
 /// Buffered render to draw the game
 render: g.Render,
 /// The seed is used to generate a new game session.
-/// This seed can be used to pass the value from the user.
+/// This seed can be passed by the user.
 seed: u64,
 /// The current state of the game
 state: State,
@@ -64,7 +67,7 @@ pub fn initNewPreset(
     runtime: g.Runtime,
     seed: u64,
     archetype: g.meta.PlayerArchetype,
-    skills: g.components.Skills,
+    skills: c.Skills,
 ) !void {
     self.* = .{
         .gpa = gpa,
@@ -214,7 +217,7 @@ fn openInventory(ptr: ?*anyopaque) callconv(.c) void {
     if (ptr == null) return;
     const self: *Self = @ptrCast(@alignCast(ptr.?));
     std.debug.assert(self.state == .game_session);
-    self.state.game_session.manageInventory() catch |err| std.debug.panic("Error on open inventory: {any}", .{err});
+    self.state.game_session.manageInventory() catch |err| std.debug.panic("Error opening inventory: {any}", .{err});
 }
 
 /// Checks that save file for a session exists.
@@ -222,7 +225,7 @@ fn isSessionFileExists(self: Self) !bool {
     return self.runtime.isFileExists(g.persistance.SESSION_FILE_NAME);
 }
 
-/// Remove the save file with a game session if exists.
+/// Remove the save file with a game session if it exists.
 fn deleteSessionFileIfExists(self: Self) !void {
     try self.runtime.deleteFileIfExists(g.persistance.SESSION_FILE_NAME);
 }
