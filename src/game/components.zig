@@ -393,6 +393,14 @@ pub const Hunger = struct {
     }
 };
 
+pub const LevelUp = struct {
+    /// The last level handled level.
+    /// For example, it's possible to get level 2, 3 and 4 before handle any of them.
+    /// The player will have the level 4, but the `last_handled_level` will be 1.
+    /// When level up will be handled once, the `last_handled_level` become 2 and so on.
+    last_handled_level: u4,
+};
+
 /// The chance of appearing an item somewhere (shop, dungeon, reward) depends on its tear and
 /// player's level. The high level tiers are for high level players. But, items with zero tear can
 /// appear at any moment. It makes possible to find something like arrows during the whole game.
@@ -471,7 +479,7 @@ pub const Experience = struct {
     experience: u16,
 
     pub fn init(experience: u16) Experience {
-        return .{ .level = actualLevel(1, experience), .experience = experience };
+        return .{ .level = g.meta.actualLevel(1, experience), .experience = experience };
     }
 
     pub inline fn reward(reward_exp: u16) Experience {
@@ -480,19 +488,6 @@ pub const Experience = struct {
 
     pub fn asReward(self: Experience) u16 {
         return self.experience / reward_denominator;
-    }
-
-    pub fn add(self: *Experience, exp: u16) void {
-        self.experience +|= exp;
-        self.level = actualLevel(self.level, self.experience);
-    }
-
-    fn actualLevel(current_level: u4, total_experience: u16) u4 {
-        var level = current_level;
-        while (g.meta.Levels[level - 1] < total_experience) {
-            level += 1;
-        }
-        return level;
     }
 };
 
@@ -572,6 +567,7 @@ pub const Components = struct {
     initiative: ?Initiative = null,
     inventory: ?Inventory = null,
     ladder: ?Ladder = null,
+    level_up: ?LevelUp = null,
     modification: ?Modification = null,
     pile: ?Pile = null,
     position: ?Position = null,

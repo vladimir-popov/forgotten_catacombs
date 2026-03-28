@@ -382,7 +382,6 @@ fn tryToHit(
     // Calculate and apply the damage
     const target_health_before = target_health.current_hp;
     const target_armor = self.session().registry.get(target, c.Protection) orelse &c.Protection.zeros;
-    const actor_experience: *c.Experience = self.session().registry.getUnsafe(actor, c.Experience);
 
     // we have to copy the whole component, because the enemy can be removed,
     // and the pointer becomes invalid:
@@ -398,11 +397,9 @@ fn tryToHit(
 
         // Give an experience to player
         if (is_target_dead and actor.eql(self.session().player)) {
-            const level_before = actor_experience.level;
-            actor_experience.add(enemy_experience.asReward());
             try self.session().notify(.{ .exp = enemy_experience.asReward() });
-            if (actor_experience.level > level_before) {
-                @panic("TODO: HANDLE LEVEL UP");
+            if (try g.meta.addExperience(&self.session().registry, self.session().player, enemy_experience.asReward())) {
+                try self.session().notify(.level_up);
             }
         }
 

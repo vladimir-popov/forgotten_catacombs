@@ -47,6 +47,9 @@ pub fn tick(self: *ExploreMode) anyerror!void {
                 try description_window.hide(self.session.render, .from_buffer);
                 description_window.deinit(self.arena.allocator());
                 self.description_window = null;
+            } else if (self.isLevelUp()) {
+                if (btn.game_button == .b)
+                    try self.session.levelUp();
             }
         } else if (self.entities_window) |*entities_window| {
             if (try entities_window.handleButton(btn)) {
@@ -78,9 +81,18 @@ pub fn tick(self: *ExploreMode) anyerror!void {
     }
 }
 
+inline fn isLevelUp(self: ExploreMode) bool {
+    return self.entity_in_focus.eql(self.session.player) and
+        g.meta.isLevelUp(&self.session.registry, self.session.player);
+}
+
 fn draw(self: *const ExploreMode) !void {
     if (self.description_window) |*window| {
         try window.draw(self.session.render);
+        if (self.isLevelUp()) {
+            try self.session.render.drawLeftButton("Up level", false);
+            try self.session.render.drawInfo("Level up!");
+        }
     } else if (self.entities_window) |*window| {
         try window.draw(self.session.render);
     } else {

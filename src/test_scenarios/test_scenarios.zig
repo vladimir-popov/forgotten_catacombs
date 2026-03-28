@@ -6,6 +6,7 @@ test {
     _ = @import("battle_suite.zig");
     _ = @import("description_suite.zig");
     _ = @import("inventory_suite.zig");
+    _ = @import("level_up_suite.zig");
     _ = @import("moving_suite.zig");
     _ = @import("notifications_suite.zig");
     _ = @import("recognize_modify_suite.zig");

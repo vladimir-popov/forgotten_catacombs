@@ -23,6 +23,7 @@ pub const Notification = union(enum) {
     },
     /// The player received experience points
     exp: u16,
+    level_up,
     /// The enemy dodged
     miss: struct { target: g.Entity },
     /// The player dodged
@@ -38,6 +39,7 @@ pub const Notification = union(enum) {
             .hit => |hit| try writer.print("Hit {d}", .{hit.damage}),
             .damage => |dmg| try writer.print("Damage -{d}", .{dmg.damage}),
             .exp => |exp| try writer.print("+{d} EXP", .{exp}),
+            .level_up => _ = try writer.write("Level up!"),
             .miss => _ = try writer.write("Miss"),
             .dodge => _ = try writer.write("Dodge"),
             .no_ammo => _ = try writer.write("No ammo!"),

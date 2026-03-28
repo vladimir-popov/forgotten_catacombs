@@ -28,6 +28,10 @@ pub fn equipment(self: Self) *c.Equipment {
     return self.test_session.session.registry.getUnsafe(self.id, c.Equipment);
 }
 
+pub fn experience(self: Self) *c.Experience {
+    return self.test_session.session.registry.getUnsafe(self.id, c.Experience);
+}
+
 pub fn wallet(self: Self) *c.Wallet {
     return self.test_session.session.registry.getUnsafe(self.id, c.Wallet);
 }

@@ -28,7 +28,7 @@ pub const QuickActions = struct {
 /// Should be shown for some time.
 const NotificationMessage = struct {
     /// the buffer for the text of the notification
-    buffer: [20]u8 = undefined,
+    buffer: [16]u8 = undefined,
     len: u8 = 0,
     /// when the notification appears on a screen
     start_showing_at: u64,
@@ -115,7 +115,7 @@ quick_actions: QuickActions,
 is_player_turn: bool = true,
 quick_actions_window: ?w.ModalWindow(w.OptionsArea(void)) = null,
 // If defined, then all input should be ignored.
-notification: ?NotificationMessage = null,
+notification_to_show: ?NotificationMessage = null,
 
 pub fn init(
     self: *Self,
@@ -142,57 +142,124 @@ pub fn deinit(self: Self) void {
     self.arena.deinit();
 }
 
-fn setTarget(self: *Self, target: g.Entity) void {
-    log.debug("Change target from {any} to {any}", .{ self.target, target });
-    self.target = target;
-    self.quick_actions.reset();
-}
+pub fn tick(self: *Self) !void {
+    // the true here means that some blocked animation or notification is shown,
+    // and any input should be ignored
+    if (try self.draw()) return;
 
-/// Trying to do an action. An action can be changed or ignored.
-/// For example, moving can lead to a collision with an enemy or a wall. In the first case,
-/// the action will be changed to `hit`, and completely ignored in the latter.
-/// Returns the actual action and the count of spent move points.
-/// When an action requires more move points than initiative, `error.NotEnoughMovePoints` will be
-/// returned.
-pub fn doTurn(
-    self: *Self,
-    actor: g.Entity,
-    action: g.actions.Action,
-    initiative: g.MovePoints,
-) !g.actions.ActionResult {
-    log.info("The turn of the entity {d}.", .{actor.id});
-    defer log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
-
-    // Do Actions
-    const action_result = try self.session.actions.doAction(actor, action, initiative);
-    switch (action_result) {
-        .done => |success| {
-            const mp = success.spent_move_points;
-            log.info("Entity {d} spent {d} move points", .{ actor.id, mp });
-
-            // Handle Initiative
-            if (self.is_player_turn and mp > 0) {
-                // Add initiative points to enemies
-                var itr = self.session.registry.query(c.Initiative);
-                while (itr.next()) |tuple| {
-                    tuple[1].move_points += mp;
+    if (self.is_player_turn) {
+        // break this function if no input
+        const action = (try self.handleInput()) orelse return;
+        const action_result = try self.doTurn(self.session.player, action, std.math.maxInt(g.MovePoints));
+        switch (action_result) {
+            .done => |success| {
+                // Force change the target
+                switch (success.actual_action) {
+                    .hit => |enemy| {
+                        self.setTarget(enemy);
+                    },
+                    .open => |door| {
+                        self.setTarget(door.id);
+                    },
+                    else => {},
                 }
-                try self.session.events.sendEvent(.{ .player_turn_completed = .{ .spent_move_points = mp } });
+                // Update counters of unknown equipment
+                try self.session.journal.onTurnCompleted();
+                self.is_player_turn = false;
+            },
+            else => {},
+        }
+    } else {
+        var itr = self.session.registry.query(c.Initiative);
+        while (itr.next()) |tuple| {
+            const npc, const initiative = tuple;
+            // repeat doing something until move points are over
+            loop: while (true) {
+                // TODO: compare initiative with minimal required mp to prevent calculating an action
+                const action = self.session.ai.action(npc);
+                const action_result = try self.doTurn(npc, action, initiative.move_points);
+                switch (action_result) {
+                    .done => |success| {
+                        const mp = success.spent_move_points;
+                        g.utils.assert(
+                            mp <= initiative.move_points,
+                            "Entity {d} spent more MP {d} than initiative has {any}. Action was {any}",
+                            .{ npc.id, mp, initiative, success.actual_action },
+                        );
+                        initiative.move_points -= mp;
+                    },
+                    .not_enough_points, .actor_is_dead => break :loop,
+                    .declined => {},
+                }
             }
-        },
-        .actor_is_dead => {
-            log.info("Entity {d} is dead after action {t}", .{ actor.id, action });
-        },
-        .not_enough_points => {
-            log.debug("Entity {d} has not enough move points for action {t}", .{ actor.id, action });
-        },
-        .declined => {
-            log.debug("The action {t} was declined for the entity {d}", .{ action, actor.id });
-        },
+        }
+        self.is_player_turn = true;
     }
-    return action_result;
+    try self.updateQuickActions();
 }
 
+/// If returns true, then the input should be ignored
+/// until all notifications and all frames from all blocked animations have been drawn.
+fn draw(self: *Self) !bool {
+    if (self.quick_actions_window != null) return false;
+
+    try self.drawInfoBar();
+    const level = &self.session.level;
+    try self.session.render.drawDungeonToBuffer(self.session.viewport, level);
+    try self.session.render.drawEntitiesToBuffer(
+        self.session.viewport,
+        &self.session.journal,
+        self.session.prng.random(),
+        level,
+        self.target,
+    );
+    const is_blocked_animation = try self.drawAnimationsFramesToBuffer();
+    try self.session.render.drawChangedSymbols();
+    const is_notification_shown = try self.showNotifications();
+    if (self.session.registry.get(self.session.player, c.Health)) |health| {
+        try self.session.render.drawPlayerHp(health);
+    }
+    // Ignore any input while showing a blocked animation or notification
+    if (is_blocked_animation or is_notification_shown) {
+        try self.session.runtime.cleanInputBuffer();
+        return true;
+    }
+    return false;
+}
+
+/// Draws a single frame from every animation.
+/// Removes the animation if the last frame was drawn.
+/// Returns true if any animation is blocked.
+pub fn drawAnimationsFramesToBuffer(self: Self) !bool {
+    const now: u64 = self.session.runtime.currentMillis();
+    var was_blocked_animation: bool = false;
+    var itr = self.session.level.registry.query2(c.Position, c.Animation);
+    while (itr.next()) |components| {
+        const entity, const position, const animation = components;
+        was_blocked_animation |= animation.is_blocked;
+        if (animation.frame(now)) |frame| {
+            if (frame > 0 and self.session.viewport.region.containsPoint(position.place)) {
+                const mode: g.DrawingMode = if (entity.eql(self.target))
+                    .inverted
+                else
+                    .normal;
+                try self.session.render.drawSpriteToBuffer(
+                    self.session.viewport,
+                    frame,
+                    position.place,
+                    3, // animations have max z order
+                    mode,
+                    self.session.level.checkPlaceVisibility(position.place),
+                );
+            }
+        } else {
+            try self.session.level.registry.remove(entity, c.Animation);
+        }
+    }
+    return was_blocked_animation;
+}
+
+// NOTE: the quick_actions_window can be drawn during this method
 fn handleInput(self: *Self) !?g.actions.Action {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (self.quick_actions_window) |*window| {
@@ -255,6 +322,16 @@ fn handleInput(self: *Self) !?g.actions.Action {
             },
             .turn_light_on => g.visibility.turn_light_on = true,
             .turn_light_off => g.visibility.turn_light_on = false,
+            .level_up => |new_level| {
+                const level_before = self.session.registry.getUnsafe(self.session.player, c.Experience).level;
+                if (new_level > level_before) {
+                    const exp = g.meta.Levels[new_level - 1];
+                    _ = try g.meta.addExperience(&self.session.registry, self.session.player, exp);
+                }
+            },
+            .set_experience => |exp| {
+                _ = try g.meta.addExperience(&self.session.registry, self.session.player, exp);
+            },
             .set_health => |hp| {
                 if (self.session.registry.get(self.session.player, c.Health)) |health| {
                     health.current_hp = hp;
@@ -282,133 +359,84 @@ fn handleInput(self: *Self) !?g.actions.Action {
     return null;
 }
 
-pub fn tick(self: *Self) !void {
-    if (try self.draw()) return;
+fn setTarget(self: *Self, target: g.Entity) void {
+    log.debug("Change target from {any} to {any}", .{ self.target, target });
+    self.target = target;
+    self.quick_actions.reset();
+}
 
-    if (self.is_player_turn) {
-        // break this function if no input
-        const action = (try self.handleInput()) orelse return;
-        const action_result = try self.doTurn(self.session.player, action, std.math.maxInt(g.MovePoints));
-        switch (action_result) {
-            .done => |success| {
-                // Force change the target
-                switch (success.actual_action) {
-                    .hit => |enemy| {
-                        self.setTarget(enemy);
-                    },
-                    .open => |door| {
-                        self.setTarget(door.id);
-                    },
-                    else => {},
+/// Trying to do an action. An action can be changed or ignored.
+/// For example, moving can lead to a collision with an enemy or a wall. In the first case,
+/// the action will be changed to `hit`, and completely ignored in the latter.
+/// Returns the actual action and the count of spent move points.
+/// When an action requires more move points than initiative, `error.NotEnoughMovePoints` will be
+/// returned.
+pub fn doTurn(
+    self: *Self,
+    actor: g.Entity,
+    action: g.actions.Action,
+    initiative: g.MovePoints,
+) !g.actions.ActionResult {
+    log.info("The turn of the entity {d}.", .{actor.id});
+    defer log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
+
+    // Do Actions
+    const action_result = try self.session.actions.doAction(actor, action, initiative);
+    switch (action_result) {
+        .done => |success| {
+            const mp = success.spent_move_points;
+            log.info("Entity {d} spent {d} move points", .{ actor.id, mp });
+
+            // Handle Initiative
+            if (self.is_player_turn and mp > 0) {
+                // Add initiative points to enemies
+                var itr = self.session.registry.query(c.Initiative);
+                while (itr.next()) |tuple| {
+                    tuple[1].move_points += mp;
                 }
-                // Update counters of unknown equipment
-                try self.session.journal.onTurnCompleted();
-                self.is_player_turn = false;
-            },
-            else => {},
-        }
-    } else {
-        var itr = self.session.registry.query(c.Initiative);
-        while (itr.next()) |tuple| {
-            const npc, const initiative = tuple;
-            // repeat doing something until move points are over
-            loop: while (true) {
-                // TODO: compare initiative with minimal required mp to prevent calculating an action
-                const action = self.session.ai.action(npc);
-                const action_result = try self.doTurn(npc, action, initiative.move_points);
-                switch (action_result) {
-                    .done => |success| {
-                        const mp = success.spent_move_points;
-                        g.utils.assert(
-                            mp <= initiative.move_points,
-                            "Entity {d} spent more MP {d} than initiative has {any}. Action was {any}",
-                            .{ npc.id, mp, initiative, success.actual_action },
-                        );
-                        initiative.move_points -= mp;
-                    },
-                    .not_enough_points, .actor_is_dead => break :loop,
-                    .declined => {},
-                }
+                try self.session.events.sendEvent(.{ .player_turn_completed = .{ .spent_move_points = mp } });
             }
-        }
-        self.is_player_turn = true;
+        },
+        .actor_is_dead => {
+            log.info("Entity {d} is dead after action {t}", .{ actor.id, action });
+        },
+        .not_enough_points => {
+            log.debug("Entity {d} has not enough move points for action {t}", .{ actor.id, action });
+        },
+        .declined => {
+            log.debug("The action {t} was declined for the entity {d}", .{ action, actor.id });
+        },
     }
-    try self.updateQuickActions();
+    return action_result;
 }
 
-/// If returns true, then the input should be ignored
-/// until all notifications and all frames from all blocked animations have been drawn.
-fn draw(self: *Self) !bool {
-    if (self.quick_actions_window == null) {
-        try self.drawInfoBar();
-        const level = &self.session.level;
-        try self.session.render.drawDungeonToBuffer(self.session.viewport, level);
-        try self.session.render.drawEntitiesToBuffer(
-            self.session.viewport,
-            &self.session.journal,
-            self.session.prng.random(),
-            level,
-            self.target,
-        );
-        const blocked_animation = try self.drawAnimationsFramesToBuffer();
-        try self.session.render.drawChangedSymbols();
-        const notification_shown = try self.showNotifications();
-        if (self.session.registry.get(self.session.player, c.Health)) |health| {
-            try self.session.render.drawPlayerHp(health);
-        }
-        if (blocked_animation or notification_shown) {
-            try self.session.runtime.cleanInputBuffer();
-            return true;
-        }
-    }
-    return false;
-}
-
-/// Draws a single frame from every animation.
-/// Removes the animation if the last frame was drawn.
-/// Returns true if any animation is blocked.
-pub fn drawAnimationsFramesToBuffer(self: Self) !bool {
-    const now: u64 = self.session.runtime.currentMillis();
-    var was_blocked_animation: bool = false;
-    var itr = self.session.level.registry.query2(c.Position, c.Animation);
-    while (itr.next()) |components| {
-        const entity, const position, const animation = components;
-        was_blocked_animation |= animation.is_blocked;
-        if (animation.frame(now)) |frame| {
-            if (frame > 0 and self.session.viewport.region.containsPoint(position.place)) {
-                const mode: g.DrawingMode = if (entity.eql(self.target))
-                    .inverted
-                else
-                    .normal;
-                try self.session.render.drawSpriteToBuffer(
-                    self.session.viewport,
-                    frame,
-                    position.place,
-                    3, // animations have max z order
-                    mode,
-                    self.session.level.checkPlaceVisibility(position.place),
-                );
-            }
-        } else {
-            try self.session.level.registry.remove(entity, c.Animation);
-        }
-    }
-    return was_blocked_animation;
-}
-
+/// Draws the `notification_to_show` if it's defined.
+/// if more time from start of showing has passed than `SHOW_NOTIFICATION_MS`, removed the `notification_to_show`,
+/// and tries to get a next notification from the global queue.
+///
+/// Returns `true` if a notification should be keep showed.
 fn showNotifications(self: *Self) !bool {
-    if (self.notification) |msg| {
-        if (self.session.runtime.currentMillis() - msg.start_showing_at > SHOW_NOTIFICATION_MS) {
-            try self.session.render.redrawRegionFromSceneBuffer(msg.region());
-            self.notification = null;
-            return false;
-        } else {
-            try self.session.render.drawText(msg.buffer[0..msg.len], msg.pp, .inverted);
+    if (self.notification_to_show) |notification| {
+        if (self.session.runtime.currentMillis() - notification.start_showing_at < SHOW_NOTIFICATION_MS) {
+            // Show the notification
+            try self.session.render.drawText(notification.buffer[0..notification.len], notification.pp, .inverted);
             return true;
+        } else {
+            // Hide the notification after timeout
+            try self.session.render.redrawRegionFromSceneBuffer(notification.region());
+            self.notification_to_show = null;
         }
     }
     if (self.session.notifications.popFront()) |notification| {
-        self.notification = try .init(notification, self.session);
+        // Get a next notification
+        const notification_message = try NotificationMessage.init(notification, self.session);
+        self.notification_to_show = notification_message;
+        // We should not wait a next invocation, because it requires an input and can happened too late.
+        try self.session.render.drawText(
+            notification_message.buffer[0..notification_message.len],
+            notification_message.pp,
+            .inverted,
+        );
         return true;
     }
     return false;

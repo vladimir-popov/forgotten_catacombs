@@ -38,7 +38,7 @@ const BuildingStep = union(enum) {
     /// ```
     /// ╔════════════════════════════════════════╗
     /// ║         Choose your archetype:         ║
-    /// ║                                        ║
+    /// ║════════════════════════════════════════║
     /// ║             ┌                          ║
     /// ║               Adventurer               ║
     /// ║              Archeologist              ║
@@ -55,7 +55,7 @@ const BuildingStep = union(enum) {
     /// ```
     /// ╔════════════════════════════════════════╗
     /// ║                 Skill:                 ║
-    /// ║                                        ║
+    /// ║════════════════════════════════════════║
     /// ║ ┌                                      ║
     /// ║  Weapon Mastery                      0 ║
     /// ║  Mechanics                           0 ║
@@ -170,6 +170,7 @@ fn initSkillsStep(
 ) !void {
     var options = w.OptionsArea(g.meta.Skill).init(self, .left);
     for (std.enums.values(g.meta.Skill)) |skill| {
+        // the button handler is omitted, because we have a single point to handle buttons in this mode
         const option = try options.addEmptyOption(
             self.arena.allocator(),
             skill,

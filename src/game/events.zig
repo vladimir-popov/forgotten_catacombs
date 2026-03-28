@@ -28,6 +28,7 @@ pub const EntityMoved = struct {
 pub const ModeChanged = union(enum) {
     to_explore,
     to_looking_around,
+    to_level_up,
     to_inventory,
     to_trading: *c.Shop,
     to_modify_recognize,

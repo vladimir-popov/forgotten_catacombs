@@ -83,6 +83,7 @@ pub fn ArraySet(comptime C: anytype) type {
             }
         }
 
+        /// Returns the component if it exists, or set the passed.
         pub fn getOrSetForEntity(self: *Self, alloc: std.mem.Allocator, entity: Entity, component: C) !*C {
             if (self.entity_index.get(entity)) |idx| {
                 return &self.components.items[idx][1];

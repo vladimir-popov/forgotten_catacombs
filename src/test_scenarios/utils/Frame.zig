@@ -16,12 +16,15 @@ pub const ComparingArea = union(enum) {
     game_area,
     region: p.Region,
     line: u8,
+    info_bar,
+
     fn toRegion(self: ComparingArea) p.Region {
         return switch (self) {
             .whole_display => p.Region.init(1, 1, g.DISPLAY_ROWS, g.DISPLAY_COLS),
             .game_area => p.Region.init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS),
             .region => |reg| reg,
             .line => |l| p.Region.init(l, 1, 1, g.DISPLAY_COLS),
+            .info_bar => p.Region.init(g.DISPLAY_ROWS, 1, 1, g.DISPLAY_COLS),
         };
     }
 };

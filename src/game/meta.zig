@@ -144,6 +144,39 @@ pub fn statsFromArchetype(archetype: PlayerArchetype) c.Stats {
     };
 }
 
+pub inline fn isLevelUp(registry: *g.Registry, player: g.Entity) bool {
+    if (registry.get(player, c.LevelUp)) |level_up| {
+        return level_up.last_handled_level < registry.getUnsafe(player, c.Experience).level;
+    } else {
+        return false;
+    }
+}
+
+pub fn actualLevel(current_level: u4, total_experience: u16) u4 {
+    var level = current_level;
+    while (g.meta.Levels[level - 1] < total_experience) {
+        level += 1;
+    }
+    return level;
+}
+
+/// Adds exp to the player's Experience. If it leads to level up,
+/// increases the player level, updates the LevelUp component for the player,
+/// and return `true`. Otherwise returns `false`.
+pub fn addExperience(registry: *g.Registry, player: g.Entity, exp: u16) !bool {
+    const experience = registry.getUnsafe(player, c.Experience);
+    const level_before = experience.level;
+    experience.experience +|= exp;
+    experience.level = actualLevel(experience.level, experience.experience);
+    if (experience.level > level_before) {
+        const level_up = try registry.getOrSet(player, c.LevelUp, .{ .last_handled_level = level_before });
+        level_up.last_handled_level = @min(level_up.last_handled_level, level_before);
+        return true;
+    } else {
+        return false;
+    }
+}
+
 pub fn initialHealth(constitution: i4) c.Health {
     const constitution_factor = (@as(f32, @floatFromInt(constitution)) * 0.6 + 4.4) / 4.0;
     return .init(@intFromFloat(@round(constitution_factor * 20)));

@@ -33,8 +33,12 @@ pub const Cheat = union(enum) {
     /// Creates a new item and put it to player's inventory
     get_item: g.entities.presets.Items.Tag,
 
-    // Moves the player to the point on the screen (1-based).
+    /// Moves the player to the point on the screen (1-based).
     goto: p.Point,
+
+    /// Sets up the player's level to the value, and add the `LevelUp` component with the current
+    /// player's level
+    level_up: u4,
 
     /// Moves the player to a ladder lead to an upper level.
     move_player_to_ladder_up,
@@ -44,6 +48,8 @@ pub const Cheat = union(enum) {
 
     /// Adds entity id to the journal
     recognize: g.Entity,
+
+    set_experience: u16,
 
     /// Sets up a passed count of health point to the player.
     set_health: u8,
@@ -88,11 +94,22 @@ pub const Cheat = union(enum) {
                     .{args},
                 );
             },
+            .level_up => if (tryParseDecimal(u4, args)) |new_level| {
+                return .{ .level_up = new_level };
+            },
             .recognize => if (tryParseDecimal(u32, args)) |entity_id| {
                 return .{ .recognize = .{ .id = entity_id } };
             } else {
                 log.warn(
                     "Wrong arguments '{s}' for 'recognize' command. It expects an entity id.",
+                    .{args},
+                );
+            },
+            .set_experience => if (tryParseDecimal(u16, args)) |exp| {
+                return .{ .set_experience = exp };
+            } else {
+                log.warn(
+                    "Wrong arguments '{s}' for 'set experience' command. It expects a number value to set.",
                     .{args},
                 );
             },
@@ -158,9 +175,11 @@ pub const Cheat = union(enum) {
             .dump_vector_field => "dump vectors",
             .get_item => "get",
             .goto => "goto",
+            .level_up => "level up",
             .move_player_to_ladder_down => "down ladder",
             .move_player_to_ladder_up => "up ladder",
             .recognize => "recognize",
+            .set_experience => "set experience",
             .set_health => "set health",
             .set_money => "set money",
             .trade => "trade",

@@ -134,7 +134,7 @@ pub fn printDisplay(self: Self) void {
 pub fn pressButton(self: *Self, button: g.Button.GameButton) !void {
     log.debug("Emulate pressing button {any}", .{button});
     try self.runtime.pushed_buttons.append(self.arena.allocator(), .{ .game_button = button, .state = .released });
-    try self.tick(.{});
+    try self.tick(.{ .duration_ms = 100 });
 }
 
 pub fn openInventory(self: *Self) !Inventory {

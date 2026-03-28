@@ -15,6 +15,7 @@ pub const PlayMode = @import("game_modes/PlayMode.zig");
 pub const ModifyMode = @import("game_modes/ModifyMode.zig");
 pub const SaveLoadMode = @import("game_modes/SaveLoadMode.zig");
 pub const TradingMode = @import("game_modes/TradingMode.zig");
+pub const LevelUp = @import("game_modes/LevelUp.zig");
 
 const log = std.log.scoped(.game_session);
 
@@ -24,9 +25,10 @@ pub const Mode = union(enum) {
     explore: ExploreMode,
     explore_level: ExploreLevelMode,
     inventory: InventoryMode,
+    level_up: LevelUp,
+    modify_recognize: ModifyMode,
     play: PlayMode,
     save_load: SaveLoadMode,
-    modify_recognize: ModifyMode,
     trading: TradingMode,
 
     fn deinit(self: *Mode) void {
@@ -34,6 +36,7 @@ pub const Mode = union(enum) {
             .explore => self.explore.deinit(),
             .explore_level => {},
             .inventory => self.inventory.deinit(),
+            .level_up => self.level_up.deinit(),
             .play => self.play.deinit(),
             .save_load => self.save_load.deinit(),
             .modify_recognize => self.modify_recognize.deinit(),
@@ -224,6 +227,10 @@ pub fn lookAround(self: *Self) !void {
     try self.events.sendEvent(.{ .mode_changed = .to_looking_around });
 }
 
+pub fn levelUp(self: *Self) !void {
+    try self.events.sendEvent(.{ .mode_changed = .to_level_up });
+}
+
 pub fn manageInventory(self: *Self) !void {
     try self.events.sendEvent(.{ .mode_changed = .to_inventory });
 }
@@ -288,6 +295,11 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
                 self.mode.deinit();
                 self.mode = .{ .explore = undefined };
                 try self.mode.explore.init(self.arena.allocator(), self);
+            },
+            .to_level_up => {
+                self.mode.deinit();
+                self.mode = .{ .level_up = try LevelUp.init(self) };
+                try self.mode.level_up.draw(self.render);
             },
             .to_inventory => {
                 if (self.registry.get2(self.player, c.Equipment, c.Inventory)) |tuple| {
@@ -354,9 +366,10 @@ pub fn tick(self: *Self) !void {
         .explore => try self.mode.explore.tick(),
         .explore_level => try self.mode.explore_level.tick(),
         .inventory => try self.mode.inventory.tick(),
+        .level_up => try self.mode.level_up.tick(),
+        .modify_recognize => try self.mode.modify_recognize.tick(),
         .play => try self.mode.play.tick(),
         .save_load => try self.mode.save_load.tick(),
-        .modify_recognize => try self.mode.modify_recognize.tick(),
         .trading => try self.mode.trading.tick(),
     }
     try self.events.notifySubscribers();
