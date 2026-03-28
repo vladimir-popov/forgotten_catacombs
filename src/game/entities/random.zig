@@ -102,7 +102,7 @@ fn itemChanceProportion(rarity: c.Rarity, tier: c.Tier, depth: u8, target: Gener
     if (tier_difference > 1) return 0;
     if (tier_difference < -1) return 0;
 
-    const tier_difference_penalty: f16 = switch (tier_difference) {
+    const tier_difference_penalty: f32 = switch (tier_difference) {
         // the player level is to low for the item's tier.
         // the chance for the item should be decreased
         -1 => 0.5,
@@ -113,7 +113,7 @@ fn itemChanceProportion(rarity: c.Rarity, tier: c.Tier, depth: u8, target: Gener
         else => 1.0,
     };
 
-    const proportion: f16 = @floatFromInt(@intFromEnum(rarity));
+    const proportion: f32 = @floatFromInt(@intFromEnum(rarity));
     return @intFromFloat(@round(proportion * tier_difference_penalty));
 }
 

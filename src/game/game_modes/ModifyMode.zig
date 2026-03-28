@@ -193,7 +193,7 @@ fn formatLine(self: *Self, buffer: []u8, item: g.Entity, price: u16) ![]const u8
     return try std.fmt.bufPrint(buffer, line_fmt, .{ sprite.codepoint, name, price });
 }
 
-fn calculateModificationPrice(self: Self, item: g.Entity, multiplayer: f16) u16 {
+fn calculateModificationPrice(self: Self, item: g.Entity, multiplayer: f32) u16 {
     var price: u16 = BASE_MODIFICATION_PRICE;
     if (self.session.registry.get(item, c.Rarity)) |rarity| {
         switch (rarity.*) {
@@ -211,7 +211,7 @@ fn calculateModificationPrice(self: Self, item: g.Entity, multiplayer: f16) u16 
                 price +|= BASE_MODIFICATION_PRICE;
         }
     }
-    const pf: f16 = @floatFromInt(price);
+    const pf: f32 = @floatFromInt(price);
     return @intFromFloat(multiplayer * pf);
 }
 

@@ -34,10 +34,10 @@ const Options = struct {
     region_min_cols: u8 = 20,
     /// Minimal scale rate to prevent too small rooms.
     /// The small values make the dungeon looked more random.
-    min_scale: f16 = 0.6,
+    min_scale: f32 = 0.6,
     /// This is rows/cols ratio of the square.
     /// In case of ascii graphics it's not 1.0
-    square_ratio: f16 = 0.4,
+    square_ratio: f32 = 0.4,
 
     /// Minimal area of the room
     inline fn minArea(opts: @This()) u16 {
@@ -190,22 +190,22 @@ const CreatePassageBetweenRegions = struct {
 /// ---------
 fn createRandomRegionInside(region: p.Region, rand: std.Random, opts: Options) !p.Region {
     var room: p.Region = region;
-    if (!std.math.approxEqAbs(f16, opts.square_ratio, region.ratio(), 0.1)) {
+    if (!std.math.approxEqAbs(f32, opts.square_ratio, region.ratio(), 0.1)) {
         // make the region 'more square'
         if (region.ratio() > opts.square_ratio) {
             room.rows = @max(
                 opts.region_min_rows,
-                @as(u8, @intFromFloat(@round(@as(f16, @floatFromInt(region.cols)) * opts.square_ratio))),
+                @as(u8, @intFromFloat(@round(@as(f32, @floatFromInt(region.cols)) * opts.square_ratio))),
             );
         } else {
             room.cols = @max(
                 opts.region_min_cols,
-                @as(u8, @intFromFloat(@round(@as(f16, @floatFromInt(region.rows)) / opts.square_ratio))),
+                @as(u8, @intFromFloat(@round(@as(f32, @floatFromInt(region.rows)) / opts.square_ratio))),
             );
         }
     }
-    var scale: f16 = @floatFromInt(1 + rand.uintAtMost(u16, room.area() - opts.minArea()));
-    scale = scale / @as(f16, @floatFromInt(room.area()));
+    var scale: f32 = @floatFromInt(1 + rand.uintAtMost(u16, room.area() - opts.minArea()));
+    scale = scale / @as(f32, @floatFromInt(room.area()));
     scale = @max(opts.min_scale, scale);
     room.scale(scale, scale);
     return room;

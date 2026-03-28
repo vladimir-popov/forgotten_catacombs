@@ -165,11 +165,11 @@ fn countOfEntitiesInFocus(self: ExploreMode) usize {
 
 fn moveFocus(self: *ExploreMode, direction: p.Direction) void {
     var nearest_place = self.place_in_focus;
-    var min_distance: f16 = std.math.floatMax(f16);
+    var min_distance: f32 = std.math.floatMax(f32);
     var itr = self.entities_on_screen.iterator();
     while (itr.next()) |entry| {
         const place = entry.key_ptr.*;
-        const d: f16 = distance(self.place_in_focus, place, direction);
+        const d: f32 = distance(self.place_in_focus, place, direction);
         if (d > 0 and d < min_distance) {
             min_distance = d;
             nearest_place = place;
@@ -186,7 +186,7 @@ fn moveFocus(self: *ExploreMode, direction: p.Direction) void {
 }
 
 /// Returns the distance between two points. If the target point is outside of the region
-/// for the specified direction, this function returns max(f16).
+/// for the specified direction, this function returns max(f32).
 ///
 ///    Example:
 ///  ------
@@ -198,7 +198,7 @@ fn moveFocus(self: *ExploreMode, direction: p.Direction) void {
 ///  ------
 ///  Only two points should have a distance in right direction. The point is on the border should
 ///  not be count.
-inline fn distance(from: p.Point, to: p.Point, direction: p.Direction) f16 {
+inline fn distance(from: p.Point, to: p.Point, direction: p.Direction) f32 {
     const in_the_direction = switch (direction) {
         .up => to.row < from.row,
         .down => to.row > from.row,
@@ -208,7 +208,7 @@ inline fn distance(from: p.Point, to: p.Point, direction: p.Direction) f16 {
     if (in_the_direction)
         return from.distanceTo(to)
     else
-        return std.math.floatMax(f16);
+        return std.math.floatMax(f32);
 }
 
 /// Returns y - x if y > x, or x - y otherwise.

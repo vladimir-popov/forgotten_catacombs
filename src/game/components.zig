@@ -156,13 +156,13 @@ pub const Price = struct {
 pub const Shop = struct {
     // FIXME: this is a very primitive mechanic. it would be better if different items would have different
     // multiplier, and that multiplier would depends on player's characteristics.
-    price_multiplier: f16,
+    price_multiplier: f32,
     items: u.EntitiesSet,
     /// This seed is used to generate items for selling.
     seed: u64,
     balance: u16 = 0,
 
-    pub fn empty(alloc: std.mem.Allocator, price_multiplier: f16, balance: u16, seed: u64) !Shop {
+    pub fn empty(alloc: std.mem.Allocator, price_multiplier: f32, balance: u16, seed: u64) !Shop {
         return .{
             .items = try u.EntitiesSet.init(alloc),
             .price_multiplier = price_multiplier,
@@ -485,7 +485,7 @@ pub const Experience = struct {
 };
 
 pub const SourceOfLight = struct {
-    radius: f16,
+    radius: f32,
 };
 
 pub const Skills = struct {

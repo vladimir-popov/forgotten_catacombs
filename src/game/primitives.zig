@@ -133,9 +133,9 @@ pub const Point = struct {
             @max(self.col, other.col) - @min(self.col, other.col) < 2;
     }
 
-    pub fn distanceTo(self: Point, other: Point) f16 {
-        const a: f16 = @floatFromInt(diff(u8, self.row, other.row));
-        const b: f16 = @floatFromInt(diff(u8, self.col, other.col));
+    pub fn distanceTo(self: Point, other: Point) f32 {
+        const a: f32 = @floatFromInt(diff(u8, self.row, other.row));
+        const b: f32 = @floatFromInt(diff(u8, self.col, other.col));
         return @sqrt(a * a + b * b);
     }
 
@@ -152,11 +152,11 @@ pub const Point = struct {
         return (x - x1) * (y2 - y1) - (y - y1) * (x2 - x1);
     }
 
-    pub fn isInsideElipse(self: Point, center: Point, rx: f16, ry: f16) bool {
-        const x0: f16 = @floatFromInt(center.col);
-        const y0: f16 = @floatFromInt(center.row);
-        const x: f16 = @floatFromInt(self.col);
-        const y: f16 = @floatFromInt(self.row);
+    pub fn isInsideElipse(self: Point, center: Point, rx: f32, ry: f32) bool {
+        const x0: f32 = @floatFromInt(center.col);
+        const y0: f32 = @floatFromInt(center.row);
+        const x: f32 = @floatFromInt(self.col);
+        const y: f32 = @floatFromInt(self.row);
         const x2 = x - x0;
         const y2 = y - y0;
         return (x2 * x2) / (rx * rx) + (y2 * y2) / (ry * ry) <= 1;
@@ -229,9 +229,9 @@ pub const Region = struct {
     }
 
     /// rows / cols
-    pub inline fn ratio(self: Region) f16 {
-        const rows: f16 = @floatFromInt(self.rows);
-        const cols: f16 = @floatFromInt(self.cols);
+    pub inline fn ratio(self: Region) f32 {
+        const rows: f32 = @floatFromInt(self.rows);
+        const cols: f32 = @floatFromInt(self.cols);
         return rows / cols;
     }
 
@@ -282,16 +282,16 @@ pub const Region = struct {
     }
 
     /// Multiplies rows by `v_scale` and columns by `h_scale`
-    pub fn scale(self: *Region, v_scale: f16, h_scale: f16) void {
-        const rows: f16 = @floatFromInt(self.rows);
-        const cols: f16 = @floatFromInt(self.cols);
+    pub fn scale(self: *Region, v_scale: f32, h_scale: f32) void {
+        const rows: f32 = @floatFromInt(self.rows);
+        const cols: f32 = @floatFromInt(self.cols);
         self.rows = @intFromFloat(@round(rows * v_scale));
         self.cols = @intFromFloat(@round(cols * h_scale));
         std.debug.assert(self.rows > 0);
         std.debug.assert(self.cols > 0);
     }
 
-    pub fn scaled(self: Region, v_scale: f16, h_scale: f16) Region {
+    pub fn scaled(self: Region, v_scale: f32, h_scale: f32) Region {
         var reg = self;
         reg.scale(v_scale, h_scale);
         return reg;

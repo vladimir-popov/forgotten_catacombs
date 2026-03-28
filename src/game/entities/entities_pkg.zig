@@ -113,7 +113,7 @@ pub fn scientist(place: p.Point) c.Components {
 pub fn trader(
     registry: *g.Registry,
     place: p.Point,
-    price_multiplier: f16,
+    price_multiplier: f32,
     balance: u16,
     seed: u64,
 ) !c.Components {

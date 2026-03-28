@@ -8,7 +8,7 @@ pub const Node = GenericNode(p.Region);
 
 pub const MinRegionSettings = struct {
     /// rows / cols ratio to keep regions looked as square:
-    square_ratio: f16,
+    square_ratio: f32,
     min_rows: u8,
     min_cols: u8,
     split_with_gap: bool = false,
@@ -313,7 +313,7 @@ test "build tree" {
 /// Utility for test
 const ValidateNodes = struct {
     opts: MinRegionSettings,
-    min_ratio: f16 = 0.2,
+    min_ratio: f32 = 0.2,
 
     fn bspNodeHandler(self: *ValidateNodes) Node.TraverseHandler {
         return .{ .ptr = self, .handle = validate };

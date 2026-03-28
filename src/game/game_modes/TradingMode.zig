@@ -190,7 +190,7 @@ fn formatProduct(self: *Self, line: *w.TextArea.Line, item: g.Entity, for_buying
 }
 
 fn actualPrice(self: Self, price: *const c.Price, for_buying: bool) u16 {
-    const base_price: f16 = @floatFromInt(price.value);
+    const base_price: f32 = @floatFromInt(price.value);
     return if (for_buying)
         @intFromFloat(base_price * self.shop.price_multiplier)
     else

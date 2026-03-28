@@ -42,7 +42,7 @@ pub inline fn getEnemyType(registry: *const g.Registry, entity: g.Entity) ?Enemy
 
 /// Returns the id of the item with maximal radius of light through all equipped sources of the light,
 /// or null and default value.
-pub fn getLight(registry: *const g.Registry, equipment: *const c.Equipment) struct { ?g.Entity, f16 } {
+pub fn getLight(registry: *const g.Registry, equipment: *const c.Equipment) struct { ?g.Entity, f32 } {
     if (equipment.light) |id| {
         if (registry.get(id, c.SourceOfLight)) |sol| {
             return .{ id, sol.radius };
