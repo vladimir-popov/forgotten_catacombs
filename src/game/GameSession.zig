@@ -29,7 +29,7 @@ pub const Mode = union(enum) {
     modify_recognize: ModifyMode,
     trading: TradingMode,
 
-    inline fn deinit(self: *Mode) void {
+    fn deinit(self: *Mode) void {
         switch (self.*) {
             .explore => self.explore.deinit(),
             .explore_level => {},
@@ -349,7 +349,7 @@ pub fn notify(self: *Self, notification: g.notifications.Notification) !void {
     try self.notifications.pushBack(self.arena.allocator(), notification);
 }
 
-pub inline fn tick(self: *Self) !void {
+pub fn tick(self: *Self) !void {
     switch (self.mode) {
         .explore => try self.mode.explore.tick(),
         .explore_level => try self.mode.explore_level.tick(),

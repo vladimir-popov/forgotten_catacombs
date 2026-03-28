@@ -101,7 +101,7 @@ pub fn Menu(comptime ROWS: u8, comptime COLS: u8) type {
             return &self.items[i];
         }
 
-        pub inline fn removeAllItems(self: *Self) void {
+        pub fn removeAllItems(self: *Self) void {
             log.debug("Remove all {d} items", .{self.items_count});
             self.items_count = 0;
             self.selected_item = 0;

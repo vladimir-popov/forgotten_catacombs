@@ -92,7 +92,7 @@ pub fn deinit(self: *Self) void {
     }
 }
 
-pub inline fn tick(self: *Self) !void {
+pub fn tick(self: *Self) !void {
     switch (self.state) {
         .welcome => if (try self.runtime.readPushedButtons()) |btn| {
             _ = try self.state.welcome.menu.handleButton(btn);

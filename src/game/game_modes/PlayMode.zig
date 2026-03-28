@@ -154,7 +154,7 @@ fn setTarget(self: *Self, target: g.Entity) void {
 /// Returns the actual action and the count of spent move points.
 /// When an action requires more move points than initiative, `error.NotEnoughMovePoints` will be
 /// returned.
-pub inline fn doTurn(
+pub fn doTurn(
     self: *Self,
     actor: g.Entity,
     action: g.actions.Action,

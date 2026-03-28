@@ -198,7 +198,7 @@ fn moveFocus(self: *ExploreMode, direction: p.Direction) void {
 ///  ------
 ///  Only two points should have a distance in right direction. The point is on the border should
 ///  not be count.
-inline fn distance(from: p.Point, to: p.Point, direction: p.Direction) f32 {
+fn distance(from: p.Point, to: p.Point, direction: p.Direction) f32 {
     const in_the_direction = switch (direction) {
         .up => to.row < from.row,
         .down => to.row > from.row,

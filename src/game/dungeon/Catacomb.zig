@@ -315,7 +315,7 @@ pub fn generateAndAddRoom(self: *Catacomb, region: p.Region) !void {
     try self.placements.append(self.arena.allocator(), .{ .room = try Placement.createRoom(&self.arena, region) });
 }
 
-inline fn addEmptyPassage(self: *Catacomb) !*Passage {
+fn addEmptyPassage(self: *Catacomb) !*Passage {
     const passage = try Placement.createPassage(&self.arena);
     try self.placements.append(self.arena.allocator(), .{ .passage = passage });
     return passage;

@@ -27,7 +27,7 @@ pub const Doorway = struct {
         );
     }
 
-    pub inline fn oppositePlacement(self: Doorway, placement: Placement) ?Placement {
+    pub fn oppositePlacement(self: Doorway, placement: Placement) ?Placement {
         if (self.placement_from.eql(placement)) {
             return self.placement_to;
         } else if (self.placement_to.eql(placement)) {
@@ -65,7 +65,7 @@ pub const Placement = union(enum) {
         return passage;
     }
 
-    pub inline fn eql(self: Placement, other: Placement) bool {
+    pub fn eql(self: Placement, other: Placement) bool {
         if (@intFromEnum(self) != @intFromEnum(other)) return false;
         return switch (self) {
             .area => self.area == other.area,
@@ -84,7 +84,7 @@ pub const Placement = union(enum) {
         }
     }
 
-    pub inline fn doorways(self: Placement) DoorwaysIterator {
+    pub fn doorways(self: Placement) DoorwaysIterator {
         return switch (self) {
             .area => |area| area.doorways.keyIterator(),
             .room => |room| room.doorways.keyIterator(),

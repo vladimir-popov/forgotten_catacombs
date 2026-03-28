@@ -87,7 +87,7 @@ pub fn fillRegion(self: Render, symbol: u21, mode: g.DrawingMode, region: p.Regi
 }
 
 /// Clears both scene and info bar. Resets the inner buffer.
-pub inline fn clearDisplay(self: Render) !void {
+pub fn clearDisplay(self: Render) !void {
     self.scene_buffer.reset();
     try self.runtime.clearDisplay();
 }

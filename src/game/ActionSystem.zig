@@ -229,7 +229,7 @@ fn tryToMove(
     return .{ .done = .{ .actual_action = .{ .move = move }, .spent_move_points = move_speed } };
 }
 
-inline fn doMove(
+fn doMove(
     self: *Self,
     entity: g.Entity,
     from_position: *c.Position,
@@ -254,7 +254,7 @@ inline fn doMove(
 /// .do_nothing or any other action means that the move should be aborted, and the action handled;
 ///
 /// {place} a place in the dungeon with which collision should be checked.
-inline fn checkCollision(self: *Self, place: p.Point, move: g.Action.Move) ?g.Action {
+fn checkCollision(self: *Self, place: p.Point, move: g.Action.Move) ?g.Action {
     switch (self.session().level.cellAt(place)) {
         .landscape => |cl| if (cl == .floor or cl == .doorway)
             return null,
@@ -425,7 +425,7 @@ fn tryToHit(
 /// `healing` effect.
 ///
 /// Returns `true` if the target is dead.
-inline fn applyEffect(
+fn applyEffect(
     self: *Self,
     /// who applies the effect
     actor: g.Entity,
