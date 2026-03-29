@@ -12,6 +12,13 @@ const SHOW_NOTIFICATION_MS = 800;
 
 const Self = @This();
 
+const State = enum {
+    player_turn,
+    update_target_after_player,
+    enemies_turn,
+    update_target_after_enemies,
+};
+
 pub const QuickActions = struct {
     // The actions which can be applied to the entity in focus
     actions: std.ArrayListUnmanaged(g.actions.Action) = .empty,
@@ -112,7 +119,7 @@ session: *g.GameSession,
 // The entity to which quick actions can be applied
 target: ?g.Entity = null,
 quick_actions: QuickActions,
-is_player_turn: bool = true,
+state: State = .player_turn,
 quick_actions_window: ?w.ModalWindow(w.OptionsArea(void)) = null,
 // If defined, then all input should be ignored.
 notification_to_show: ?NotificationMessage = null,
@@ -147,55 +154,65 @@ pub fn tick(self: *Self) !void {
     // and any input should be ignored
     if (try self.draw()) return;
 
-    if (self.is_player_turn) {
-        // break this function if no input
-        const action = (try self.handleInput()) orelse return;
-        const action_result = try self.doTurn(self.session.player, action, std.math.maxInt(g.MovePoints));
-        switch (action_result) {
-            .done => |success| {
-                // Force change the target
-                switch (success.actual_action) {
-                    .hit => |enemy| {
-                        self.setTarget(enemy);
-                    },
-                    .open => |door| {
-                        self.setTarget(door.id);
-                    },
-                    else => {},
-                }
-                // Update counters of unknown equipment
-                try self.session.journal.onTurnCompleted();
-                self.is_player_turn = false;
-            },
-            else => {},
-        }
-    } else {
-        var itr = self.session.registry.query(c.Initiative);
-        while (itr.next()) |tuple| {
-            const npc, const initiative = tuple;
-            // repeat doing something until move points are over
-            loop: while (true) {
-                // TODO: compare initiative with minimal required mp to prevent calculating an action
-                const action = self.session.ai.action(npc);
-                const action_result = try self.doTurn(npc, action, initiative.move_points);
-                switch (action_result) {
-                    .done => |success| {
-                        const mp = success.spent_move_points;
-                        g.utils.assert(
-                            mp <= initiative.move_points,
-                            "Entity {d} spent more MP {d} than initiative has {any}. Action was {any}",
-                            .{ npc.id, mp, initiative, success.actual_action },
-                        );
-                        initiative.move_points -= mp;
-                    },
-                    .not_enough_points, .actor_is_dead => break :loop,
-                    .declined => {},
+    switch (self.state) {
+        .player_turn => {
+            // break this function if no input
+            const action = (try self.handleInput()) orelse return;
+            const action_result = try self.doTurn(self.session.player, action, std.math.maxInt(g.MovePoints));
+            switch (action_result) {
+                .done => |success| {
+                    // Force change the target
+                    switch (success.actual_action) {
+                        .hit => |enemy| {
+                            self.setTarget(enemy);
+                        },
+                        .open => |door| {
+                            self.setTarget(door.id);
+                        },
+                        else => {},
+                    }
+                    // Update counters of unknown equipment
+                    try self.session.journal.onTurnCompleted();
+                    self.state = .update_target_after_player;
+                },
+                else => {},
+            }
+        },
+        .enemies_turn => {
+            var itr = self.session.registry.query(c.Initiative);
+            while (itr.next()) |tuple| {
+                const npc, const initiative = tuple;
+                // repeat doing something until move points are over
+                loop: while (true) {
+                    // TODO: compare initiative with minimal required mp to prevent calculating an action
+                    const action = self.session.ai.action(npc);
+                    const action_result = try self.doTurn(npc, action, initiative.move_points);
+                    switch (action_result) {
+                        .done => |success| {
+                            const mp = success.spent_move_points;
+                            g.utils.assert(
+                                mp <= initiative.move_points,
+                                "Entity {d} spent more MP {d} than initiative has {any}. Action was {any}",
+                                .{ npc.id, mp, initiative, success.actual_action },
+                            );
+                            initiative.move_points -= mp;
+                        },
+                        .not_enough_points, .actor_is_dead => break :loop,
+                        .declined => {},
+                    }
                 }
             }
-        }
-        self.is_player_turn = true;
+            self.state = .update_target_after_enemies;
+        },
+        .update_target_after_player => {
+            try self.updateQuickActions();
+            self.state = .enemies_turn;
+        },
+        .update_target_after_enemies => {
+            try self.updateQuickActions();
+            self.state = .player_turn;
+        },
     }
-    try self.updateQuickActions();
 }
 
 /// If returns true, then the input should be ignored
@@ -388,7 +405,7 @@ pub fn doTurn(
             log.info("Entity {d} spent {d} move points", .{ actor.id, mp });
 
             // Handle Initiative
-            if (self.is_player_turn and mp > 0) {
+            if (self.state == .player_turn and mp > 0) {
                 // Add initiative points to enemies
                 var itr = self.session.registry.query(c.Initiative);
                 while (itr.next()) |tuple| {

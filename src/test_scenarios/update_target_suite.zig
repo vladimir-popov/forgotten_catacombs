@@ -55,7 +55,6 @@ test "Lose target on moving away" {
 
     // Prepare a game session:
     try test_session.player.moveOnScreenTo(.{ .row = 4, .col = 18 });
-    try test_session.tick(.{});
     try test_session.runtime.display.expectLooksLike(
         \\######################################30
         \\####•••••••••••••#     #••••••••••••••••

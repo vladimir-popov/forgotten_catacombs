@@ -14,6 +14,9 @@ const space_symbol = '¶';
 pub const ComparingArea = union(enum) {
     whole_display,
     game_area,
+    /// The same as `.game_area`, but without the first line.
+    /// It can be more robust in cases when it's impossible to predict a hp count.
+    game_area_without_first_line,
     region: p.Region,
     line: u8,
     info_bar,
@@ -22,6 +25,7 @@ pub const ComparingArea = union(enum) {
         return switch (self) {
             .whole_display => p.Region.init(1, 1, g.DISPLAY_ROWS, g.DISPLAY_COLS),
             .game_area => p.Region.init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS),
+            .game_area_without_first_line => p.Region.init(2, 1, g.DISPLAY_ROWS - 3, g.DISPLAY_COLS),
             .region => |reg| reg,
             .line => |l| p.Region.init(l, 1, 1, g.DISPLAY_COLS),
             .info_bar => p.Region.init(g.DISPLAY_ROWS, 1, 1, g.DISPLAY_COLS),

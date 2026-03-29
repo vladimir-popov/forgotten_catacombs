@@ -106,21 +106,10 @@ pub const TickOptions = struct {
 /// and merges the last_frame into the display buffer.
 pub fn tick(self: *Self, opts: TickOptions) !void {
     for (0..opts.count) |_| {
-        try self.singleTick(opts.duration_ms);
-    }
-}
-
-fn singleTick(self: *Self, duration: u16) !void {
-    self.runtime.last_frame = .empty;
-    self.runtime.current_millis += duration;
-    try self.session.tick();
-    self.runtime.display.merge(self.runtime.last_frame);
-}
-
-pub fn completeRound(self: *Self) !void {
-    std.debug.assert(self.session.mode == .play);
-    while (!self.session.mode.play.is_player_turn) {
-        try self.tick(.{});
+        self.runtime.last_frame = .empty;
+        self.runtime.current_millis += opts.duration_ms;
+        try self.session.tick();
+        self.runtime.display.merge(self.runtime.last_frame);
     }
 }
 
@@ -128,13 +117,27 @@ pub fn printDisplay(self: Self) void {
     std.debug.print("{f}", .{std.fmt.alt(self.runtime.display, .ttyFormat)});
 }
 
+/// In Play mode it ticks until the state become `.player_turn`.
 /// Emulates pressing a button and ticks one time.
 /// Note, this method do not ticks until the next player's turn.
 /// Invoke explicitly `completeRound` between pressing buttons more than once.
 pub fn pressButton(self: *Self, button: g.Button.GameButton) !void {
     log.debug("Emulate pressing button {any}", .{button});
+    if (self.session.mode == .play) {
+        // complete unfinished turns of enemies
+        while (self.session.mode.play.state != .player_turn) {
+            try self.tick(.{});
+        }
+    }
     try self.runtime.pushed_buttons.append(self.arena.allocator(), .{ .game_button = button, .state = .released });
     try self.tick(.{ .duration_ms = 100 });
+}
+
+pub fn completeRound(self: *Self) !void {
+    std.debug.assert(self.session.mode == .play);
+    while (self.session.mode.play.state != .player_turn) {
+        try self.tick(.{});
+    }
 }
 
 pub fn openInventory(self: *Self) !Inventory {

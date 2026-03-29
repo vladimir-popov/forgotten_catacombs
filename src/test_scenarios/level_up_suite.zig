@@ -21,7 +21,6 @@ test "A notification should appear after killing an enemy and receiving enough e
 
     // Check a notification
     try test_session.runtime.display.expectLooksLike(
-        \\######################################30
         \\#•••••••••••••#     #••••••••••••••••••#
         \\#•••┌───┐•••••###+###•••••••••••┌───┐••#
         \\#•••│   +•••••••••••••••••••••••+   │••#
@@ -31,7 +30,7 @@ test "A notification should appear after killing an enemy and receiving enough e
         \\#•••└───┘•••••••Level up!••••••••••••••#
         \\~~~~~~~~~~~~~~~~~~~│@│~~~~~~~~~~~~~~~~~~
         \\~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    , .game_area);
+    , .game_area_without_first_line);
 }
 
 test "Level up should become available after killing an enemy and receiving enough exp" {
