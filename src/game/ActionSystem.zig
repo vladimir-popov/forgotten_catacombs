@@ -235,7 +235,7 @@ fn doMove(
     from_position: *c.Position,
     target: g.actions.Action.Move.Target,
 ) !void {
-    try self.session().events.sendEvent(.{
+    try self.session().sendEvent(.{
         .entity_moved = .{
             .entity = entity,
             .is_player = (entity.eql(self.session().player)),

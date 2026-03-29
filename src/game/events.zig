@@ -6,6 +6,23 @@ const p = g.primitives;
 
 const log = std.log.scoped(.events);
 
+pub const Event = union(enum) {
+    const Tag = @typeInfo(Event).@"union".tag_type.?;
+
+    level_changed: ChangingLevel,
+    entity_moved: EntityMoved,
+    entity_died: g.Entity,
+    mode_changed: ModeChanged,
+    player_turn_completed: PlayerTurnCompleted,
+
+    pub fn get(self: Event, comptime tag: Tag) ?@FieldType(Event, @tagName(tag)) {
+        switch (self) {
+            tag => |v| return v,
+            else => return null,
+        }
+    }
+};
+
 pub const ChangingLevel = struct {
     by_ladder: c.Ladder,
 };
@@ -38,106 +55,3 @@ pub const ModeChanged = union(enum) {
 pub const PlayerTurnCompleted = struct {
     spent_move_points: g.MovePoints,
 };
-
-pub const Event = union(enum) {
-    const Tag = @typeInfo(Event).@"union".tag_type.?;
-
-    level_changed: ChangingLevel,
-    entity_moved: EntityMoved,
-    entity_died: g.Entity,
-    mode_changed: ModeChanged,
-    player_turn_completed: PlayerTurnCompleted,
-
-    pub fn get(self: Event, comptime tag: Tag) ?@FieldType(Event, @tagName(tag)) {
-        switch (self) {
-            tag => |v| return v,
-            else => return null,
-        }
-    }
-};
-
-pub const Subscriber = struct {
-    context: *anyopaque,
-    onEvent: *const fn (ptr: *anyopaque, event: Event) anyerror!void,
-};
-
-pub const EventBus = struct {
-    const Ptr = usize;
-
-    arena: *std.heap.ArenaAllocator,
-    events: std.ArrayListUnmanaged(Event),
-    subscribers: std.AutoHashMapUnmanaged(Ptr, Subscriber),
-
-    pub fn init(arena: *std.heap.ArenaAllocator) EventBus {
-        return .{
-            .arena = arena,
-            .subscribers = .empty,
-            .events = .empty,
-        };
-    }
-
-    pub inline fn subscribe(self: *EventBus, subscriber: Subscriber) !void {
-        try self.subscribers.putNoClobber(self.arena.allocator(), @intFromPtr(subscriber.context), subscriber);
-    }
-
-    pub fn unsubscribe(self: *EventBus, subscriber_context: *anyopaque) bool {
-        return self.subscribers.remove(@intFromPtr(subscriber_context));
-    }
-
-    pub fn sendEvent(self: *EventBus, event: Event) !void {
-        log.debug("Event happened: {any}", .{event});
-        try self.events.append(self.arena.allocator(), event);
-    }
-
-    pub fn notifySubscribers(self: *EventBus) !void {
-        for (self.events.items) |event| {
-            var itr = self.subscribers.valueIterator();
-            while (itr.next()) |subscriber| {
-                try subscriber.onEvent(subscriber.context, event);
-            }
-            log.debug("Event handled: {any}", .{event});
-        }
-        self.events.clearRetainingCapacity();
-    }
-};
-
-test "publish/consume" {
-    // given:
-    const TestSubscriber = struct {
-        event: ?Event = null,
-
-        pub fn subscriber(self: *@This()) Subscriber {
-            return .{ .context = self, .onEvent = rememberEvent };
-        }
-        fn rememberEvent(ptr: *anyopaque, event: Event) anyerror!void {
-            const self: *@This() = @ptrCast(@alignCast(ptr));
-            self.event = event;
-        }
-    };
-    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer arena.deinit();
-
-    var bus: EventBus = EventBus.init(&arena);
-    var subscriber = TestSubscriber{};
-    const event = Event{
-        .entity_moved = .{
-            .entity = .{ .id = 1 },
-            .is_player = true,
-            .moved_from = .{ .row = 1, .col = 1 },
-            .target = .{ .new_place = .{ .row = 1, .col = 2 } },
-        },
-    };
-
-    // when:
-    try bus.subscribe(subscriber.subscriber());
-    try bus.sendEvent(event);
-
-    // then:
-    try std.testing.expectEqual(null, subscriber.event);
-
-    // when:
-    try bus.notifySubscribers();
-
-    // then:
-    try std.testing.expectEqualDeep(event, subscriber.event);
-}

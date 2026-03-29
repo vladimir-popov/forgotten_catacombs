@@ -394,7 +394,7 @@ pub fn doTurn(
                 while (itr.next()) |tuple| {
                     tuple[1].move_points += mp;
                 }
-                try self.session.events.sendEvent(.{ .player_turn_completed = .{ .spent_move_points = mp } });
+                try self.session.sendEvent(.{ .player_turn_completed = .{ .spent_move_points = mp } });
             }
         },
         .actor_is_dead => {
@@ -483,15 +483,16 @@ fn quickAction(self: Self) g.actions.Action {
 /// Recalculates the list of available quick actions applicable to the target.
 pub fn updateQuickActions(self: *Self) anyerror!void {
     defer {
-        log.debug(
-            "{d} quick actions after update:\n{any}\nThe selected action is {any}\nThe target is {any}",
-            .{
-                self.quick_actions.actions.items.len,
-                g.utils.toStringWithListOf(self.quick_actions.actions.items),
-                self.quickAction(),
-                self.target,
-            },
-        );
+        if (g.utils.isDebug())
+            log.debug(
+                "{d} quick actions after update:\n{any}\nThe selected action is {any}\nThe target is {any}",
+                .{
+                    self.quick_actions.actions.items.len,
+                    g.utils.toStringWithListOf(self.quick_actions.actions.items),
+                    self.quickAction(),
+                    self.target,
+                },
+            );
     }
 
     const alloc = self.arena.allocator();

@@ -63,7 +63,7 @@ registry: g.Registry,
 ///
 journal: g.Journal,
 ///
-events: g.events.EventBus,
+events: std.ArrayListUnmanaged(g.events.Event),
 player: g.Entity,
 /// The current level
 level: g.Level,
@@ -106,7 +106,7 @@ pub fn preInit(
         .render = render,
         .viewport = g.Viewport.init(render.scene_rows, render.scene_cols),
         .registry = try g.Registry.init(self.arena.allocator()),
-        .events = g.events.EventBus.init(&self.arena),
+        .events = .empty,
         .seed = 0,
         .max_depth = 0,
         .spent_turns = 0,
@@ -129,8 +129,6 @@ pub fn preInit(
 ///  - switches the game session to the `play` mode.
 pub fn completeInitialization(self: *Self) !void {
     self.journal = try g.Journal.init(self.arena.allocator(), &self.registry, self.seed);
-    try self.events.subscribe(self.viewport.subscriber());
-    try self.events.subscribe(self.subscriber());
     self.viewport.centeredAround(self.level.playerPosition().place);
     log.debug(
         "The game session is completely initialized. Seed {d}; Max depth {d}; Player id {d}",
@@ -206,9 +204,13 @@ pub fn switchModeToSavingSession(self: *Self) void {
 ///  - `action` - an action to perform; Usually an action initiated during managing the inventory.
 pub fn continuePlay(self: *Self, entity_in_focus: ?g.Entity, action: ?g.actions.Action) !void {
     log.debug("Continue playing with entity_in_focus {any}, action {any}", .{ entity_in_focus, action });
-    try self.events.sendEvent(
+    try self.sendEvent(
         .{ .mode_changed = .{ .to_play = .{ .entity_in_focus = entity_in_focus, .action = action } } },
     );
+}
+
+pub inline fn sendEvent(self: *Self, event: g.events.Event) !void {
+    try self.events.append(self.arena.allocator(), event);
 }
 
 // should not be invoked outside. `continuePlay` should be used instead
@@ -220,31 +222,31 @@ fn switchModeToPlay(self: *Self, entity_in_focus: ?g.Entity) !void {
 }
 
 pub fn explore(self: *Self) !void {
-    try self.events.sendEvent(.{ .mode_changed = .to_explore });
+    try self.sendEvent(.{ .mode_changed = .to_explore });
 }
 
 pub fn lookAround(self: *Self) !void {
-    try self.events.sendEvent(.{ .mode_changed = .to_looking_around });
+    try self.sendEvent(.{ .mode_changed = .to_looking_around });
 }
 
 pub fn levelUp(self: *Self) !void {
-    try self.events.sendEvent(.{ .mode_changed = .to_level_up });
+    try self.sendEvent(.{ .mode_changed = .to_level_up });
 }
 
 pub fn manageInventory(self: *Self) !void {
-    try self.events.sendEvent(.{ .mode_changed = .to_inventory });
+    try self.sendEvent(.{ .mode_changed = .to_inventory });
 }
 
 pub fn modifyRecognize(self: *Self) !void {
-    try self.events.sendEvent(.{ .mode_changed = .to_modify_recognize });
+    try self.sendEvent(.{ .mode_changed = .to_modify_recognize });
 }
 
 pub fn trade(self: *Self, shop: *c.Shop) !void {
-    try self.events.sendEvent(.{ .mode_changed = .{ .to_trading = shop } });
+    try self.sendEvent(.{ .mode_changed = .{ .to_trading = shop } });
 }
 
 pub fn movePlayerToLevel(self: *Self, by_ladder: c.Ladder) !void {
-    try self.events.sendEvent(.{ .level_changed = .{ .by_ladder = by_ladder } });
+    try self.sendEvent(.{ .level_changed = .{ .by_ladder = by_ladder } });
 }
 
 pub fn removeEntity(self: *Self, entity: g.Entity) !void {
@@ -262,13 +264,54 @@ pub fn removeDeadEntity(self: *Self, entity: g.Entity) !void {
         log.debug("NPC {d} is dead", .{entity.id});
         // Handle death and remove the entity here, within the current tick
         try self.removeEntity(entity);
-        try self.events.sendEvent(.{ .entity_died = entity });
+        try self.sendEvent(.{ .entity_died = entity });
     }
 }
 
+pub fn playerMovedToLevel(self: *Self) !void {
+    self.max_depth = @max(self.max_depth, self.level.depth);
+    self.viewport.centeredAround(self.level.playerPosition().place);
+    try self.switchModeToPlay(null);
+    const event = g.events.Event{
+        .entity_moved = .{
+            .entity = self.player,
+            .is_player = true,
+            .moved_from = g.primitives.Point.init(0, 0),
+            .target = .{ .new_place = self.level.playerPosition().place },
+        },
+    };
+    try self.sendEvent(event);
+}
+
+pub fn subscriber(self: *Self) g.events.Subscriber {
+    return .{ .context = self, .onEvent = handleEvent };
+}
+
+pub fn notify(self: *Self, notification: g.notifications.Notification) !void {
+    log.info("Notification: {any}", .{notification});
+    try self.notifications.pushBack(self.arena.allocator(), notification);
+}
+
+pub fn tick(self: *Self) !void {
+    switch (self.mode) {
+        .explore => try self.mode.explore.tick(),
+        .explore_level => try self.mode.explore_level.tick(),
+        .inventory => try self.mode.inventory.tick(),
+        .level_up => try self.mode.level_up.tick(),
+        .modify_recognize => try self.mode.modify_recognize.tick(),
+        .play => try self.mode.play.tick(),
+        .save_load => try self.mode.save_load.tick(),
+        .trading => try self.mode.trading.tick(),
+    }
+    for (self.events.items) |event| {
+        try self.handleEvent(event);
+        log.debug("Event handled: {any}", .{event});
+    }
+    self.events.clearRetainingCapacity();
+}
+
 /// Handles events on the end of the `tick`
-fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
-    const self: *Self = @ptrCast(@alignCast(ptr));
+fn handleEvent(self: *Self, event: g.events.Event) !void {
     switch (event) {
         .player_turn_completed => {
             self.spent_move_points += event.player_turn_completed.spent_move_points;
@@ -330,47 +373,10 @@ fn handleEvent(ptr: *anyopaque, event: g.events.Event) !void {
             if (entity_moved.entity.id == self.player.id) {
                 try self.level.onPlayerMoved(entity_moved);
             }
+            try self.viewport.onEntityMoved(entity_moved);
         },
         .entity_died => |entity| {
             log.debug("The enemy {d} has died", .{entity.id});
         },
     }
-}
-
-pub fn playerMovedToLevel(self: *Self) !void {
-    self.max_depth = @max(self.max_depth, self.level.depth);
-    self.viewport.centeredAround(self.level.playerPosition().place);
-    try self.switchModeToPlay(null);
-    const event = g.events.Event{
-        .entity_moved = .{
-            .entity = self.player,
-            .is_player = true,
-            .moved_from = g.primitives.Point.init(0, 0),
-            .target = .{ .new_place = self.level.playerPosition().place },
-        },
-    };
-    try self.events.sendEvent(event);
-}
-
-pub fn subscriber(self: *Self) g.events.Subscriber {
-    return .{ .context = self, .onEvent = handleEvent };
-}
-
-pub fn notify(self: *Self, notification: g.notifications.Notification) !void {
-    log.info("Notification: {any}", .{notification});
-    try self.notifications.pushBack(self.arena.allocator(), notification);
-}
-
-pub fn tick(self: *Self) !void {
-    switch (self.mode) {
-        .explore => try self.mode.explore.tick(),
-        .explore_level => try self.mode.explore_level.tick(),
-        .inventory => try self.mode.inventory.tick(),
-        .level_up => try self.mode.level_up.tick(),
-        .modify_recognize => try self.mode.modify_recognize.tick(),
-        .play => try self.mode.play.tick(),
-        .save_load => try self.mode.save_load.tick(),
-        .trading => try self.mode.trading.tick(),
-    }
-    try self.events.notifySubscribers();
 }

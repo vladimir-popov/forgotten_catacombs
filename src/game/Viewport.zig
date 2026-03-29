@@ -23,15 +23,8 @@ pub fn init(rows: u8, cols: u8) Viewport {
     };
 }
 
-pub fn subscriber(self: *Viewport) g.events.Subscriber {
-    return .{ .context = self, .onEvent = onEntityMoved };
-}
-
-fn onEntityMoved(ptr: *anyopaque, event: g.events.Event) !void {
-    if (event.get(.entity_moved) == null) return;
-    if (!event.entity_moved.is_player) return;
-    const self: *Viewport = @ptrCast(@alignCast(ptr));
-    const entity_moved = event.entity_moved;
+pub fn onEntityMoved(self: *Viewport, entity_moved: g.events.EntityMoved) !void {
+    if (!entity_moved.is_player) return;
 
     // keep player on the screen:
     switch (entity_moved.target) {
