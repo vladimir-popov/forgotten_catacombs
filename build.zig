@@ -147,7 +147,10 @@ pub fn build(b: *std.Build) !void {
         const pdc_path = b.pathJoin(&.{ playdate_sdk_path, "bin", if (native_os_tag == .windows) "pdc.exe" else "pdc" });
         const pd_simulator_path = switch (native_os_tag) {
             .linux => b.pathJoin(&.{ playdate_sdk_path, "bin", "PlaydateSimulator" }),
-            .macos => "open", // `open` focuses the window, while running the simulator directry doesn't.
+            // .macos => "open", // `open` focuses the window, while running the simulator directry doesn't.
+            .macos => b.pathJoin(
+                &.{ playdate_sdk_path, "bin", "Playdate Simulator.app", "Contents", "MacOS", "Playdate Simulator" },
+            ),
             .windows => b.pathJoin(&.{ playdate_sdk_path, "bin", "PlaydateSimulator.exe" }),
             else => @panic("Unsupported OS"),
         };
