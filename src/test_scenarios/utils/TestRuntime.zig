@@ -66,7 +66,7 @@ fn currentMillis(ptr: *anyopaque) u64 {
 
 fn addMenuItem(
     ptr: *anyopaque,
-    title: []const u8,
+    title: [:0]const u8,
     game_object: *anyopaque,
     callback: g.Runtime.MenuItemCallback,
 ) ?*anyopaque {

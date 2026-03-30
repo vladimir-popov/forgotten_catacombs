@@ -18,7 +18,7 @@ const VTable = struct {
     cleanInputBuffer: *const fn (context: *anyopaque) anyerror!void,
     addMenuItem: *const fn (
         context: *anyopaque,
-        title: []const u8,
+        title: [:0]const u8,
         game_object: *anyopaque,
         callback: MenuItemCallback,
     ) ?*anyopaque,
@@ -61,7 +61,7 @@ pub inline fn currentMillis(self: Runtime) u64 {
 
 pub inline fn addMenuItem(
     self: Runtime,
-    title: []const u8,
+    title: [:0]const u8,
     game_object: *anyopaque,
     callback: MenuItemCallback,
 ) ?*anyopaque {

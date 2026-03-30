@@ -93,12 +93,12 @@ fn currentMillis(ptr: *anyopaque) u64 {
 
 fn addMenuItem(
     ptr: *anyopaque,
-    title: []const u8,
+    title: [:0]const u8,
     game_object: *anyopaque,
     callback: g.Runtime.MenuItemCallback,
 ) ?*anyopaque {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    return self.playdate.system.addMenuItem(title[0.. :0], callback, game_object).?;
+    return self.playdate.system.addMenuItem(title, callback, game_object).?;
 }
 
 fn removeAllMenuItems(ptr: *anyopaque) void {

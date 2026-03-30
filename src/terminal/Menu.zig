@@ -8,7 +8,7 @@ const log = std.log.scoped(.tty_menu);
 const DisplayBuffer = @import("DisplayBuffer.zig").DisplayBuffer;
 
 const Item = struct {
-    title: []const u8,
+    title: [:0]const u8,
     game_object: *anyopaque,
     callback: g.Runtime.MenuItemCallback,
 };
@@ -83,7 +83,7 @@ pub fn Menu(comptime ROWS: u8, comptime COLS: u8) type {
 
         pub fn addMenuItem(
             self: *Self,
-            title: []const u8,
+            title: [:0]const u8,
             game_object: *anyopaque,
             callback: g.Runtime.MenuItemCallback,
         ) ?*anyopaque {
