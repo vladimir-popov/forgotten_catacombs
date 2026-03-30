@@ -27,7 +27,7 @@ pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
     self.lines.deinit(alloc);
 }
 
-pub fn totalLines(self: Self) usize {
+pub fn totalLines(self: *const Self) usize {
     return self.lines.items.len;
 }
 
@@ -69,7 +69,7 @@ pub fn draw(self: *const Self, render: g.Render, region: p.Region, scrolled: usi
     }
 }
 
-pub fn write(self: Self, writer: *std.Io.Writer) !void {
+pub fn write(self: *const Self, writer: *std.Io.Writer) !void {
     for (self.lines.items) |line| {
         try writer.writeAll(&line);
         try writer.writeByte('\n');

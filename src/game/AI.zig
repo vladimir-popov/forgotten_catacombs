@@ -5,7 +5,7 @@ const p = g.primitives;
 
 const log = std.log.scoped(.ai);
 
-const AI = @This();
+const Self = @This();
 
 session: *const g.GameSession,
 rand: std.Random,
@@ -13,7 +13,7 @@ rand: std.Random,
 /// Calculates the next action for the entity.
 /// Do not mutate anything, only creates an action.
 pub fn action(
-    self: AI,
+    self: *const Self,
     npc: g.Entity,
 ) g.actions.Action {
     const npc_place = self.session.registry.getUnsafe(npc, c.Position).place;
@@ -30,7 +30,7 @@ pub fn action(
 }
 
 fn actionForSleepingEnemy(
-    self: AI,
+    self: *const Self,
     entity: g.Entity,
     entity_place: p.Point,
     player_place: p.Point,
@@ -44,7 +44,7 @@ fn actionForSleepingEnemy(
 }
 
 fn actionForWalkingEnemy(
-    self: AI,
+    self: *const Self,
     entity: g.Entity,
     entity_place: p.Point,
     player_place: p.Point,
@@ -69,7 +69,7 @@ fn actionForWalkingEnemy(
 }
 
 fn actionForAggressiveEnemy(
-    self: AI,
+    self: *const Self,
     entity: g.Entity,
     entity_place: p.Point,
     player_place: p.Point,
@@ -90,7 +90,7 @@ fn actionForAggressiveEnemy(
     }
 }
 
-fn isPlayerIsInSight(self: AI, entity_place: p.Point) bool {
+fn isPlayerIsInSight(self: *const Self, entity_place: p.Point) bool {
     return if (self.session.level.dijkstra_map.get(entity_place)) |vector|
         vector.distance > 0
     else

@@ -145,7 +145,7 @@ pub fn init(
     );
 }
 
-pub fn deinit(self: Self) void {
+pub fn deinit(self: *const Self) void {
     self.arena.deinit();
 }
 
@@ -255,7 +255,7 @@ fn draw(self: *Self) !bool {
 /// Draws a single frame from every animation.
 /// Removes the animation if the last frame was drawn.
 /// Returns true if any animation is blocked.
-pub fn drawAnimationsFramesToBuffer(self: Self) !bool {
+pub fn drawAnimationsFramesToBuffer(self: *const Self) !bool {
     const now: u64 = self.session.runtime.currentMillis();
     var was_blocked_animation: bool = false;
     var itr = self.session.level.registry.query2(c.Position, c.Animation);
@@ -491,7 +491,7 @@ fn drawInfoBar(self: *const Self) !void {
     }
 }
 
-fn quickAction(self: Self) g.actions.Action {
+inline fn quickAction(self: *const Self) g.actions.Action {
     if (self.quick_actions.actions.items.len > 0)
         return self.quick_actions.actions.items[self.quick_actions.selected_idx]
     else

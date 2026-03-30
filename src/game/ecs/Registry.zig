@@ -79,7 +79,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
             return entity;
         }
 
-        pub fn has(self: Self, entity: Entity, comptime C: type) bool {
+        pub fn has(self: *const Self, entity: Entity, comptime C: type) bool {
             return @field(self.components_map, @typeName(C)).existsForEntity(entity);
         }
 
@@ -94,11 +94,11 @@ pub fn Registry(comptime ComponentsStruct: type) type {
         }
 
         /// Returns the pointer to the component for the entity, if it was added before, or null.
-        pub fn get(self: Self, entity: Entity, comptime C: type) ?*C {
+        pub fn get(self: *const Self, entity: Entity, comptime C: type) ?*C {
             return @field(self.components_map, @typeName(C)).getForEntity(entity);
         }
 
-        pub fn getUnsafe(self: Self, entity: Entity, comptime C: type) *C {
+        pub fn getUnsafe(self: *const Self, entity: Entity, comptime C: type) *C {
             return get(self, entity, C) orelse std.debug.panic(
                 "Entity {d} doesn't have component {any}\n{any}",
                 .{ entity.id, C, self.entityToStruct(entity) },
@@ -109,7 +109,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
             return try @field(self.components_map, @typeName(C)).getOrSetForEntity(self.allocator(), entity, default);
         }
 
-        pub fn get2(self: Self, entity: Entity, comptime C1: type, comptime C2: type) ?struct { *C1, *C2 } {
+        pub fn get2(self: *const Self, entity: Entity, comptime C1: type, comptime C2: type) ?struct { *C1, *C2 } {
             if (self.get(entity, C1)) |c1| {
                 if (self.get(entity, C2)) |c2| {
                     return .{ c1, c2 };
@@ -136,7 +136,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
         }
 
         pub fn get4(
-            self: Self,
+            self: *const Self,
             entity: Entity,
             comptime C1: type,
             comptime C2: type,
@@ -156,7 +156,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
         }
 
         pub fn get5(
-            self: Self,
+            self: *const Self,
             entity: Entity,
             comptime C1: type,
             comptime C2: type,
@@ -179,7 +179,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
         }
 
         pub fn get6(
-            self: Self,
+            self: *const Self,
             entity: Entity,
             comptime C1: type,
             comptime C2: type,
@@ -204,19 +204,19 @@ pub fn Registry(comptime ComponentsStruct: type) type {
             return null;
         }
 
-        pub fn query(self: Self, comptime C: type) ArraySet(C).Iterator {
+        pub fn query(self: *const Self, comptime C: type) ArraySet(C).Iterator {
             return @field(self.components_map, @typeName(C)).iterator();
         }
 
         pub fn Iterator2(comptime C1: type, C2: type) type {
             return struct {
-                manager: Self,
+                registry: *const Self,
                 main_iterator: ArraySet(C1).Iterator,
 
                 pub fn next(self: *@This()) ?struct { Entity, *C1, *C2 } {
                     while (self.main_iterator.next()) |tuple| {
                         const entity: Entity, const c1: *C1 = tuple;
-                        if (self.manager.get(entity, C2)) |c2|
+                        if (self.registry.get(entity, C2)) |c2|
                             return .{ entity, c1, c2 };
                     }
                     return null;
@@ -224,22 +224,22 @@ pub fn Registry(comptime ComponentsStruct: type) type {
             };
         }
 
-        pub fn query2(self: Self, comptime C1: type, C2: type) Iterator2(C1, C2) {
+        pub fn query2(self: *const Self, comptime C1: type, C2: type) Iterator2(C1, C2) {
             return .{
-                .manager = self,
+                .registry = self,
                 .main_iterator = @field(self.components_map, @typeName(C1)).iterator(),
             };
         }
 
         pub fn Iterator3(comptime C1: type, C2: type, C3: type) type {
             return struct {
-                manager: Self,
+                registry: *const Self,
                 main_iterator: ArraySet(C1).Iterator,
 
                 pub fn next(self: *@This()) ?struct { Entity, *C1, *C2, *C3 } {
                     while (self.main_iterator.next()) |tuple| {
                         const entity: Entity, const c1: *C1 = tuple;
-                        if (self.manager.get2(entity, C2, C3)) |cc|
+                        if (self.registry.get2(entity, C2, C3)) |cc|
                             return .{ entity, c1, cc[0], cc[1] };
                     }
                     return null;
@@ -247,22 +247,22 @@ pub fn Registry(comptime ComponentsStruct: type) type {
             };
         }
 
-        pub fn query3(self: Self, comptime C1: type, C2: type, C3: type) Iterator3(C1, C2, C3) {
+        pub fn query3(self: *const Self, comptime C1: type, C2: type, C3: type) Iterator3(C1, C2, C3) {
             return .{
-                .manager = self,
+                .registry = self,
                 .main_iterator = @field(self.components_map, @typeName(C1)).iterator(),
             };
         }
 
         pub fn Iterator4(comptime C1: type, C2: type, C3: type, C4: type) type {
             return struct {
-                manager: Self,
+                registry: *const Self,
                 main_iterator: ArraySet(C1).Iterator,
 
                 pub fn next(self: *@This()) ?struct { Entity, *C1, *C2, *C3, *C4 } {
                     while (self.main_iterator.next()) |tuple| {
                         const entity: Entity, const c1: *C1 = tuple;
-                        if (self.manager.get3(entity, C2, C3, C4)) |cc|
+                        if (self.registry.get3(entity, C2, C3, C4)) |cc|
                             return .{ entity, c1, cc[0], cc[1], cc[2] };
                     }
                     return null;
@@ -270,9 +270,9 @@ pub fn Registry(comptime ComponentsStruct: type) type {
             };
         }
 
-        pub fn query4(self: Self, comptime C1: type, C2: type, C3: type, C4: type) Iterator4(C1, C2, C3, C4) {
+        pub fn query4(self: *const Self, comptime C1: type, C2: type, C3: type, C4: type) Iterator4(C1, C2, C3, C4) {
             return .{
-                .manager = self,
+                .registry = self,
                 .main_iterator = @field(self.components_map, @typeName(C1)).iterator(),
             };
         }
@@ -296,7 +296,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
 
         /// Takes all components for the entity and set them to the appropriate
         /// fields of the `ComponentsStruct`.
-        pub fn entityToStruct(self: Self, entity: Entity) !ComponentsStruct {
+        pub fn entityToStruct(self: *const Self, entity: Entity) !ComponentsStruct {
             var has_at_least_one_component: bool = false;
             var structure: ComponentsStruct = undefined;
             inline for (@typeInfo(ComponentsStruct).@"struct".fields) |field| {

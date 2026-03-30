@@ -221,35 +221,35 @@ fn switchModeToPlay(self: *Self, entity_in_focus: ?g.Entity) !void {
     try self.mode.play.init(self.arena.allocator(), self, entity_in_focus);
 }
 
-pub fn explore(self: *Self) !void {
+pub inline fn explore(self: *Self) !void {
     try self.sendEvent(.{ .mode_changed = .to_explore });
 }
 
-pub fn lookAround(self: *Self) !void {
+pub inline fn lookAround(self: *Self) !void {
     try self.sendEvent(.{ .mode_changed = .to_looking_around });
 }
 
-pub fn levelUp(self: *Self) !void {
+pub inline fn levelUp(self: *Self) !void {
     try self.sendEvent(.{ .mode_changed = .to_level_up });
 }
 
-pub fn manageInventory(self: *Self) !void {
+pub inline fn manageInventory(self: *Self) !void {
     try self.sendEvent(.{ .mode_changed = .to_inventory });
 }
 
-pub fn modifyRecognize(self: *Self) !void {
+pub inline fn modifyRecognize(self: *Self) !void {
     try self.sendEvent(.{ .mode_changed = .to_modify_recognize });
 }
 
-pub fn trade(self: *Self, shop: *c.Shop) !void {
+pub inline fn trade(self: *Self, shop: *c.Shop) !void {
     try self.sendEvent(.{ .mode_changed = .{ .to_trading = shop } });
 }
 
-pub fn movePlayerToLevel(self: *Self, by_ladder: c.Ladder) !void {
+pub inline fn movePlayerToLevel(self: *Self, by_ladder: c.Ladder) !void {
     try self.sendEvent(.{ .level_changed = .{ .by_ladder = by_ladder } });
 }
 
-pub fn removeEntity(self: *Self, entity: g.Entity) !void {
+pub inline fn removeEntity(self: *Self, entity: g.Entity) !void {
     try self.registry.removeEntity(entity);
     try self.level.removeEntity(entity);
 }

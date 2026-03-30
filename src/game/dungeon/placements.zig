@@ -148,7 +148,7 @@ pub const Area = struct {
 
     /// Returns true if the place is inside the area or on its border, but not
     /// inside the inner rooms.
-    pub fn contains(self: Area, place: p.Point) bool {
+    pub fn contains(self: *const Area, place: p.Point) bool {
         if (!self.region.containsPoint(place)) return false;
         var itr = self.inner_rooms.constIterator(0);
         while (itr.next()) |ir| {
@@ -158,7 +158,7 @@ pub const Area = struct {
     }
 
     /// Returns true if the place is inside one of the inner room of the area.
-    pub fn isInsideInnerRoom(self: Area, place: p.Point) bool {
+    pub fn isInsideInnerRoom(self: *const Area, place: p.Point) bool {
         var itr = self.inner_rooms.constIterator(0);
         while (itr.next()) |ir| {
             if (ir.innerRegion().containsPoint(place)) return true;
@@ -167,7 +167,7 @@ pub const Area = struct {
     }
 
     // TODO: should not return places from the inner rooms
-    pub fn randomPlace(self: Area, rand: std.Random) p.Point {
+    pub fn randomPlace(self: *const Area, rand: std.Random) p.Point {
         return .{
             .row = self.region.top_left.row + rand.uintLessThan(u8, self.region.rows - 2) + 1,
             .col = self.region.top_left.col + rand.uintLessThan(u8, self.region.cols - 2) + 1,

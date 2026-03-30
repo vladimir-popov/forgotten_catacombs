@@ -330,9 +330,11 @@ fn generateDungeon(arena: *std.heap.ArenaAllocator, depth: u8, seed: u64) !?d.Du
         try d.Catacomb.generateDungeon(arena, .{}, seed);
 }
 
-pub fn isVisited(self: Self, place: p.Point) bool {
-    if (place.row > self.dungeon.rows or place.col > self.dungeon.cols) return false;
-    return self.visited_places[place.row - 1].isSet(place.col - 1);
+pub inline fn isVisited(self: *const Self, place: p.Point) bool {
+    return if (place.row > self.dungeon.rows or place.col > self.dungeon.cols)
+        false
+    else
+        self.visited_places[place.row - 1].isSet(place.col - 1);
 }
 
 pub fn addVisitedPlace(self: *Self, visited_place: p.Point) !void {
@@ -416,7 +418,7 @@ pub inline fn playerPosition(self: *const Self) *c.Position {
     return self.registry.getUnsafe(self.player, c.Position);
 }
 
-pub fn randomEmptyPlace(self: Self, rand: std.Random) ?p.Point {
+pub fn randomEmptyPlace(self: *const Self, rand: std.Random) ?p.Point {
     var attempt: u8 = 10;
     while (attempt > 0) : (attempt -= 1) {
         const place = self.dungeon.randomPlace(rand);
@@ -428,7 +430,7 @@ pub fn randomEmptyPlace(self: Self, rand: std.Random) ?p.Point {
     return null;
 }
 
-pub fn isObstaclesOnTheLine(self: Self, from: p.Point, to: p.Point) bool {
+pub fn isObstaclesOnTheLine(self: *const Self, from: p.Point, to: p.Point) bool {
     var itr = g.utils.Bresenham.init(from, to);
     while (itr.next()) |place| {
         if (self.isObstacle(place)) return true;
@@ -470,7 +472,7 @@ pub fn isObstacle(self: *const Self, place: p.Point) bool {
 ///       1 - trap
 ///       2 - any dropped items;
 ///       3 - player, enemies, npc, closed doors;
-pub fn cellAt(self: Self, place: p.Point) Cell {
+pub fn cellAt(self: *const Self, place: p.Point) Cell {
     const landscape = switch (self.dungeon.cellAt(place)) {
         .floor, .doorway => |cl| cl,
         else => |cl| return .{ .landscape = cl },
@@ -511,7 +513,7 @@ pub fn tryToPutItem(self: *Self, item: g.Entity, place: p.Point) !bool {
 }
 
 // OPTIMIZE IT
-pub fn itemAt(self: Self, place: p.Point) ?g.Entity {
+pub fn itemAt(self: *const Self, place: p.Point) ?g.Entity {
     switch (self.dungeon.cellAt(place)) {
         .floor, .doorway => {},
         else => return null,

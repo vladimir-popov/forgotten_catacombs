@@ -144,7 +144,7 @@ fn drawSprite(ptr: *anyopaque, codepoint: g.Codepoint, position_on_display: p.Po
     self.playdate.graphics.drawBitmap(self.getBitmap(codepoint), x, y, .BitmapUnflipped);
 }
 
-fn getBitmap(self: Self, codepoint: g.Codepoint) *api.LCDBitmap {
+fn getBitmap(self: *const Self, codepoint: g.Codepoint) *api.LCDBitmap {
     const idx = getCodepointIdx(codepoint);
     return self.playdate.graphics.getTableBitmap(self.bitmap_table, idx) orelse {
         std.debug.panic("Wrong index {d} for codepoint {d}", .{ idx, codepoint });

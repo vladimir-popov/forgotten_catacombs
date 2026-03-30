@@ -23,17 +23,17 @@ pub fn ScrollableArea(comptime Area: type) type {
             self.content.deinit(alloc);
         }
 
-        pub fn isScrollRequired(self: Self) bool {
+        pub fn isScrollRequired(self: *const Self) bool {
             return self.content.totalLines() > self.region.rows;
         }
 
-        fn maxScrollingCount(self: Self) usize {
+        fn maxScrollingCount(self: *const Self) usize {
             return self.content.totalLines() -| (self.region.rows);
         }
 
         /// Returns a label for the right button handled by the content,
         /// or null if the content doesn't handle the right button.
-        pub fn button(self: Self) ?struct { []const u8, bool } {
+        pub fn button(self: *const Self) ?struct { []const u8, bool } {
             return self.content.button();
         }
 

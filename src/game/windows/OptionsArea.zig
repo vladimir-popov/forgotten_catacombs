@@ -76,17 +76,17 @@ pub fn OptionsArea(comptime Item: type) type {
             self.selected_line = 0;
         }
 
-        pub fn totalLines(self: Self) usize {
+        pub fn totalLines(self: *const Self) usize {
             return self.options.items.len;
         }
 
-        pub fn selectedLine(self: Self) ?usize {
+        pub fn selectedLine(self: *const Self) ?usize {
             return self.selected_line;
         }
 
         /// Returns a button to choose the selected option.
         /// Returned button is used to draw its label.
-        pub fn button(self: Self) ?struct { []const u8, bool } {
+        pub fn button(self: *const Self) ?struct { []const u8, bool } {
             if (self.options.items.len > 0) {
                 const option = self.options.items[self.selected_line];
                 return .{ "Choose", option.onHoldButtonFn != null };
@@ -172,11 +172,11 @@ pub fn OptionsArea(comptime Item: type) type {
                 self.selected_line += 1;
         }
 
-        pub fn selectedOption(self: Self) *Option {
+        pub inline fn selectedOption(self: *const Self) *Option {
             return &self.options.items[self.selected_line];
         }
 
-        pub fn selectedItem(self: Self) Item {
+        pub inline fn selectedItem(self: *const Self) Item {
             return self.options.items[self.selected_line].item;
         }
 

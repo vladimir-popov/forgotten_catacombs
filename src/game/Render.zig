@@ -41,7 +41,7 @@ pub const Visibility = enum { visible, known, invisible };
 // this should be used to erase a symbol
 pub const default_filler = ' ';
 
-const Render = @This();
+const Self = @This();
 
 arena: std.heap.ArenaAllocator,
 runtime: g.Runtime,
@@ -51,7 +51,7 @@ scene_rows: u8,
 scene_cols: u8,
 
 pub fn init(
-    self: *Render,
+    self: *Self,
     gpa: std.mem.Allocator,
     runtime: g.Runtime,
     display_rows: u8,
@@ -67,19 +67,19 @@ pub fn init(
     try self.scene_buffer.init(&self.arena, self.scene_rows, self.scene_cols);
 }
 
-pub fn deinit(self: *Render) void {
+pub fn deinit(self: *Self) void {
     self.arena.deinit();
 }
 
 /// Draws the dungeon and visible sprites on the screen.
-pub fn drawScene(self: Render, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
+pub fn drawScene(self: *const Self, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
     const level = &session.level;
     try self.drawDungeonToBuffer(session.viewport, level);
     try self.drawEntitiesToBuffer(session.viewport, &session.journal, session.prng.random(), level, entity_in_focus);
     try self.drawChangedSymbols();
 }
 
-pub fn fillRegion(self: Render, symbol: u21, mode: g.DrawingMode, region: p.Region) !void {
+pub fn fillRegion(self: *const Self, symbol: u21, mode: g.DrawingMode, region: p.Region) !void {
     var itr = region.cells();
     while (itr.next()) |cell| {
         try self.runtime.drawSprite(symbol, cell, mode);
@@ -87,12 +87,12 @@ pub fn fillRegion(self: Render, symbol: u21, mode: g.DrawingMode, region: p.Regi
 }
 
 /// Clears both scene and info bar. Resets the inner buffer.
-pub fn clearDisplay(self: Render) !void {
+pub fn clearDisplay(self: *const Self) !void {
     self.scene_buffer.reset();
     try self.runtime.clearDisplay();
 }
 
-pub fn drawDungeonToBuffer(self: Render, viewport: g.Viewport, level: *g.Level) anyerror!void {
+pub fn drawDungeonToBuffer(self: *const Self, viewport: g.Viewport, level: *g.Level) anyerror!void {
     var itr = level.dungeon.cellsInRegion(viewport.region);
     var place = viewport.region.top_left;
     while (itr.next()) |cell| {
@@ -128,7 +128,7 @@ fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order
 }
 /// Draw entities inside the screen
 pub fn drawEntitiesToBuffer(
-    self: Render,
+    self: *const Self,
     viewport: g.Viewport,
     journal: *g.Journal,
     /// Used to decide visibility of some objects
@@ -163,7 +163,7 @@ pub fn drawEntitiesToBuffer(
 }
 
 pub fn drawSpriteToBuffer(
-    self: Render,
+    self: *const Self,
     viewport: g.Viewport,
     codepoint: g.Codepoint,
     place_in_dungeon: p.Point,
@@ -209,7 +209,7 @@ fn actualCodepoint(codepoint: g.Codepoint, visibility: g.Render.Visibility) g.Co
 
 /// Invokes the runtime to draw only changed symbols.
 /// After drawing all changes, the number of the viewport.buffer.iteration will be incremented.
-pub fn drawChangedSymbols(self: Render) !void {
+pub fn drawChangedSymbols(self: *const Self) !void {
     var itr = self.scene_buffer.changedSymbols();
     while (itr.next()) |tuple| {
         try self.runtime.drawSprite(tuple[1].codepoint, tuple[0], tuple[1].mode);
@@ -218,7 +218,7 @@ pub fn drawChangedSymbols(self: Render) !void {
 
 /// Copies sprites from the scene buffer to the screen.
 /// `region` - is a region inside the scene.
-pub fn redrawRegionFromSceneBuffer(self: Render, region: p.Region) !void {
+pub fn redrawRegionFromSceneBuffer(self: *const Self, region: p.Region) !void {
     var itr = region.cells();
     while (itr.next()) |point| {
         if (self.scene_buffer.getSymbol(point)) |symbol| {
@@ -227,17 +227,17 @@ pub fn redrawRegionFromSceneBuffer(self: Render, region: p.Region) !void {
     }
 }
 
-pub fn redrawFromSceneBuffer(self: Render) !void {
+pub fn redrawFromSceneBuffer(self: *const Self) !void {
     try self.redrawRegionFromSceneBuffer(self.scene_buffer.region());
 }
 
 /// Draws a single symbol directly to display
-pub fn drawSymbol(self: Render, symbol: u21, position_on_display: p.Point, mode: g.DrawingMode) !void {
+pub fn drawSymbol(self: *const Self, symbol: u21, position_on_display: p.Point, mode: g.DrawingMode) !void {
     try self.runtime.drawSprite(symbol, position_on_display, mode);
 }
 
 /// Draws a one-line border of the region directly on the screen.
-pub fn drawBorder(self: Render, region: p.Region) !void {
+pub fn drawBorder(self: *const Self, region: p.Region) !void {
     var itr = region.cells();
     while (itr.next()) |point| {
         if (point.row == region.top_left.row or point.row == region.bottomRightRow()) {
@@ -253,7 +253,7 @@ pub fn drawBorder(self: Render, region: p.Region) !void {
 }
 
 /// Draws a two-lines border of the region directly on the screen.
-pub fn drawDoubledBorder(self: Render, region: p.Region, filler: ?u8) !void {
+pub fn drawDoubledBorder(self: *const Self, region: p.Region, filler: ?u8) !void {
     var itr = region.cells();
     while (itr.next()) |point| {
         if (point.row == region.top_left.row or point.row == region.bottomRightRow()) {
@@ -270,7 +270,7 @@ pub fn drawDoubledBorder(self: Render, region: p.Region, filler: ?u8) !void {
     try self.runtime.drawSprite('╝', region.bottomRight(), .normal);
 }
 
-pub fn drawHorizontalLine(self: Render, codepoint: u21, left_point: p.Point, length: u8) !void {
+pub fn drawHorizontalLine(self: *const Self, codepoint: u21, left_point: p.Point, length: u8) !void {
     var point = left_point;
     for (0..length) |_| {
         try self.runtime.drawSprite(codepoint, point, .normal);
@@ -280,7 +280,7 @@ pub fn drawHorizontalLine(self: Render, codepoint: u21, left_point: p.Point, len
 
 // Draws the current count of player's hp at the top right corner
 // directly on the screen.
-pub fn drawPlayerHp(self: Render, health: *const cm.Health) !void {
+pub fn drawPlayerHp(self: *const Self, health: *const cm.Health) !void {
     var buf = [_]u8{0} ** BUTTON_ZONE_LENGTH;
     const text = if (health.current_hp > 0)
         // hack to avoid showing '+'
@@ -290,7 +290,7 @@ pub fn drawPlayerHp(self: Render, health: *const cm.Health) !void {
     try self.drawText(text, .{ .row = 1, .col = g.DISPLAY_COLS - @as(u8, @intCast(text.len)) + 1 }, .inverted);
 }
 
-pub fn drawEnemyHealth(self: Render, codepoint: g.Codepoint, health: *const cm.Health) !void {
+pub fn drawEnemyHealth(self: *const Self, codepoint: g.Codepoint, health: *const cm.Health) !void {
     var buf: [INFO_ZONE_LENGTH]u8 = undefined;
     inline for (0..INFO_ZONE_LENGTH) |i| buf[i] = default_filler;
     // +1 for padding between the right zone
@@ -311,12 +311,12 @@ pub fn drawEnemyHealth(self: Render, codepoint: g.Codepoint, health: *const cm.H
 /// Draws the text with center aligning in the Info field directly on the display.
 /// The text should be no longer than `INFO_ZONE_LENGTH`.
 /// All space except the text will be filled by the `filler`.
-pub fn drawInfo(self: Render, text: []const u8) !void {
+pub fn drawInfo(self: *const Self, text: []const u8) !void {
     const pos = p.Point{ .row = g.DISPLAY_ROWS, .col = 1 };
     try self.drawTextWithAlign(INFO_ZONE_LENGTH, text, pos, .normal, .center);
 }
 
-pub fn cleanInfo(self: Render) !void {
+pub fn cleanInfo(self: *const Self) !void {
     var pos = p.Point{ .row = g.DISPLAY_ROWS, .col = 1 };
     for (0..INFO_ZONE_LENGTH) |_| {
         try self.drawSymbol(' ', pos, .normal);
@@ -325,7 +325,7 @@ pub fn cleanInfo(self: Render) !void {
 }
 
 /// Draws the label for the B button
-pub fn drawLeftButton(self: Render, text: []const u8, has_alternatives: bool) !void {
+pub fn drawLeftButton(self: *const Self, text: []const u8, has_alternatives: bool) !void {
     var pos = p.Point{ .row = g.DISPLAY_ROWS, .col = INFO_ZONE_LENGTH + 1 };
     try self.runtime.drawSprite(
         if (has_alternatives) cp.variants else ' ',
@@ -336,7 +336,7 @@ pub fn drawLeftButton(self: Render, text: []const u8, has_alternatives: bool) !v
     try self.drawTextWithAlign(BUTTON_ZONE_LENGTH, text, pos, .inverted, .center);
 }
 
-pub fn hideLeftButton(self: Render) !void {
+pub fn hideLeftButton(self: *const Self) !void {
     var pos = p.Point{ .row = g.DISPLAY_ROWS, .col = INFO_ZONE_LENGTH + 1 };
     for (0..BUTTON_ZONE_LENGTH + 1) |_| {
         try self.drawSymbol(' ', pos, .normal);
@@ -345,7 +345,7 @@ pub fn hideLeftButton(self: Render) !void {
 }
 
 /// Draws the label for the A button
-pub fn drawRightButton(self: Render, text: []const u8, has_alternatives: bool) !void {
+pub fn drawRightButton(self: *const Self, text: []const u8, has_alternatives: bool) !void {
     const pos = p.Point{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS - BUTTON_ZONE_LENGTH };
     try self.drawTextWithAlign(BUTTON_ZONE_LENGTH, text, pos, .inverted, .center);
     try self.runtime.drawSprite(
@@ -355,7 +355,7 @@ pub fn drawRightButton(self: Render, text: []const u8, has_alternatives: bool) !
     );
 }
 
-pub fn hideRightButton(self: Render) !void {
+pub fn hideRightButton(self: *const Self) !void {
     var pos = p.Point{ .row = g.DISPLAY_ROWS, .col = g.DISPLAY_COLS - BUTTON_ZONE_LENGTH };
     for (0..BUTTON_ZONE_LENGTH) |_| {
         try self.drawSymbol(' ', pos, .normal);
@@ -365,7 +365,7 @@ pub fn hideRightButton(self: Render) !void {
 
 /// Sets the line of spaces as a board on the passed side. Inverts the draw mode
 /// for few symbols in the middle.
-pub fn setBorderWithArrow(self: Render, viewport: g.Viewport, side: p.Direction) void {
+pub fn setBorderWithArrow(self: *const Self, viewport: g.Viewport, side: p.Direction) void {
     switch (side) {
         .left => self.scene_buffer.setSymbol(
             p.Point.init(1 + self.scene_rows / 2, 1),
@@ -401,7 +401,7 @@ pub fn setBorderWithArrow(self: Render, viewport: g.Viewport, side: p.Direction)
 /// This method uses the `runtime.drawSprite()` to draw the text directly on the display avoiding
 /// the scene buffer.
 pub fn drawTextWithAlign(
-    self: Render,
+    self: *const Self,
     zone_codepoints_max_count: usize,
     utf8_text: []const u8,
     absolut_position: p.Point,
@@ -429,12 +429,12 @@ pub fn drawTextWithAlign(
 }
 
 /// Draws the text directly on the screen without aligning and cropping.
-pub fn drawText(self: Render, utf8_text: []const u8, position_on_display: p.Point, mode: g.DrawingMode) !void {
+pub fn drawText(self: *const Self, utf8_text: []const u8, position_on_display: p.Point, mode: g.DrawingMode) !void {
     try self.drawTextWithMaxLength(utf8_text, std.math.maxInt(usize), position_on_display, mode);
 }
 
 fn drawTextWithMaxLength(
-    self: Render,
+    self: *const Self,
     utf8_text: []const u8,
     max_length: usize,
     position_on_display: p.Point,
@@ -452,7 +452,7 @@ fn drawTextWithMaxLength(
 }
 
 pub fn drawTextToBuffer(
-    self: Render,
+    self: *const Self,
     ascii_text: []const u8,
     position_on_display: p.Point,
     mode: g.DrawingMode,

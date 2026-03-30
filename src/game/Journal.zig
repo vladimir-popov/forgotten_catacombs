@@ -56,7 +56,7 @@ pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
 }
 
 /// Try to guess a type of the entity to check its known status correctly.
-pub fn isKnown(self: Self, entity: g.Entity) bool {
+pub fn isKnown(self: *const Self, entity: g.Entity) bool {
     if (self.known_entities.contains(entity)) {
         return true;
     }
@@ -78,7 +78,7 @@ pub fn addUnknownEquipment(self: *Self, entity: g.Entity) !void {
 }
 
 /// Returns a color for an unknown potion, or null if the potion is known.
-pub fn unknownPotionColor(self: Self, potion_type: g.meta.PotionType) ?g.Color {
+pub fn unknownPotionColor(self: *const Self, potion_type: g.meta.PotionType) ?g.Color {
     if (!self.known_potions.contains(potion_type))
         return self.potion_colors[@intFromEnum(potion_type)];
     return null;

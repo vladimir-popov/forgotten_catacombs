@@ -42,7 +42,7 @@ pub const Cell = enum(u6) {
     water,
 };
 
-const Dungeon = @This();
+const Self = @This();
 
 pub const VTable = struct {
     /// Should return the cell of the dungeon on the passed place
@@ -71,12 +71,12 @@ exit: p.Point,
 doorways: ?*const std.AutoHashMapUnmanaged(p.Point, d.Doorway) = null,
 vtable: VTable,
 
-pub inline fn cellAt(self: Dungeon, place: p.Point) Cell {
+pub inline fn cellAt(self: *const Self, place: p.Point) Cell {
     return self.vtable.cellAtFn(self.parent, place);
 }
 
 pub const CellsIterator = struct {
-    dungeon: *const Dungeon,
+    dungeon: *const Self,
     region: p.Region,
     next_place: p.Point,
     current_place: p.Point = undefined,
@@ -96,7 +96,7 @@ pub const CellsIterator = struct {
     }
 };
 
-pub fn cellsInRegion(self: *const Dungeon, region: p.Region) CellsIterator {
+pub fn cellsInRegion(self: *const Self, region: p.Region) CellsIterator {
     return .{
         .dungeon = self,
         .region = region,
@@ -104,7 +104,7 @@ pub fn cellsInRegion(self: *const Dungeon, region: p.Region) CellsIterator {
     };
 }
 
-pub fn cellsAround(self: Dungeon, place: p.Point) ?CellsIterator {
+pub fn cellsAround(self: *const Self, place: p.Point) ?CellsIterator {
     return self.cellsInRegion(.{
         .top_left = .{
             .row = @max(place.row - 1, 1),
@@ -115,22 +115,22 @@ pub fn cellsAround(self: Dungeon, place: p.Point) ?CellsIterator {
     });
 }
 
-pub inline fn doorwayAt(self: Dungeon, place: p.Point) ?*d.Doorway {
+pub inline fn doorwayAt(self: *const Self, place: p.Point) ?*d.Doorway {
     if (self.doorways) |dws|
         return dws.getPtr(place)
     else
         return null;
 }
 
-pub fn placementWith(self: Dungeon, place: p.Point) ?d.Placement {
+pub inline fn placementWith(self: *const Self, place: p.Point) ?d.Placement {
     return self.vtable.placementWithFn(self.parent, place);
 }
 
-pub fn randomPlace(self: Dungeon, rand: std.Random) p.Point {
+pub inline fn randomPlace(self: *const Self, rand: std.Random) p.Point {
     return self.vtable.randomPlaceFn(self.parent, rand);
 }
 
-pub fn dumpToLog(self: Dungeon) void {
+pub fn dumpToLog(self: *const Self) void {
     var buf: [(g.DUNGEON_COLS + 1) * g.DUNGEON_ROWS]u8 = undefined;
     const real_size: usize = @as(usize, @intCast(self.rows)) * (self.cols + 1);
     var writer = std.Io.fixedBufferStream(&buf);
@@ -139,7 +139,7 @@ pub fn dumpToLog(self: Dungeon) void {
 }
 
 pub fn write(
-    self: Dungeon,
+    self: *const Self,
     writer: *std.Io.Writer,
 ) !usize {
     var itr = self.cellsInRegion(.{ .top_left = .{ .row = 1, .col = 1 }, .rows = self.rows, .cols = self.cols });
