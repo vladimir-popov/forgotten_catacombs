@@ -312,7 +312,7 @@ pub fn handleTrap(self: *Self, actor: g.Entity, trap_id: g.Entity, trap: c.Trap)
     // Show pop-up notifications about hit/damage
     if (actor.eql(self.session().player)) {
         const name = try g.meta.rawName(&self.session().registry, trap_id);
-        try self.session().notify(.{ .trap = .{ .name = name, .damage = health_before - health.current_hp } });
+        try self.session().showPopUpNotification(.{ .trap = .{ .name = name, .damage = health_before - health.current_hp } });
     }
 
     return is_actor_dead;
@@ -331,12 +331,12 @@ fn tryToHit(
     if (weapon.ammunition_type) |expected_ammo| {
         const ammo_id, const ammo = g.meta.getAmmunition(&self.session().registry, actor) orelse {
             if (actor.eql(self.session().player))
-                try self.session().notify(.no_ammo);
+                try self.session().showPopUpNotification(.no_ammo);
             return false;
         };
         if (ammo.ammunition_type != expected_ammo) {
             if (actor.eql(self.session().player))
-                try self.session().notify(.wrong_ammo);
+                try self.session().showPopUpNotification(.wrong_ammo);
             return false;
         }
         ammo.amount -= 1;
@@ -373,9 +373,9 @@ fn tryToHit(
             .{ actor.id, target.id, evation, rand },
         );
         if (actor.eql(self.session().player))
-            try self.session().notify(.{ .miss = .{ .target = target } })
+            try self.session().showPopUpNotification(.{ .miss = .{ .target = target } })
         else if (target.eql(self.session().player))
-            try self.session().notify(.{ .dodge = .{ .actor = actor } });
+            try self.session().showPopUpNotification(.{ .dodge = .{ .actor = actor } });
         return true;
     }
 
@@ -397,9 +397,9 @@ fn tryToHit(
 
         // Give an experience to player
         if (is_target_dead and actor.eql(self.session().player)) {
-            try self.session().notify(.{ .exp = enemy_experience.asReward() });
+            try self.session().showPopUpNotification(.{ .exp = enemy_experience.asReward() });
             if (try g.meta.addExperience(&self.session().registry, self.session().player, enemy_experience.asReward())) {
-                try self.session().notify(.level_up);
+                try self.session().showPopUpNotification(.level_up);
             }
         }
 
@@ -408,11 +408,11 @@ fn tryToHit(
     }
     // Show pop-up notifications about hit/damage
     if (actor.eql(self.session().player))
-        try self.session().notify(
+        try self.session().showPopUpNotification(
             .{ .hit = .{ .target = target, .damage = target_health_before - target_health.current_hp } },
         )
     else if (target.eql(self.session().player))
-        try self.session().notify(
+        try self.session().showPopUpNotification(
             .{ .damage = .{ .actor = actor, .damage = target_health_before - target_health.current_hp } },
         );
     return true;

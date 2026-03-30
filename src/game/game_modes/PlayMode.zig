@@ -12,106 +12,20 @@ const SHOW_NOTIFICATION_MS = 800;
 
 const Self = @This();
 
-const State = enum {
+/// ```
+///                                  ⟳
+/// player_turn ⭢  update_target ⭢  draw
+///      ⭡                           ⭣
+///    draw  ⭠   update_target ⭠  enemies_turn
+///     ⟳
+/// ```
+const State = union(enum) {
     player_turn,
-    update_target_after_player,
     enemies_turn,
-    update_target_after_enemies,
-};
-
-pub const QuickActions = struct {
-    // The actions which can be applied to the entity in focus
-    actions: std.ArrayList(g.actions.Action) = .empty,
-    // The index of the quick action for the target entity
-    selected_idx: usize = 0,
-
-    fn reset(self: *QuickActions) void {
-        self.actions.clearRetainingCapacity();
-        self.selected_idx = 0;
-    }
-};
-
-/// A notification about important event.
-/// Should be shown for some time.
-const NotificationMessage = struct {
-    /// the buffer for the text of the notification
-    buffer: [16]u8 = undefined,
-    len: u8 = 0,
-    /// when the notification appears on a screen
-    start_showing_at: u64,
-    /// where to place the first letter of the notification
-    pp: p.Point,
-
-    /// The region of the display occupied by the notification
-    pub fn region(self: NotificationMessage) p.Region {
-        return .{ .top_left = self.pp, .rows = 1, .cols = @intCast(self.len) };
-    }
-
-    /// Precalculates a notification message from a notification.
-    /// Text, position and mode will be calculated once to show the message every tick for the whole delay.
-    pub fn init(notification: g.notifications.Notification, session: *const g.GameSession) !NotificationMessage {
-        var msg: NotificationMessage = .{
-            // Start calculation of the place to show from the player place on the screen
-            .pp = session.viewport.relative(session.level.playerPosition().place) orelse unreachable,
-            .start_showing_at = session.runtime.currentMillis(),
-        };
-        msg.len = @intCast((try std.fmt.bufPrint(&msg.buffer, "{f}", .{notification})).len);
-        const display_region = p.Region.init(1, 1, session.viewport.region.rows, session.viewport.region.cols);
-
-        // Trying to place the notification relative to the player in follow order:
-        const relative_positions = [_]p.Direction{ .up, .down, .right, .left };
-        for (relative_positions) |direction| {
-            switch (direction) {
-                .up, .down => {
-                    const left_half: u8 = msg.len / 2;
-                    msg.pp.move(direction);
-                    // center the notification.
-                    // validate left border
-                    if (msg.pp.col > left_half)
-                        msg.pp.col -= left_half
-                    else if (left_half > msg.pp.col)
-                        msg.pp.col = 1;
-                    // validate right border
-                    if (msg.pp.col + msg.len - 1 > display_region.cols)
-                        msg.pp.col = display_region.cols - msg.len + 1;
-                },
-                .right => {
-                    msg.pp.move(direction);
-                },
-                .left => {
-                    msg.pp.moveNTimes(.left, msg.len);
-                },
-            }
-
-            // The notification should not hide the current enemy (but it could be dead and removed at
-            // this moment, for example, when we're showing a notification about receiving exp)
-            const maybe_enemy_position = switch (notification) {
-                .hit => |hit| session.registry.get(hit.target, c.Position),
-                .damage => |damage| session.registry.get(damage.actor, c.Position),
-                .miss => |miss| session.registry.get(miss.target, c.Position),
-                .dodge => |dodge| session.registry.get(dodge.actor, c.Position),
-                else => null,
-            };
-            const is_hiding_the_target = if (maybe_enemy_position) |pos|
-                if (session.viewport.relative(pos.place)) |enemy_pp|
-                    msg.region().containsPoint(enemy_pp)
-                else
-                    false
-            else
-                false;
-            const is_first_letter_on_screen = display_region.containsPoint(msg.pp);
-            const is_last_letter_on_screen = display_region.containsPoint(msg.pp.movedToNTimes(.right, msg.len - 1));
-
-            if (is_first_letter_on_screen and is_last_letter_on_screen and !is_hiding_the_target) {
-                // all done
-                break;
-            } else {
-                // reset the point and try another direction
-                msg.pp = session.viewport.relative(session.level.playerPosition().place) orelse unreachable;
-            }
-        }
-        return msg;
-    }
+    /// `true` means the next state is `player_turn`, or else `enemies_turn`
+    update_target: bool,
+    /// `true` means the next state is `player_turn`, or else `enemies_turn`
+    draw: bool,
 };
 
 arena: std.heap.ArenaAllocator,
@@ -119,7 +33,7 @@ session: *g.GameSession,
 // The entity to which quick actions can be applied
 target: ?g.Entity = null,
 quick_actions: QuickActions,
-state: State = .player_turn,
+state: State = .{ .draw = true },
 quick_actions_window: ?w.ModalWindow(w.OptionsArea(void)) = null,
 // If defined, then all input should be ignored.
 notification_to_show: ?NotificationMessage = null,
@@ -156,10 +70,6 @@ inline fn setTarget(self: *Self, target: ?g.Entity) void {
 }
 
 pub fn tick(self: *Self) !void {
-    // the true here means that some blocked animation or notification is shown,
-    // and any input should be ignored
-    if (try self.draw()) return;
-
     switch (self.state) {
         .player_turn => {
             // break this function if no input
@@ -179,9 +89,7 @@ pub fn tick(self: *Self) !void {
                         },
                         else => {},
                     }
-                    // Update counters of unknown equipment
-                    try self.session.journal.onTurnCompleted();
-                    self.state = .update_target_after_player;
+                    self.state = .{ .update_target = false };
                 },
                 else => {},
             }
@@ -210,53 +118,78 @@ pub fn tick(self: *Self) !void {
                     }
                 }
             }
-            self.state = .update_target_after_enemies;
+            self.state = .{ .update_target = true };
         },
-        .update_target_after_player => {
+        .update_target => |next_turn| {
             try self.updateQuickActions();
-            self.state = .enemies_turn;
+            self.state = .{ .draw = next_turn };
         },
-        .update_target_after_enemies => {
-            try self.updateQuickActions();
-            self.state = .player_turn;
+        .draw => |is_next_player_turn| {
+            // the quick_actions_window is drawn during handleInput
+            if (self.quick_actions_window != null) return;
+
+            try self.drawInfoBar();
+            const level = &self.session.level;
+            try self.session.render.drawDungeonToBuffer(self.session.viewport, level);
+            try self.session.render.drawEntitiesToBuffer(
+                self.session.viewport,
+                &self.session.journal,
+                self.session.prng.random(),
+                level,
+                self.target,
+            );
+            const now = self.session.runtime.currentMillis();
+            const is_blocked_animation = try self.drawAnimationsFramesToBuffer(now);
+            try self.session.render.drawChangedSymbols();
+            const is_notification_shown = try self.showNotifications(now);
+            if (self.session.registry.get(self.session.player, c.Health)) |health| {
+                try self.session.render.drawPlayerHp(health);
+            }
+            // Ignore any input while showing a blocked animation or notification
+            if (is_blocked_animation or is_notification_shown) {
+                try self.session.runtime.cleanInputBuffer();
+            } else {
+                // Drawing is completed
+                self.state = if (is_next_player_turn) .player_turn else .enemies_turn;
+            }
         },
     }
 }
 
-/// If returns true, then the input should be ignored
-/// until all notifications and all frames from all blocked animations have been drawn.
-fn draw(self: *Self) !bool {
-    if (self.quick_actions_window != null) return false;
+fn drawInfoBar(self: *const Self) !void {
+    try self.session.render.drawLeftButton("Explore", true);
+    const qa = self.quickAction();
+    const action_label = qa.toString();
+    try self.session.render.drawRightButton(action_label, self.quick_actions.actions.items.len > 1);
 
-    try self.drawInfoBar();
-    const level = &self.session.level;
-    try self.session.render.drawDungeonToBuffer(self.session.viewport, level);
-    try self.session.render.drawEntitiesToBuffer(
-        self.session.viewport,
-        &self.session.journal,
-        self.session.prng.random(),
-        level,
-        self.target,
-    );
-    const is_blocked_animation = try self.drawAnimationsFramesToBuffer();
-    try self.session.render.drawChangedSymbols();
-    const is_notification_shown = try self.showNotifications();
-    if (self.session.registry.get(self.session.player, c.Health)) |health| {
-        try self.session.render.drawPlayerHp(health);
+    // Draw the name or health of the target entity
+    if (self.target) |entity| {
+        if (!entity.eql(self.session.player)) {
+            if (self.session.registry.get2(entity, c.Sprite, c.Health)) |tuple| {
+                try self.session.render.drawEnemyHealth(tuple[0].codepoint, tuple[1]);
+                return;
+            }
+        }
+        var buf: [32]u8 = undefined;
+        try self.session.render.drawInfo(try g.meta.printActualName(&buf, self.session.journal, entity));
+    } else if (self.session.registry.get(self.session.player, c.Hunger)) |hunger| {
+        // Draw the hunger level
+        switch (hunger.level()) {
+            .well_fed => try self.session.render.cleanInfo(),
+            else => |lvl| {
+                var buf: [g.Render.INFO_ZONE_LENGTH]u8 = undefined;
+                try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "{f}", .{lvl}));
+            },
+        }
+    } else {
+        try self.session.render.cleanInfo();
     }
-    // Ignore any input while showing a blocked animation or notification
-    if (is_blocked_animation or is_notification_shown) {
-        try self.session.runtime.cleanInputBuffer();
-        return true;
-    }
-    return false;
 }
 
 /// Draws a single frame from every animation.
 /// Removes the animation if the last frame was drawn.
 /// Returns true if any animation is blocked.
-pub fn drawAnimationsFramesToBuffer(self: *const Self) !bool {
-    const now: u64 = self.session.runtime.currentMillis();
+pub fn drawAnimationsFramesToBuffer(self: *const Self, now: u64) !bool {
     var was_blocked_animation: bool = false;
     var itr = self.session.level.registry.query2(c.Position, c.Animation);
     while (itr.next()) |components| {
@@ -282,6 +215,37 @@ pub fn drawAnimationsFramesToBuffer(self: *const Self) !bool {
         }
     }
     return was_blocked_animation;
+}
+
+/// Draws the `notification_to_show` if it's defined.
+/// if more time from start of showing has passed than `SHOW_NOTIFICATION_MS`, removed the `notification_to_show`,
+/// and tries to get a next notification from the global queue.
+///
+/// Returns `true` if a notification should be keep showed.
+fn showNotifications(self: *Self, now: u64) !bool {
+    if (self.notification_to_show) |notification| {
+        if (now - notification.start_showing_at < SHOW_NOTIFICATION_MS) {
+            // Show the notification
+            try self.session.render.drawText(notification.buffer[0..notification.len], notification.pp, .inverted);
+            return true;
+        } else {
+            // Hide the notification after timeout
+            try self.session.render.redrawRegionFromSceneBuffer(notification.region());
+            self.notification_to_show = null;
+        }
+    }
+    if (self.session.notifications.popFront()) |notification| {
+        // Get a next notification
+        self.notification_to_show = try NotificationMessage.init(notification, self.session);
+        // We should not wait a next invocation, because it requires an input and can happened too late.
+        try self.session.render.drawText(
+            self.notification_to_show.?.buffer[0..self.notification_to_show.?.len],
+            self.notification_to_show.?.pp,
+            .inverted,
+        );
+        return true;
+    }
+    return false;
 }
 
 // NOTE: the quick_actions_window can be drawn during this method
@@ -427,68 +391,6 @@ pub fn doTurn(
         },
     }
     return action_result;
-}
-
-/// Draws the `notification_to_show` if it's defined.
-/// if more time from start of showing has passed than `SHOW_NOTIFICATION_MS`, removed the `notification_to_show`,
-/// and tries to get a next notification from the global queue.
-///
-/// Returns `true` if a notification should be keep showed.
-fn showNotifications(self: *Self) !bool {
-    if (self.notification_to_show) |notification| {
-        if (self.session.runtime.currentMillis() - notification.start_showing_at < SHOW_NOTIFICATION_MS) {
-            // Show the notification
-            try self.session.render.drawText(notification.buffer[0..notification.len], notification.pp, .inverted);
-            return true;
-        } else {
-            // Hide the notification after timeout
-            try self.session.render.redrawRegionFromSceneBuffer(notification.region());
-            self.notification_to_show = null;
-        }
-    }
-    if (self.session.notifications.popFront()) |notification| {
-        // Get a next notification
-        const notification_message = try NotificationMessage.init(notification, self.session);
-        self.notification_to_show = notification_message;
-        // We should not wait a next invocation, because it requires an input and can happened too late.
-        try self.session.render.drawText(
-            notification_message.buffer[0..notification_message.len],
-            notification_message.pp,
-            .inverted,
-        );
-        return true;
-    }
-    return false;
-}
-
-fn drawInfoBar(self: *const Self) !void {
-    try self.session.render.drawLeftButton("Explore", true);
-    const qa = self.quickAction();
-    const action_label = qa.toString();
-    try self.session.render.drawRightButton(action_label, self.quick_actions.actions.items.len > 1);
-
-    // Draw the name or health of the target entity
-    if (self.target) |entity| {
-        if (!entity.eql(self.session.player)) {
-            if (self.session.registry.get2(entity, c.Sprite, c.Health)) |tuple| {
-                try self.session.render.drawEnemyHealth(tuple[0].codepoint, tuple[1]);
-                return;
-            }
-        }
-        var buf: [32]u8 = undefined;
-        try self.session.render.drawInfo(try g.meta.printActualName(&buf, self.session.journal, entity));
-    } else if (self.session.registry.get(self.session.player, c.Hunger)) |hunger| {
-        // Draw the hunger level
-        switch (hunger.level()) {
-            .well_fed => try self.session.render.cleanInfo(),
-            else => |lvl| {
-                var buf: [g.Render.INFO_ZONE_LENGTH]u8 = undefined;
-                try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "{f}", .{lvl}));
-            },
-        }
-    } else {
-        try self.session.render.cleanInfo();
-    }
 }
 
 inline fn quickAction(self: *const Self) g.actions.Action {
@@ -644,3 +546,98 @@ fn chooseQuickAction(ptr: *anyopaque, line_idx: usize, _: void) anyerror!bool {
     log.debug("Chosen option {d}: {t}", .{ line_idx, self.quickAction() });
     return true;
 }
+
+pub const QuickActions = struct {
+    // The actions which can be applied to the entity in focus
+    actions: std.ArrayList(g.actions.Action) = .empty,
+    // The index of the quick action for the target entity
+    selected_idx: usize = 0,
+
+    fn reset(self: *QuickActions) void {
+        self.actions.clearRetainingCapacity();
+        self.selected_idx = 0;
+    }
+};
+
+/// A notification about important event.
+/// Should be shown for some time.
+const NotificationMessage = struct {
+    /// the buffer for the text of the notification
+    buffer: [16]u8 = undefined,
+    len: u8 = 0,
+    /// when the notification appears on a screen
+    start_showing_at: u64,
+    /// where to place the first letter of the notification
+    pp: p.Point,
+
+    /// The region of the display occupied by the notification
+    pub fn region(self: NotificationMessage) p.Region {
+        return .{ .top_left = self.pp, .rows = 1, .cols = @intCast(self.len) };
+    }
+
+    /// Precalculates a notification message from a notification.
+    /// Text, position and mode will be calculated once to show the message every tick for the whole delay.
+    pub fn init(notification: g.notifications.Notification, session: *const g.GameSession) !NotificationMessage {
+        var msg: NotificationMessage = .{
+            // Start calculation of the place to show from the player place on the screen
+            .pp = session.viewport.relative(session.level.playerPosition().place) orelse unreachable,
+            .start_showing_at = session.runtime.currentMillis(),
+        };
+        msg.len = @intCast((try std.fmt.bufPrint(&msg.buffer, "{f}", .{notification})).len);
+        const display_region = p.Region.init(1, 1, session.viewport.region.rows, session.viewport.region.cols);
+
+        // Trying to place the notification relative to the player in follow order:
+        const relative_positions = [_]p.Direction{ .up, .down, .right, .left };
+        for (relative_positions) |direction| {
+            switch (direction) {
+                .up, .down => {
+                    const left_half: u8 = msg.len / 2;
+                    msg.pp.move(direction);
+                    // center the notification.
+                    // validate left border
+                    if (msg.pp.col > left_half)
+                        msg.pp.col -= left_half
+                    else if (left_half > msg.pp.col)
+                        msg.pp.col = 1;
+                    // validate right border
+                    if (msg.pp.col + msg.len - 1 > display_region.cols)
+                        msg.pp.col = display_region.cols - msg.len + 1;
+                },
+                .right => {
+                    msg.pp.move(direction);
+                },
+                .left => {
+                    msg.pp.moveNTimes(.left, msg.len);
+                },
+            }
+
+            // The notification should not hide the current enemy (but it could be dead and removed at
+            // this moment, for example, when we're showing a notification about receiving exp)
+            const maybe_enemy_position = switch (notification) {
+                .hit => |hit| session.registry.get(hit.target, c.Position),
+                .damage => |damage| session.registry.get(damage.actor, c.Position),
+                .miss => |miss| session.registry.get(miss.target, c.Position),
+                .dodge => |dodge| session.registry.get(dodge.actor, c.Position),
+                else => null,
+            };
+            const is_hiding_the_target = if (maybe_enemy_position) |pos|
+                if (session.viewport.relative(pos.place)) |enemy_pp|
+                    msg.region().containsPoint(enemy_pp)
+                else
+                    false
+            else
+                false;
+            const is_first_letter_on_screen = display_region.containsPoint(msg.pp);
+            const is_last_letter_on_screen = display_region.containsPoint(msg.pp.movedToNTimes(.right, msg.len - 1));
+
+            if (is_first_letter_on_screen and is_last_letter_on_screen and !is_hiding_the_target) {
+                // all done
+                break;
+            } else {
+                // reset the point and try another direction
+                msg.pp = session.viewport.relative(session.level.playerPosition().place) orelse unreachable;
+            }
+        }
+        return msg;
+    }
+};

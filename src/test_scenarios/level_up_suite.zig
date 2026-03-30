@@ -17,7 +17,8 @@ test "A notification should appear after killing an enemy and receiving enough e
     while (rat_health.current_hp == initial_health) {
         try test_session.pressButton(.a);
     }
-    try test_session.tick(.{ .count = 3, .duration_ms = 400 });
+    // Skip a notification about experience
+    try test_session.tick(.{ .count = 4, .duration_ms = 400 });
 
     // Check a notification
     try test_session.runtime.display.expectLooksLike(

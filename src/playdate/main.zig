@@ -4,24 +4,26 @@ const g = @import("game");
 
 const PlaydateRuntime = @import("PlaydateRuntime.zig");
 
+const log = std.log.scoped(.playdate);
+
 pub const std_options = std.Options{
     .log_level = .warn,
     .logFn = writeLog,
     .log_scope_levels = &[_]std.log.ScopeLevel{
         // .{ .scope = .default, .level = .debug },
-        .{ .scope = .playdate, .level = .debug },
+        // .{ .scope = .playdate, .level = .debug },
+        // .{ .scope = .game, .level = .debug },
+        // .{ .scope = .game_session, .level = .debug },
         // .{ .scope = .playdate_io, .level = .debug },
         // .{ .scope = .last_button, .level = .debug },
         // .{ .scope = .runtime, .level = .debug },
         // .{ .scope = .render, .level = .warn },
         // .{ .scope = .visibility, .level = .debug },
-        // .{ .scope = .game, .level = .debug },
-        // .{ .scope = .game_session, .level = .debug },
         // .{ .scope = .play_mode, .level = .debug },
         // .{ .scope = .ai, .level = .debug },
         // .{ .scope = .explore_mode, .level = .debug },
         // .{ .scope = .looking_around_mode, .level = .debug },
-        .{ .scope = .save_load_mode, .level = .debug },
+        // .{ .scope = .save_load_mode, .level = .debug },
         // .{ .scope = .level, .level = .debug },
         // .{ .scope = .cmd, .level = .debug },
         // .{ .scope = .events, .level = .debug },
@@ -90,6 +92,7 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
 
             playdate.display.setRefreshRate(0);
             playdate.system.setUpdateCallback(updateAndRender, global_state);
+            log.info("Run game", .{});
         },
         .EventPause => {
             global_state.playdate_runtime.last_button.is_menu_shown = true;

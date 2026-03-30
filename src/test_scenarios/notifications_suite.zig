@@ -8,7 +8,7 @@ test "Show a notification from the center" {
     try test_session.initWithTestArea(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
 
-    try test_session.session.notify(.{ .exp = 100 });
+    try test_session.session.showPopUpNotification(.{ .exp = 100 });
     try test_session.tick(.{ .count = 2, .duration_ms = 100 });
 
     try test_session.runtime.display.expectLooksLike(
@@ -31,7 +31,7 @@ test "Show a notification from the top left corner" {
     defer test_session.deinit();
 
     test_session.player.position().place = .init(1, 1);
-    try test_session.session.notify(.{ .exp = 100 });
+    try test_session.session.showPopUpNotification(.{ .exp = 100 });
     try test_session.tick(.{ .count = 2, .duration_ms = 100 });
 
     try test_session.runtime.display.expectLooksLike(
@@ -54,7 +54,7 @@ test "Show a notification near the left border" {
     defer test_session.deinit();
 
     test_session.player.position().place = .init(2, 2);
-    try test_session.session.notify(.{ .exp = 100 });
+    try test_session.session.showPopUpNotification(.{ .exp = 100 });
     try test_session.tick(.{ .count = 2, .duration_ms = 100 });
 
     try test_session.runtime.display.expectLooksLike(
@@ -77,7 +77,7 @@ test "Show a notification from the bottom right corner" {
     defer test_session.deinit();
 
     test_session.player.position().place = .init(10, 40);
-    try test_session.session.notify(.{ .exp = 100 });
+    try test_session.session.showPopUpNotification(.{ .exp = 100 });
     try test_session.tick(.{ .count = 2, .duration_ms = 100 });
 
     try test_session.runtime.display.expectLooksLike(
@@ -100,7 +100,7 @@ test "Show a notification near the right border" {
     defer test_session.deinit();
 
     test_session.player.position().place = .init(10, 39);
-    try test_session.session.notify(.{ .exp = 100 });
+    try test_session.session.showPopUpNotification(.{ .exp = 100 });
     try test_session.tick(.{ .count = 2, .duration_ms = 100 });
 
     try test_session.runtime.display.expectLooksLike(
@@ -127,7 +127,7 @@ test "Show a notification near an enemy" {
     const rat = try test_session.session.level.addEnemy(.sleeping, g.entities.enemyAtPlace(.rat, pp));
     test_session.session.mode.play.target = rat;
 
-    try test_session.session.notify(.{ .hit = .{ .target = rat, .damage = 5 } });
+    try test_session.session.showPopUpNotification(.{ .hit = .{ .target = rat, .damage = 5 } });
     try test_session.tick(.{ .count = 2, .duration_ms = 100 });
 
     try test_session.runtime.display.expectLooksLike(

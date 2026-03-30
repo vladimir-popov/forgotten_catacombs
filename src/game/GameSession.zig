@@ -209,10 +209,6 @@ pub fn continuePlay(self: *Self, entity_in_focus: ?g.Entity, action: ?g.actions.
     );
 }
 
-pub inline fn sendEvent(self: *Self, event: g.events.Event) !void {
-    try self.events.append(self.arena.allocator(), event);
-}
-
 // should not be invoked outside. `continuePlay` should be used instead
 fn switchModeToPlay(self: *Self, entity_in_focus: ?g.Entity) !void {
     self.mode.deinit();
@@ -283,8 +279,8 @@ pub fn playerMovedToLevel(self: *Self) !void {
     try self.sendEvent(event);
 }
 
-pub fn notify(self: *Self, notification: g.notifications.Notification) !void {
-    log.info("Notification: {any}", .{notification});
+pub fn showPopUpNotification(self: *Self, notification: g.notifications.Notification) !void {
+    log.debug("Notification: {any}", .{notification});
     try self.notifications.pushBack(self.arena.allocator(), notification);
 }
 
@@ -308,6 +304,10 @@ pub fn tick(self: *Self) !void {
     }
 }
 
+pub inline fn sendEvent(self: *Self, event: g.events.Event) !void {
+    try self.events.append(self.arena.allocator(), event);
+}
+
 /// Handles events on the end of the `tick`
 fn handleEvent(self: *Self, event: g.events.Event) !void {
     switch (event) {
@@ -323,6 +323,7 @@ fn handleEvent(self: *Self, event: g.events.Event) !void {
         },
         .mode_changed => |new_mode| switch (new_mode) {
             .to_play => |args| {
+                // mode.deinit() is invoked inside:
                 try self.switchModeToPlay(args.entity_in_focus);
                 if (args.action) |action| {
                     _ = try self.mode.play.doTurn(self.player, action, std.math.maxInt(g.MovePoints));
@@ -370,8 +371,8 @@ fn handleEvent(self: *Self, event: g.events.Event) !void {
         .entity_moved => |entity_moved| {
             if (entity_moved.entity.id == self.player.id) {
                 try self.level.onPlayerMoved(entity_moved);
+                try self.viewport.onPlayerMoved(entity_moved);
             }
-            try self.viewport.onEntityMoved(entity_moved);
         },
         .entity_died => |entity| {
             log.debug("The enemy {d} has died", .{entity.id});

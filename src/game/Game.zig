@@ -165,7 +165,9 @@ fn newGame(ptr: *anyopaque, _: usize, _: void) !bool {
 
 fn startGameSession(self: *Self, stats: c.Stats, skills: c.Skills, health: c.Health) !void {
     try self.deleteSessionFileIfExists();
+    log.debug("Init menu", .{});
     self.initSideMenu();
+    log.debug("Menu inited", .{});
     self.state = .{ .game_session = undefined };
     try self.state.game_session.initNew(
         self.gpa,
@@ -176,6 +178,7 @@ fn startGameSession(self: *Self, stats: c.Stats, skills: c.Skills, health: c.Hea
         skills,
         health,
     );
+    log.debug("New session inited", .{});
 }
 
 fn continueGame(ptr: *anyopaque, _: usize, _: void) !bool {
@@ -206,18 +209,20 @@ fn initSideMenu(self: *Self) void {
     _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
 }
 
-fn goToMainMenu(ptr: ?*anyopaque) callconv(.c) void {
-    if (ptr == null) return;
-    const self: *Self = @ptrCast(@alignCast(ptr.?));
-    std.debug.assert(self.state == .game_session);
-    self.state.game_session.switchModeToSavingSession();
+fn goToMainMenu(null_ptr: ?*anyopaque) callconv(.c) void {
+    if (null_ptr) |ptr| {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        std.debug.assert(self.state == .game_session);
+        self.state.game_session.switchModeToSavingSession();
+    }
 }
 
-fn openInventory(ptr: ?*anyopaque) callconv(.c) void {
-    if (ptr == null) return;
-    const self: *Self = @ptrCast(@alignCast(ptr.?));
-    std.debug.assert(self.state == .game_session);
-    self.state.game_session.manageInventory() catch |err| std.debug.panic("Error opening inventory: {any}", .{err});
+fn openInventory(null_ptr: ?*anyopaque) callconv(.c) void {
+    if (null_ptr) |ptr| {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        std.debug.assert(self.state == .game_session);
+        self.state.game_session.manageInventory() catch |err| std.debug.panic("Error opening inventory: {any}", .{err});
+    }
 }
 
 /// Checks that save file for a session exists.

@@ -28,8 +28,7 @@ test "A trap should not be removed when player leave it" {
 
     // move into the trap:
     try test_session.pressButton(.up);
-    // skip notification and animation:
-    try test_session.tick(.{ .count = 10 });
+    try test_session.completeRound();
     try test_session.runtime.display.expectLooksLike(
         \\•••
         \\•@•
@@ -38,7 +37,7 @@ test "A trap should not be removed when player leave it" {
 
     // move out from the trap:
     try test_session.pressButton(.up);
-    try test_session.tick(.{});
+    try test_session.completeRound();
 
     // then:
     try test_session.runtime.display.expectLooksLike(
