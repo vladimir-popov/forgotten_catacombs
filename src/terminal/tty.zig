@@ -261,7 +261,7 @@ pub const KeyboardAndMouse = struct {
 
     /// Read code
     pub const PressedButton = struct {
-        bytes: [11]u8,
+        bytes: [16]u8,
         len: usize,
 
         pub fn button(self: @This()) Button {
@@ -337,10 +337,10 @@ pub const KeyboardAndMouse = struct {
     };
 
     pub fn readPressedButton() ?Button {
-        var buffer: [11]u8 = undefined;
-        const len: usize = @intCast(c.read(c.STDIN_FILENO, &buffer, buffer.len));
+        var buffer: [16]u8 = undefined;
+        const len: isize = c.read(c.STDIN_FILENO, &buffer, buffer.len);
         if (len > 0) {
-            const pbtn = PressedButton{ .bytes = buffer, .len = len };
+            const pbtn = PressedButton{ .bytes = buffer, .len = @intCast(len) };
             return pbtn.button();
         } else {
             return null;
