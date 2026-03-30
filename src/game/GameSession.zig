@@ -63,7 +63,7 @@ registry: g.Registry,
 ///
 journal: g.Journal,
 ///
-events: std.ArrayListUnmanaged(g.events.Event),
+events: std.ArrayList(g.events.Event),
 player: g.Entity,
 /// The current level
 level: g.Level,
@@ -283,10 +283,6 @@ pub fn playerMovedToLevel(self: *Self) !void {
     try self.sendEvent(event);
 }
 
-pub fn subscriber(self: *Self) g.events.Subscriber {
-    return .{ .context = self, .onEvent = handleEvent };
-}
-
 pub fn notify(self: *Self, notification: g.notifications.Notification) !void {
     log.info("Notification: {any}", .{notification});
     try self.notifications.pushBack(self.arena.allocator(), notification);
@@ -303,11 +299,13 @@ pub fn tick(self: *Self) !void {
         .save_load => try self.mode.save_load.tick(),
         .trading => try self.mode.trading.tick(),
     }
-    for (self.events.items) |event| {
-        try self.handleEvent(event);
-        log.debug("Event handled: {any}", .{event});
+    if (self.events.items.len > 0) {
+        for (self.events.items) |event| {
+            try self.handleEvent(event);
+            log.debug("Event handled: {any}", .{event});
+        }
+        self.events.clearRetainingCapacity();
     }
-    self.events.clearRetainingCapacity();
 }
 
 /// Handles events on the end of the `tick`

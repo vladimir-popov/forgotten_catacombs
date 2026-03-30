@@ -222,7 +222,7 @@ fn tryToMove(
     if (from_position.place.eql(new_place)) return .declined;
 
     if (checkCollision(self, new_place, move)) |action| {
-        log.debug("Collision lead to {s}", .{@tagName(action)});
+        log.debug("Collision lead to {t}", .{action});
         return try doAction(self, entity, action, move_points_limit);
     }
     try self.doMove(entity, from_position, move.target);

@@ -52,7 +52,7 @@ pub fn dungeon(self: *Self, seed: u64) !?d.Dungeon {
     log.debug("Generated cave with max open area {d}. Expected > {d}", .{ tuple[0], min_area });
     if (tuple[0] > min_area) {
         log.debug("The cave is successfully generate with seed {d}", .{seed});
-        var stack: std.ArrayListUnmanaged(p.Point) = .empty;
+        var stack: std.ArrayList(p.Point) = .empty;
         defer stack.deinit(tmp_alloc);
 
         try stack.append(self.alloc, tuple[1]);

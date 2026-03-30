@@ -19,7 +19,7 @@ pub const Line = [COLS]u8;
 const Self = @This();
 
 /// The scrollable content of the window
-lines: std.ArrayListUnmanaged(Line) = .empty,
+lines: std.ArrayList(Line) = .empty,
 
 pub const empty: Self = .{};
 

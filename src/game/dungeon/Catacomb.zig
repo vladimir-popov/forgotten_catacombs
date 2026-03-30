@@ -53,7 +53,7 @@ opts: Options,
 /// The index over all placements in the dungeon.
 // we can't store the placements in the array, because of invalidation of the
 // inner state of the array
-placements: std.ArrayListUnmanaged(Placement),
+placements: std.ArrayList(Placement),
 /// Index of all doorways by their place
 doorways: std.AutoHashMapUnmanaged(p.Point, Doorway),
 /// The bit mask of the places with floor.

@@ -261,7 +261,7 @@ pub const Passage = struct {
     };
 
     // the last turn - is a place where the passage is ended, the turn direction is not important there.
-    turns: std.ArrayListUnmanaged(Turn),
+    turns: std.ArrayList(Turn),
     doorways: std.AutoHashMapUnmanaged(p.Point, void),
 
     pub fn format(
@@ -359,7 +359,7 @@ pub const Passage = struct {
     }
 
     pub const PlacesIterator = struct {
-        turns: std.ArrayListUnmanaged(Turn),
+        turns: std.ArrayList(Turn),
         last_turn_idx: u8 = 0,
         current_place: p.Point,
 
@@ -402,7 +402,7 @@ test "places iterator" {
         .{ .row = 2, .col = 3 },
         .{ .row = 3, .col = 3 },
     };
-    var actual_places: std.ArrayListUnmanaged(p.Point) = .empty;
+    var actual_places: std.ArrayList(p.Point) = .empty;
     defer actual_places.deinit(std.testing.allocator);
 
     // when:

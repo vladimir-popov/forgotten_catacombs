@@ -26,7 +26,7 @@ pub fn calculate(
     obstacles: Obstacles,
     target: p.Point,
 ) !void {
-    var openned: std.ArrayListUnmanaged(struct { p.Point, u8 }) = .empty;
+    var openned: std.ArrayList(struct { p.Point, u8 }) = .empty;
     defer openned.deinit(alloc);
 
     if (map.size > 0)

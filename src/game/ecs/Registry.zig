@@ -322,7 +322,7 @@ test "Add/Get/Remove component" {
     const TestComponent = struct {
         const Self = @This();
 
-        state: std.ArrayListUnmanaged(u8) = .empty,
+        state: std.ArrayList(u8) = .empty,
         deinited: *bool,
 
         fn init(value: u8, ptr: *bool) !Self {

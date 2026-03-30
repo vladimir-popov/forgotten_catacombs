@@ -240,7 +240,7 @@ pub const Reader = struct {
                 return buf;
             },
             .pointer => |ptr| if (ptr.size == .slice) {
-                var buf: std.ArrayListUnmanaged(ptr.child) = .empty;
+                var buf: std.ArrayList(ptr.child) = .empty;
                 errdefer buf.deinit(self.registry.allocator());
 
                 try self.beginCollection();

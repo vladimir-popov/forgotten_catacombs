@@ -37,7 +37,7 @@ player_placement: d.Placement = undefined,
 /// The list of the entities belong to this level.
 /// Used to cleanup global registry on moving from the level.
 /// The player doesn't belong to any particular level and should not be presented here.
-entities_on_level: std.ArrayListUnmanaged(g.Entity),
+entities_on_level: std.ArrayList(g.Entity),
 /// The depth of the current level. The session_seed + depth is unique seed for the level.
 depth: u8 = undefined,
 dungeon: d.Dungeon = undefined,

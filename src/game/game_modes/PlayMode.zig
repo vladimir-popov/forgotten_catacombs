@@ -21,7 +21,7 @@ const State = enum {
 
 pub const QuickActions = struct {
     // The actions which can be applied to the entity in focus
-    actions: std.ArrayListUnmanaged(g.actions.Action) = .empty,
+    actions: std.ArrayList(g.actions.Action) = .empty,
     // The index of the quick action for the target entity
     selected_idx: usize = 0,
 
@@ -149,6 +149,12 @@ pub fn deinit(self: Self) void {
     self.arena.deinit();
 }
 
+inline fn setTarget(self: *Self, target: ?g.Entity) void {
+    log.debug("Change target from {any} to {any}", .{ self.target, target });
+    self.target = target;
+    self.quick_actions.reset();
+}
+
 pub fn tick(self: *Self) !void {
     // the true here means that some blocked animation or notification is shown,
     // and any input should be ignored
@@ -163,8 +169,10 @@ pub fn tick(self: *Self) !void {
                 .done => |success| {
                     // Force change the target
                     switch (success.actual_action) {
-                        .hit => |enemy| {
+                        .hit => |enemy| if (self.session.registry.contains(enemy)) {
                             self.setTarget(enemy);
+                        } else {
+                            self.setTarget(null);
                         },
                         .open => |door| {
                             self.setTarget(door.id);
@@ -374,12 +382,6 @@ fn handleInput(self: *Self) !?g.actions.Action {
         }
     }
     return null;
-}
-
-fn setTarget(self: *Self, target: g.Entity) void {
-    log.debug("Change target from {any} to {any}", .{ self.target, target });
-    self.target = target;
-    self.quick_actions.reset();
 }
 
 /// Trying to do an action. An action can be changed or ignored.

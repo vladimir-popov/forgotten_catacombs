@@ -15,7 +15,7 @@ menu: Menu(g.DISPLAY_ROWS, g.DISPLAY_COLS),
 display: Frame = .empty,
 current_millis: u64,
 last_frame: Frame = .empty,
-pushed_buttons: std.ArrayListUnmanaged(?g.Button) = .empty,
+pushed_buttons: std.ArrayList(?g.Button) = .empty,
 
 is_dev_mode: bool = false,
 cheat: ?g.Cheat = null,

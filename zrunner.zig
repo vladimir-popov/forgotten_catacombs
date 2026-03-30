@@ -259,7 +259,7 @@ fn writeTestResults(
     failed_only: bool,
 ) !void {
     const alloc = arena.allocator();
-    var grouped_tests: std.StringHashMapUnmanaged(std.ArrayListUnmanaged(TestResult)) = .empty;
+    var grouped_tests: std.StringHashMapUnmanaged(std.ArrayList(TestResult)) = .empty;
     for (report.test_results) |test_result| {
         if (failed_only and test_result != .failed) continue;
 

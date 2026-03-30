@@ -14,7 +14,7 @@ pub fn ArraySet(comptime C: anytype) type {
         const Self = @This();
         const type_info = @typeInfo(C);
 
-        components: std.ArrayListUnmanaged(struct { Entity, C }),
+        components: std.ArrayList(struct { Entity, C }),
         entity_index: std.AutoHashMapUnmanaged(Entity, usize),
 
         /// An instance of this ArraySet with empty inner storages.

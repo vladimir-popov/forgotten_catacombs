@@ -54,7 +54,7 @@ pub fn OptionsArea(comptime Item: type) type {
 
         /// The context is always passed to button handlers
         context: *anyopaque,
-        options: std.ArrayListUnmanaged(Option),
+        options: std.ArrayList(Option),
         text_align: g.TextAlign,
         /// The absolute index of the selected line (includes the lines out of scroll)
         selected_line: usize = 0,
