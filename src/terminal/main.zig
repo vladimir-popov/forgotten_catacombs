@@ -84,13 +84,12 @@ pub fn main(init: std.process.Init.Minimal) !void {
     }
     var game = try alloc.create(g.Game);
     defer alloc.destroy(game);
+    game.* = try g.Game.init(alloc, runtime.runtime(), seed);
+    defer game.deinit();
 
     if (preset) |tuple| {
-        try game.initNewPreset(alloc, runtime.runtime(), seed, tuple[0], tuple[1]);
-    } else {
-        try game.init(alloc, runtime.runtime(), seed);
+        try game.startWithPreset(tuple[0], tuple[1]);
     }
-    defer game.deinit();
 
     try runtime.run(game);
 }

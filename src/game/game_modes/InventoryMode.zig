@@ -45,7 +45,6 @@ const MODAL_WINDOW_REGION: p.Region = p.Region.init(2, 2, g.DISPLAY_ROWS - 4, g.
 
 const Self = @This();
 
-alloc: std.mem.Allocator,
 session: *g.GameSession,
 inventory: *c.Inventory,
 equipment: *c.Equipment,
@@ -59,7 +58,6 @@ actions_window: ?w.ModalWindow(w.OptionsArea(g.Entity)) = null,
 
 pub fn init(
     self: *Self,
-    alloc: std.mem.Allocator,
     session: *g.GameSession,
     equipment: *c.Equipment,
     inventory: *c.Inventory,
@@ -67,7 +65,6 @@ pub fn init(
 ) !void {
     log.debug("Init inventory with drop {any}", .{drop});
     self.* = .{
-        .alloc = alloc,
         .session = session,
         .equipment = equipment,
         .inventory = inventory,
@@ -82,36 +79,24 @@ pub fn init(
     try self.draw();
 }
 
-// TODO use arena
-pub fn deinit(self: *Self) void {
-    if (self.description_window) |*window| {
-        window.deinit(self.alloc);
-    }
-    if (self.actions_window) |*window| {
-        window.deinit(self.alloc);
-    }
-    self.main_window.deinit(self.alloc);
-}
-
 pub fn tick(self: *Self) !void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (self.description_window) |*window| {
             if (try window.handleButton(btn)) {
                 log.debug("Close description window", .{});
                 try window.hide(self.session.render, .fill_region);
-                window.deinit(self.alloc);
+                window.deinit(self.session.mode_arena.allocator());
                 self.description_window = null;
             }
         } else if (self.actions_window) |*window| {
             if (try window.handleButton(btn)) {
                 log.debug("Close actions window", .{});
                 try window.hide(self.session.render, .fill_region);
-                window.deinit(self.alloc);
+                window.deinit(self.session.mode_arena.allocator());
                 self.actions_window = null;
             }
         } else {
             if (try self.main_window.handleButton(btn)) {
-                // the  deinit method will be invoked here:
                 try self.session.continuePlay(null, self.action);
                 return;
             }
@@ -160,7 +145,7 @@ pub fn updateInventoryTab(self: *Self) !void {
     while (itr.next()) |item_ptr| {
         var buffer: w.TextArea.Line = undefined;
         try tab.scrollable_area.content.addOption(
-            self.alloc,
+            self.session.mode_arena.allocator(),
             try self.formatInventoryLine(&buffer, item_ptr.*),
             item_ptr.*,
             useDropDescribe,
@@ -203,29 +188,29 @@ fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     log.debug("Buttons is helt. Show modal window for {any}", .{item});
     var area = w.OptionsArea(g.Entity).centered(self);
     if (self.isEquipped(item)) {
-        try area.addOption(self.alloc, "Unequip", item, unequipItem, null);
+        try area.addOption(self.session.mode_arena.allocator(), "Unequip", item, unequipItem, null);
     } else {
         if (self.session.registry.has(item, c.SourceOfLight)) {
-            try area.addOption(self.alloc, "Use as a light", item, useAsLight, null);
+            try area.addOption(self.session.mode_arena.allocator(), "Use as a light", item, useAsLight, null);
         }
         if (self.session.registry.has(item, c.Weapon)) {
-            try area.addOption(self.alloc, "Use as a weapon", item, useAsWeapon, null);
+            try area.addOption(self.session.mode_arena.allocator(), "Use as a weapon", item, useAsWeapon, null);
         }
         if (self.session.registry.has(item, c.Ammunition)) {
-            try area.addOption(self.alloc, "Put to quiver", item, putToQuiver, null);
+            try area.addOption(self.session.mode_arena.allocator(), "Put to quiver", item, putToQuiver, null);
         }
         if (self.session.registry.has(item, c.Protection)) {
-            try area.addOption(self.alloc, "Wear", item, useAsArmor, null);
+            try area.addOption(self.session.mode_arena.allocator(), "Wear", item, useAsArmor, null);
         }
         if (self.session.registry.get(item, c.Consumable)) |consumable| {
             switch (consumable.consumable_type) {
-                .potion => try area.addOption(self.alloc, "Drink", item, consumeItem, null),
-                .food => try area.addOption(self.alloc, "Eat", item, consumeItem, null),
+                .potion => try area.addOption(self.session.mode_arena.allocator(), "Drink", item, consumeItem, null),
+                .food => try area.addOption(self.session.mode_arena.allocator(), "Eat", item, consumeItem, null),
             }
         }
     }
-    try area.addOption(self.alloc, "Drop", item, dropSelectedItem, null);
-    try area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
+    try area.addOption(self.session.mode_arena.allocator(), "Drop", item, dropSelectedItem, null);
+    try area.addOption(self.session.mode_arena.allocator(), "Describe", item, describeSelectedItem, null);
     self.actions_window = .modalWindow(area, MODAL_WINDOW_REGION);
     // keep the main window opened
     return false;
@@ -313,8 +298,8 @@ fn consumeItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
 fn takeFromPileOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     var area = w.OptionsArea(g.Entity).centered(self);
-    try area.addOption(self.alloc, "Take", item, takeSelectedItem, null);
-    try area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
+    try area.addOption(self.session.mode_arena.allocator(), "Take", item, takeSelectedItem, null);
+    try area.addOption(self.session.mode_arena.allocator(), "Describe", item, describeSelectedItem, null);
     self.actions_window = .modalWindow(area, MODAL_WINDOW_REGION);
     return true;
 }
@@ -352,13 +337,19 @@ fn addDropOption(self: *Self, tab: *w.WindowWithTabs.Tab, item: g.Entity) !void 
     var buffer: w.TextArea.Line = undefined;
     var len = (try std.fmt.bufPrint(&buffer, "{u} ", .{self.session.registry.getUnsafe(item, c.Sprite).codepoint})).len;
     len += (try g.meta.printActualName(buffer[len..], self.session.journal, item)).len;
-    try tab.scrollable_area.content.addOption(self.alloc, buffer[0..len], item, takeFromPileOrDescribe, describeSelectedItem);
+    try tab.scrollable_area.content.addOption(
+        self.session.mode_arena.allocator(),
+        buffer[0..len],
+        item,
+        takeFromPileOrDescribe,
+        describeSelectedItem,
+    );
 }
 
 fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Show info about item {d}", .{item.id});
-    self.description_window = try w.entityDescription(self.alloc, self.session, item);
+    self.description_window = try w.entityDescription(self.session.mode_arena.allocator(), self.session, item);
     // keep the main window opened
     return false;
 }
@@ -397,7 +388,7 @@ fn takeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
         // Remove the pile only if it is became empty
         if (pile.items.size() == 0) {
             try self.session.registry.removeEntity(entity);
-            self.main_window.removeLastTab(self.alloc);
+            self.main_window.removeLastTab(self.session.mode_arena.allocator());
             self.drop = null;
         } else {
             try self.updateDropTab(self.drop.?);
@@ -406,7 +397,7 @@ fn takeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
         std.debug.assert(entity.eql(item));
         try self.session.registry.remove(item, c.Position);
         try self.session.level.removeEntity(item);
-        self.main_window.removeLastTab(self.alloc);
+        self.main_window.removeLastTab(self.session.mode_arena.allocator());
     }
     try self.updateInventoryTab();
     return true;

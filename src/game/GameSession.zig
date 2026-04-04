@@ -21,31 +21,49 @@ const log = std.log.scoped(.game_session);
 
 const Self = @This();
 
+// zig copies a tagged union on stack in switch statement.
+// this is why all values must be very compacted
 pub const Mode = union(enum) {
-    explore: ExploreMode,
-    explore_level: ExploreLevelMode,
-    inventory: InventoryMode,
-    level_up: LevelUp,
-    modify_recognize: ModifyMode,
-    play: PlayMode,
-    save_load: SaveLoadMode,
-    trading: TradingMode,
+    explore: *ExploreMode,
+    explore_level: *ExploreLevelMode,
+    inventory: *InventoryMode,
+    level_up: *LevelUp,
+    modify_recognize: *ModifyMode,
+    play: *PlayMode,
+    save_load: *SaveLoadMode,
+    trading: *TradingMode,
+};
 
-    fn deinit(self: *Mode) void {
-        switch (self.*) {
-            .explore => self.explore.deinit(),
-            .explore_level => {},
-            .inventory => self.inventory.deinit(),
-            .level_up => self.level_up.deinit(),
-            .play => self.play.deinit(),
-            .save_load => self.save_load.deinit(),
-            .modify_recognize => self.modify_recognize.deinit(),
-            .trading => self.trading.deinit(),
-        }
+const Events = struct {
+    // I don't want to share this around the GamseSession,
+    // this is why it here, and should be used *only* here.
+    alloc: std.mem.Allocator,
+    events: std.ArrayList(g.events.Event),
+
+    fn init(game_arena: *g.GameStateArena) Events {
+        return .{ .alloc = game_arena.allocator(), .events = .empty };
+    }
+
+    fn add(self: *Events, event: g.events.Event) !void {
+        try self.events.append(self.alloc, event);
+    }
+
+    fn clear(self: *Events) void {
+        self.events.clearRetainingCapacity();
+    }
+
+    fn size(self: Events) usize {
+        return self.events.items.len;
+    }
+
+    fn get(self: Events, idx: usize) g.events.Event {
+        std.debug.assert(self.size() > idx);
+        return self.events.items[idx];
     }
 };
 
-arena: std.heap.ArenaAllocator,
+/// Used to allocate memory for the current mode
+mode_arena: g.SessionModeArena,
 /// This seed should help to make all levels of a single game session reproducible.
 seed: u64,
 /// The PRNG initialized with the current time.
@@ -63,7 +81,7 @@ registry: g.Registry,
 ///
 journal: g.Journal,
 ///
-events: std.ArrayList(g.events.Event),
+events: Events,
 player: g.Entity,
 /// The current level
 level: g.Level,
@@ -95,18 +113,18 @@ notifications: std.Deque(g.notifications.Notification),
 ///
 pub fn preInit(
     self: *Self,
-    game_arena_allocator: std.mem.Allocator,
+    game_session_arena: *g.GameStateArena,
     runtime: g.Runtime,
     render: g.Render,
 ) !void {
     self.* = .{
         .actions = .{},
-        .arena = std.heap.ArenaAllocator.init(game_arena_allocator),
+        .mode_arena = std.heap.ArenaAllocator.init(game_session_arena.allocator()),
         .runtime = runtime,
         .render = render,
-        .viewport = g.Viewport.init(render.scene_rows, render.scene_cols),
-        .registry = try g.Registry.init(self.arena.allocator()),
-        .events = .empty,
+        .viewport = g.Viewport.init(render.scene_buffer.region().rows, render.scene_buffer.region().cols),
+        .registry = try g.Registry.init(game_session_arena),
+        .events = .init(game_session_arena),
         .seed = 0,
         .max_depth = 0,
         .spent_turns = 0,
@@ -122,24 +140,10 @@ pub fn preInit(
     log.debug("The game session is pre-initialized", .{});
 }
 
-/// This method is idempotent. It does the following:
-///  - initializes a journal;
-///  - subscribes event handlers;
-///  - puts the viewport around the player;
-///  - switches the game session to the `play` mode.
-pub fn completeInitialization(self: *Self) !void {
-    self.journal = try g.Journal.init(self.arena.allocator(), &self.registry, self.seed);
-    self.viewport.centeredAround(self.level.playerPosition().place);
-    log.debug(
-        "The game session is completely initialized. Seed {d}; Max depth {d}; Player id {d}",
-        .{ self.seed, self.max_depth, self.player.id },
-    );
-}
-
 /// Completely initializes an undefined GameSession.
 pub fn initNew(
     self: *Self,
-    gpa: std.mem.Allocator,
+    game_session_arena: *g.GameStateArena,
     seed: u64,
     runtime: g.Runtime,
     render: g.Render,
@@ -148,7 +152,7 @@ pub fn initNew(
     health: c.Health,
 ) !void {
     log.debug("Begin a new game session with seed {d}", .{seed});
-    try self.preInit(gpa, runtime, render);
+    try self.preInit(game_session_arena, runtime, render);
     self.seed = seed;
     var prng = std.Random.DefaultPrng.init(seed);
     self.player = try self.registry.addNewEntity(
@@ -165,36 +169,44 @@ pub fn initNew(
     try invent.items.add(light);
 
     self.max_depth = 0;
-    self.level = g.Level.preInit(self.arena.allocator(), &self.registry);
+    self.level = g.Level.preInit(game_session_arena, &self.registry);
     try self.level.initAsFirstLevel(self.player);
     try self.completeInitialization();
 
-    self.mode = .{ .play = undefined };
-    try self.mode.play.init(self.arena.allocator(), self, null);
+    self.mode = .{ .play = try self.mode_arena.allocator().create(PlayMode) };
+    try self.mode.play.init(self, null);
     // hack for the first level only
     self.viewport.region.top_left.moveNTimes(.up, 3);
 }
 
-pub fn deinit(self: *Self) void {
-    // to be sure that all files are closed
-    self.mode.deinit();
-    // free memory
-    self.arena.deinit();
-    self.* = undefined;
-    log.debug("The game session is de-initialized", .{});
+/// This method is idempotent. It does the following:
+///  - initializes a journal;
+///  - subscribes event handlers;
+///  - puts the viewport around the player;
+///  - switches the game session to the `play` mode.
+pub fn completeInitialization(self: *Self) !void {
+    self.journal = try g.Journal.init(&self.registry, self.seed);
+    self.viewport.centeredAround(self.level.playerPosition().place);
+    log.debug(
+        "The game session is completely initialized. Seed {d}; Max depth {d}; Player id {d}",
+        .{ self.seed, self.max_depth, self.player.id },
+    );
 }
 
-pub fn switchModeToLoadingSession(self: *Self) !void {
+pub fn switchModeToLoadingSession(self: *Self, game_session_arena: *g.GameStateArena) !void {
     log.debug("Start loading a game session", .{});
-    self.mode = .{ .save_load = SaveLoadMode.loadSession(self) };
+    _ = self.mode_arena.reset(.retain_capacity);
+    self.mode = .{ .save_load = try self.mode_arena.allocator().create(SaveLoadMode) };
+    self.mode.save_load.* = SaveLoadMode.loadSession(self, game_session_arena);
 }
 
 /// Changes the mode to the SaveLoadMode.
 /// The next process after saving the session will be `.go_to_welcome_screen`.
 /// This means that the `error.GoToMainMenu` will be returned on the next tick.
-pub fn switchModeToSavingSession(self: *Self) void {
-    self.mode.deinit();
-    self.mode = .{ .save_load = SaveLoadMode.saveSession(self) };
+pub fn switchModeToSavingSession(self: *Self) !void {
+    _ = self.mode_arena.reset(.retain_capacity);
+    self.mode = .{ .save_load = try self.mode_arena.allocator().create(SaveLoadMode) };
+    self.mode.save_load.* = SaveLoadMode.saveSession(self);
 }
 
 /// Produces an event to change the mode to `PlayMode`.
@@ -211,10 +223,10 @@ pub fn continuePlay(self: *Self, entity_in_focus: ?g.Entity, action: ?g.actions.
 
 // should not be invoked outside. `continuePlay` should be used instead
 fn switchModeToPlay(self: *Self, entity_in_focus: ?g.Entity) !void {
-    self.mode.deinit();
-    self.mode = .{ .play = undefined };
     try self.render.redrawFromSceneBuffer();
-    try self.mode.play.init(self.arena.allocator(), self, entity_in_focus);
+    _ = self.mode_arena.reset(.retain_capacity);
+    self.mode = .{ .play = try self.mode_arena.allocator().create(PlayMode) };
+    try self.mode.play.init(self, entity_in_focus);
 }
 
 pub inline fn explore(self: *Self) !void {
@@ -281,7 +293,7 @@ pub fn playerMovedToLevel(self: *Self) !void {
 
 pub fn showPopUpNotification(self: *Self, notification: g.notifications.Notification) !void {
     log.debug("Notification: {any}", .{notification});
-    try self.notifications.pushBack(self.arena.allocator(), notification);
+    try self.notifications.pushBack(self.mode_arena.allocator(), notification);
 }
 
 pub fn tick(self: *Self) !void {
@@ -295,21 +307,21 @@ pub fn tick(self: *Self) !void {
         .save_load => try self.mode.save_load.tick(),
         .trading => try self.mode.trading.tick(),
     }
-    if (self.events.items.len > 0) {
-        for (self.events.items) |event| {
-            try self.handleEvent(event);
-            log.debug("Event handled: {any}", .{event});
+    if (self.events.size() > 0) {
+        for (0..self.events.size()) |event_idx| {
+            try self.handleEvent(event_idx);
         }
-        self.events.clearRetainingCapacity();
+        self.events.clear();
     }
 }
 
 pub inline fn sendEvent(self: *Self, event: g.events.Event) !void {
-    try self.events.append(self.arena.allocator(), event);
+    try self.events.add(event);
 }
 
 /// Handles events on the end of the `tick`
-fn handleEvent(self: *Self, event: g.events.Event) !void {
+fn handleEvent(self: *Self, event_idx: usize) !void {
+    const event = self.events.get(event_idx);
     switch (event) {
         .player_turn_completed => {
             self.spent_move_points += event.player_turn_completed.spent_move_points;
@@ -323,50 +335,52 @@ fn handleEvent(self: *Self, event: g.events.Event) !void {
         },
         .mode_changed => |new_mode| switch (new_mode) {
             .to_play => |args| {
-                // mode.deinit() is invoked inside:
                 try self.switchModeToPlay(args.entity_in_focus);
                 if (args.action) |action| {
                     _ = try self.mode.play.doTurn(self.player, action, std.math.maxInt(g.MovePoints));
                 }
             },
             .to_explore => {
-                self.mode.deinit();
-                self.mode = .{ .explore_level = try ExploreLevelMode.init(self) };
+                _ = self.mode_arena.reset(.retain_capacity);
+                self.mode = .{ .explore_level = try self.mode_arena.allocator().create(ExploreLevelMode) };
+                self.mode.explore_level.* = try ExploreLevelMode.init(self);
             },
             .to_looking_around => {
-                self.mode.deinit();
-                self.mode = .{ .explore = undefined };
-                try self.mode.explore.init(self.arena.allocator(), self);
+                _ = self.mode_arena.reset(.retain_capacity);
+                self.mode = .{ .explore = try self.mode_arena.allocator().create(ExploreMode) };
+                try self.mode.explore.init(self);
             },
             .to_level_up => {
-                self.mode.deinit();
-                self.mode = .{ .level_up = try LevelUp.init(self) };
+                _ = self.mode_arena.reset(.retain_capacity);
+                self.mode = .{ .level_up = try self.mode_arena.allocator().create(LevelUp) };
+                self.mode.level_up.* = try LevelUp.init(self);
                 try self.mode.level_up.draw(self.render);
             },
             .to_inventory => {
                 if (self.registry.get2(self.player, c.Equipment, c.Inventory)) |tuple| {
-                    self.mode.deinit();
-                    self.mode = .{ .inventory = undefined };
                     const drop = self.level.itemAt(self.level.playerPosition().place);
-                    try self.mode.inventory.init(self.arena.allocator(), self, tuple[0], tuple[1], drop);
+                    _ = self.mode_arena.reset(.retain_capacity);
+                    self.mode = .{ .inventory = try self.mode_arena.allocator().create(InventoryMode) };
+                    try self.mode.inventory.init(self, tuple[0], tuple[1], drop);
                 }
             },
             .to_trading => |shop| {
-                self.mode.deinit();
-                self.mode = .{ .trading = undefined };
-                try self.mode.trading.init(self.arena.allocator(), self, shop);
+                _ = self.mode_arena.reset(.retain_capacity);
+                self.mode = .{ .trading = try self.mode_arena.allocator().create(TradingMode) };
+                try self.mode.trading.init(self, shop);
             },
             .to_modify_recognize => {
-                self.mode.deinit();
-                self.mode = .{ .modify_recognize = undefined };
+                _ = self.mode_arena.reset(.retain_capacity);
+                self.mode = .{ .modify_recognize = try self.mode_arena.allocator().create(ModifyMode) };
                 if (self.registry.get2(self.player, c.Inventory, c.Wallet)) |tuple| {
-                    try self.mode.modify_recognize.init(self.arena.allocator(), self, tuple[0], tuple[1]);
+                    try self.mode.modify_recognize.init(self, tuple[0], tuple[1]);
                 }
             },
         },
         .level_changed => |lvl| {
-            self.mode.deinit();
-            self.mode = .{ .save_load = try SaveLoadMode.loadOrGenerateLevel(self, lvl.by_ladder) };
+            _ = self.mode_arena.reset(.retain_capacity);
+            self.mode = .{ .save_load = try self.mode_arena.allocator().create(SaveLoadMode) };
+            self.mode.save_load.* = try SaveLoadMode.loadOrGenerateLevel(self, lvl.by_ladder);
         },
         .entity_moved => |entity_moved| {
             if (entity_moved.entity.id == self.player.id) {

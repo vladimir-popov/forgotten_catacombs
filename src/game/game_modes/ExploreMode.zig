@@ -11,7 +11,6 @@ const log = std.log.scoped(.explore_mode);
 const ExploreMode = @This();
 const EntitiesOnScreen = std.AutoHashMapUnmanaged(p.Point, [c.Position.ZOrder.size]?g.Entity);
 
-arena: std.heap.ArenaAllocator,
 session: *g.GameSession,
 /// Map of entities and their positions on the screen
 entities_on_screen: EntitiesOnScreen,
@@ -22,10 +21,9 @@ place_in_focus: p.Point,
 entities_window: ?w.ModalWindow(w.OptionsArea(g.Entity)) = null,
 description_window: ?w.ModalWindow(w.TextArea) = null,
 
-pub fn init(self: *ExploreMode, alloc: std.mem.Allocator, session: *g.GameSession) !void {
+pub fn init(self: *ExploreMode, session: *g.GameSession) !void {
     log.debug("Init LookingAroundMode", .{});
     self.* = .{
-        .arena = std.heap.ArenaAllocator.init(alloc),
         .session = session,
         .entity_in_focus = session.player,
         .place_in_focus = session.level.playerPosition().place,
@@ -35,17 +33,13 @@ pub fn init(self: *ExploreMode, alloc: std.mem.Allocator, session: *g.GameSessio
     try self.draw();
 }
 
-pub fn deinit(self: ExploreMode) void {
-    self.arena.deinit();
-}
-
 pub fn tick(self: *ExploreMode) anyerror!void {
     // Nothing should happened until the player push a button
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (self.description_window) |*description_window| {
             if (try description_window.handleButton(btn)) {
                 try description_window.hide(self.session.render, .from_buffer);
-                description_window.deinit(self.arena.allocator());
+                description_window.deinit(self.session.mode_arena.allocator());
                 self.description_window = null;
             } else if (self.isLevelUp()) {
                 if (btn.game_button == .b)
@@ -54,7 +48,7 @@ pub fn tick(self: *ExploreMode) anyerror!void {
         } else if (self.entities_window) |*entities_window| {
             if (try entities_window.handleButton(btn)) {
                 try entities_window.hide(self.session.render, .from_buffer);
-                entities_window.deinit(self.arena.allocator());
+                entities_window.deinit(self.session.mode_arena.allocator());
                 self.entities_window = null;
             }
         } else {
@@ -133,7 +127,7 @@ fn statusLine(self: ExploreMode, entity: g.Entity, line: []u8) !usize {
 }
 
 fn updateEntitiesOnScreen(self: *ExploreMode) !void {
-    const alloc = self.arena.allocator();
+    const alloc = self.session.mode_arena.allocator();
     self.entities_on_screen.clearRetainingCapacity();
     const level = &self.session.level;
     var itr = level.registry.query(c.Position);
@@ -237,7 +231,7 @@ fn windowWithEntities(
         if (maybe_entity) |entity| {
             var buf: [32]u8 = undefined;
             try area.addOption(
-                self.arena.allocator(),
+                self.session.mode_arena.allocator(),
                 try g.meta.printActualName(&buf, self.session.journal, entity),
                 entity,
                 showEntityDescription,
@@ -260,7 +254,7 @@ fn showEntityDescription(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!b
 
 fn windowWithDescription(self: *ExploreMode) !w.ModalWindow(w.TextArea) {
     return try w.entityDescription(
-        self.arena.allocator(),
+        self.session.mode_arena.allocator(),
         self.session,
         self.entity_in_focus,
     );

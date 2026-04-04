@@ -1,4 +1,6 @@
 const std = @import("std");
+const g = @import("../game_pkg.zig");
+
 const Type = std.builtin.Type;
 const Entity = @import("Entity.zig");
 const ArraySet = @import("ArraySet.zig").ArraySet;
@@ -15,19 +17,16 @@ pub fn Registry(comptime ComponentsStruct: type) type {
         pub const ComponentsMap = @import("ComponentsMap.zig").ComponentsMap(ComponentsStruct);
         pub const TypeTag = std.meta.FieldEnum(ComponentsStruct);
 
-        arena: std.heap.ArenaAllocator,
+        /// The same arena that used to init the GameSession
+        arena: *g.GameStateArena,
         // segmentation fault happens if use it as a structure
         components_map: *ComponentsMap,
         /// An id for a next new entity
         next_entity: Entity,
 
         /// Initializes every field of the inner components map.
-        /// The allocator is used for allocate inner storages.
-        pub fn init(alloc: std.mem.Allocator) !Self {
-            // const arena = try alloc.create(std.heap.ArenaAllocator);
-            var arena = std.heap.ArenaAllocator.init(alloc);
+        pub fn init(arena: *g.GameStateArena) !Self {
             var cm = try arena.allocator().create(ComponentsMap);
-
             const ArraySets = @typeInfo(ComponentsMap).@"struct".fields;
             inline for (ArraySets) |array_set| {
                 @field(cm, array_set.name) = array_set.type.empty;
@@ -39,11 +38,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
             };
         }
 
-        /// Cleans up all inner storages.
-        pub fn deinit(self: *Self) void {
-            self.arena.deinit();
-        }
-
+        /// Returns the allocator with GameStateArena underlying
         pub fn allocator(self: *Self) std.mem.Allocator {
             return self.arena.allocator();
         }
@@ -343,23 +338,25 @@ test "Add/Get/Remove component" {
         foo: ?TestComponent,
     };
 
-    var manager = try Registry(TestComponents).init(std.testing.allocator);
-    defer manager.deinit();
+    var game_state_arena: g.GameStateArena = .init(std.testing.allocator);
+    defer game_state_arena.deinit();
+
+    var registry = try Registry(TestComponents).init(&game_state_arena);
 
     // should return the component, which was added before
-    const entity = manager.newEntity();
-    try manager.set(entity, try TestComponent.init(123, &deinited));
+    const entity = registry.newEntity();
+    try registry.set(entity, try TestComponent.init(123, &deinited));
 
-    var component = manager.get(entity, TestComponent);
+    var component = registry.get(entity, TestComponent);
     try std.testing.expectEqual(123, component.?.state.items[0]);
 
     // should return null for entity, without requested component
-    component = manager.get(.{ .id = entity.id + 1 }, TestComponent);
+    component = registry.get(.{ .id = entity.id + 1 }, TestComponent);
     try std.testing.expectEqual(null, component);
 
     // should return null for removed component
-    try manager.remove(entity, TestComponent);
-    component = manager.get(entity, TestComponent);
+    try registry.remove(entity, TestComponent);
+    component = registry.get(entity, TestComponent);
     try std.testing.expectEqual(null, component);
 
     // should deinit component on removing it
@@ -381,8 +378,10 @@ test "deinit entity on update" {
     };
     const Components = struct { cmp: ?Cmp };
 
-    var registry = try Registry(Components).init(std.testing.allocator);
-    defer registry.deinit();
+    var game_state_arena: g.GameStateArena = .init(std.testing.allocator);
+    defer game_state_arena.deinit();
+
+    var registry = try Registry(Components).init(&game_state_arena);
 
     const entity = registry.newEntity();
     try registry.set(entity, Cmp{ .value = 1, .deinited = &deinited_1 });
@@ -402,8 +401,10 @@ test "get entity as a struct" {
 
     const TestComponents = struct { foo: ?Foo, bar: ?Bar };
 
-    var registry = try Registry(TestComponents).init(std.testing.allocator);
-    defer registry.deinit();
+    var game_state_arena: g.GameStateArena = .init(std.testing.allocator);
+    defer game_state_arena.deinit();
+
+    var registry = try Registry(TestComponents).init(&game_state_arena);
 
     const entity = registry.newEntity();
     try registry.set(entity, Bar{ .value = true });
@@ -423,8 +424,10 @@ test "set all components as a struct to the entity" {
 
     const TestComponents = struct { foo: ?Foo = null, bar: ?Bar = null };
 
-    var registry = try Registry(TestComponents).init(std.testing.allocator);
-    defer registry.deinit();
+    var game_state_arena: g.GameStateArena = .init(std.testing.allocator);
+    defer game_state_arena.deinit();
+
+    var registry = try Registry(TestComponents).init(&game_state_arena);
 
     const entity = try registry.addNewEntity(.{ .foo = .{ .value = 42 } });
 

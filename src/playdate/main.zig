@@ -83,7 +83,7 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
             global_state = @ptrCast(@alignCast(playdate.system.realloc(null, @sizeOf(GlobalState))));
             global_state.playdate_runtime = PlaydateRuntime.init(playdate) catch
                 @panic("Error on creating Runtime");
-            global_state.game.init(
+            global_state.game = g.Game.init(
                 global_state.playdate_runtime.alloc,
                 global_state.playdate_runtime.runtime(),
                 playdate.system.getCurrentTimeMilliseconds(),

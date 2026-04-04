@@ -4,13 +4,14 @@ const c = g.components;
 const TestSession = @import("utils/TestSession.zig");
 
 test "Shoot at the target" {
-    var test_session: TestSession = undefined;
+    var test_session: *TestSession = try std.testing.allocator.create(TestSession);
+    defer std.testing.allocator.destroy(test_session);
     try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
     errdefer test_session.printDisplay();
 
-    const rat_id = try initFirstLevelWithRat(&test_session);
-    _ = try equipBowAndArrows(&test_session);
+    const rat_id = try initFirstLevelWithRat(test_session);
+    _ = try equipBowAndArrows(test_session);
 
     // Take aim at a rat
     try test_session.exploreMode();

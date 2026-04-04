@@ -29,16 +29,19 @@ const WelcomeScreen = struct {
     }
 };
 
+// zig copies a tagged union on stack in switch statement.
+// this is why all values must be very compacted
 pub const State = union(enum) {
-    welcome: WelcomeScreen,
-    create_character: g.CharacterBuilder,
+    inited,
+    welcome: *WelcomeScreen,
+    create_character: *g.CharacterBuilder,
     /// The current game session
-    game_session: g.GameSession,
+    game_session: *g.GameSession,
     game_over,
 };
 
-/// The general purpose allocator
-gpa: std.mem.Allocator,
+/// Used to allocate memory for the current state
+state_arena: g.GameStateArena,
 /// Playdate or terminal
 runtime: g.Runtime,
 /// Buffered render to draw the game
@@ -49,51 +52,24 @@ seed: u64,
 /// The current state of the game
 state: State,
 
-pub fn init(self: *Self, gpa: std.mem.Allocator, runtime: g.Runtime, seed: u64) !void {
-    self.* = .{
-        .gpa = gpa,
+pub fn init(gpa: std.mem.Allocator, runtime: g.Runtime, seed: u64) !Self {
+    return .{
+        .state_arena = .init(gpa),
         .runtime = runtime,
-        .render = undefined,
+        .render = try .init(gpa, runtime),
         .seed = seed,
-        .state = undefined,
+        .state = .inited,
     };
-    try self.render.init(gpa, runtime, g.DISPLAY_ROWS, g.DISPLAY_COLS);
-    try self.welcome();
-}
-
-pub fn initNewPreset(
-    self: *Self,
-    gpa: std.mem.Allocator,
-    runtime: g.Runtime,
-    seed: u64,
-    archetype: g.meta.PlayerArchetype,
-    skills: c.Skills,
-) !void {
-    self.* = .{
-        .gpa = gpa,
-        .runtime = runtime,
-        .render = undefined,
-        .seed = seed,
-        .state = undefined,
-    };
-    try self.render.init(gpa, runtime, g.DISPLAY_ROWS, g.DISPLAY_COLS);
-    try self.runtime.clearDisplay();
-    const stats = g.meta.statsFromArchetype(archetype);
-    try self.startGameSession(stats, skills, g.meta.initialHealth(stats.constitution));
 }
 
 pub fn deinit(self: *Self) void {
     self.render.deinit();
-    switch (self.state) {
-        .welcome => self.state.welcome.menu.deinit(self.gpa),
-        .create_character => self.state.create_character.deinit(),
-        .game_session => self.state.game_session.deinit(),
-        .game_over => {},
-    }
+    self.state_arena.deinit();
 }
 
 pub fn tick(self: *Self) !void {
     switch (self.state) {
+        .inited => try self.welcome(),
         .welcome => if (try self.runtime.readPushedButtons()) |btn| {
             _ = try self.state.welcome.menu.handleButton(btn);
             if (btn.game_button.isMove())
@@ -107,23 +83,21 @@ pub fn tick(self: *Self) !void {
         },
         .create_character => if (try self.runtime.readPushedButtons()) |btn| {
             if (try self.state.create_character.handleButton(btn, self.render)) |tuple| {
-                self.state.create_character.deinit();
                 const stats, const skills, const health = tuple;
                 try self.startGameSession(stats, skills, health);
             } else {
                 try self.state.create_character.draw(self.render);
             }
         },
-        .game_session => |*session| {
+        .game_session => |session| {
             session.tick() catch |err| switch (err) {
                 error.GameOver => {
-                    self.state.game_session.deinit();
                     try self.deleteSessionFileIfExists();
+                    _ = self.state_arena.reset(.retain_capacity);
                     self.state = .game_over;
                     try self.drawGameOverScreen();
                 },
                 error.GoToMainMenu => {
-                    self.state.game_session.deinit();
                     try self.welcome();
                 },
                 else => return err,
@@ -134,19 +108,22 @@ pub fn tick(self: *Self) !void {
 
 /// Changes the current state to the `welcome`,
 /// removes all items from the global menu, and draws the Welcome screen.
-pub fn welcome(self: *Self) !void {
-    log.debug("Welcome screen. The game state is {s}", .{@tagName(self.state)});
-    self.state = .{ .welcome = .{ .menu = w.OptionsArea(void).init(self, .center) } };
+fn welcome(self: *Self) !void {
+    log.debug("Welcome screen. The game state is {t}", .{self.state});
+    _ = self.state_arena.reset(.retain_capacity);
+    self.state = .{ .welcome = try self.state_arena.allocator().create(WelcomeScreen) };
+    self.state.welcome.menu = .init(self, .center);
     self.state.welcome.menu.selected_line = 0;
 
     self.runtime.removeAllMenuItems();
 
+    const alloc = self.state_arena.allocator();
     // The choice will be handled manually in the `tick` method
     if (try self.isSessionFileExists())
-        try self.state.welcome.menu.addOption(self.gpa, " Continue ", {}, continueGame, null);
-    try self.state.welcome.menu.addOption(self.gpa, " New game ", {}, newGame, null);
-    try self.state.welcome.menu.addOption(self.gpa, "  Manual  ", {}, showManual, null);
-    try self.state.welcome.menu.addOption(self.gpa, "  About   ", {}, showAbout, null);
+        try self.state.welcome.menu.addOption(alloc, " Continue ", {}, continueGame, null);
+    try self.state.welcome.menu.addOption(alloc, " New game ", {}, newGame, null);
+    try self.state.welcome.menu.addOption(alloc, "  Manual  ", {}, showManual, null);
+    try self.state.welcome.menu.addOption(alloc, "  About   ", {}, showAbout, null);
 
     try self.render.clearDisplay();
     try self.drawWelcomeScreen();
@@ -155,22 +132,29 @@ pub fn welcome(self: *Self) !void {
 fn newGame(ptr: *anyopaque, _: usize, _: void) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     std.debug.assert(self.state == .welcome);
-    self.state.welcome.menu.deinit(self.gpa);
     try self.render.clearDisplay();
-    self.state = .{ .create_character = undefined };
-    try self.state.create_character.init(self.gpa);
+    _ = self.state_arena.reset(.retain_capacity);
+    self.state = .{ .create_character = try self.state_arena.allocator().create(g.CharacterBuilder) };
+    try self.state.create_character.init(&self.state_arena);
     try self.state.create_character.draw(self.render);
     return false;
 }
 
+pub fn startWithPreset(self: *Self, archetype: g.meta.PlayerArchetype, skills: c.Skills) !void {
+    const stats = g.meta.statsFromArchetype(archetype);
+    try self.startGameSession(stats, skills, g.meta.initialHealth(stats.constitution));
+}
+
 fn startGameSession(self: *Self, stats: c.Stats, skills: c.Skills, health: c.Health) !void {
+    try self.render.clearDisplay();
     try self.deleteSessionFileIfExists();
     log.debug("Init menu", .{});
     self.initSideMenu();
     log.debug("Menu inited", .{});
-    self.state = .{ .game_session = undefined };
+    _ = self.state_arena.reset(.retain_capacity);
+    self.state = .{ .game_session = try self.state_arena.allocator().create(g.GameSession) };
     try self.state.game_session.initNew(
-        self.gpa,
+        &self.state_arena,
         self.seed,
         self.runtime,
         self.render,
@@ -184,15 +168,15 @@ fn startGameSession(self: *Self, stats: c.Stats, skills: c.Skills, health: c.Hea
 fn continueGame(ptr: *anyopaque, _: usize, _: void) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     std.debug.assert(self.state == .welcome);
-    self.state.welcome.menu.deinit(self.gpa);
     self.initSideMenu();
-    self.state = .{ .game_session = undefined };
+    _ = self.state_arena.reset(.retain_capacity);
+    self.state = .{ .game_session = try self.state_arena.allocator().create(g.GameSession) };
     try self.state.game_session.preInit(
-        self.gpa,
+        &self.state_arena,
         self.runtime,
         self.render,
     );
-    try self.state.game_session.switchModeToLoadingSession();
+    try self.state.game_session.switchModeToLoadingSession(&self.state_arena);
     return false;
 }
 
@@ -213,7 +197,8 @@ fn goToMainMenu(null_ptr: ?*anyopaque) callconv(.c) void {
     if (null_ptr) |ptr| {
         const self: *Self = @ptrCast(@alignCast(ptr));
         std.debug.assert(self.state == .game_session);
-        self.state.game_session.switchModeToSavingSession();
+        self.state.game_session.switchModeToSavingSession() catch |err|
+            std.debug.panic("Error on switching to SaveSession: {any}", .{err});
     }
 }
 
@@ -221,7 +206,8 @@ fn openInventory(null_ptr: ?*anyopaque) callconv(.c) void {
     if (null_ptr) |ptr| {
         const self: *Self = @ptrCast(@alignCast(ptr));
         std.debug.assert(self.state == .game_session);
-        self.state.game_session.manageInventory() catch |err| std.debug.panic("Error opening inventory: {any}", .{err});
+        self.state.game_session.manageInventory() catch |err|
+            std.debug.panic("Error on opening inventory: {any}", .{err});
     }
 }
 

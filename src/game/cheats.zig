@@ -233,10 +233,10 @@ pub const Cheat = union(enum) {
                 if (global_debug_shop) |shop| {
                     shop.deinit();
                 } else {
-                    global_debug_shop = try session.arena.allocator().create(c.Shop);
+                    global_debug_shop = try session.mode_arena.allocator().create(c.Shop);
                 }
                 const seed = session.prng.next();
-                global_debug_shop.?.* = try c.Shop.empty(session.arena.allocator(), 1.0, 200, seed);
+                global_debug_shop.?.* = try c.Shop.empty(session.mode_arena.allocator(), 1.0, 200, seed);
                 return .{ .trade = global_debug_shop.? };
             },
             else => return null,

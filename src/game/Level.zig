@@ -28,7 +28,7 @@ pub const Cell = union(enum) {
 
 pub const DijkstraMapRegion = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 12, .cols = 25 };
 
-arena: std.heap.ArenaAllocator,
+arena: g.LevelArena,
 registry: *g.Registry,
 player: g.Entity = undefined,
 player_equipment: *c.Equipment = undefined,
@@ -50,9 +50,9 @@ remembered_objects: std.AutoHashMapUnmanaged(p.Point, g.Entity),
 dijkstra_map: u.DijkstraMap.VectorsMap,
 
 /// Initializes an arena to store everything inside the level.
-pub fn preInit(alloc: std.mem.Allocator, registry: *g.Registry) Self {
+pub fn preInit(session_arena: *g.GameStateArena, registry: *g.Registry) Self {
     return .{
-        .arena = std.heap.ArenaAllocator.init(alloc),
+        .arena = std.heap.ArenaAllocator.init(session_arena.allocator()),
         .registry = registry,
         .entities_on_level = .empty,
         .remembered_objects = .empty,

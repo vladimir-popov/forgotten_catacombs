@@ -10,7 +10,8 @@ const Self = @This();
 test_session: *TestSession,
 
 fn inventoryMode(self: Self) *g.GameSession.InventoryMode {
-    return &self.test_session.session.mode.inventory;
+    std.debug.assert(self.test_session.session.mode == .inventory);
+    return self.test_session.session.mode.inventory;
 }
 
 pub fn isClosed(self: Self) bool {
@@ -57,7 +58,7 @@ pub fn contains(self: Self, item: g.Entity) bool {
     return options.contains(item);
 }
 
-/// Creates a new entity with provided components, add that entity to the player's inventory,
+/// Creates a new entity with provided components, adds that entity to the player's inventory,
 /// and updates the Inventory tab.
 pub fn add(self: Self, item: c.Components) !g.Entity {
     const item_id = try self.test_session.session.registry.addNewEntity(item);

@@ -7,7 +7,7 @@ test "Saving a game session and go back to the main menu" {
     try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
 
-    test_session.session.switchModeToSavingSession();
+    try test_session.session.switchModeToSavingSession();
 
     try std.testing.expectEqual(.inited, test_session.session.mode.save_load.process.saving.progress);
     try test_session.tick(.{});

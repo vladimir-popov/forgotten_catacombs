@@ -131,19 +131,15 @@ const BuildingStep = union(enum) {
     },
 };
 
-arena: std.heap.ArenaAllocator,
+arena: *g.GameStateArena,
 step: BuildingStep,
 // a popup window with description of a selected item (archetype, stat or skill)
 description: ?w.ModalWindow(w.TextArea),
 
-pub fn init(self: *Self, alloc: std.mem.Allocator) !void {
-    self.arena = std.heap.ArenaAllocator.init(alloc);
+pub fn init(self: *Self, arena: *g.GameStateArena) !void {
+    self.arena = arena;
     self.description = null;
     try self.initArchetypeStep();
-}
-
-pub fn deinit(self: *Self) void {
-    self.arena.deinit();
 }
 
 fn initArchetypeStep(self: *Self) !void {

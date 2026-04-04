@@ -10,7 +10,7 @@ const Self = @This();
 test_session: *TestSession,
 
 fn modifyMode(self: Self) *g.GameSession.ModifyMode {
-    return &self.test_session.session.mode.modify_recognize;
+    return self.test_session.session.mode.modify_recognize;
 }
 
 pub fn isClosed(self: Self) bool {

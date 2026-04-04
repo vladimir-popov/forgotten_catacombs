@@ -36,6 +36,10 @@ pub const Runtime = @import("Runtime.zig");
 pub const TextAlign = Runtime.TextAlign;
 pub const Viewport = @import("Viewport.zig");
 
+pub const GameStateArena = std.heap.ArenaAllocator;
+pub const SessionModeArena = std.heap.ArenaAllocator;
+pub const LevelArena = std.heap.ArenaAllocator;
+
 /// How many move points should spent player to increase a turns counter
 pub const MOVE_POINTS_IN_TURN = 10;
 

@@ -388,8 +388,10 @@ fn assertEql(actual: anytype, expected: anytype) !void {
 }
 
 test "All components should be serializable" {
-    var original_registry = try g.Registry.init(std.testing.allocator);
-    errdefer original_registry.deinit();
+    var orig_game_state_arena: g.GameStateArena = .init(std.testing.allocator);
+    errdefer orig_game_state_arena.deinit();
+
+    var original_registry = try g.Registry.init(&orig_game_state_arena);
 
     var inventory = try c.Inventory.empty(std.testing.allocator);
     try inventory.items.add(.{ .id = 7 });
@@ -456,11 +458,13 @@ test "All components should be serializable" {
 
     // when:
     try writer.write(expected);
-    original_registry.deinit();
+    orig_game_state_arena.deinit();
 
     // then:
-    var actual_registry = try g.Registry.init(std.testing.allocator);
-    defer actual_registry.deinit();
+    var game_state_arena: g.GameStateArena = .init(std.testing.allocator);
+    defer game_state_arena.deinit();
+
+    var actual_registry = try g.Registry.init(&game_state_arena);
 
     var fixed_reader = std.Io.Reader.fixed(&buffer);
     var reader = Reader.init(&actual_registry, &fixed_reader);

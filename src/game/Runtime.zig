@@ -1,3 +1,5 @@
+//! This is a kind of the fat pointer similar to the `std.mem.Allocator`.
+//! It means, the `Render` can be always passed by value.
 const std = @import("std");
 const g = @import("game_pkg.zig");
 const p = g.primitives;

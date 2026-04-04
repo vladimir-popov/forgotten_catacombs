@@ -50,7 +50,7 @@ pub fn init(session: *g.GameSession) !Self {
     var options: w.OptionsArea(g.meta.Skill) = .init(session, .left);
     for (std.enums.values(g.meta.Skill)) |skill| {
         const option = try options.addEmptyOption(
-            session.arena.allocator(),
+            session.mode_arena.allocator(),
             skill,
         );
         option.label_len = SKILLS_AREA_REGION.cols;
@@ -74,7 +74,7 @@ pub fn init(session: *g.GameSession) !Self {
 }
 
 pub fn deinit(self: *Self) void {
-    self.options.deinit(self.session.arena.allocator());
+    self.options.deinit(self.session.mode_arena.allocator());
 }
 
 pub fn tick(self: *Self) !void {
@@ -110,7 +110,7 @@ pub fn tick(self: *Self) !void {
 fn showDescription(self: *Self, description: *const g.descriptions.Description) !void {
     var area: w.TextArea = .empty;
     for (description.description) |descr_line| {
-        const line = try area.addEmptyLine(self.session.arena.allocator());
+        const line = try area.addEmptyLine(self.session.mode_arena.allocator());
         _ = try std.fmt.bufPrint(line, "{s}", .{descr_line});
     }
     var window: w.ModalWindow(w.TextArea) = .defaultModalWindow(area);

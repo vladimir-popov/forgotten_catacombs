@@ -28,7 +28,6 @@ const State = union(enum) {
     draw: bool,
 };
 
-arena: std.heap.ArenaAllocator,
 session: *g.GameSession,
 // The entity to which quick actions can be applied
 target: ?g.Entity = null,
@@ -40,13 +39,11 @@ notification_to_show: ?NotificationMessage = null,
 
 pub fn init(
     self: *Self,
-    alloc: std.mem.Allocator,
     session: *g.GameSession,
     target: ?g.Entity,
 ) !void {
     log.debug("Init PlayMode. Target is {any}", .{target});
     self.* = .{
-        .arena = std.heap.ArenaAllocator.init(alloc),
         .session = session,
         .target = target,
         .quick_actions = .{},
@@ -57,10 +54,6 @@ pub fn init(
         .{ .row = self.session.viewport.region.rows + 1, .col = 1 },
         self.session.viewport.region.cols,
     );
-}
-
-pub fn deinit(self: *const Self) void {
-    self.arena.deinit();
 }
 
 inline fn setTarget(self: *Self, target: ?g.Entity) void {
@@ -254,7 +247,7 @@ fn handleInput(self: *Self) !?g.actions.Action {
         if (self.quick_actions_window) |*window| {
             if (try window.handleButton(btn)) {
                 try window.hide(self.session.render, .from_buffer);
-                window.deinit(self.arena.allocator());
+                window.deinit(self.session.mode_arena.allocator());
                 self.quick_actions_window = null;
             }
             switch (btn.game_button) {
@@ -416,7 +409,7 @@ pub fn updateQuickActions(self: *Self) anyerror!void {
             );
     }
 
-    const alloc = self.arena.allocator();
+    const alloc = self.session.mode_arena.allocator();
     // Remember the previously selected action to try to keep it selected
     const prev_selected_action = self.quickAction();
     log.debug(
@@ -532,7 +525,7 @@ const TargetsIterator = struct {
 fn windowWithQuickActions(self: *Self) !w.ModalWindow(w.OptionsArea(void)) {
     var area = w.OptionsArea(void).centered(self);
     for (self.quick_actions.actions.items, 0..) |qa, idx| {
-        try area.addOption(self.arena.allocator(), qa.toString(), {}, chooseQuickAction, null);
+        try area.addOption(self.session.mode_arena.allocator(), qa.toString(), {}, chooseQuickAction, null);
         if (idx == self.quick_actions.selected_idx)
             try area.selectLine(idx);
     }

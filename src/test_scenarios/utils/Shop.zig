@@ -10,7 +10,7 @@ const Self = @This();
 test_session: *TestSession,
 
 fn tradingMode(self: Self) *g.GameSession.TradingMode {
-    return &self.test_session.session.mode.trading;
+    return self.test_session.session.mode.trading;
 }
 
 pub fn isClosed(self: Self) bool {

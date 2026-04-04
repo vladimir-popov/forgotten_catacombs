@@ -1,4 +1,7 @@
-//! Set of methods to draw the game.
+//! This is a kind of the fat pointer similar to the `std.mem.Allocator`.
+//! It means, the `Render` can be always passed by value.
+//!
+//! The `Render` provides methods to draw the game.
 //! Comparing with `Runtime`, this module contains methods
 //! to draw objects from the game domain.
 //!
@@ -43,32 +46,19 @@ pub const default_filler = ' ';
 
 const Self = @This();
 
-arena: std.heap.ArenaAllocator,
 runtime: g.Runtime,
-/// A pointer to the cache of the visible area.
+/// A cache of the visible area.
 scene_buffer: *SceneBuffer,
-scene_rows: u8,
-scene_cols: u8,
 
-pub fn init(
-    self: *Self,
-    gpa: std.mem.Allocator,
-    runtime: g.Runtime,
-    display_rows: u8,
-    display_cols: u8,
-) !void {
-    self.* = .{
-        .arena = std.heap.ArenaAllocator.init(gpa),
+pub fn init(gpa: std.mem.Allocator, runtime: g.Runtime) !Self {
+    return .{
         .runtime = runtime,
-        .scene_buffer = try self.arena.allocator().create(SceneBuffer),
-        .scene_rows = display_rows - 2,
-        .scene_cols = display_cols,
+        .scene_buffer = try .create(gpa, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS),
     };
-    try self.scene_buffer.init(&self.arena, self.scene_rows, self.scene_cols);
 }
 
 pub fn deinit(self: *Self) void {
-    self.arena.deinit();
+    self.scene_buffer.destroy();
 }
 
 /// Draws the dungeon and visible sprites on the screen.
@@ -368,13 +358,13 @@ pub fn hideRightButton(self: *const Self) !void {
 pub fn setBorderWithArrow(self: *const Self, viewport: g.Viewport, side: p.Direction) void {
     switch (side) {
         .left => self.scene_buffer.setSymbol(
-            p.Point.init(1 + self.scene_rows / 2, 1),
+            p.Point.init(1 + viewport.region.rows / 2, 1),
             '<',
             .inverted,
             std.math.maxInt(SceneBuffer.ZOrder),
         ),
         .right => self.scene_buffer.setSymbol(
-            p.Point.init(1 + self.scene_rows / 2, self.scene_cols),
+            p.Point.init(1 + viewport.region.rows / 2, viewport.region.cols),
             '>',
             .inverted,
             std.math.maxInt(SceneBuffer.ZOrder),
@@ -386,7 +376,7 @@ pub fn setBorderWithArrow(self: *const Self, viewport: g.Viewport, side: p.Direc
             std.math.maxInt(SceneBuffer.ZOrder),
         ),
         .down => self.scene_buffer.setSymbol(
-            p.Point.init(self.scene_rows, viewport.region.cols / 2),
+            p.Point.init(viewport.region.rows, viewport.region.cols / 2),
             'v',
             .inverted,
             std.math.maxInt(SceneBuffer.ZOrder),
@@ -480,16 +470,26 @@ const SceneBuffer = struct {
     };
     pub const Row = []VersionedCell;
 
+    arena: std.heap.ArenaAllocator,
     rows: []Row,
     current_iteration: u1 = 1,
 
-    pub fn init(self: *SceneBuffer, arena: *std.heap.ArenaAllocator, rows: u8, cols: u8) !void {
-        const arena_alloc = arena.allocator();
-        self.rows = try arena_alloc.alloc(Row, rows);
+    pub fn create(gpa: std.mem.Allocator, rows: u8, cols: u8) !*SceneBuffer {
+        const self = try gpa.create(SceneBuffer);
+        self.arena = .init(gpa);
+        const alloc = self.arena.allocator();
+        self.rows = try alloc.alloc(Row, rows);
         for (0..rows) |r| {
-            self.rows[r] = try arena_alloc.alloc(VersionedCell, cols);
+            self.rows[r] = try alloc.alloc(VersionedCell, cols);
         }
         self.reset();
+        return self;
+    }
+
+    pub fn destroy(self: *SceneBuffer) void {
+        const alloc = self.arena.child_allocator;
+        self.arena.deinit();
+        alloc.destroy(self);
     }
 
     pub fn reset(self: *SceneBuffer) void {

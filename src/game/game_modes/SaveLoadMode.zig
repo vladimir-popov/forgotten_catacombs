@@ -46,8 +46,8 @@ const Self = @This();
 process: Process,
 
 // the session should be preinited
-pub fn loadSession(session: *g.GameSession) Self {
-    return .{ .process = .{ .loading = Loading.loadSession(session) } };
+pub fn loadSession(session: *g.GameSession, game_session_arena: *g.GameStateArena) Self {
+    return .{ .process = .{ .loading = Loading.loadSession(session, game_session_arena) } };
 }
 
 // the session should be preinited
@@ -239,12 +239,20 @@ const Loading = struct {
     file: g.Runtime.OpaqueFile = undefined,
     io_buffer: [128]u8 = undefined,
     level_depth: u8 = undefined,
+    /// This arena is used to manage memory for the Game.State, including the GameSession.
+    /// It have to be initialized only during loading a game session.
+    game_session_arena: ?*g.GameStateArena = null,
     /// Helps to choose a ladder on which the player should appear on the loaded level.
     /// null means that player's position will be loaded together with game session.
     moving_direction: ?c.Ladder.Direction,
 
-    pub fn loadSession(session: *g.GameSession) Loading {
-        return .{ .session = session, .progress = .load_session, .moving_direction = null };
+    pub fn loadSession(session: *g.GameSession, game_session_arena: *g.GameStateArena) Loading {
+        return .{
+            .game_session_arena = game_session_arena,
+            .session = session,
+            .progress = .load_session,
+            .moving_direction = null,
+        };
     }
 
     pub fn loadLevel(session: *g.GameSession, depth: u8, moving_direction: c.Ladder.Direction) Loading {
@@ -253,6 +261,7 @@ const Loading = struct {
             .progress = .session_loaded,
             .level_depth = depth,
             .moving_direction = moving_direction,
+            .game_session_arena = null,
         };
     }
 
@@ -303,7 +312,7 @@ const Loading = struct {
                 try self.state.reading.endObject();
                 log.debug("A game session was loaded.", .{});
 
-                self.session.level = g.Level.preInit(self.session.arena.allocator(), &self.session.registry);
+                self.session.level = g.Level.preInit(self.game_session_arena.?, &self.session.registry);
                 log.debug("A level was preinited.", .{});
 
                 self.progress = .session_loaded;

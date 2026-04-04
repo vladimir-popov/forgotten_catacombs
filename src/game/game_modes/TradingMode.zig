@@ -46,7 +46,6 @@ const MODAL_WINDOW_REGION: p.Region = p.Region.init(3, 2, g.DISPLAY_ROWS - 5, g.
 
 const Self = @This();
 
-alloc: std.mem.Allocator,
 session: *g.GameSession,
 wallet: *c.Wallet,
 inventory: *c.Inventory,
@@ -59,12 +58,10 @@ actions_window: ?w.ModalWindow(w.OptionsArea(g.Entity)) = null,
 
 pub fn init(
     self: *Self,
-    alloc: std.mem.Allocator,
     session: *g.GameSession,
     shop: *c.Shop,
 ) !void {
     self.* = .{
-        .alloc = alloc,
         .session = session,
         .wallet = session.registry.getUnsafe(session.player, c.Wallet),
         .inventory = session.registry.getUnsafe(session.player, c.Inventory),
@@ -88,12 +85,12 @@ pub fn init(
 // TODO use arena
 pub fn deinit(self: *Self) void {
     if (self.modal_window) |*window| {
-        window.deinit(self.alloc);
+        window.deinit(self.session.mode_arena.allocator());
     }
     if (self.actions_window) |*window| {
-        window.deinit(self.alloc);
+        window.deinit(self.session.mode_arena.allocator());
     }
-    self.main_window.deinit(self.alloc);
+    self.main_window.deinit(self.session.mode_arena.allocator());
 }
 
 inline fn buyingTab(self: *Self) *w.WindowWithTabs.Tab {
@@ -110,14 +107,14 @@ pub fn tick(self: *Self) !void {
             if (try window.handleButton(btn)) {
                 std.log.debug("Close description window", .{});
                 try self.main_window.draw(self.session.render);
-                window.deinit(self.alloc);
+                window.deinit(self.session.mode_arena.allocator());
                 self.modal_window = null;
             }
         } else if (self.actions_window) |*window| {
             if (try window.handleButton(btn)) {
                 std.log.debug("Close actions window", .{});
                 try self.main_window.draw(self.session.render);
-                window.deinit(self.alloc);
+                window.deinit(self.session.mode_arena.allocator());
                 self.actions_window = null;
             }
         } else {
@@ -205,7 +202,7 @@ fn updateBuyingTab(self: *Self) !void {
     while (itr.next()) |item_ptr| {
         var buffer: w.TextArea.Line = undefined;
         try tab.scrollable_area.content.addOption(
-            self.alloc,
+            self.session.mode_arena.allocator(),
             try self.formatProduct(&buffer, item_ptr.*, true),
             item_ptr.*,
             buyOrDescribe,
@@ -228,7 +225,7 @@ fn updateSellingTab(self: *Self) !void {
     while (itr.next()) |item_ptr| {
         var buffer: w.TextArea.Line = undefined;
         try tab.scrollable_area.content.addOption(
-            self.alloc,
+            self.session.mode_arena.allocator(),
             try self.formatProduct(&buffer, item_ptr.*, false),
             item_ptr.*,
             sellOrDescribe,
@@ -247,8 +244,8 @@ fn buyOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Buttons is helt. Show modal window for {any}", .{item});
     var area = w.OptionsArea(g.Entity).centered(self);
-    try area.addOption(self.alloc, "Buy", item, buySelectedItem, null);
-    try area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
+    try area.addOption(self.session.mode_arena.allocator(), "Buy", item, buySelectedItem, null);
+    try area.addOption(self.session.mode_arena.allocator(), "Describe", item, describeSelectedItem, null);
     self.actions_window = .defaultModalWindow(area);
     // keep the main window opened
     return false;
@@ -257,8 +254,8 @@ fn buyOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
 fn sellOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     var area = w.OptionsArea(g.Entity).centered(self);
-    try area.addOption(self.alloc, "Sell", item, sellSelectedItem, null);
-    try area.addOption(self.alloc, "Describe", item, describeSelectedItem, null);
+    try area.addOption(self.session.mode_arena.allocator(), "Sell", item, sellSelectedItem, null);
+    try area.addOption(self.session.mode_arena.allocator(), "Describe", item, describeSelectedItem, null);
     self.actions_window = .defaultModalWindow(area);
     // keep the main window opened
     return false;
@@ -276,7 +273,7 @@ fn buySelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
         try self.updateSellingTab();
     } else {
         self.modal_window = try w.notification(
-            self.alloc,
+            self.session.mode_arena.allocator(),
             "You have not enough\nmoney.",
             .{ .max_region = MODAL_WINDOW_REGION },
         );
@@ -297,7 +294,7 @@ fn sellSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
         try self.updateSellingTab();
     } else {
         self.modal_window = try w.notification(
-            self.alloc,
+            self.session.mode_arena.allocator(),
             "Traider doesn't have\nenough money",
             .{ .max_region = MODAL_WINDOW_REGION },
         );
@@ -309,7 +306,7 @@ fn sellSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
 fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Show info about item {d}", .{item.id});
-    self.modal_window = try w.entityDescription(self.alloc, self.session, item);
+    self.modal_window = try w.entityDescription(self.session.mode_arena.allocator(), self.session, item);
     // keep the main window opened
     return false;
 }

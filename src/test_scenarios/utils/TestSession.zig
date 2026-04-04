@@ -11,7 +11,7 @@ pub const log = std.log.scoped(.test_session);
 
 const Self = @This();
 
-arena: std.heap.ArenaAllocator,
+arena: g.GameStateArena,
 runtime: TestRuntime,
 render: g.Render,
 session: g.GameSession,
@@ -25,9 +25,9 @@ pub fn initOnFirstLevel(self: *Self, gpa: std.mem.Allocator, io: std.Io) !void {
     const arena_alloc = self.arena.allocator();
     log.info("Test directory is {s}", .{try self.tmp_dir.dir.realPathFileAlloc(io, ".", arena_alloc)});
     self.runtime = try TestRuntime.init(arena_alloc, io, self.tmp_dir.dir);
-    try self.render.init(arena_alloc, self.runtime.runtime(), g.DISPLAY_ROWS, g.DISPLAY_COLS);
+    self.render = try g.Render.init(arena_alloc, self.runtime.runtime());
     try self.session.initNew(
-        arena_alloc,
+        &self.arena,
         std.testing.random_seed,
         self.runtime.runtime(),
         self.render,
@@ -64,7 +64,7 @@ pub fn initWithTestArea(self: *Self, gpa: std.mem.Allocator, io: std.Io) !void {
         }
     }
     self.session.level.deinit();
-    self.session.level = g.Level.preInit(self.session.arena.allocator(), &self.session.registry);
+    self.session.level = g.Level.preInit(&self.arena, &self.session.registry);
     const level = &self.session.level;
     const dungeon = try TestLocation.generateDungeon(&self.session.level.arena);
     try level.setupDungeon(0, dungeon, self.session.player);
@@ -79,13 +79,13 @@ pub fn load(self: *Self, gpa: std.mem.Allocator, io: std.Io, working_dir: std.te
     self.arena = std.heap.ArenaAllocator.init(gpa);
     const arena_alloc = self.arena.allocator();
     self.runtime = try TestRuntime.init(arena_alloc, io, self.tmp_dir.dir);
-    try self.render.init(arena_alloc, self.runtime.runtime(), g.DISPLAY_ROWS, g.DISPLAY_COLS);
+    self.render = try g.Render.init(arena_alloc, self.runtime.runtime());
     try self.session.preInit(
-        arena_alloc,
+        &self.arena,
         self.runtime.runtime(),
         self.render,
     );
-    try self.session.switchModeToLoadingSession();
+    try self.session.switchModeToLoadingSession(&self.arena);
 }
 
 pub fn deinit(self: *Self) void {
@@ -144,10 +144,12 @@ pub fn completeRound(self: *Self) !void {
 pub fn openInventory(self: *Self) !Inventory {
     try self.session.manageInventory();
     try self.tick(.{});
+    std.debug.assert(self.session.mode == .inventory);
     return .{ .test_session = self };
 }
 
 pub fn exploreMode(self: *Self) !void {
     try self.session.lookAround();
     try self.tick(.{});
+    std.debug.assert(self.session.mode == .explore);
 }
