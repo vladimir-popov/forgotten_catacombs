@@ -19,6 +19,7 @@ pushed_buttons: std.ArrayList(?g.Button) = .empty,
 
 is_dev_mode: bool = false,
 cheat: ?g.Cheat = null,
+stack_start: usize = 0,
 
 pub fn init(alloc: std.mem.Allocator, io: std.Io, working_dir: std.Io.Dir) !Self {
     return .{
@@ -54,6 +55,7 @@ pub fn runtime(self: *Self) g.Runtime {
             .writeToFile = writeToFile,
             .isFileExists = isFileExists,
             .deleteFileIfExists = deleteFileIfExists,
+            .stackSize = stackSize,
         },
     };
 }
@@ -168,4 +170,10 @@ fn deleteFileIfExists(ptr: *anyopaque, file_path: []const u8) !void {
             else => return err,
         }
     };
+}
+
+fn stackSize(ptr: *anyopaque) usize {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    const stack: usize = @intFromPtr(&self);
+    return if (stack > self.stack_start) stack - self.stack_start else self.stack_start - stack;
 }

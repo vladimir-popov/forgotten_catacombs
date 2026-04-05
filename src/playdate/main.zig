@@ -104,6 +104,8 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
 
 fn updateAndRender(userdata: ?*anyopaque) callconv(.c) c_int {
     const state: *GlobalState = @ptrCast(@alignCast(userdata.?));
+    // we get the first address on the stack here, this is why take the point on the pointer here
+    state.playdate_runtime.stack_start = @intFromPtr(&state);
     state.game.tick() catch |err|
         std.debug.panic("Error {any} on game tick", .{err});
 

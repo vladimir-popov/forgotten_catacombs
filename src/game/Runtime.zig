@@ -44,6 +44,7 @@ const VTable = struct {
     isFileExists: *const fn (context: *anyopaque, path: [:0]const u8) anyerror!bool,
     deleteFileIfExists: *const fn (context: *anyopaque, path: [:0]const u8) anyerror!void,
     //  ----------------------------------
+    stackSize: *const fn (context: *anyopaque) usize,
 };
 
 context: *anyopaque,
@@ -51,6 +52,10 @@ vtable: *const VTable,
 
 pub inline fn isDevMode(self: *const Self) bool {
     return self.vtable.isDevMode(self.context);
+}
+
+pub inline fn stackSize(self: *const Self) usize {
+    return self.vtable.stackSize(self.context);
 }
 
 pub inline fn popCheat(self: *const Self) ?g.Cheat {

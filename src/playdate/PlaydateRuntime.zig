@@ -21,6 +21,7 @@ alloc: std.mem.Allocator,
 bitmap_table: *api.LCDBitmapTable,
 last_button: *LastButton,
 is_dev_mode: bool = false,
+stack_start: usize = 0,
 
 pub fn init(playdate: *api.PlaydateAPI) !Self {
     const err: ?*[*c]const u8 = null;
@@ -75,6 +76,7 @@ pub fn runtime(self: *Self) g.Runtime {
             .writeToFile = writeToFile,
             .isFileExists = isFileExists,
             .deleteFileIfExists = deleteFileIfExists,
+            .stackSize = stackSize,
         },
     };
 }
@@ -269,6 +271,13 @@ fn deleteFileIfExists(ptr: *anyopaque, file_path: [:0]const u8) !void {
         log.err("Error on deleting file '{s}': {s}", .{ file_path, self.playdate.file.geterr() orelse "" });
         return error.IOError;
     }
+}
+
+fn stackSize(ptr: *anyopaque) usize {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    // we get the first address on the stack here, this is why take the point on the pointer here
+    const stack: usize = @intFromPtr(&self);
+    return if (stack > self.stack_start) stack - self.stack_start else self.stack_start - stack;
 }
 
 const ExpectedFile = struct {

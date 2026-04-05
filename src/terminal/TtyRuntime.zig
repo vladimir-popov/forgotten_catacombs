@@ -117,6 +117,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                     .writeToFile = writeToFile,
                     .isFileExists = isFileExists,
                     .deleteFileIfExists = deleteFileIfExists,
+                    .stackSize = stackSize,
                 },
             };
         }
@@ -338,6 +339,11 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                     else => return err,
                 }
             };
+        }
+
+        fn stackSize(_: *anyopaque) usize {
+            // TODO
+            return 0;
         }
     };
 }
