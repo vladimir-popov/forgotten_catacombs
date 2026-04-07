@@ -149,14 +149,10 @@ pub fn doAction(
             return try self.hit(actor, action, move_points_for_action);
         },
         .open => {
-            const door = action.payload.open;
-            try self.session().registry.setComponentsToEntity(door.id, g.entities.openedDoor(door.place));
-            return .{ .done = move_points_for_action };
+            return try self.openDoor(actor, action, move_points_for_action);
         },
         .close => {
-            const door = action.payload.close;
-            try self.session().registry.setComponentsToEntity(door.id, g.entities.closedDoor(door.place));
-            return .{ .done = move_points_for_action };
+            return try self.closeDoor(actor, action, move_points_for_action);
         },
         .pickup => {
             return try self.pickup(actor, action, move_points_for_action);
@@ -598,6 +594,32 @@ fn consume(self: *Self, actor: g.Entity, item: g.Entity, consumable: *const c.Co
     }
     // remove the potion
     try self.session().registry.removeEntity(item);
+}
+
+fn openDoor(
+    self: *Self,
+    _: g.Entity,
+    action: *const g.Action,
+    move_points_for_action: g.MovePoints,
+) !g.actions.ActionResult {
+    const door = action.payload.open;
+    try self.session().registry.set(door.id, c.Door{ .state = .opened });
+    try self.session().registry.set(door.id, c.Sprite{ .codepoint = g.codepoints.door_opened });
+    try self.session().registry.set(door.id, c.Description{ .preset = .opened_door });
+    return .{ .done = move_points_for_action };
+}
+
+fn closeDoor(
+    self: *Self,
+    _: g.Entity,
+    action: *const g.Action,
+    move_points_for_action: g.MovePoints,
+) !g.actions.ActionResult {
+    const door = action.payload.open;
+    try self.session().registry.set(door.id, c.Door{ .state = .closed });
+    try self.session().registry.set(door.id, c.Sprite{ .codepoint = g.codepoints.door_closed });
+    try self.session().registry.set(door.id, c.Description{ .preset = .closed_door });
+    return .{ .done = move_points_for_action };
 }
 
 fn pickup(
