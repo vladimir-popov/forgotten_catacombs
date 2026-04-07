@@ -237,7 +237,7 @@ pub const Cheat = union(enum) {
                 }
                 const seed = session.prng.next();
                 global_debug_shop.?.* = try c.Shop.empty(session.mode_arena.allocator(), 1.0, 200, seed);
-                return .{ .trade = global_debug_shop.? };
+                return .action(.trade, global_debug_shop.?);
             },
             else => return null,
         }
@@ -252,7 +252,7 @@ pub const Cheat = union(enum) {
     }
 
     inline fn movePlayerToPoint(place: p.Point) g.actions.Action {
-        return .{ .move = g.actions.Action.Move{ .target = .{ .new_place = place } } };
+        return .action(.move, g.actions.Action.Payload.Move{ .target = .{ .new_place = place } });
     }
 };
 

@@ -64,88 +64,99 @@ inline fn setTarget(self: *Self, target: ?g.Entity) void {
 
 pub fn tick(self: *Self) !void {
     switch (self.state) {
-        .player_turn => {
-            // break this function if no input
-            const action = (try self.handleInput()) orelse return;
-            const action_result = try self.doTurn(self.session.player, action, std.math.maxInt(g.MovePoints));
-            switch (action_result) {
-                .done => |success| {
-                    // Force change the target
-                    switch (success.actual_action) {
-                        .hit => |enemy| if (self.session.registry.contains(enemy)) {
-                            self.setTarget(enemy);
-                        } else {
-                            self.setTarget(null);
-                        },
-                        .open => |door| {
-                            self.setTarget(door.id);
-                        },
-                        else => {},
-                    }
-                    self.state = .{ .update_target = false };
-                },
-                else => {},
-            }
-        },
-        .enemies_turn => {
-            var itr = self.session.registry.query(c.Initiative);
-            while (itr.next()) |tuple| {
-                const npc, const initiative = tuple;
-                // repeat doing something until move points are over
-                loop: while (true) {
-                    // TODO: compare initiative with minimal required mp to prevent calculating an action
-                    const action = self.session.ai.action(npc);
-                    const action_result = try self.doTurn(npc, action, initiative.move_points);
-                    switch (action_result) {
-                        .done => |success| {
-                            const mp = success.spent_move_points;
-                            g.utils.assert(
-                                mp <= initiative.move_points,
-                                "Entity {d} spent more MP {d} than initiative has {any}. Action was {any}",
-                                .{ npc.id, mp, initiative, success.actual_action },
-                            );
-                            initiative.move_points -= mp;
-                        },
-                        .not_enough_points, .actor_is_dead => break :loop,
-                        .declined => {},
-                    }
-                }
-            }
-            self.state = .{ .update_target = true };
-        },
+        .player_turn => try self.playerTurn(),
+        .enemies_turn => try self.enemiesTurn(),
         .update_target => |next_turn| {
             try self.updateQuickActions();
             self.state = .{ .draw = next_turn };
         },
-        .draw => |is_next_player_turn| {
-            // the quick_actions_window is drawn during handleInput
-            if (self.quick_actions_window != null) return;
+        .draw => |is_next_player_turn| try self.draw(is_next_player_turn),
+    }
+}
 
-            try self.drawInfoBar();
-            const level = &self.session.level;
-            try self.session.render.drawDungeonToBuffer(self.session.viewport, level);
-            try self.session.render.drawEntitiesToBuffer(
-                self.session.viewport,
-                &self.session.journal,
-                self.session.prng.random(),
-                level,
-                self.target,
-            );
-            const now = self.session.runtime.currentMillis();
-            const is_blocked_animation = try self.drawAnimationsFramesToBuffer(now);
-            try self.session.render.drawChangedSymbols();
-            const is_notification_shown = try self.showNotifications(now);
-            if (self.session.registry.get(self.session.player, c.Health)) |health| {
-                try self.session.render.drawPlayerHp(health);
+fn playerTurn(self: *Self) !void {
+    // break this function if no input
+    const action = (try self.handleInput()) orelse return;
+    const action_result = try self.doTurn(self.session.player, action, std.math.maxInt(g.MovePoints));
+    switch (action_result) {
+        .done => |success| {
+            // Force change the target
+            switch (success.actual_action.tag) {
+                .hit => {
+                    const enemy = success.actual_action.payload.hit;
+                    if (self.session.registry.contains(enemy)) {
+                        self.setTarget(enemy);
+                    } else {
+                        self.setTarget(null);
+                    }
+                },
+                .open => {
+                    const door = success.actual_action.payload.open;
+                    self.setTarget(door.id);
+                },
+                else => {},
             }
-            // Ignore any input while showing a blocked animation or notification
-            if (is_blocked_animation or is_notification_shown) {
-                try self.session.runtime.cleanInputBuffer();
-            } else {
-                // Drawing is completed
-                self.state = if (is_next_player_turn) .player_turn else .enemies_turn;
-            }
+            self.state = .{ .update_target = false };
         },
+        else => {},
+    }
+}
+
+fn enemiesTurn(self: *Self) !void {
+    log.warn("enemiesTurn {d}", .{self.session.runtime.stackSize()});
+    var itr = self.session.registry.query(c.Initiative);
+    while (itr.next()) |tuple| {
+        const npc, const initiative = tuple;
+        // repeat doing something until move points are over
+        loop: while (true) {
+            // TODO: compare initiative with minimal required mp to prevent calculating an action
+            const action = self.session.ai.action(npc);
+            const action_result = try self.doTurn(npc, action, initiative.move_points);
+            switch (action_result) {
+                .done => |success| {
+                    const mp = success.spent_move_points;
+                    g.utils.assert(
+                        mp <= initiative.move_points,
+                        "Entity {d} spent more MP {d} than initiative has {any}. Action was {any}",
+                        .{ npc.id, mp, initiative, success.actual_action },
+                    );
+                    initiative.move_points -= mp;
+                },
+                .not_enough_points, .actor_is_dead => break :loop,
+                .declined => {},
+            }
+        }
+    }
+    self.state = .{ .update_target = true };
+}
+
+fn draw(self: *Self, is_next_player_turn: bool) !void {
+    // the quick_actions_window is drawn during handleInput
+    if (self.quick_actions_window != null) return;
+
+    try self.drawInfoBar();
+    const level = &self.session.level;
+    try self.session.render.drawDungeonToBuffer(self.session.viewport, level);
+    try self.session.render.drawEntitiesToBuffer(
+        self.session.viewport,
+        &self.session.journal,
+        self.session.prng.random(),
+        level,
+        self.target,
+    );
+    const now = self.session.runtime.currentMillis();
+    const is_blocked_animation = try self.drawAnimationsFramesToBuffer(now);
+    try self.session.render.drawChangedSymbols();
+    const is_notification_shown = try self.showNotifications(now);
+    if (self.session.registry.get(self.session.player, c.Health)) |health| {
+        try self.session.render.drawPlayerHp(health);
+    }
+    // Ignore any input while showing a blocked animation or notification
+    if (is_blocked_animation or is_notification_shown) {
+        try self.session.runtime.cleanInputBuffer();
+    } else {
+        // Drawing is completed
+        self.state = if (is_next_player_turn) .player_turn else .enemies_turn;
     }
 }
 
@@ -244,6 +255,7 @@ fn showNotifications(self: *Self, now: u64) !bool {
 // NOTE: the quick_actions_window can be drawn during this method
 fn handleInput(self: *Self) !?g.actions.Action {
     if (try self.session.runtime.readPushedButtons()) |btn| {
+        log.warn("handleInput {d}", .{self.session.runtime.stackSize()});
         if (self.quick_actions_window) |*window| {
             if (try window.handleButton(btn)) {
                 try window.hide(self.session.render, .from_buffer);
@@ -278,11 +290,7 @@ fn handleInput(self: *Self) !?g.actions.Action {
                     },
                 },
                 .left, .right, .up, .down => {
-                    return g.actions.Action{
-                        .move = .{
-                            .target = .{ .direction = btn.toDirection().? },
-                        },
-                    };
+                    return .action(.move, .{ .target = .{ .direction = btn.toDirection().? } });
                 },
             }
         }
@@ -356,6 +364,7 @@ pub fn doTurn(
     log.info("The turn of the entity {d}.", .{actor.id});
     defer log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
 
+    log.warn("doTurn {d}", .{self.session.runtime.stackSize()});
     // Do Actions
     const action_result = try self.session.actions.doAction(actor, action, initiative);
     switch (action_result) {
@@ -374,13 +383,13 @@ pub fn doTurn(
             }
         },
         .actor_is_dead => {
-            log.info("Entity {d} is dead after action {t}", .{ actor.id, action });
+            log.info("Entity {d} is dead after action {t}", .{ actor.id, action.tag });
         },
         .not_enough_points => {
-            log.debug("Entity {d} has not enough move points for action {t}", .{ actor.id, action });
+            log.debug("Entity {d} has not enough move points for action {t}", .{ actor.id, action.tag });
         },
         .declined => {
-            log.debug("The action {t} was declined for the entity {d}", .{ action, actor.id });
+            log.debug("The action {t} was declined for the entity {d}", .{ action.tag, actor.id });
         },
     }
     return action_result;
@@ -390,7 +399,7 @@ inline fn quickAction(self: *const Self) g.actions.Action {
     if (self.quick_actions.actions.items.len > 0)
         return self.quick_actions.actions.items[self.quick_actions.selected_idx]
     else
-        return .wait;
+        return .action(.wait, {});
 }
 
 /// Checks that the target exists, or finds another.
@@ -408,6 +417,7 @@ pub fn updateQuickActions(self: *Self) anyerror!void {
                 },
             );
     }
+    log.warn("updateQActions {d}", .{self.session.runtime.stackSize()});
 
     const alloc = self.session.mode_arena.allocator();
     // Remember the previously selected action to try to keep it selected
@@ -441,7 +451,7 @@ pub fn updateQuickActions(self: *Self) anyerror!void {
             log.debug("Calculated action is {any}", .{qa});
             try self.quick_actions.actions.append(alloc, qa);
             // Try to keep previous selection
-            if (qa.eql(prev_selected_action)) {
+            if (qa.tag == prev_selected_action.tag) {
                 self.quick_actions.selected_idx = self.quick_actions.actions.items.len - 1;
             }
             // Let's use the first target with calculated qa.
@@ -479,9 +489,9 @@ pub fn updateQuickActions(self: *Self) anyerror!void {
     }
 
     // The player should always be able to wait...
-    try self.quick_actions.actions.append(alloc, .wait);
+    try self.quick_actions.actions.append(alloc, .action(.wait, {}));
     // ...and manage its inventory.
-    try self.quick_actions.actions.append(alloc, .open_inventory);
+    try self.quick_actions.actions.append(alloc, .action(.open_inventory, {}));
 }
 
 /// Iterates over all entities with `Position` component on the level,

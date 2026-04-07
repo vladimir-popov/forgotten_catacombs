@@ -26,13 +26,13 @@ pub fn calculateQuickActionForTarget(
 
     if (player_place.eql(target_position.place)) {
         if (g.meta.isItem(&self.session().registry, target_entity)) {
-            return .{ .pickup = target_entity };
+            return .action(.pickup, target_entity);
         }
         if (self.session().registry.get(target_entity, c.Ladder)) |ladder| {
             // It's impossible to go upper the first level
             if (ladder.direction == .up and self.session().level.depth == 0) return null;
 
-            return .{ .move_to_level = ladder.* };
+            return .action(.move_to_level, ladder.*);
         }
     }
 
@@ -40,23 +40,23 @@ pub fn calculateQuickActionForTarget(
 
     if (g.meta.getEnemyType(&self.session().registry, target_entity)) |_| {
         // It's always possible to hit neighbors in 4 directions
-        if (is_near4) return .{ .hit = target_entity };
+        if (is_near4) return .action(.hit, target_entity);
 
         // Check the achievability of the target
         const distance: u8 = @intFromFloat(player_place.distanceTo(target_position.place));
         if (distance <= player_weapon.max_distance) {
             if (!self.session().level.isObstaclesOnTheLine(player_place, target_position.place))
-                return .{ .hit = target_entity };
+                return .action(.hit, target_entity);
         }
     }
 
     if (is_near4) {
         if (self.session().registry.get(target_entity, c.Shop)) |shop| {
-            return .{ .trade = shop };
+            return .action(.trade, shop);
         }
         if (self.session().registry.get(target_entity, c.Description)) |descr| {
             if (descr.preset == .scientist) {
-                return .modify_recognize;
+                return .action(.modify_recognize, {});
             }
         }
         if (self.session().registry.get(target_entity, c.Door)) |door| {
@@ -65,8 +65,8 @@ pub fn calculateQuickActionForTarget(
                 return null;
             }
             return switch (door.state) {
-                .opened => .{ .close = .{ .id = target_entity, .place = target_position.place } },
-                .closed => .{ .open = .{ .id = target_entity, .place = target_position.place } },
+                .opened => .action(.close, .{ .id = target_entity, .place = target_position.place }),
+                .closed => .action(.open, .{ .id = target_entity, .place = target_position.place }),
             };
         }
     }
@@ -114,29 +114,33 @@ pub fn doAction(
     action: g.Action,
     move_points_limit: g.MovePoints,
 ) !g.actions.ActionResult {
-    if (std.log.logEnabled(.debug, .actions) and action != .do_nothing) {
+    if (std.log.logEnabled(.debug, .actions) and action.tag != .do_nothing) {
         log.debug("Do action {any} by the entity {d}", .{ action, actor.id });
     }
     const move_points_for_action = g.meta.movePointsForAction(&self.session().registry, actor, action);
     if (move_points_for_action > move_points_limit)
         return .not_enough_points;
 
-    switch (action) {
+    log.warn("2. doAction {d}", .{self.session().runtime.stackSize()});
+    switch (action.tag) {
         .do_nothing => return .declined,
-        .drink => |potion_id| if (g.meta.getPotionType(&self.session().registry, potion_id)) |potion_type| {
-            try self.drinkPotion(actor, potion_id, potion_type);
+        .drink => if (g.meta.getPotionType(&self.session().registry, action.payload.drink)) |potion_type| {
+            try self.drinkPotion(actor, action.payload.drink, potion_type);
         },
-        .eat => |food_id| {
+        .eat => {
+            const food_id = action.payload.eat;
             try self.consume(actor, food_id, self.session().registry.getUnsafe(food_id, c.Consumable));
         },
         .open_inventory => {
             try self.session().manageInventory();
         },
-        .move => |move| {
+        .move => {
+            const move = action.payload.move;
             if (self.session().registry.get(actor, c.Position)) |position|
                 return self.tryToMove(actor, position, move, move_points_for_action, move_points_limit);
         },
-        .step_in_trap => |step| {
+        .step_in_trap => {
+            const step = action.payload.step_in_trap;
             // If the actor not dead, moving
             if (!try self.handleTrap(actor, step.trap_entity, step.trap)) {
                 const from_position = self.session().registry.get(actor, c.Position).?;
@@ -145,22 +149,28 @@ pub fn doAction(
                 return .actor_is_dead;
             }
         },
-        .move_to_level => |ladder| {
-            try self.session().movePlayerToLevel(ladder);
+        .move_to_level => {
+            try self.session().movePlayerToLevel(action.payload.move_to_level);
             return .{ .done = .{ .actual_action = action, .spent_move_points = 0 } };
         },
-        .hit => |target| if (self.session().registry.get(target, c.Health)) |target_health| {
-            if (!try self.tryToHit(actor, target, target_health)) return .declined;
-        } else {
-            return .declined;
+        .hit => {
+            const target = action.payload.hit;
+            if (self.session().registry.get(target, c.Health)) |target_health| {
+                if (!try self.tryToHit(actor, target, target_health)) return .declined;
+            } else {
+                return .declined;
+            }
         },
-        .open => |door| {
+        .open => {
+            const door = action.payload.open;
             try self.session().registry.setComponentsToEntity(door.id, g.entities.openedDoor(door.place));
         },
-        .close => |door| {
+        .close => {
+            const door = action.payload.close;
             try self.session().registry.setComponentsToEntity(door.id, g.entities.closedDoor(door.place));
         },
-        .pickup => |item| {
+        .pickup => {
+            const item = action.payload.pickup;
             const inventory = self.session().registry.getUnsafe(self.session().player, c.Inventory);
             if (self.session().registry.get(item, c.Pile)) |_| {
                 try self.session().manageInventory();
@@ -170,21 +180,24 @@ pub fn doAction(
                 try self.session().level.removeEntity(item);
             }
         },
-        .go_sleep => |target| {
+        .go_sleep => {
+            const target = action.payload.go_sleep;
             self.session().registry.getUnsafe(target, c.EnemyState).* = .sleeping;
             try self.session().registry.set(
                 target,
                 c.Animation{ .preset = .go_sleep },
             );
         },
-        .chill => |target| {
+        .chill => {
+            const target = action.payload.chill;
             self.session().registry.getUnsafe(target, c.EnemyState).* = .walking;
             try self.session().registry.set(
                 target,
                 c.Animation{ .preset = .relax },
             );
         },
-        .get_angry => |target| {
+        .get_angry => {
+            const target = action.payload.get_angry;
             self.session().registry.getUnsafe(target, c.EnemyState).* = .aggressive;
             try self.session().registry.set(
                 target,
@@ -194,7 +207,8 @@ pub fn doAction(
         .modify_recognize => {
             try self.session().modifyRecognize();
         },
-        .trade => |shop| {
+        .trade => {
+            const shop = action.payload.trade;
             try self.session().trade(shop);
         },
         .wait => {
@@ -211,7 +225,7 @@ fn tryToMove(
     self: *Self,
     entity: g.Entity,
     from_position: *c.Position,
-    move: g.Action.Move,
+    move: g.Action.Payload.Move,
     move_speed: g.MovePoints,
     move_points_limit: g.MovePoints,
 ) anyerror!g.actions.ActionResult {
@@ -221,19 +235,20 @@ fn tryToMove(
     };
     if (from_position.place.eql(new_place)) return .declined;
 
+    log.warn("3 tryToMove {d}", .{self.session().runtime.stackSize()});
     if (checkCollision(self, new_place, move)) |action| {
-        log.debug("Collision lead to {t}", .{action});
+        log.debug("Collision lead to {t} {d}", .{ action.tag, self.session().runtime.stackSize() });
         return try doAction(self, entity, action, move_points_limit);
     }
     try self.doMove(entity, from_position, move.target);
-    return .{ .done = .{ .actual_action = .{ .move = move }, .spent_move_points = move_speed } };
+    return .{ .done = .{ .actual_action = .action(.move, move), .spent_move_points = move_speed } };
 }
 
 fn doMove(
     self: *Self,
     entity: g.Entity,
     from_position: *c.Position,
-    target: g.actions.Action.Move.Target,
+    target: g.actions.Action.Payload.Move.Target,
 ) !void {
     try self.session().sendEvent(.{
         .entity_moved = .{
@@ -243,6 +258,7 @@ fn doMove(
             .target = target,
         },
     });
+    log.warn("4 doMove {d}", .{self.session().runtime.stackSize()});
     from_position.place = switch (target) {
         .direction => |direction| from_position.place.movedTo(direction),
         .new_place => |place| place,
@@ -254,7 +270,8 @@ fn doMove(
 /// .do_nothing or any other action means that the move should be aborted, and the action handled;
 ///
 /// {place} a place in the dungeon with which collision should be checked.
-fn checkCollision(self: *Self, place: p.Point, move: g.Action.Move) ?g.Action {
+fn checkCollision(self: *Self, place: p.Point, move: g.Action.Payload.Move) ?g.Action {
+    log.warn("4 checkCollision {d}", .{self.session().runtime.stackSize()});
     switch (self.session().level.cellAt(place)) {
         .landscape => |cl| if (cl == .floor or cl == .doorway)
             return null,
@@ -263,28 +280,31 @@ fn checkCollision(self: *Self, place: p.Point, move: g.Action.Move) ?g.Action {
             // Check obstacles
             if (entities[c.Position.ZOrder.obstacle.index()]) |entity| {
                 if (self.session().registry.get(entity, c.Door)) |_|
-                    return .{ .open = .{ .id = entity, .place = place } };
+                    return .action(.open, .{ .id = entity, .place = place });
 
                 if (g.meta.getEnemyType(&self.session().registry, entity)) |_|
-                    return .{ .hit = entity };
+                    return .action(.hit, entity);
 
                 if (self.session().registry.get(entity, c.Shop)) |shop| {
-                    return .{ .trade = shop };
+                    return .action(.trade, shop);
                 }
 
                 if (self.session().registry.get(entity, c.Description)) |descr| {
                     if (descr.preset == .scientist) {
-                        return .modify_recognize;
+                        return .action(.modify_recognize, {});
                     }
                 }
 
                 // the player should not step on the place with entity with z-order = 2
-                return .do_nothing;
+                return .action(.do_nothing, {});
             }
             // Check traps
             if (entities[c.Position.ZOrder.trap.index()]) |entity| {
                 if (self.session().registry.get(entity, c.Trap)) |trap| {
-                    return .{ .step_in_trap = .{ .trap_entity = entity, .trap = trap.*, .moving_target = move.target } };
+                    return .action(
+                        .step_in_trap,
+                        .{ .trap_entity = entity, .trap = trap.*, .moving_target = move.target },
+                    );
                 }
             }
             // it's possible to step on the ladder, opened door, teleport, dropped item and
@@ -292,7 +312,7 @@ fn checkCollision(self: *Self, place: p.Point, move: g.Action.Move) ?g.Action {
             return null;
         },
     }
-    return .do_nothing;
+    return .action(.do_nothing, {});
 }
 
 // actor - is who is stepping in the trap

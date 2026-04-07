@@ -35,12 +35,12 @@ fn actionForSleepingEnemy(
     entity_place: p.Point,
     player_place: p.Point,
 ) g.actions.Action {
-    if (entity_place.near8(player_place)) return .{ .get_angry = entity };
+    if (entity_place.near8(player_place)) return .action(.get_angry, entity);
     if (self.isPlayerIsInSight(entity_place)) {
         // TODO Probability of waking up should depends on player's skills
-        if (self.rand.uintLessThan(u8, 10) == 0) return .{ .get_angry = entity };
+        if (self.rand.uintLessThan(u8, 10) == 0) return .action(.get_angry, entity);
     }
-    return .wait;
+    return .action(.wait, {});
 }
 
 fn actionForWalkingEnemy(
@@ -49,11 +49,11 @@ fn actionForWalkingEnemy(
     entity_place: p.Point,
     player_place: p.Point,
 ) g.actions.Action {
-    if (entity_place.near8(player_place)) return .{ .get_angry = entity };
+    if (entity_place.near8(player_place)) return .action(.get_angry, entity);
 
     if (self.isPlayerIsInSight(entity_place)) {
         // TODO Probability of become aggressive should depends on player's skills
-        if (self.rand.uintLessThan(u8, 10) > 3) return .{ .get_angry = entity };
+        if (self.rand.uintLessThan(u8, 10) > 3) return .action(.get_angry, entity);
     }
 
     var directions = [4]p.Direction{ .left, .up, .right, .down };
@@ -62,10 +62,10 @@ fn actionForWalkingEnemy(
     for (directions) |direction| {
         const place = entity_place.movedTo(direction);
         if (level.isObstacle(place)) continue;
-        return .{ .move = .{ .target = .{ .direction = direction } } };
+        return .action(.move, .{ .target = .{ .direction = direction } });
     }
     log.err("Entity {d} is stuck at {any}. Sleep.", .{ entity.id, entity_place });
-    return .{ .go_sleep = entity };
+    return .action(.go_sleep, entity);
 }
 
 fn actionForAggressiveEnemy(
@@ -75,7 +75,7 @@ fn actionForAggressiveEnemy(
     player_place: p.Point,
 ) g.actions.Action {
     if (entity_place.near4(player_place)) {
-        return .{ .hit = self.session.player };
+        return .action(.hit, self.session.player);
     }
     const level = &self.session.level;
     if (level.dijkstra_map.get(entity_place)) |vector| {
@@ -83,10 +83,10 @@ fn actionForAggressiveEnemy(
             "Entity {any} moves to the player from {any} in direction {s}",
             .{ entity, entity_place, @tagName(vector.direction) },
         );
-        return .{ .move = .{ .target = .{ .direction = vector.direction } } };
+        return .action(.move, .{ .target = .{ .direction = vector.direction } });
     } else {
         log.info("Player is out of reach for {any} (from {any}). Chill.", .{ entity, entity_place });
-        return .{ .chill = entity };
+        return .action(.chill, entity);
     }
 }
 

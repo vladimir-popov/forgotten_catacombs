@@ -283,10 +283,10 @@ fn consumeItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
         log.debug("Consume the item {d} {any}. (current equipment: {any})", .{ item.id, consumable, self.equipment });
         switch (consumable.consumable_type) {
             .potion => {
-                self.action = .{ .drink = item };
+                self.action = .action(.drink, item);
             },
             .food => {
-                self.action = .{ .eat = item };
+                self.action = .action(.eat, item);
             },
         }
         _ = self.inventory.items.remove(item);

@@ -31,7 +31,7 @@ pub const EntityMoved = struct {
     entity: g.Entity,
     is_player: bool,
     moved_from: p.Point,
-    target: g.actions.Action.Move.Target,
+    target: g.actions.Action.Payload.Move.Target,
 
     pub fn targetPlace(self: EntityMoved) p.Point {
         return switch (self.target) {
