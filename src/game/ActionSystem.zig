@@ -15,7 +15,7 @@ inline fn session(self: *Self) *g.GameSession {
 pub fn calculateQuickActionForTarget(
     self: *Self,
     player_place: p.Point,
-    player_weapon: c.Weapon,
+    player_weapon: *const c.Weapon,
     target_entity: g.Entity,
 ) ?g.Action {
     const target_position =
@@ -146,7 +146,7 @@ pub fn doAction(
             return .{ .done = 0 };
         },
         .hit => {
-            return try self.hit(actor, action, move_points_for_action);
+            return try self.tryToHit(actor, action, move_points_for_action);
         },
         .open => {
             return try self.openDoor(actor, action, move_points_for_action);
@@ -291,7 +291,12 @@ fn doMove(
 
 // actor - is who is stepping in the trap
 // returns true if the actor is dead.
-pub fn handleTrap(self: *Self, actor: g.Entity, action: *const g.Action, move_points_for_action: g.MovePoints) !g.actions.ActionResult {
+pub fn handleTrap(
+    self: *Self,
+    actor: g.Entity,
+    action: *const g.Action,
+    move_points_for_action: g.MovePoints,
+) !g.actions.ActionResult {
     const trap_id: g.Entity = action.payload.step_in_trap.trap_entity;
     const trap: c.Trap = action.payload.step_in_trap.trap;
     log.debug("The entity {d} stepped to the trap {d} {any}", .{ actor.id, trap_id.id, trap });
@@ -303,7 +308,7 @@ pub fn handleTrap(self: *Self, actor: g.Entity, action: *const g.Action, move_po
         .max = (health.max + trap.power * health.max) / 10,
     };
 
-    const is_actor_dead = try self.applyEffect(trap_id, trap_id, trap.effect, damage, actor, protection.*, health);
+    const is_actor_dead = try self.applyEffect(trap_id, trap_id, trap.effect, damage, actor, protection, health);
 
     // Show pop-up notifications about hit/damage
     if (actor.eql(self.session().player)) {
@@ -321,22 +326,55 @@ pub fn handleTrap(self: *Self, actor: g.Entity, action: *const g.Action, move_po
     }
 }
 
-fn hit(self: *Self, actor: g.Entity, action: *const g.Action, move_points_for_action: g.MovePoints) !g.actions.ActionResult {
+fn tryToHit(
+    self: *Self,
+    actor: g.Entity,
+    action: *const g.Action,
+    move_points_for_action: g.MovePoints,
+) !g.actions.ActionResult {
     log.warn("3. tryToHit {d}", .{self.session().runtime.stackSize()});
-    const target = action.payload.hit;
-    const target_health = self.session().registry.getUnsafe(target, c.Health);
     // Validate the weapon
     const weapon_id, const weapon = g.meta.getWeapon(&self.session().registry, actor);
+    if (!try self.isValidWeapon(actor, weapon)) {
+        return .declined;
+    }
+
+    // Calculate and handle evasion
+    const target = action.payload.hit;
+    if (try self.isMissed(actor, target)) {
+        return .{ .done = move_points_for_action };
+    }
+
+    const target_health = self.session().registry.getUnsafe(target, c.Health);
+    const target_health_before = target_health.current_hp;
+    // Break the function because the target is dead
+    if (try self.applyWeaponDamage(actor, weapon_id, weapon, target, target_health)) {
+        return .{ .done = move_points_for_action };
+    }
+
+    // Show pop-up notifications about hit/damage
+    if (actor.eql(self.session().player))
+        try self.session().showPopUpNotification(
+            .{ .hit = .{ .target = target, .damage = target_health_before - target_health.current_hp } },
+        )
+    else if (target.eql(self.session().player))
+        try self.session().showPopUpNotification(
+            .{ .damage = .{ .actor = actor, .damage = target_health_before - target_health.current_hp } },
+        );
+    return .{ .done = move_points_for_action };
+}
+
+fn isValidWeapon(self: *Self, actor: g.Entity, weapon: *const c.Weapon) !bool {
     if (weapon.ammunition_type) |expected_ammo| {
         const ammo_id, const ammo = g.meta.getAmmunition(&self.session().registry, actor) orelse {
             if (actor.eql(self.session().player))
                 try self.session().showPopUpNotification(.no_ammo);
-            return .declined;
+            return false;
         };
         if (ammo.ammunition_type != expected_ammo) {
             if (actor.eql(self.session().player))
                 try self.session().showPopUpNotification(.wrong_ammo);
-            return .declined;
+            return false;
         }
         ammo.amount -= 1;
         if (ammo.amount == 0) {
@@ -351,8 +389,10 @@ fn hit(self: *Self, actor: g.Entity, action: *const g.Action, move_points_for_ac
             }
         }
     }
+    return true;
+}
 
-    // Calculate and handle evasion
+fn isMissed(self: *Self, actor: g.Entity, target: g.Entity) !bool {
     const actor_weapon_skill: i16 = if (self.session().registry.get(actor, c.Skills)) |skills|
         skills.values.get(.weapon_mastery)
     else
@@ -375,11 +415,20 @@ fn hit(self: *Self, actor: g.Entity, action: *const g.Action, move_points_for_ac
             try self.session().showPopUpNotification(.{ .miss = .{ .target = target } })
         else if (target.eql(self.session().player))
             try self.session().showPopUpNotification(.{ .dodge = .{ .actor = actor } });
-        return .{ .done = move_points_for_action };
+        return true;
     }
+    return false;
+}
 
-    // Calculate and apply the damage
-    const target_health_before = target_health.current_hp;
+fn applyWeaponDamage(
+    self: *Self,
+    actor: g.Entity,
+    weapon_id: g.Entity,
+    weapon: *const c.Weapon,
+    target: g.Entity,
+    target_health: *c.Health,
+) !bool {
+    log.warn("4. applyWeaponDamage {d}", .{self.session().runtime.stackSize()});
     const target_armor = self.session().registry.get(target, c.Protection) orelse &c.Protection.zeros;
 
     // we have to copy the whole component, because the enemy can be removed,
@@ -392,7 +441,7 @@ fn hit(self: *Self, actor: g.Entity, action: *const g.Action, move_points_for_ac
     var itr = effects.values.iterator();
     while (itr.next()) |tuple| {
         const is_target_dead =
-            try self.applyEffect(actor, weapon_id, tuple.key, tuple.value.*, target, target_armor.*, target_health);
+            try self.applyEffect(actor, weapon_id, tuple.key, tuple.value.*, target, target_armor, target_health);
 
         // Give an experience to player
         if (is_target_dead and actor.eql(self.session().player)) {
@@ -402,20 +451,9 @@ fn hit(self: *Self, actor: g.Entity, action: *const g.Action, move_points_for_ac
             }
         }
 
-        // Break the function because the target is dead
-        if (is_target_dead)
-            return .{ .done = move_points_for_action };
+        if (is_target_dead) return true;
     }
-    // Show pop-up notifications about hit/damage
-    if (actor.eql(self.session().player))
-        try self.session().showPopUpNotification(
-            .{ .hit = .{ .target = target, .damage = target_health_before - target_health.current_hp } },
-        )
-    else if (target.eql(self.session().player))
-        try self.session().showPopUpNotification(
-            .{ .damage = .{ .actor = actor, .damage = target_health_before - target_health.current_hp } },
-        );
-    return .{ .done = move_points_for_action };
+    return false;
 }
 
 /// Applies the effect to the target. Calculates and applies the damage, or increase the target health for the
@@ -432,49 +470,87 @@ fn applyEffect(
     effect_range: p.Range(u8),
     /// to whom the effect should be applied
     target: g.Entity,
-    target_protection: c.Protection,
+    target_protection: *const c.Protection,
     target_health: *c.Health,
 ) !bool {
     log.warn("4. applyEffect {d}", .{self.session().runtime.stackSize()});
-    const target_defence: p.Range(u8) = target_protection.resistance.values.get(effect_type) orelse .empty;
     switch (effect_type) {
         .heal => {
-            const value = self.session().prng.random().intRangeAtMost(u8, effect_range.min, effect_range.max);
-            target_health.current_hp += value;
-            target_health.current_hp = @min(target_health.max, target_health.current_hp);
-            const is_blocked_animation = actor.eql(self.session().player) or target.eql(self.session().player);
-            try self.session().registry.set(
-                target,
-                c.Animation{ .preset = .healing, .is_blocked = is_blocked_animation },
-            );
-
-            log.debug("Entity {d} recovered up to {d} hp", .{ target.id, value });
+            try self.heal(actor, effect_range, target, target_health);
             return false;
         },
         else => {
-            const weapon_class =
-                if (self.session().registry.get(source, c.Weapon)) |weapon| weapon.class else .primitive;
-            const actor_stats = if (self.session().registry.get(actor, c.Stats)) |st| st.* else c.Stats.zeros;
-            const base_damage: f32 =
-                @floatFromInt(self.session().prng.random().intRangeAtMost(u8, effect_range.min, effect_range.max));
-            const character_factor: f32 = (0.4 * statBonus(actor_stats, weapon_class) + 4) / 4;
-            const damage: u8 = @intFromFloat(@round(base_damage * character_factor));
-            const absorbed_damage: u8 = self.session().prng.random().intRangeAtMost(
-                u8,
-                target_defence.min,
-                target_defence.max,
+            return try self.applyEffectDamage(
+                actor,
+                source,
+                effect_type,
+                effect_range,
+                target,
+                target_health,
+                target_protection,
             );
-            const damage_value: u8 = if (damage > absorbed_damage) damage - absorbed_damage else 1;
-            log.debug(
-                "Base damage {d}; Character factor {d}; Damage {d}; Absorbed damage {d};",
-                .{ base_damage, character_factor, damage, absorbed_damage },
-            );
-            return self.applyDamage(actor, target, target_health, damage_value, effect_type);
         },
     }
 }
 
-inline fn statBonus(actor_stats: c.Stats, weapon_class: c.Weapon.Class) f32 {
+fn heal(
+    self: *Self,
+    /// who applies the effect
+    actor: g.Entity,
+    effect_range: p.Range(u8),
+    target: g.Entity,
+    target_health: *c.Health,
+) !void {
+    const value = self.session().prng.random().intRangeAtMost(u8, effect_range.min, effect_range.max);
+    target_health.current_hp += value;
+    target_health.current_hp = @min(target_health.max, target_health.current_hp);
+    const is_blocked_animation = actor.eql(self.session().player) or target.eql(self.session().player);
+    try self.session().registry.set(
+        target,
+        c.Animation{ .preset = .healing, .is_blocked = is_blocked_animation },
+    );
+
+    log.debug("Entity {d} recovered up to {d} hp", .{ target.id, value });
+}
+
+fn applyEffectDamage(
+    self: *Self,
+    /// who applies the effect
+    actor: g.Entity,
+    source: g.Entity,
+    effect_type: c.Effects.Type,
+    effect_range: p.Range(u8),
+    target: g.Entity,
+    target_health: *c.Health,
+    target_protection: *const c.Protection,
+) !bool {
+    log.warn("6. applyEffectDamage {d}", .{self.session().runtime.stackSize()});
+    const target_defence: p.Range(u8) = target_protection.resistance.values.get(effect_type) orelse .empty;
+    const weapon_class =
+        if (self.session().registry.get(source, c.Weapon)) |weapon| weapon.class else .primitive;
+
+    const character_factor: f32 = if (self.session().registry.get(actor, c.Stats)) |actor_stats|
+        (0.4 * statBonus(actor_stats, weapon_class) + 4.0) / 4.0
+    else
+        1.0;
+
+    const base_damage: f32 =
+        @floatFromInt(self.session().prng.random().intRangeAtMost(u8, effect_range.min, effect_range.max));
+    const damage: u8 = @intFromFloat(@round(base_damage * character_factor));
+    const absorbed_damage: u8 = self.session().prng.random().intRangeAtMost(
+        u8,
+        target_defence.min,
+        target_defence.max,
+    );
+    const damage_value: u8 = if (damage > absorbed_damage) damage - absorbed_damage else 1;
+    log.debug(
+        "Base damage {d}; Character factor {d}; Damage {d}; Absorbed damage {d};",
+        .{ base_damage, character_factor, damage, absorbed_damage },
+    );
+    return try self.applyDamage(actor, target, target_health, damage_value, effect_type);
+}
+
+fn statBonus(actor_stats: *const c.Stats, weapon_class: c.Weapon.Class) f32 {
     return @floatFromInt(switch (weapon_class) {
         .primitive => actor_stats.strength,
         .tricky => actor_stats.dexterity,
@@ -563,7 +639,7 @@ fn drinkPotion(
                         effect_type,
                         range,
                         actor,
-                        actual_protection,
+                        &actual_protection,
                         health,
                     );
                     if (is_actor_dead) break;

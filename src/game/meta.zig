@@ -60,17 +60,17 @@ pub fn getLight(registry: *const g.Registry, equipment: *const c.Equipment) stru
 /// Returns an id of the equipped weapon, or the `actor`, because any enemy must be able to provide
 /// a damage without equipment. The player and humanoid enemies should be able to damage by hands,
 /// animal should bite (but, hands and tooth are not equipped as a weapon).
-pub fn getWeapon(registry: *const g.Registry, actor: g.Entity) struct { g.Entity, c.Weapon } {
+pub fn getWeapon(registry: *const g.Registry, actor: g.Entity) struct { g.Entity, *const c.Weapon } {
     if (registry.get(actor, c.Equipment)) |equipment| {
         if (equipment.weapon) |weapon_id| {
             const weapon = registry.get(weapon_id, c.Weapon) orelse
                 std.debug.panic("A Weapon component is not provided for the weapon entity {d}", .{weapon_id.id});
-            return .{ weapon_id, weapon.* };
+            return .{ weapon_id, weapon };
         }
     }
     // "tooth" and "bare hands" are not equipped weapon,
     // just emulate them
-    return .{ actor, registry.getUnsafe(actor, c.Weapon).* };
+    return .{ actor, registry.getUnsafe(actor, c.Weapon) };
 }
 
 /// If the actor has equipped armor, this method returns id of the equipped armor and its
@@ -109,7 +109,7 @@ pub fn getAmmunition(registry: *const g.Registry, actor: g.Entity) ?struct { g.E
 }
 
 /// Merges the original weapon's effects with modifications possibly applied to the weapon
-pub fn getActualDamage(registry: *const g.Registry, weapon_id: g.Entity, weapon: c.Weapon) c.Effects {
+pub fn getActualDamage(registry: *const g.Registry, weapon_id: g.Entity, weapon: *const c.Weapon) c.Effects {
     var effects: c.Effects = weapon.damage;
     // TODO: summarize effects with ammo
     // Merge with modifications

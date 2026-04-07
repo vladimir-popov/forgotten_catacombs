@@ -1,0 +1,81 @@
+==== Если двигаться в стену на 1 уровне =====
+Текущий результат:
+(play_mode) handleInput 6216
+(play_mode) doTurn 2552
+(actions) 2. doAction 5816
+(actions) 3 tryToMove 6232
+(actions) 4 checkCollision 6968
+(actions) 2. doAction 9496
+
+(play_mode) doTurn 2552
+(actions) 2. doAction 4680
+(actions) 3 tryToMove 5096
+(actions) 4 checkCollision 5832
+(actions) 2. doAction 7224
+
+(play_mode) doTurn 2568
+(actions) 2. doAction 3768
+(actions) 3 tryToMove 4184
+(actions) 4 checkCollision 4920
+(actions) 2. doAction 5384
+
+(play_mode) doTurn 2568
+(actions) 2. doAction 3768
+(actions) 3 tryToMove 4168
+(actions) 4 checkCollision 4904
+(actions) 2. doAction 3768
+
+==== Если атаковать ========
+(stack) handleInput 6104
+(stack) doTurn 2600
+(stack) 2. doAction 3832
+(stack) 3 tryToMove 4264
+(stack) 4 checkCollision 5032
+(stack) 2. doAction 3832
+(stack) 3. tryToHit 6280
+(stack) updateQActions 3448
+
+(stack) 0. playerTurn 2168
+(stack) 1. doTurn 2664
+(stack) 2. doAction 3896
+(stack) 3 tryToMove 4328
+(stack) 4 checkCollision 5096
+(stack) 2. doAction 3896
+(stack) 3. tryToHit 5224
+(stack) 4. applyEffect 6248
+(stack) updateQActions 3416
+
+(stack) 0. playerTurn 2168
+(stack) 1. doTurn 2664
+(stack) 2. doAction 3896
+(stack) 3 tryToMove 4328
+(stack) 4 checkCollision 5096
+(stack) 2. doAction 3896
+(stack) 3. tryToHit 4616
+(stack) 4. applyEffect 6392
+(stack) updateQActions 3416
+
+(stack) 0. playerTurn 2168
+(stack) 1. doTurn 2664
+(stack) 2. doAction 3896
+(stack) 3 tryToMove 4328
+(stack) 4 checkCollision 5096
+(stack) 2. doAction 3896
+(stack) 3. tryToHit 4616
+(stack) 4. applyWeaponDamage 5448
+(stack) 5. applyEffect 5736
+(stack) 6. applyEffectDamage 6392
+(stack) updateQActions 3416
+
+(stack) 0. playerTurn 2136
+(stack) 1. doTurn 2600
+(stack) 2. doAction 3800
+(stack) 3. tryToMove 4200
+(stack) 4. checkCollision 4936
+(stack) 2. doAction 3800
+(stack) 3. tryToHit 4488
+(stack) 4. applyWeaponDamage 5288
+(stack) 5. applyEffect 5528
+(stack) 6. applyEffectDamage 6152
+(stack) updateQActions 3384
+
