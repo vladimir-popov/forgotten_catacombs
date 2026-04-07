@@ -178,6 +178,13 @@ pub fn build(b: *std.Build) !void {
         const emulate_step = b.step("emulate", "Run the Forgotten Catacomb in the Playdate Simulator");
         emulate_step.dependOn(&emulate_cmd.step);
         emulate_step.dependOn(b.getInstallStep());
+
+        // // --- Add this to generate ASM ---
+        // const asm_step = b.addInstallFile(
+        //     elf.getEmittedAsm(),
+        //     "bin/elf.s",
+        // );
+        // emulate_step.dependOn(&asm_step.step);
     }
 
     // ============================================================
