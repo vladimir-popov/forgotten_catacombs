@@ -108,116 +108,84 @@ pub fn onTurnCompleted(self: *Self) !void {
 }
 
 /// Handles intentions to do some actions.
+/// The action can be modified during this method.
 pub fn doAction(
     self: *Self,
     actor: g.Entity,
     action: *g.Action,
-    move_points_limit: g.MovePoints,
+    move_points_for_action: g.MovePoints,
 ) !g.actions.ActionResult {
     if (std.log.logEnabled(.debug, .actions) and action.tag != .do_nothing) {
         log.debug("Do action {any} by the entity {d}", .{ action, actor.id });
     }
-    const move_points_for_action = g.meta.movePointsForAction(&self.session().registry, actor, action);
-    if (move_points_for_action > move_points_limit)
-        return .not_enough_points;
 
     log.warn("2. doAction {d}", .{self.session().runtime.stackSize()});
     switch (action.tag) {
-        .do_nothing => return .declined,
-        .drink => if (g.meta.getPotionType(&self.session().registry, action.payload.drink)) |potion_type| {
-            try self.drinkPotion(actor, action.payload.drink, potion_type);
+        .do_nothing => {
+            return .declined;
+        },
+        .drink => {
+            return try self.drinkPotion(actor, action, move_points_for_action);
         },
         .eat => {
-            const food_id = action.payload.eat;
-            try self.consume(actor, food_id, self.session().registry.getUnsafe(food_id, c.Consumable));
+            return try self.eat(actor, action, move_points_for_action);
         },
         .open_inventory => {
             try self.session().manageInventory();
+            return .{ .done = move_points_for_action };
         },
         .move => {
-            if (self.session().registry.get(actor, c.Position)) |position|
-                return self.tryToMove(actor, position, action, move_points_for_action, move_points_limit);
+            const from_position = self.session().registry.getUnsafe(actor, c.Position);
+            return self.tryToMove(actor, from_position, action, move_points_for_action);
         },
         .step_in_trap => {
-            const step = action.payload.step_in_trap;
-            // If the actor not dead, moving
-            if (!try self.handleTrap(actor, step.trap_entity, step.trap)) {
-                const from_position = self.session().registry.get(actor, c.Position).?;
-                try self.doMove(actor, from_position, step.moving_target);
-            } else {
-                return .actor_is_dead;
-            }
+            return try self.handleTrap(actor, action, move_points_for_action);
         },
         .move_to_level => {
             try self.session().movePlayerToLevel(action.payload.move_to_level);
             return .{ .done = 0 };
         },
         .hit => {
-            const target = action.payload.hit;
-            if (self.session().registry.get(target, c.Health)) |target_health| {
-                if (!try self.tryToHit(actor, target, target_health)) return .declined;
-            } else {
-                return .declined;
-            }
+            return try self.hit(actor, action, move_points_for_action);
         },
         .open => {
             const door = action.payload.open;
             try self.session().registry.setComponentsToEntity(door.id, g.entities.openedDoor(door.place));
+            return .{ .done = move_points_for_action };
         },
         .close => {
             const door = action.payload.close;
             try self.session().registry.setComponentsToEntity(door.id, g.entities.closedDoor(door.place));
+            return .{ .done = move_points_for_action };
         },
         .pickup => {
-            const item = action.payload.pickup;
-            const inventory = self.session().registry.getUnsafe(self.session().player, c.Inventory);
-            if (self.session().registry.get(item, c.Pile)) |_| {
-                try self.session().manageInventory();
-            } else {
-                try inventory.items.add(item);
-                try self.session().registry.remove(item, c.Position);
-                try self.session().level.removeEntity(item);
-            }
+            return try self.pickup(actor, action, move_points_for_action);
         },
         .go_sleep => {
-            const target = action.payload.go_sleep;
-            self.session().registry.getUnsafe(target, c.EnemyState).* = .sleeping;
-            try self.session().registry.set(
-                target,
-                c.Animation{ .preset = .go_sleep },
-            );
+            return try self.goSleep(actor, action, move_points_for_action);
         },
         .chill => {
-            const target = action.payload.chill;
-            self.session().registry.getUnsafe(target, c.EnemyState).* = .walking;
-            try self.session().registry.set(
-                target,
-                c.Animation{ .preset = .relax },
-            );
+            return try self.chill(actor, action, move_points_for_action);
         },
         .get_angry => {
-            const target = action.payload.get_angry;
-            self.session().registry.getUnsafe(target, c.EnemyState).* = .aggressive;
-            try self.session().registry.set(
-                target,
-                c.Animation{ .preset = .get_angry },
-            );
+            return try self.getAngry(actor, action, move_points_for_action);
         },
         .modify_recognize => {
             try self.session().modifyRecognize();
+            return .{ .done = move_points_for_action };
         },
         .trade => {
-            const shop = action.payload.trade;
-            try self.session().trade(shop);
+            try self.session().trade(action.payload.trade);
+            return .{ .done = move_points_for_action };
         },
         .wait => {
             try self.session().registry.set(
                 actor,
                 c.Animation{ .preset = .wait, .is_blocked = self.session().player.eql(actor) },
             );
+            return .{ .done = move_points_for_action };
         },
     }
-    return .{ .done = move_points_for_action };
 }
 
 fn tryToMove(
@@ -226,7 +194,6 @@ fn tryToMove(
     from_position: *c.Position,
     action: *g.Action,
     move_speed: g.MovePoints,
-    move_points_limit: g.MovePoints,
 ) anyerror!g.actions.ActionResult {
     std.debug.assert(action.tag == .move);
     const new_place = switch (action.payload.move.target) {
@@ -238,7 +205,7 @@ fn tryToMove(
     log.warn("3 tryToMove {d}", .{self.session().runtime.stackSize()});
     if (checkCollision(self, new_place, action)) {
         log.debug("Collision lead to {t}", .{action.tag});
-        return try doAction(self, entity, action, move_points_limit);
+        return try doAction(self, entity, action, move_speed);
     }
     try self.doMove(entity, from_position, action.payload.move.target);
     return .{ .done = move_speed };
@@ -326,7 +293,9 @@ fn checkCollision(self: *Self, place: p.Point, action: *g.Action) bool {
 
 // actor - is who is stepping in the trap
 // returns true if the actor is dead.
-pub fn handleTrap(self: *Self, actor: g.Entity, trap_id: g.Entity, trap: c.Trap) !bool {
+pub fn handleTrap(self: *Self, actor: g.Entity, action: *const g.Action, move_points_for_action: g.MovePoints) !g.actions.ActionResult {
+    const trap_id: g.Entity = action.payload.step_in_trap.trap_entity;
+    const trap: c.Trap = action.payload.step_in_trap.trap;
     log.debug("The entity {d} stepped to the trap {d} {any}", .{ actor.id, trap_id.id, trap });
     const protection = self.session().registry.get(actor, c.Protection) orelse &c.Protection.zeros;
     const health = self.session().registry.getUnsafe(actor, c.Health);
@@ -341,32 +310,35 @@ pub fn handleTrap(self: *Self, actor: g.Entity, trap_id: g.Entity, trap: c.Trap)
     // Show pop-up notifications about hit/damage
     if (actor.eql(self.session().player)) {
         const name = try g.meta.rawName(&self.session().registry, trap_id);
-        try self.session().showPopUpNotification(.{ .trap = .{ .name = name, .damage = health_before - health.current_hp } });
+        try self.session().showPopUpNotification(
+            .{ .trap = .{ .name = name, .damage = health_before - health.current_hp } },
+        );
     }
-
-    return is_actor_dead;
+    if (is_actor_dead) {
+        return .actor_is_dead;
+    } else {
+        const from_position = self.session().registry.get(actor, c.Position).?;
+        try self.doMove(actor, from_position, action.payload.step_in_trap.moving_target);
+        return .{ .done = move_points_for_action };
+    }
 }
 
-/// Returns `true` if the hit or evasion happens. Otherwise returns `false` (as example, because of
-/// not enough ammo).
-fn tryToHit(
-    self: *Self,
-    actor: g.Entity,
-    target: g.Entity,
-    target_health: *c.Health,
-) !bool {
+fn hit(self: *Self, actor: g.Entity, action: *const g.Action, move_points_for_action: g.MovePoints) !g.actions.ActionResult {
+    log.warn("3. tryToHit {d}", .{self.session().runtime.stackSize()});
+    const target = action.payload.hit;
+    const target_health = self.session().registry.getUnsafe(target, c.Health);
     // Validate the weapon
     const weapon_id, const weapon = g.meta.getWeapon(&self.session().registry, actor);
     if (weapon.ammunition_type) |expected_ammo| {
         const ammo_id, const ammo = g.meta.getAmmunition(&self.session().registry, actor) orelse {
             if (actor.eql(self.session().player))
                 try self.session().showPopUpNotification(.no_ammo);
-            return false;
+            return .declined;
         };
         if (ammo.ammunition_type != expected_ammo) {
             if (actor.eql(self.session().player))
                 try self.session().showPopUpNotification(.wrong_ammo);
-            return false;
+            return .declined;
         }
         ammo.amount -= 1;
         if (ammo.amount == 0) {
@@ -405,7 +377,7 @@ fn tryToHit(
             try self.session().showPopUpNotification(.{ .miss = .{ .target = target } })
         else if (target.eql(self.session().player))
             try self.session().showPopUpNotification(.{ .dodge = .{ .actor = actor } });
-        return true;
+        return .{ .done = move_points_for_action };
     }
 
     // Calculate and apply the damage
@@ -433,7 +405,8 @@ fn tryToHit(
         }
 
         // Break the function because the target is dead
-        if (is_target_dead) return true;
+        if (is_target_dead)
+            return .{ .done = move_points_for_action };
     }
     // Show pop-up notifications about hit/damage
     if (actor.eql(self.session().player))
@@ -444,7 +417,7 @@ fn tryToHit(
         try self.session().showPopUpNotification(
             .{ .damage = .{ .actor = actor, .damage = target_health_before - target_health.current_hp } },
         );
-    return true;
+    return .{ .done = move_points_for_action };
 }
 
 /// Applies the effect to the target. Calculates and applies the damage, or increase the target health for the
@@ -464,6 +437,7 @@ fn applyEffect(
     target_protection: c.Protection,
     target_health: *c.Health,
 ) !bool {
+    log.warn("4. applyEffect {d}", .{self.session().runtime.stackSize()});
     const target_defence: p.Range(u8) = target_protection.resistance.values.get(effect_type) orelse .empty;
     switch (effect_type) {
         .heal => {
@@ -568,30 +542,50 @@ fn applyDamage(
     }
 }
 
-fn drinkPotion(self: *Self, actor: g.Entity, potion_id: g.Entity, potion_type: g.meta.PotionType) !void {
-    if (self.session().registry.get(potion_id, c.Consumable)) |potion| {
-        var itr = potion.effects.values.iterator();
-        while (itr.next()) |entry| {
-            const effect_type: c.Effects.Type = entry.key;
-            const range: p.Range(u8) = entry.value.*;
-            if (self.session().registry.get(actor, c.Health)) |health| {
-                const armor_id, const protection = g.meta.getArmor(&self.session().registry, actor);
-                const actual_protection = g.meta.getActualProtection(&self.session().registry, armor_id, protection);
-                try self.session().journal.markPotionAsKnown(potion_type);
-                const is_actor_dead = try self.applyEffect(
-                    actor,
-                    potion_id,
-                    effect_type,
-                    range,
-                    actor,
-                    actual_protection,
-                    health,
-                );
-                if (is_actor_dead) break;
+fn drinkPotion(
+    self: *Self,
+    actor: g.Entity,
+    action: *const g.Action,
+    move_points_for_action: g.MovePoints,
+) !g.actions.ActionResult {
+    const potion_id = action.payload.drink;
+    if (g.meta.getPotionType(&self.session().registry, potion_id)) |potion_type| {
+        if (self.session().registry.get(potion_id, c.Consumable)) |potion| {
+            var itr = potion.effects.values.iterator();
+            while (itr.next()) |entry| {
+                const effect_type: c.Effects.Type = entry.key;
+                const range: p.Range(u8) = entry.value.*;
+                if (self.session().registry.get(actor, c.Health)) |health| {
+                    const armor_id, const protection = g.meta.getArmor(&self.session().registry, actor);
+                    const actual_protection = g.meta.getActualProtection(&self.session().registry, armor_id, protection);
+                    try self.session().journal.markPotionAsKnown(potion_type);
+                    const is_actor_dead = try self.applyEffect(
+                        actor,
+                        potion_id,
+                        effect_type,
+                        range,
+                        actor,
+                        actual_protection,
+                        health,
+                    );
+                    if (is_actor_dead) break;
+                }
             }
         }
+        try self.consume(actor, potion_id, self.session().registry.getUnsafe(potion_id, c.Consumable));
     }
-    try self.consume(actor, potion_id, self.session().registry.getUnsafe(potion_id, c.Consumable));
+    return .{ .done = move_points_for_action };
+}
+
+fn eat(
+    self: *Self,
+    actor: g.Entity,
+    action: *const g.Action,
+    move_points_for_action: g.MovePoints,
+) !g.actions.ActionResult {
+    const food_id = action.payload.eat;
+    try self.consume(actor, food_id, self.session().registry.getUnsafe(food_id, c.Consumable));
+    return .{ .done = move_points_for_action };
 }
 
 fn consume(self: *Self, actor: g.Entity, item: g.Entity, consumable: *const c.Consumable) !void {
@@ -604,4 +598,67 @@ fn consume(self: *Self, actor: g.Entity, item: g.Entity, consumable: *const c.Co
     }
     // remove the potion
     try self.session().registry.removeEntity(item);
+}
+
+fn pickup(
+    self: *Self,
+    _: g.Entity,
+    action: *const g.Action,
+    move_points_for_action: g.MovePoints,
+) !g.actions.ActionResult {
+    const item = action.payload.pickup;
+    const inventory = self.session().registry.getUnsafe(self.session().player, c.Inventory);
+    if (self.session().registry.get(item, c.Pile)) |_| {
+        try self.session().manageInventory();
+    } else {
+        try inventory.items.add(item);
+        try self.session().registry.remove(item, c.Position);
+        try self.session().level.removeEntity(item);
+    }
+    return .{ .done = move_points_for_action };
+}
+
+fn goSleep(
+    self: *Self,
+    _: g.Entity,
+    action: *const g.Action,
+    move_points_for_action: g.MovePoints,
+) !g.actions.ActionResult {
+    const target = action.payload.go_sleep;
+    self.session().registry.getUnsafe(target, c.EnemyState).* = .sleeping;
+    try self.session().registry.set(
+        target,
+        c.Animation{ .preset = .go_sleep },
+    );
+    return .{ .done = move_points_for_action };
+}
+
+fn chill(
+    self: *Self,
+    _: g.Entity,
+    action: *const g.Action,
+    move_points_for_action: g.MovePoints,
+) !g.actions.ActionResult {
+    const target = action.payload.chill;
+    self.session().registry.getUnsafe(target, c.EnemyState).* = .walking;
+    try self.session().registry.set(
+        target,
+        c.Animation{ .preset = .relax },
+    );
+    return .{ .done = move_points_for_action };
+}
+
+fn getAngry(
+    self: *Self,
+    _: g.Entity,
+    action: *const g.Action,
+    move_points_for_action: g.MovePoints,
+) !g.actions.ActionResult {
+    const target = action.payload.get_angry;
+    self.session().registry.getUnsafe(target, c.EnemyState).* = .aggressive;
+    try self.session().registry.set(
+        target,
+        c.Animation{ .preset = .get_angry },
+    );
+    return .{ .done = move_points_for_action };
 }

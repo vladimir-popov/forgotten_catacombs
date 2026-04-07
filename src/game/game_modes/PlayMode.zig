@@ -364,8 +364,12 @@ pub fn doTurn(
     defer log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
 
     log.warn("doTurn {d}", .{self.session.runtime.stackSize()});
+    const move_points_for_action = g.meta.movePointsForAction(&self.session.registry, actor, action);
+    if (move_points_for_action > initiative)
+        return .not_enough_points;
+
     // Do Actions
-    const action_result = try self.session.actions.doAction(actor, action, initiative);
+    const action_result = try self.session.actions.doAction(actor, action, move_points_for_action);
     switch (action_result) {
         .done => |mp| {
             log.info("Entity {d} spent {d} move points", .{ actor.id, mp });
