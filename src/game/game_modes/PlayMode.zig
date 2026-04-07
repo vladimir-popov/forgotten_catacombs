@@ -113,6 +113,7 @@ fn enemiesTurn(self: *Self) !void {
             var action = self.session.ai.action(npc);
             const action_result = try self.doTurn(npc, &action, initiative.move_points);
             switch (action_result) {
+                .repeat_action_handler => continue :loop,
                 .done => |mp| {
                     g.utils.assert(
                         mp <= initiative.move_points,
@@ -348,10 +349,12 @@ fn handleInput(self: *Self) !?g.actions.Action {
     return null;
 }
 
-/// Trying to do an action. An action can be changed or ignored.
-/// For example, moving can lead to a collision with an enemy or a wall. In the first case,
-/// the action will be changed to `hit`, and completely ignored in the latter.
-/// Returns the actual action and the count of spent move points.
+/// Trying to do an action. The action can be changed or ignored.
+/// For example, the `move` action can lead to a collision with an enemy or a wall. In the first case,
+/// the action will be changed to `hit`, and completely ignored (changed to `do_nothing`) in the second.
+///
+/// It returns result of handling the action. In successful case the actual count of spent move
+/// points is stored in the result.
 /// When an action requires more move points than initiative, `error.NotEnoughMovePoints` will be
 /// returned.
 pub fn doTurn(
@@ -369,32 +372,35 @@ pub fn doTurn(
         return .not_enough_points;
 
     // Do Actions
-    const action_result = try self.session.actions.doAction(actor, action, move_points_for_action);
-    switch (action_result) {
-        .done => |mp| {
-            log.info("Entity {d} spent {d} move points", .{ actor.id, mp });
+    loop: while (true) {
+        const action_result = try self.session.actions.doAction(actor, action, move_points_for_action);
+        switch (action_result) {
+            .repeat_action_handler => continue :loop,
+            .done => |mp| {
+                log.info("Entity {d} spent {d} move points", .{ actor.id, mp });
 
-            // Handle Initiative
-            if (self.state == .player_turn and mp > 0) {
-                // Add initiative points to enemies
-                var itr = self.session.registry.query(c.Initiative);
-                while (itr.next()) |tuple| {
-                    tuple[1].move_points += mp;
+                // Handle Initiative
+                if (self.state == .player_turn and mp > 0) {
+                    // Add initiative points to enemies
+                    var itr = self.session.registry.query(c.Initiative);
+                    while (itr.next()) |tuple| {
+                        tuple[1].move_points += mp;
+                    }
+                    try self.session.sendEvent(.{ .player_turn_completed = .{ .spent_move_points = mp } });
                 }
-                try self.session.sendEvent(.{ .player_turn_completed = .{ .spent_move_points = mp } });
-            }
-        },
-        .actor_is_dead => {
-            log.info("Entity {d} is dead after action {t}", .{ actor.id, action.tag });
-        },
-        .not_enough_points => {
-            log.debug("Entity {d} has not enough move points for action {t}", .{ actor.id, action.tag });
-        },
-        .declined => {
-            log.debug("The action {t} was declined for the entity {d}", .{ action.tag, actor.id });
-        },
+            },
+            .actor_is_dead => {
+                log.info("Entity {d} is dead after action {t}", .{ actor.id, action.tag });
+            },
+            .not_enough_points => {
+                log.debug("Entity {d} has not enough move points for action {t}", .{ actor.id, action.tag });
+            },
+            .declined => {
+                log.debug("The action {t} was declined for the entity {d}", .{ action.tag, actor.id });
+            },
+        }
+        return action_result;
     }
-    return action_result;
 }
 
 fn quickAction(self: *const Self) g.actions.Action {

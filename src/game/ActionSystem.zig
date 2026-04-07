@@ -201,35 +201,16 @@ fn tryToMove(
     log.warn("3 tryToMove {d}", .{self.session().runtime.stackSize()});
     if (checkCollision(self, new_place, action)) {
         log.debug("Collision lead to {t}", .{action.tag});
-        return try doAction(self, entity, action, move_speed);
+        // The action was changed during checking collision.
+        // Now, the action should be handled again.
+        return .repeat_action_handler;
     }
     try self.doMove(entity, from_position, action.payload.move.target);
     return .{ .done = move_speed };
 }
 
-fn doMove(
-    self: *Self,
-    entity: g.Entity,
-    from_position: *c.Position,
-    target: g.actions.Action.Payload.Move.Target,
-) !void {
-    try self.session().sendEvent(.{
-        .entity_moved = .{
-            .entity = entity,
-            .is_player = (entity.eql(self.session().player)),
-            .moved_from = from_position.place,
-            .target = target,
-        },
-    });
-    log.warn("4 doMove {d}", .{self.session().runtime.stackSize()});
-    from_position.place = switch (target) {
-        .direction => |direction| from_position.place.movedTo(direction),
-        .new_place => |place| place,
-    };
-}
-
 /// If a collision happens, this method changes the action to an actual one
-/// and return true. Otherwise return false, it means that the move is completed.
+/// and return `true`. Otherwise return `false`, it means that the move is completed.
 ///
 /// {place} a place in the dungeon with which collision should be checked.
 fn checkCollision(self: *Self, place: p.Point, action: *g.Action) bool {
@@ -285,6 +266,27 @@ fn checkCollision(self: *Self, place: p.Point, action: *g.Action) bool {
     }
     action.set(.do_nothing, {});
     return true;
+}
+
+fn doMove(
+    self: *Self,
+    entity: g.Entity,
+    from_position: *c.Position,
+    target: g.actions.Action.Payload.Move.Target,
+) !void {
+    try self.session().sendEvent(.{
+        .entity_moved = .{
+            .entity = entity,
+            .is_player = (entity.eql(self.session().player)),
+            .moved_from = from_position.place,
+            .target = target,
+        },
+    });
+    log.warn("4 doMove {d}", .{self.session().runtime.stackSize()});
+    from_position.place = switch (target) {
+        .direction => |direction| from_position.place.movedTo(direction),
+        .new_place => |place| place,
+    };
 }
 
 // actor - is who is stepping in the trap
@@ -606,6 +608,8 @@ fn openDoor(
     try self.session().registry.set(door.id, c.Door{ .state = .opened });
     try self.session().registry.set(door.id, c.Sprite{ .codepoint = g.codepoints.door_opened });
     try self.session().registry.set(door.id, c.Description{ .preset = .opened_door });
+    // an opened door has different z-order
+    try self.session().registry.set(door.id, c.Position{ .zorder = .floor, .place = door.place });
     return .{ .done = move_points_for_action };
 }
 
@@ -619,6 +623,8 @@ fn closeDoor(
     try self.session().registry.set(door.id, c.Door{ .state = .closed });
     try self.session().registry.set(door.id, c.Sprite{ .codepoint = g.codepoints.door_closed });
     try self.session().registry.set(door.id, c.Description{ .preset = .closed_door });
+    // a closed door has different z-order
+    try self.session().registry.set(door.id, c.Position{ .zorder = .obstacle, .place = door.place });
     return .{ .done = move_points_for_action };
 }
 

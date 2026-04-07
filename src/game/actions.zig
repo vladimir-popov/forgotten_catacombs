@@ -9,6 +9,9 @@ const log = std.log.scoped(.actions);
 pub const MovePoints = u8;
 
 pub const ActionResult = union(enum) {
+    /// If the original action leads to another (moving to hit as example),
+    /// the new updated action should be handled again
+    repeat_action_handler,
     /// Action successfully happened and move points were spent
     done: g.MovePoints,
     /// As example, because of moving to the wall
