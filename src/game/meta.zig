@@ -182,7 +182,7 @@ pub fn initialHealth(constitution: i4) c.Health {
     return .init(@intFromFloat(@round(constitution_factor * 20)));
 }
 
-pub fn movePointsForAction(registry: *const g.Registry, actor: g.Entity, _: g.Action) g.MovePoints {
+pub fn movePointsForAction(registry: *const g.Registry, actor: g.Entity, _: *const g.Action) g.MovePoints {
     // TODO: return different mp for attacks
     return registry.getUnsafe(actor, c.Speed).move_points;
 }

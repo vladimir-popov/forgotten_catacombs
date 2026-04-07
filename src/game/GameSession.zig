@@ -213,7 +213,8 @@ pub fn switchModeToSavingSession(self: *Self) !void {
 /// Receives continuations: arguments to recover the previous state of the `PlayMode`.
 ///  - `entity_in_focus` - an entity that should be targeted in focus; This is either the previous
 ///    target or a new target from the `Explore` mode.
-///  - `action` - an action to perform; Usually an action initiated during managing the inventory.
+///  - `action` - an action to perform; Usually an action initiated during managing the inventory
+///  (eat or drink as example).
 pub fn continuePlay(self: *Self, entity_in_focus: ?g.Entity, action: ?g.actions.Action) !void {
     log.debug("Continue playing with entity_in_focus {any}, action {any}", .{ entity_in_focus, action });
     try self.sendEvent(
@@ -321,7 +322,7 @@ pub inline fn sendEvent(self: *Self, event: g.events.Event) !void {
 
 /// Handles events on the end of the `tick`
 fn handleEvent(self: *Self, event_idx: usize) !void {
-    const event = self.events.get(event_idx);
+    var event = self.events.get(event_idx);
     switch (event) {
         .player_turn_completed => {
             self.spent_move_points += event.player_turn_completed.spent_move_points;
@@ -336,7 +337,8 @@ fn handleEvent(self: *Self, event_idx: usize) !void {
         .mode_changed => |new_mode| switch (new_mode) {
             .to_play => |args| {
                 try self.switchModeToPlay(args.entity_in_focus);
-                if (args.action) |action| {
+                if (args.action != null) {
+                    const action = &(event.mode_changed.to_play.action.?);
                     _ = try self.mode.play.doTurn(self.player, action, std.math.maxInt(g.MovePoints));
                 }
             },

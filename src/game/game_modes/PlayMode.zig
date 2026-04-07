@@ -76,14 +76,14 @@ pub fn tick(self: *Self) !void {
 
 fn playerTurn(self: *Self) !void {
     // break this function if no input
-    const action = (try self.handleInput()) orelse return;
-    const action_result = try self.doTurn(self.session.player, action, std.math.maxInt(g.MovePoints));
+    var action = (try self.handleInput()) orelse return;
+    const action_result = try self.doTurn(self.session.player, &action, std.math.maxInt(g.MovePoints));
     switch (action_result) {
-        .done => |success| {
+        .done => {
             // Force change the target
-            switch (success.actual_action.tag) {
+            switch (action.tag) {
                 .hit => {
-                    const enemy = success.actual_action.payload.hit;
+                    const enemy = action.payload.hit;
                     if (self.session.registry.contains(enemy)) {
                         self.setTarget(enemy);
                     } else {
@@ -91,7 +91,7 @@ fn playerTurn(self: *Self) !void {
                     }
                 },
                 .open => {
-                    const door = success.actual_action.payload.open;
+                    const door = action.payload.open;
                     self.setTarget(door.id);
                 },
                 else => {},
@@ -110,15 +110,14 @@ fn enemiesTurn(self: *Self) !void {
         // repeat doing something until move points are over
         loop: while (true) {
             // TODO: compare initiative with minimal required mp to prevent calculating an action
-            const action = self.session.ai.action(npc);
-            const action_result = try self.doTurn(npc, action, initiative.move_points);
+            var action = self.session.ai.action(npc);
+            const action_result = try self.doTurn(npc, &action, initiative.move_points);
             switch (action_result) {
-                .done => |success| {
-                    const mp = success.spent_move_points;
+                .done => |mp| {
                     g.utils.assert(
                         mp <= initiative.move_points,
-                        "Entity {d} spent more MP {d} than initiative has {any}. Action was {any}",
-                        .{ npc.id, mp, initiative, success.actual_action },
+                        "Entity {d} spent more MP {d} than initiative has {any}.",
+                        .{ npc.id, mp, initiative },
                     );
                     initiative.move_points -= mp;
                 },
@@ -358,7 +357,7 @@ fn handleInput(self: *Self) !?g.actions.Action {
 pub fn doTurn(
     self: *Self,
     actor: g.Entity,
-    action: g.actions.Action,
+    action: *g.actions.Action,
     initiative: g.MovePoints,
 ) !g.actions.ActionResult {
     log.info("The turn of the entity {d}.", .{actor.id});
@@ -368,8 +367,7 @@ pub fn doTurn(
     // Do Actions
     const action_result = try self.session.actions.doAction(actor, action, initiative);
     switch (action_result) {
-        .done => |success| {
-            const mp = success.spent_move_points;
+        .done => |mp| {
             log.info("Entity {d} spent {d} move points", .{ actor.id, mp });
 
             // Handle Initiative
@@ -395,7 +393,7 @@ pub fn doTurn(
     return action_result;
 }
 
-inline fn quickAction(self: *const Self) g.actions.Action {
+fn quickAction(self: *const Self) g.actions.Action {
     if (self.quick_actions.actions.items.len > 0)
         return self.quick_actions.actions.items[self.quick_actions.selected_idx]
     else

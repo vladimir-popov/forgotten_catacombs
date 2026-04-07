@@ -111,7 +111,7 @@ pub fn onTurnCompleted(self: *Self) !void {
 pub fn doAction(
     self: *Self,
     actor: g.Entity,
-    action: g.Action,
+    action: *g.Action,
     move_points_limit: g.MovePoints,
 ) !g.actions.ActionResult {
     if (std.log.logEnabled(.debug, .actions) and action.tag != .do_nothing) {
@@ -135,9 +135,8 @@ pub fn doAction(
             try self.session().manageInventory();
         },
         .move => {
-            const move = action.payload.move;
             if (self.session().registry.get(actor, c.Position)) |position|
-                return self.tryToMove(actor, position, move, move_points_for_action, move_points_limit);
+                return self.tryToMove(actor, position, action, move_points_for_action, move_points_limit);
         },
         .step_in_trap => {
             const step = action.payload.step_in_trap;
@@ -151,7 +150,7 @@ pub fn doAction(
         },
         .move_to_level => {
             try self.session().movePlayerToLevel(action.payload.move_to_level);
-            return .{ .done = .{ .actual_action = action, .spent_move_points = 0 } };
+            return .{ .done = 0 };
         },
         .hit => {
             const target = action.payload.hit;
@@ -218,30 +217,31 @@ pub fn doAction(
             );
         },
     }
-    return .{ .done = .{ .actual_action = action, .spent_move_points = move_points_for_action } };
+    return .{ .done = move_points_for_action };
 }
 
 fn tryToMove(
     self: *Self,
     entity: g.Entity,
     from_position: *c.Position,
-    move: g.Action.Payload.Move,
+    action: *g.Action,
     move_speed: g.MovePoints,
     move_points_limit: g.MovePoints,
 ) anyerror!g.actions.ActionResult {
-    const new_place = switch (move.target) {
+    std.debug.assert(action.tag == .move);
+    const new_place = switch (action.payload.move.target) {
         .direction => |direction| from_position.place.movedTo(direction),
         .new_place => |place| place,
     };
     if (from_position.place.eql(new_place)) return .declined;
 
     log.warn("3 tryToMove {d}", .{self.session().runtime.stackSize()});
-    if (checkCollision(self, new_place, move)) |action| {
-        log.debug("Collision lead to {t} {d}", .{ action.tag, self.session().runtime.stackSize() });
+    if (checkCollision(self, new_place, action)) {
+        log.debug("Collision lead to {t}", .{action.tag});
         return try doAction(self, entity, action, move_points_limit);
     }
-    try self.doMove(entity, from_position, move.target);
-    return .{ .done = .{ .actual_action = .action(.move, move), .spent_move_points = move_speed } };
+    try self.doMove(entity, from_position, action.payload.move.target);
+    return .{ .done = move_speed };
 }
 
 fn doMove(
@@ -265,54 +265,63 @@ fn doMove(
     };
 }
 
-/// Returns an action that should be done because of collision.
-/// The `null` means that the move is completed;
-/// .do_nothing or any other action means that the move should be aborted, and the action handled;
+/// If a collision happens, this method changes the action to an actual one
+/// and return true. Otherwise return false, it means that the move is completed.
 ///
 /// {place} a place in the dungeon with which collision should be checked.
-fn checkCollision(self: *Self, place: p.Point, move: g.Action.Payload.Move) ?g.Action {
+fn checkCollision(self: *Self, place: p.Point, action: *g.Action) bool {
+    std.debug.assert(action.tag == .move);
     log.warn("4 checkCollision {d}", .{self.session().runtime.stackSize()});
     switch (self.session().level.cellAt(place)) {
         .landscape => |cl| if (cl == .floor or cl == .doorway)
-            return null,
+            return false,
 
         .entities => |entities| {
             // Check obstacles
             if (entities[c.Position.ZOrder.obstacle.index()]) |entity| {
-                if (self.session().registry.get(entity, c.Door)) |_|
-                    return .action(.open, .{ .id = entity, .place = place });
+                if (self.session().registry.get(entity, c.Door)) |_| {
+                    action.set(.open, .{ .id = entity, .place = place });
+                    return true;
+                }
 
-                if (g.meta.getEnemyType(&self.session().registry, entity)) |_|
-                    return .action(.hit, entity);
+                if (g.meta.getEnemyType(&self.session().registry, entity)) |_| {
+                    action.set(.hit, entity);
+                    return true;
+                }
 
                 if (self.session().registry.get(entity, c.Shop)) |shop| {
-                    return .action(.trade, shop);
+                    action.set(.trade, shop);
+                    return true;
                 }
 
                 if (self.session().registry.get(entity, c.Description)) |descr| {
                     if (descr.preset == .scientist) {
-                        return .action(.modify_recognize, {});
+                        action.set(.modify_recognize, {});
+                        return true;
                     }
                 }
 
                 // the player should not step on the place with entity with z-order = 2
-                return .action(.do_nothing, {});
+                action.set(.do_nothing, {});
+                return true;
             }
             // Check traps
             if (entities[c.Position.ZOrder.trap.index()]) |entity| {
                 if (self.session().registry.get(entity, c.Trap)) |trap| {
-                    return .action(
+                    action.set(
                         .step_in_trap,
-                        .{ .trap_entity = entity, .trap = trap.*, .moving_target = move.target },
+                        .{ .trap_entity = entity, .trap = trap.*, .moving_target = action.payload.move.target },
                     );
+                    return true;
                 }
             }
             // it's possible to step on the ladder, opened door, teleport, dropped item and
             // other entities with z_order < 2
-            return null;
+            return false;
         },
     }
-    return .action(.do_nothing, {});
+    action.set(.do_nothing, {});
+    return true;
 }
 
 // actor - is who is stepping in the trap

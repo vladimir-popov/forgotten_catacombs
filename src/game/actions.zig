@@ -10,7 +10,7 @@ pub const MovePoints = u8;
 
 pub const ActionResult = union(enum) {
     /// Action successfully happened and move points were spent
-    done: struct { actual_action: g.Action, spent_move_points: g.MovePoints },
+    done: g.MovePoints,
     /// As example, because of moving to the wall
     declined,
     /// Means that action requires more move points than limit
@@ -93,6 +93,11 @@ pub const Action = struct {
 
     pub fn action(comptime tag: Tag, payload: PayloadType(tag)) Action {
         return .{ .tag = tag, .payload = @unionInit(Payload, @tagName(tag), payload) };
+    }
+
+    pub fn set(self: *Action, comptime tag: Tag, payload: PayloadType(tag)) void {
+        self.tag = tag;
+        self.payload = @unionInit(Payload, @tagName(tag), payload);
     }
 
     fn PayloadType(comptime tag: Tag) type {
