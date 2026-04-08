@@ -31,21 +31,22 @@ pub const std_options = std.Options{
     },
 };
 
+var log_buffer: [128]u8 = undefined;
+
 fn writeLog(
     comptime _: std.log.Level,
     comptime scope: @TypeOf(.enum_literal),
     comptime format: []const u8,
     args: anytype,
 ) void {
-    var buffer: [64]u8 = undefined;
     const prefix = std.fmt.comptimePrint("({t}) ", .{scope});
-    const msg = std.fmt.bufPrint(&buffer, prefix ++ format, args) catch |err|
+    const msg = std.fmt.bufPrint(&log_buffer, prefix ++ format, args) catch |err|
         switch (err) {
             // Let's write as much as possible
-            error.NoSpaceLeft => &buffer,
+            error.NoSpaceLeft => &log_buffer,
         };
-    const end = @min(msg.len, buffer.len - 1);
-    buffer[end] = 0;
+    const end = @min(msg.len, log_buffer.len - 1);
+    log_buffer[end] = 0;
     playdate_log_to_console(msg.ptr);
 }
 
@@ -56,7 +57,14 @@ pub fn panic(
 ) noreturn {
     _ = error_return_trace;
     _ = return_address;
-    playdate_error_to_console(msg.ptr);
+    const msg0 = std.fmt.bufPrint(&log_buffer, "{s}", .{msg}) catch |err|
+        switch (err) {
+            // Let's write as much as possible
+            error.NoSpaceLeft => &log_buffer,
+        };
+    const end = @min(msg0.len, log_buffer.len - 1);
+    log_buffer[end] = 0;
+    playdate_error_to_console(msg0.ptr);
     @breakpoint();
     @trap();
 }
