@@ -34,43 +34,20 @@ pub const Mode = union(enum) {
     trading: *TradingMode,
 };
 
-const Events = struct {
-    // I don't want to share this around the GamseSession,
-    // this is why it here, and should be used *only* here.
-    alloc: std.mem.Allocator,
-    events: std.ArrayList(g.events.Event),
-
-    fn init(game_arena: *g.GameStateArena) Events {
-        return .{ .alloc = game_arena.allocator(), .events = .empty };
-    }
-
-    fn add(self: *Events, event: g.events.Event) !void {
-        try self.events.append(self.alloc, event);
-    }
-
-    fn clear(self: *Events) void {
-        self.events.clearRetainingCapacity();
-    }
-
-    fn size(self: Events) usize {
-        return self.events.items.len;
-    }
-
-    fn get(self: Events, idx: usize) g.events.Event {
-        std.debug.assert(self.size() > idx);
-        return self.events.items[idx];
-    }
-};
-
-/// Used to allocate memory for the current mode
+/// This is an arena used to create this session.
+/// It should be used only inside this session to manage its state (events and notifications)
+root_arena: *g.GameStateArena,
+/// Used to allocate memory for the current mode.
+/// Should be used to allocate anything within mode.
 mode_arena: g.SessionModeArena,
-/// This seed should help to make all levels of a single game session reproducible.
+/// This is a main seed of the game session. 
+/// It should help to make all levels of a single game session reproducible.
 seed: u64,
 /// The PRNG initialized with the current time.
 /// This PRNG should be used to make any dynamic decision by AI or game events,
 /// and should not be used to generate any level objects, to keep the levels reproducible.
 prng: std.Random.DefaultPrng,
-ai: g.AI,
+//
 runtime: g.Runtime,
 /// Buffered render to draw the game
 render: g.Render,
@@ -80,8 +57,12 @@ viewport: g.Viewport,
 registry: g.Registry,
 ///
 journal: g.Journal,
+//
+ai: g.AI,
 ///
-events: Events,
+actions: ActionSystem,
+/// The entity id of the player.
+/// This id should never changes during the game session.
 player: g.Entity,
 /// The current level
 level: g.Level,
@@ -94,7 +75,7 @@ spent_move_points: g.MovePoints,
 /// The current mode of the game
 mode: Mode,
 ///
-actions: ActionSystem,
+events: std.ArrayList(g.events.Event),
 /// A pop up notifications to show.
 notifications: std.Deque(g.notifications.Notification),
 
@@ -118,13 +99,14 @@ pub fn preInit(
     render: g.Render,
 ) !void {
     self.* = .{
-        .actions = .{},
+        .root_arena = game_session_arena,
         .mode_arena = std.heap.ArenaAllocator.init(game_session_arena.allocator()),
         .runtime = runtime,
         .render = render,
         .viewport = g.Viewport.init(render.scene_buffer.region().rows, render.scene_buffer.region().cols),
         .registry = try g.Registry.init(game_session_arena),
-        .events = .init(game_session_arena),
+        .actions = .{},
+        .events = .empty,
         .seed = 0,
         .max_depth = 0,
         .spent_turns = 0,
@@ -294,7 +276,7 @@ pub fn playerMovedToLevel(self: *Self) !void {
 
 pub fn showPopUpNotification(self: *Self, notification: g.notifications.Notification) !void {
     log.debug("Notification: {any}", .{notification});
-    try self.notifications.pushBack(self.mode_arena.allocator(), notification);
+    try self.notifications.pushBack(self.root_arena.allocator(), notification);
 }
 
 pub fn tick(self: *Self) !void {
@@ -308,21 +290,21 @@ pub fn tick(self: *Self) !void {
         .save_load => try self.mode.save_load.tick(),
         .trading => try self.mode.trading.tick(),
     }
-    if (self.events.size() > 0) {
-        for (0..self.events.size()) |event_idx| {
+    if (self.events.items.len > 0) {
+        for (0..self.events.items.len) |event_idx| {
             try self.handleEvent(event_idx);
         }
-        self.events.clear();
+        self.events.clearRetainingCapacity();
     }
 }
 
 pub inline fn sendEvent(self: *Self, event: g.events.Event) !void {
-    try self.events.add(event);
+    try self.events.append(self.root_arena.allocator(), event);
 }
 
 /// Handles events on the end of the `tick`
 fn handleEvent(self: *Self, event_idx: usize) !void {
-    var event = self.events.get(event_idx);
+    var event = self.events.items[event_idx];
     switch (event) {
         .player_turn_completed => {
             self.spent_move_points += event.player_turn_completed.spent_move_points;

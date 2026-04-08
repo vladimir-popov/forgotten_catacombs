@@ -33,7 +33,7 @@ pub const Notification = union(enum) {
     /// The weapon requires different type of the ammo
     wrong_ammo,
 
-    // Max length is 20 symbols
+    // Max length is 16 symbols
     pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
         switch (self) {
             .hit => |hit| try writer.print("Hit {d}", .{hit.damage}),

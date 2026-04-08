@@ -192,13 +192,13 @@ fn tryToMove(
     move_speed: g.MovePoints,
 ) anyerror!g.actions.ActionResult {
     std.debug.assert(action.tag == .move);
+    log.warn("3 tryToMove {d}", .{self.session().runtime.stackSize()});
     const new_place = switch (action.payload.move.target) {
         .direction => |direction| from_position.place.movedTo(direction),
         .new_place => |place| place,
     };
     if (from_position.place.eql(new_place)) return .declined;
 
-    log.warn("3 tryToMove {d}", .{self.session().runtime.stackSize()});
     if (checkCollision(self, new_place, action)) {
         log.debug("Collision lead to {t}", .{action.tag});
         // The action was changed during checking collision.
@@ -274,6 +274,7 @@ fn doMove(
     from_position: *c.Position,
     target: g.actions.Action.Payload.Move.Target,
 ) !void {
+    log.warn("4 doMove {d}", .{self.session().runtime.stackSize()});
     try self.session().sendEvent(.{
         .entity_moved = .{
             .entity = entity,
@@ -282,7 +283,6 @@ fn doMove(
             .target = target,
         },
     });
-    log.warn("4 doMove {d}", .{self.session().runtime.stackSize()});
     from_position.place = switch (target) {
         .direction => |direction| from_position.place.movedTo(direction),
         .new_place => |place| place,
@@ -332,7 +332,9 @@ fn tryToHit(
     action: *const g.Action,
     move_points_for_action: g.MovePoints,
 ) !g.actions.ActionResult {
+    std.debug.assert(action.tag == .hit);
     log.warn("3. tryToHit {d}", .{self.session().runtime.stackSize()});
+
     // Validate the weapon
     const weapon_id, const weapon = g.meta.getWeapon(&self.session().registry, actor);
     if (!try self.isValidWeapon(actor, weapon)) {
