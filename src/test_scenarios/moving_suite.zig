@@ -19,7 +19,7 @@ fn setup(test_session: *TestSession) !void {
         \\~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     , .game_area);
     try std.testing.expect(test_session.session.mode == .play);
-    try std.testing.expect(test_session.session.mode.play.state == .player_turn);
+    try std.testing.expect(test_session.session.mode.play.is_players_turn);
 }
 
 test "player's turn should be completed after moving on empty space" {
@@ -32,7 +32,7 @@ test "player's turn should be completed after moving on empty space" {
     try test_session.pressButton(.up);
 
     // then:
-    try std.testing.expect(test_session.session.mode.play.state != .player_turn);
+    try std.testing.expect(!test_session.session.mode.play.is_players_turn);
 }
 
 test "player's turn should NOT be completed after moving to a wall" {
@@ -45,7 +45,7 @@ test "player's turn should NOT be completed after moving to a wall" {
     try test_session.pressButton(.right);
 
     // then:
-    try std.testing.expectEqual(.player_turn, test_session.session.mode.play.state);
+    try std.testing.expect(test_session.session.mode.play.is_players_turn);
 }
 
 test "the global turns counter should be incremented after player moved on empty space with normal speed" {

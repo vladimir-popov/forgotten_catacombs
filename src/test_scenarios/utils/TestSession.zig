@@ -126,7 +126,7 @@ pub fn pressButton(self: *Self, button: g.Button.GameButton) !void {
     log.debug("Emulate pressing button {any}", .{button});
     if (self.session.mode == .play) {
         // complete unfinished turns of enemies
-        while (self.session.mode.play.state != .player_turn) {
+        while (!self.session.mode.play.is_players_turn) {
             try self.tick(.{});
         }
     }
@@ -136,7 +136,7 @@ pub fn pressButton(self: *Self, button: g.Button.GameButton) !void {
 
 pub fn completeRound(self: *Self) !void {
     std.debug.assert(self.session.mode == .play);
-    while (self.session.mode.play.state != .player_turn) {
+    while (!self.session.mode.play.is_players_turn) {
         try self.tick(.{});
     }
 }

@@ -99,7 +99,9 @@ fn addRatAndExp(test_session: *TestSession) !g.Entity {
     rat.health.?.current_hp = 1;
     const rat_id = try test_session.session.level.addEnemy(.sleeping, rat);
 
-    // The initial game state:
+    // Refresh the target
+    try test_session.tick(.{});
+    // Redraw the info bar
     try test_session.tick(.{});
     try test_session.runtime.display.expectLooksLike(
         \\######################################30
@@ -113,8 +115,8 @@ fn addRatAndExp(test_session: *TestSession) !g.Entity {
         \\~~~~~~~~~~~~~~~~~~~│@│~~~~~~~~~~~~~~~~~~
         \\~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         \\════════════════════════════════════════
-        \\                    ⇧Explore     Wait  ⇧
+        \\ r:|                ⇧Explore    Attack ⇧
     , .whole_display);
-    try std.testing.expectEqual(null, test_session.player.target());
+    try std.testing.expectEqual(rat_id, test_session.player.target());
     return rat_id;
 }

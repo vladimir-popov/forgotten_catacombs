@@ -53,6 +53,10 @@ pub fn ArraySet(comptime C: anytype) type {
                 }
                 return null;
             }
+
+            pub fn hasNext(self: *const Iterator) bool {
+                return self.idx < self.parent.components.items.len;
+            }
         };
 
         pub fn iterator(self: *const Self) Iterator {

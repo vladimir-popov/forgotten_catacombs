@@ -40,7 +40,7 @@ root_arena: *g.GameStateArena,
 /// Used to allocate memory for the current mode.
 /// Should be used to allocate anything within mode.
 mode_arena: g.SessionModeArena,
-/// This is a main seed of the game session. 
+/// This is a main seed of the game session.
 /// It should help to make all levels of a single game session reproducible.
 seed: u64,
 /// The PRNG initialized with the current time.

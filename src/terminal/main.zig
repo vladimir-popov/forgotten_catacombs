@@ -9,13 +9,13 @@ pub const TtyRuntime = @import("TtyRuntime.zig");
 
 pub const std_options: std.Options = .{
     .logFn = Logger.writeLog,
-    .log_level = .info,
+    .log_level = .warn,
     .log_scope_levels = &[_]std.log.ScopeLevel{
-        .{ .scope = .default, .level = .debug },
-        .{ .scope = .game_session, .level = .debug },
-        .{ .scope = .cheats, .level = .debug },
+        // .{ .scope = .default, .level = .debug },
         // .{ .scope = .game_session, .level = .debug },
-        .{ .scope = .actions, .level = .debug },
+        // .{ .scope = .cheats, .level = .debug },
+        // .{ .scope = .game_session, .level = .debug },
+        // .{ .scope = .actions, .level = .debug },
         // .{ .scope = .registry, .level = .debug },
         // .{ .scope = .ai, .level = .debug },
         // .{ .scope = .cave, .level = .debug },

@@ -12,27 +12,11 @@ const SHOW_NOTIFICATION_MS = 800;
 
 const Self = @This();
 
-/// ```
-///                                  ⟳
-/// player_turn ⭢  update_target ⭢  draw
-///      ⭡                           ⭣
-///    draw  ⭠   update_target ⭠  enemies_turn
-///     ⟳
-/// ```
-const State = union(enum) {
-    player_turn,
-    enemies_turn,
-    /// `true` means the next state is `player_turn`, or else `enemies_turn`
-    update_target: bool,
-    /// `true` means the next state is `player_turn`, or else `enemies_turn`
-    draw: bool,
-};
-
 session: *g.GameSession,
 // The entity to which quick actions can be applied
 target: ?g.Entity = null,
 quick_actions: QuickActions,
-state: State = .{ .draw = true },
+is_players_turn: bool = true,
 quick_actions_window: ?w.ModalWindow(w.OptionsArea(void)) = null,
 // If defined, then all input should be ignored.
 notification_to_show: ?NotificationMessage = null,
@@ -63,15 +47,20 @@ inline fn setTarget(self: *Self, target: ?g.Entity) void {
 }
 
 pub fn tick(self: *Self) !void {
-    switch (self.state) {
-        .player_turn => try self.playerTurn(),
-        .enemies_turn => try self.enemiesTurn(),
-        .update_target => |next_turn| {
-            try self.updateQuickActions();
-            self.state = .{ .draw = next_turn };
-        },
-        .draw => |is_next_player_turn| try self.draw(is_next_player_turn),
+    // TODO draw only after changes and return 1, else 0.
+    if (try self.isDrawing()) {
+        try self.session.runtime.cleanInputBuffer();
+        // skip getting an input from the player, or AI actions to show blocking animations
+        // and pop-up notifications
+        return;
     }
+
+    if (self.is_players_turn) {
+        try self.playerTurn();
+    } else {
+        try self.enemiesTurn();
+    }
+    try self.updateQuickActions();
 }
 
 fn playerTurn(self: *Self) !void {
@@ -96,14 +85,14 @@ fn playerTurn(self: *Self) !void {
                 },
                 else => {},
             }
-            self.state = .{ .update_target = false };
+            self.is_players_turn = false;
         },
         else => {},
     }
 }
 
 fn enemiesTurn(self: *Self) !void {
-    log.warn("enemiesTurn {d}", .{self.session.runtime.stackSize()});
+    log.debug("enemiesTurn {d}", .{self.session.runtime.stackSize()});
     var itr = self.session.registry.query(c.Initiative);
     while (itr.next()) |tuple| {
         const npc, const initiative = tuple;
@@ -127,12 +116,16 @@ fn enemiesTurn(self: *Self) !void {
             }
         }
     }
-    self.state = .{ .update_target = true };
+    self.is_players_turn = true;
 }
 
-fn draw(self: *Self, is_next_player_turn: bool) !void {
+/// Draws the whole screen.
+///
+/// Returns true if the drawing is not completed,
+/// and the input should be ignored.
+fn isDrawing(self: *Self) !bool {
     // the quick_actions_window is drawn during handleInput
-    if (self.quick_actions_window != null) return;
+    if (self.quick_actions_window != null) return false;
 
     try self.drawInfoBar();
     const level = &self.session.level;
@@ -146,48 +139,17 @@ fn draw(self: *Self, is_next_player_turn: bool) !void {
     );
     const now = self.session.runtime.currentMillis();
     const is_blocked_animation = try self.drawAnimationsFramesToBuffer(now);
+
+    // Flash all scene changes to display
     try self.session.render.drawChangedSymbols();
-    const is_notification_shown = try self.showNotifications(now);
-    if (self.session.registry.get(self.session.player, c.Health)) |health| {
-        try self.session.render.drawPlayerHp(health);
-    }
-    // Ignore any input while showing a blocked animation or notification
-    if (is_blocked_animation or is_notification_shown) {
-        try self.session.runtime.cleanInputBuffer();
-    } else {
-        // Drawing is completed
-        self.state = if (is_next_player_turn) .player_turn else .enemies_turn;
-    }
-}
 
-fn drawInfoBar(self: *const Self) !void {
-    try self.session.render.drawLeftButton("Explore", true);
-    const qa = self.quickAction();
-    const action_label = qa.toString();
-    try self.session.render.drawRightButton(action_label, self.quick_actions.actions.items.len > 1);
+    // Draw pop-up notifications
+    const notification_shown = try self.showNotifications(now);
 
-    // Draw the name or health of the target entity
-    if (self.target) |entity| {
-        if (!entity.eql(self.session.player)) {
-            if (self.session.registry.get2(entity, c.Sprite, c.Health)) |tuple| {
-                try self.session.render.drawEnemyHealth(tuple[0].codepoint, tuple[1]);
-                return;
-            }
-        }
-        var buf: [32]u8 = undefined;
-        try self.session.render.drawInfo(try g.meta.printActualName(&buf, self.session.journal, entity));
-    } else if (self.session.registry.get(self.session.player, c.Hunger)) |hunger| {
-        // Draw the hunger level
-        switch (hunger.level()) {
-            .well_fed => try self.session.render.cleanInfo(),
-            else => |lvl| {
-                var buf: [g.Render.INFO_ZONE_LENGTH]u8 = undefined;
-                try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "{f}", .{lvl}));
-            },
-        }
-    } else {
-        try self.session.render.cleanInfo();
-    }
+    // Draw player's hp
+    try self.session.render.drawPlayerHp(self.session.registry.getUnsafe(self.session.player, c.Health));
+
+    return is_blocked_animation or notification_shown;
 }
 
 /// Draws a single frame from every animation.
@@ -252,10 +214,40 @@ fn showNotifications(self: *Self, now: u64) !bool {
     return false;
 }
 
+fn drawInfoBar(self: *const Self) !void {
+    try self.session.render.drawLeftButton("Explore", true);
+    const qa = self.quickAction();
+    const action_label = qa.toString();
+    try self.session.render.drawRightButton(action_label, self.quick_actions.actions.items.len > 1);
+
+    // Draw the name or health of the target entity
+    if (self.target) |entity| {
+        if (!entity.eql(self.session.player)) {
+            if (self.session.registry.get2(entity, c.Sprite, c.Health)) |tuple| {
+                try self.session.render.drawEnemyHealth(tuple[0].codepoint, tuple[1]);
+                return;
+            }
+        }
+        var buf: [32]u8 = undefined;
+        try self.session.render.drawInfo(try g.meta.printActualName(&buf, self.session.journal, entity));
+    } else if (self.session.registry.get(self.session.player, c.Hunger)) |hunger| {
+        // Draw the hunger level
+        switch (hunger.level()) {
+            .well_fed => try self.session.render.cleanInfo(),
+            else => |lvl| {
+                var buf: [g.Render.INFO_ZONE_LENGTH]u8 = undefined;
+                try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "{f}", .{lvl}));
+            },
+        }
+    } else {
+        try self.session.render.cleanInfo();
+    }
+}
+
 // NOTE: the quick_actions_window can be drawn during this method
 fn handleInput(self: *Self) !?g.actions.Action {
     if (try self.session.runtime.readPushedButtons()) |btn| {
-        log.warn("handleInput {d}", .{self.session.runtime.stackSize()});
+        log.debug("handleInput {d}", .{self.session.runtime.stackSize()});
         if (self.quick_actions_window) |*window| {
             if (try window.handleButton(btn)) {
                 try window.hide(self.session.render, .from_buffer);
@@ -366,7 +358,7 @@ pub fn doTurn(
     log.info("The turn of the entity {d}.", .{actor.id});
     defer log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
 
-    log.warn("doTurn {d}", .{self.session.runtime.stackSize()});
+    log.debug("doTurn {d}", .{self.session.runtime.stackSize()});
     const move_points_for_action = g.meta.movePointsForAction(&self.session.registry, actor, action);
     if (move_points_for_action > initiative)
         return .not_enough_points;
@@ -380,7 +372,7 @@ pub fn doTurn(
                 log.info("Entity {d} spent {d} move points", .{ actor.id, mp });
 
                 // Handle Initiative
-                if (self.state == .player_turn and mp > 0) {
+                if (self.is_players_turn and mp > 0) {
                     // Add initiative points to enemies
                     var itr = self.session.registry.query(c.Initiative);
                     while (itr.next()) |tuple| {
@@ -425,7 +417,7 @@ pub fn updateQuickActions(self: *Self) anyerror!void {
                 },
             );
     }
-    log.warn("updateQActions {d}", .{self.session.runtime.stackSize()});
+    log.debug("updateQActions {d}", .{self.session.runtime.stackSize()});
 
     const alloc = self.session.mode_arena.allocator();
     // Remember the previously selected action to try to keep it selected
@@ -554,7 +546,7 @@ fn windowWithQuickActions(self: *Self) !w.ModalWindow(w.OptionsArea(void)) {
 fn chooseQuickAction(ptr: *anyopaque, line_idx: usize, _: void) anyerror!bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     self.quick_actions.selected_idx = line_idx;
-    log.debug("Chosen option {d}: {t}", .{ line_idx, self.quickAction() });
+    log.debug("Chosen option {d}: {t}", .{ line_idx, self.quickAction().tag });
     return true;
 }
 

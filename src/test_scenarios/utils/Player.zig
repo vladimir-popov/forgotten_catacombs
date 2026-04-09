@@ -57,7 +57,7 @@ pub fn move(self: Self, direction: p.Direction, count: u8) !void {
     for (0..count) |_| {
         try self.test_session.pressButton(btn);
         // again wait enemies
-        while (self.test_session.session.mode.play.state != .player_turn) {
+        while (!self.test_session.session.mode.play.is_players_turn) {
             try self.test_session.tick(.{});
         }
     }
@@ -73,12 +73,12 @@ pub fn moveOnScreenTo(self: Self, place: p.Point) !void {
 fn doCheat(self: Self, cheat: g.Cheat) !void {
     std.debug.assert(self.test_session.session.mode == .play);
     // complete unfinished turns of enemies
-    while (self.test_session.session.mode.play.state != .player_turn) {
+    while (!self.test_session.session.mode.play.is_players_turn) {
         try self.test_session.tick(.{});
     }
     self.test_session.runtime.cheat = cheat;
     // again wait enemies
-    while (self.test_session.session.mode.play.state != .player_turn) {
+    while (!self.test_session.session.mode.play.is_players_turn) {
         try self.test_session.tick(.{});
     }
     // one extra tick to draw the actual state

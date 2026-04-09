@@ -216,6 +216,10 @@ pub fn Registry(comptime ComponentsStruct: type) type {
                     }
                     return null;
                 }
+
+                pub fn hasNext(self: *const @This()) bool {
+                    return self.main_iterator.hasNext();
+                }
             };
         }
 
@@ -239,6 +243,10 @@ pub fn Registry(comptime ComponentsStruct: type) type {
                     }
                     return null;
                 }
+
+                pub fn hasNext(self: *const @This()) bool {
+                    return self.main_iterator.hasNext();
+                }
             };
         }
 
@@ -261,6 +269,10 @@ pub fn Registry(comptime ComponentsStruct: type) type {
                             return .{ entity, c1, cc[0], cc[1], cc[2] };
                     }
                     return null;
+                }
+
+                pub fn hasNext(self: *const @This()) bool {
+                    return self.main_iterator.hasNext();
                 }
             };
         }
