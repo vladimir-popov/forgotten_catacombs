@@ -5,7 +5,7 @@ const g = @import("game_pkg.zig");
 const p = g.primitives;
 const c = g.components;
 
-const log = std.log.scoped(.runtime);
+const stack_log = std.log.scoped(.stack);
 
 const Self = @This();
 
@@ -58,6 +58,10 @@ pub inline fn stackSize(self: *const Self) usize {
     return self.vtable.stackSize(self.context);
 }
 
+pub inline fn printStackSize(self: *const Self, comptime depth: u4, tag: []const u8) void {
+    stack_log.debug(("  " ** depth) ++ "{s} {d}", .{ tag, self.stackSize() });
+}
+
 pub inline fn popCheat(self: *const Self) ?g.Cheat {
     return self.vtable.popCheat(self.context);
 }
@@ -80,9 +84,7 @@ pub inline fn removeAllMenuItems(self: *const Self) void {
 }
 
 pub fn readPushedButtons(self: *const Self) !?g.Button {
-    const btn = try self.vtable.readPushedButtons(self.context);
-    if (btn) |b| log.debug("Pressed button {s}", .{@tagName(b.game_button)});
-    return btn;
+    return try self.vtable.readPushedButtons(self.context);
 }
 
 pub fn cleanInputBuffer(self: *const Self) !void {
@@ -98,10 +100,7 @@ pub fn drawSprite(self: *const Self, codepoint: u21, position_on_display: p.Poin
 }
 
 pub fn openFile(self: *const Self, file_path: [:0]const u8, mode: FileMode, buffer: []u8) anyerror!OpaqueFile {
-    return self.vtable.openFile(self.context, file_path, mode, buffer) catch |err| {
-        log.err("Error {t} on opening to {t} file {s}", .{ err, mode, file_path });
-        return err;
-    };
+    return try self.vtable.openFile(self.context, file_path, mode, buffer);
 }
 
 pub fn closeFile(self: *const Self, file: OpaqueFile) void {

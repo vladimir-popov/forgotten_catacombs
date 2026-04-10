@@ -119,7 +119,7 @@ pub fn doAction(
         log.debug("Do action {any} by the entity {d}", .{ action, actor.id });
     }
 
-    log.debug("2. doAction {d}", .{self.session().runtime.stackSize()});
+    self.session().runtime.printStackSize(2, "doAction");
     switch (action.tag) {
         .do_nothing => {
             return .declined;
@@ -192,7 +192,7 @@ fn tryToMove(
     move_speed: g.MovePoints,
 ) anyerror!g.actions.ActionResult {
     std.debug.assert(action.tag == .move);
-    log.debug("3 tryToMove {d}", .{self.session().runtime.stackSize()});
+    self.session().runtime.printStackSize(3, "tryToMove");
     const new_place = switch (action.payload.move.target) {
         .direction => |direction| from_position.place.movedTo(direction),
         .new_place => |place| place,
@@ -215,7 +215,7 @@ fn tryToMove(
 /// {place} a place in the dungeon with which collision should be checked.
 fn checkCollision(self: *Self, place: p.Point, action: *g.Action) bool {
     std.debug.assert(action.tag == .move);
-    log.debug("4 checkCollision {d}", .{self.session().runtime.stackSize()});
+    self.session().runtime.printStackSize(4, "checkCollision");
     switch (self.session().level.cellAt(place)) {
         .landscape => |cl| if (cl == .floor or cl == .doorway)
             return false,
@@ -274,7 +274,7 @@ fn doMove(
     from_position: *c.Position,
     target: g.actions.Action.Payload.Move.Target,
 ) !void {
-    log.debug("4 doMove {d}", .{self.session().runtime.stackSize()});
+    self.session().runtime.printStackSize(4, "doMove");
     try self.session().sendEvent(.{
         .entity_moved = .{
             .entity = entity,
@@ -333,7 +333,7 @@ fn tryToHit(
     move_points_for_action: g.MovePoints,
 ) !g.actions.ActionResult {
     std.debug.assert(action.tag == .hit);
-    log.debug("3. tryToHit {d}", .{self.session().runtime.stackSize()});
+    self.session().runtime.printStackSize(3, "tryToHit");
 
     // Validate the weapon
     const weapon_id, const weapon = g.meta.getWeapon(&self.session().registry, actor);
@@ -430,7 +430,7 @@ fn applyWeaponDamage(
     target: g.Entity,
     target_health: *c.Health,
 ) !bool {
-    log.debug("4. applyWeaponDamage {d}", .{self.session().runtime.stackSize()});
+    self.session().runtime.printStackSize(4, "applyWeaponDamage");
     const target_armor = self.session().registry.get(target, c.Protection) orelse &c.Protection.zeros;
 
     // we have to copy the whole component, because the enemy can be removed,
@@ -475,7 +475,7 @@ fn applyEffect(
     target_protection: *const c.Protection,
     target_health: *c.Health,
 ) !bool {
-    log.debug("4. applyEffect {d}", .{self.session().runtime.stackSize()});
+    self.session().runtime.printStackSize(4, "applyEffect");
     switch (effect_type) {
         .heal => {
             try self.heal(actor, effect_range, target, target_health);
@@ -526,7 +526,7 @@ fn applyEffectDamage(
     target_health: *c.Health,
     target_protection: *const c.Protection,
 ) !bool {
-    log.debug("6. applyEffectDamage {d}", .{self.session().runtime.stackSize()});
+    self.session().runtime.printStackSize(6, "applyEffectDamage");
     const target_defence: p.Range(u8) = target_protection.resistance.values.get(effect_type) orelse .empty;
     const weapon_class =
         if (self.session().registry.get(source, c.Weapon)) |weapon| weapon.class else .primitive;

@@ -56,16 +56,25 @@ pub fn tick(self: *Self) !void {
     }
 
     if (self.is_players_turn) {
-        try self.playerTurn();
+        self.is_players_turn = try self.playerTurn();
+        // update quick action only if the player completed its turn
+        if (!self.is_players_turn)
+            try self.updateQuickActions();
     } else {
         try self.enemiesTurn();
+        self.is_players_turn = true;
+        // always update quick actions after enemies
+        try self.updateQuickActions();
     }
-    try self.updateQuickActions();
 }
 
-fn playerTurn(self: *Self) !void {
+/// Returns `false` when the player's turn is over (input led to an action, and that action is
+/// handled).
+fn playerTurn(self: *Self) !bool {
     // break this function if no input
-    var action = (try self.handleInput()) orelse return;
+    var action = (try self.handleInput()) orelse {
+        return true;
+    };
     const action_result = try self.doTurn(self.session.player, &action, std.math.maxInt(g.MovePoints));
     switch (action_result) {
         .done => {
@@ -85,14 +94,15 @@ fn playerTurn(self: *Self) !void {
                 },
                 else => {},
             }
-            self.is_players_turn = false;
+            return false;
         },
         else => {},
     }
+    return true;
 }
 
 fn enemiesTurn(self: *Self) !void {
-    log.debug("enemiesTurn {d}", .{self.session.runtime.stackSize()});
+    self.session.runtime.printStackSize(0, "enemiesTurn");
     var itr = self.session.registry.query(c.Initiative);
     while (itr.next()) |tuple| {
         const npc, const initiative = tuple;
@@ -116,7 +126,6 @@ fn enemiesTurn(self: *Self) !void {
             }
         }
     }
-    self.is_players_turn = true;
 }
 
 /// Draws the whole screen.
@@ -247,7 +256,8 @@ fn drawInfoBar(self: *const Self) !void {
 // NOTE: the quick_actions_window can be drawn during this method
 fn handleInput(self: *Self) !?g.actions.Action {
     if (try self.session.runtime.readPushedButtons()) |btn| {
-        log.debug("handleInput {d}", .{self.session.runtime.stackSize()});
+        self.session.runtime.printStackSize(1, "handleInput");
+
         if (self.quick_actions_window) |*window| {
             if (try window.handleButton(btn)) {
                 try window.hide(self.session.render, .from_buffer);
@@ -358,7 +368,8 @@ pub fn doTurn(
     log.info("The turn of the entity {d}.", .{actor.id});
     defer log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
 
-    log.debug("doTurn {d}", .{self.session.runtime.stackSize()});
+    self.session.runtime.printStackSize(1, "doTurn");
+
     const move_points_for_action = g.meta.movePointsForAction(&self.session.registry, actor, action);
     if (move_points_for_action > initiative)
         return .not_enough_points;
@@ -417,7 +428,7 @@ pub fn updateQuickActions(self: *Self) anyerror!void {
                 },
             );
     }
-    log.debug("updateQActions {d}", .{self.session.runtime.stackSize()});
+    self.session.runtime.printStackSize(0, "updateQActions");
 
     const alloc = self.session.mode_arena.allocator();
     // Remember the previously selected action to try to keep it selected
