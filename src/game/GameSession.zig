@@ -232,7 +232,7 @@ pub inline fn modifyRecognize(self: *Self) !void {
     try self.sendEvent(.{ .mode_changed = .to_modify_recognize });
 }
 
-pub inline fn trade(self: *Self, shop: *c.Shop) !void {
+pub inline fn trade(self: *Self, shop: g.Entity) !void {
     try self.sendEvent(.{ .mode_changed = .{ .to_trading = shop } });
 }
 

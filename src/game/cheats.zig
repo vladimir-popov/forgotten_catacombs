@@ -5,8 +5,6 @@ const c = g.components;
 
 const log = std.log.scoped(.cheats);
 
-var global_debug_shop: ?*c.Shop = null;
-
 const items_suggestions: [g.entities.presets.Items.fields.values.len][]const u8 = blk: {
     var suggestions: [g.entities.presets.Items.fields.values.len][]const u8 = undefined;
     const items = std.enums.values(g.entities.presets.Items.Tag);
@@ -59,10 +57,6 @@ pub const Cheat = union(enum) {
     ///  - for Buying tab the balance of the shop will be changed;
     ///  - for Selling tab the player's balance will be changed.
     set_money: u16,
-
-    /// Switches the game to the Trading mode with a special debug trader.
-    /// By default the trader has arbitrary number of random items to sell.
-    trade,
 
     /// Replaces a current visibility strategy to "show all"
     turn_light_on,
@@ -140,7 +134,6 @@ pub const Cheat = union(enum) {
             .dump_vector_field => return .dump_vector_field,
             .move_player_to_ladder_up => return .move_player_to_ladder_up,
             .move_player_to_ladder_down => return .move_player_to_ladder_down,
-            .trade => return .trade,
             .turn_light_on => return .turn_light_on,
             .turn_light_off => return .turn_light_off,
         }
@@ -182,7 +175,6 @@ pub const Cheat = union(enum) {
             .set_experience => "set experience",
             .set_health => "set health",
             .set_money => "set money",
-            .trade => "trade",
             .turn_light_off => "light off",
             .turn_light_on => "light on",
         };
@@ -228,16 +220,6 @@ pub const Cheat = union(enum) {
                     .row = goto.row + screen_corner.row - 1,
                     .col = goto.col + screen_corner.col - 1,
                 });
-            },
-            .trade => {
-                if (global_debug_shop) |shop| {
-                    shop.deinit();
-                } else {
-                    global_debug_shop = try session.mode_arena.allocator().create(c.Shop);
-                }
-                const seed = session.prng.next();
-                global_debug_shop.?.* = try c.Shop.empty(session.mode_arena.allocator(), 1.0, 200, seed);
-                return .action(.trade, global_debug_shop.?);
             },
             else => return null,
         }

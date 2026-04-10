@@ -59,17 +59,17 @@ actions_window: ?w.ModalWindow(w.OptionsArea(g.Entity)) = null,
 pub fn init(
     self: *Self,
     session: *g.GameSession,
-    shop: *c.Shop,
+    shop: g.Entity,
 ) !void {
     self.* = .{
         .session = session,
         .wallet = session.registry.getUnsafe(session.player, c.Wallet),
         .inventory = session.registry.getUnsafe(session.player, c.Inventory),
-        .shop = shop,
+        .shop = session.registry.getUnsafe(shop, c.Shop),
     };
     try g.entities.random.fillShop(
         &session.registry,
-        shop,
+        self.shop,
         session.level.depth,
         session.registry.getUnsafe(session.player, c.Experience).level,
     );

@@ -51,8 +51,8 @@ pub fn calculateQuickActionForTarget(
     }
 
     if (is_near4) {
-        if (self.session().registry.get(target_entity, c.Shop)) |shop| {
-            return .action(.trade, shop);
+        if (self.session().registry.has(target_entity, c.Shop)) {
+            return .action(.trade, target_entity);
         }
         if (self.session().registry.get(target_entity, c.Description)) |descr| {
             if (descr.preset == .scientist) {
@@ -233,8 +233,8 @@ fn checkCollision(self: *Self, place: p.Point, action: *g.Action) bool {
                     return true;
                 }
 
-                if (self.session().registry.get(entity, c.Shop)) |shop| {
-                    action.set(.trade, shop);
+                if (self.session().registry.has(entity, c.Shop)) {
+                    action.set(.trade, entity);
                     return true;
                 }
 

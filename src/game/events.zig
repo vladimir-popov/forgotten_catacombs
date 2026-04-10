@@ -47,7 +47,7 @@ pub const ModeChanged = union(enum) {
     to_looking_around,
     to_level_up,
     to_inventory,
-    to_trading: *c.Shop,
+    to_trading: g.Entity,
     to_modify_recognize,
     to_play: struct { entity_in_focus: ?g.Entity, action: ?g.actions.Action },
 };

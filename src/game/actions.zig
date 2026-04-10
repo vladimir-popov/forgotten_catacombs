@@ -71,7 +71,7 @@ pub const Action = struct {
         //
         step_in_trap: struct { trap_entity: g.Entity, trap: c.Trap, moving_target: Move.Target },
         //
-        trade: *c.Shop,
+        trade: g.Entity,
     };
 
     pub const Tag = blk: {
