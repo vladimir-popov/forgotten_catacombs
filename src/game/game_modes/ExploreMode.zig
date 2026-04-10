@@ -9,7 +9,7 @@ const w = g.windows;
 const log = std.log.scoped(.explore_mode);
 
 const ExploreMode = @This();
-const EntitiesOnScreen = std.AutoHashMapUnmanaged(p.Point, [c.Position.ZOrder.size]?g.Entity);
+const EntitiesOnScreen = std.AutoHashMapUnmanaged(p.Point, [c.Position.ZOrder.count]?g.Entity);
 
 session: *g.GameSession,
 /// Map of entities and their positions on the screen
@@ -151,7 +151,7 @@ fn updateEntitiesOnScreen(self: *ExploreMode) !void {
     log.debug("ExploreMode has been refreshed. Entities on screen:\n{any}", .{self.entities_on_screen});
 }
 
-fn entitiesInFocus(self: ExploreMode) ?[c.Position.ZOrder.size]?g.Entity {
+fn entitiesInFocus(self: ExploreMode) ?[c.Position.ZOrder.count]?g.Entity {
     if (self.entities_on_screen.get(self.place_in_focus)) |entities|
         return entities;
     return null;
@@ -224,7 +224,7 @@ inline fn sub(x: u8, y: u8) u8 {
 
 fn windowWithEntities(
     self: *ExploreMode,
-    variants: [c.Position.ZOrder.size]?g.Entity,
+    variants: [c.Position.ZOrder.count]?g.Entity,
 ) !w.ModalWindow(w.OptionsArea(g.Entity)) {
     var area = w.OptionsArea(g.Entity).centered(self);
     for (variants) |maybe_entity| {

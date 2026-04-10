@@ -250,7 +250,7 @@ fn checkCollision(self: *Self, place: p.Point, action: *g.Action) bool {
                 return true;
             }
             // Check traps
-            if (entities[c.Position.ZOrder.trap.index()]) |entity| {
+            if (entities[c.Position.ZOrder.item.index()]) |entity| {
                 if (self.session().registry.get(entity, c.Trap)) |trap| {
                     action.set(
                         .step_in_trap,

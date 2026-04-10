@@ -9,15 +9,13 @@ const u = g.utils;
 /// because z-order is a constant property of the entity.
 pub const Position = struct {
     pub const ZOrder = enum {
-        pub const size = @typeInfo(ZOrder).@"enum".fields.len;
+        pub const count = @typeInfo(ZOrder).@"enum".fields.len;
 
-        pub const indexes: [size]u8 = .{ 0, 1, 2, 3 };
+        pub const indexes: [count]u8 = .{ 0, 1, 2 };
 
         /// opened doors, ladders, teleports...
         floor,
-        /// Traps are between floor and dropped item
-        trap,
-        /// any dropped items, piles...
+        /// any dropped items, traps, piles...
         item,
         /// player, enemies, npc, closed doors...
         obstacle,
