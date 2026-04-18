@@ -115,10 +115,6 @@ pub fn doAction(
     action: *g.Action,
     move_points_for_action: g.MovePoints,
 ) !g.actions.ActionResult {
-    if (std.log.logEnabled(.debug, .actions) and action.tag != .do_nothing) {
-        log.debug("Do action {any} by the entity {d}", .{ action, actor.id });
-    }
-
     self.session().runtime.printStackSize(2, "doAction");
     switch (action.tag) {
         .do_nothing => {

@@ -196,13 +196,14 @@ pub const Cheat = union(enum) {
     }
 
     /// Some cheats can be interpreted as game actions.
-    pub fn toAction(self: Cheat, session: *g.GameSession) !?g.actions.Action {
+    pub fn toAction(self: Cheat, session: *g.GameSession, action: *g.Action) !bool {
         switch (self) {
             .move_player_to_ladder_up => {
                 var itr = session.registry.query2(c.Ladder, c.Position);
                 while (itr.next()) |tuple| {
                     if (tuple[1].direction == .up) {
-                        return movePlayerToPoint(tuple[2].place);
+                        action.* = movePlayerToPoint(tuple[2].place);
+                        return true;
                     }
                 }
             },
@@ -210,20 +211,22 @@ pub const Cheat = union(enum) {
                 var itr = session.registry.query2(c.Ladder, c.Position);
                 while (itr.next()) |tuple| {
                     if (tuple[1].direction == .down) {
-                        return movePlayerToPoint(tuple[2].place);
+                        action.* = movePlayerToPoint(tuple[2].place);
+                        return true;
                     }
                 }
             },
             .goto => |goto| {
                 const screen_corner = session.viewport.region.top_left;
-                return movePlayerToPoint(.{
+                action.* = movePlayerToPoint(.{
                     .row = goto.row + screen_corner.row - 1,
                     .col = goto.col + screen_corner.col - 1,
                 });
+                return true;
             },
-            else => return null,
+            else => return false,
         }
-        return null;
+        return false;
     }
 
     pub fn suggestions(tag: Tag) ?[]const []const u8 {

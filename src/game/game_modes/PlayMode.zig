@@ -21,6 +21,9 @@ quick_actions_window: ?w.ModalWindow(w.OptionsArea(void)) = null,
 // If defined, then all input should be ignored.
 notification_to_show: ?NotificationMessage = null,
 
+// This is a buffer for an action. It should help to avoid putting action on stack
+action: g.Action = undefined,
+
 pub fn init(
     self: *Self,
     session: *g.GameSession,
@@ -40,7 +43,7 @@ pub fn init(
     );
 }
 
-inline fn setTarget(self: *Self, target: ?g.Entity) void {
+fn setTarget(self: *Self, target: ?g.Entity) void {
     log.debug("Change target from {any} to {any}", .{ self.target, target });
     self.target = target;
     self.quick_actions.reset();
@@ -72,16 +75,16 @@ pub fn tick(self: *Self) !void {
 /// handled).
 fn playerTurn(self: *Self) !bool {
     // break this function if no input
-    var action = (try self.handleInput()) orelse {
+    if (!try self.handleInput()) {
         return true;
-    };
-    const action_result = try self.doTurn(self.session.player, &action, std.math.maxInt(g.MovePoints));
+    }
+    const action_result = try self.doTurn(self.session.player, &self.action, std.math.maxInt(g.MovePoints));
     switch (action_result) {
         .done => {
             // Force change the target
-            switch (action.tag) {
+            switch (self.action.tag) {
                 .hit => {
-                    const enemy = action.payload.hit;
+                    const enemy = self.action.payload.hit;
                     if (self.session.registry.contains(enemy)) {
                         self.setTarget(enemy);
                     } else {
@@ -89,7 +92,7 @@ fn playerTurn(self: *Self) !bool {
                     }
                 },
                 .open => {
-                    const door = action.payload.open;
+                    const door = self.action.payload.open;
                     self.setTarget(door.id);
                 },
                 else => {},
@@ -253,8 +256,9 @@ fn drawInfoBar(self: *const Self) !void {
     }
 }
 
-// NOTE: the quick_actions_window can be drawn during this method
-fn handleInput(self: *Self) !?g.actions.Action {
+/// Returns `true` when an input leads to an action
+fn handleInput(self: *Self) !bool {
+    // NOTE: the quick_actions_window can be drawn during this method
     if (try self.session.runtime.readPushedButtons()) |btn| {
         self.session.runtime.printStackSize(1, "handleInput");
 
@@ -265,34 +269,41 @@ fn handleInput(self: *Self) !?g.actions.Action {
                 self.quick_actions_window = null;
             }
             switch (btn.game_button) {
-                .a => return self.quickAction(),
+                .a => {
+                    self.action = self.quickAction();
+                    return true;
+                },
                 .up, .down => try window.draw(self.session.render),
                 else => {},
             }
         } else {
             switch (btn.game_button) {
                 .a => switch (btn.state) {
-                    .released => return self.quickAction(),
+                    .released => {
+                        self.action = self.quickAction();
+                        return true;
+                    },
                     .hold => {
                         self.quick_actions_window = try self.windowWithQuickActions();
                         try self.quick_actions_window.?.draw(self.session.render);
-                        return null;
+                        return false;
                     },
                 },
                 .b => switch (btn.state) {
                     .released => {
                         try self.session.lookAround();
                         // we have to handle changing the state right after this function
-                        return null;
+                        return false;
                     },
                     .hold => {
                         try self.session.explore();
                         // we have to handle changing the state right after this function
-                        return null;
+                        return false;
                     },
                 },
                 .left, .right, .up, .down => {
-                    return .action(.move, .{ .target = .{ .direction = btn.toDirection().? } });
+                    self.action = .action(.move, .{ .target = .{ .direction = btn.toDirection().? } });
+                    return true;
                 },
             }
         }
@@ -343,12 +354,12 @@ fn handleInput(self: *Self) !?g.actions.Action {
                     try self.session.journal.markArmorAsKnown(entity);
                 }
             },
-            else => if (try cheat.toAction(self.session)) |action| {
-                return action;
+            else => if (try cheat.toAction(self.session, &self.action)) {
+                return true;
             },
         }
     }
-    return null;
+    return false;
 }
 
 /// Trying to do an action. The action can be changed or ignored.

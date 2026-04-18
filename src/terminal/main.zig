@@ -11,6 +11,7 @@ pub const std_options: std.Options = .{
     .logFn = Logger.writeLog,
     .log_level = .warn,
     .log_scope_levels = &[_]std.log.ScopeLevel{
+        .{ .scope = .main, .level = .info },
         // .{ .scope = .default, .level = .debug },
         // .{ .scope = .game_session, .level = .debug },
         // .{ .scope = .cheats, .level = .debug },

@@ -1,3 +1,4 @@
+const builtin = @import("builtin");
 const std = @import("std");
 const g = @import("../game_pkg.zig");
 
@@ -93,11 +94,15 @@ pub fn Registry(comptime ComponentsStruct: type) type {
             return @field(self.components_map, @typeName(C)).getForEntity(entity);
         }
 
-        pub fn getUnsafe(self: *const Self, entity: Entity, comptime C: type) *C {
-            return get(self, entity, C) orelse std.debug.panic(
-                "Entity {d} doesn't have component {any}\n{any}",
-                .{ entity.id, C, self.entityToStruct(entity) },
-            );
+        // inlining of this function leads to very huge `doAction` function
+        pub noinline fn getUnsafe(self: *const Self, entity: Entity, comptime C: type) *C {
+            return get(self, entity, C) orelse if (builtin.mode == .Debug)
+                std.debug.panic(
+                    "Entity {d} doesn't have component {any}\n{any}",
+                    .{ entity.id, C, self.entityToStruct(entity) },
+                )
+            else
+                std.debug.panic("Entity {d} doesn't have component {s}", .{ entity.id, @typeName(C) });
         }
 
         pub fn getOrSet(self: *Self, entity: Entity, comptime C: type, default: C) !*C {

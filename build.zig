@@ -104,8 +104,9 @@ pub fn build(b: *std.Build) !void {
         .name = "pdex.elf",
         .root_module = playdate_module,
     });
-    elf.link_emit_relocs = true;
+    elf.link_emit_relocs = true; // not compatible with ReleaseSmall
     elf.entry = .{ .symbol_name = "eventHandler" };
+    elf.link_gc_sections = true;
 
     elf.setLinkerScript(b.path("link_map.ld"));
     elf.root_module.omit_frame_pointer = true;
@@ -179,12 +180,12 @@ pub fn build(b: *std.Build) !void {
         emulate_step.dependOn(&emulate_cmd.step);
         emulate_step.dependOn(b.getInstallStep());
 
-        // // --- Add this to generate ASM ---
-        // const asm_step = b.addInstallFile(
-        //     elf.getEmittedAsm(),
-        //     "bin/elf.s",
-        // );
-        // emulate_step.dependOn(&asm_step.step);
+        // --- Add this to generate ASM ---
+        const asm_step = b.addInstallFile(
+            elf.getEmittedAsm(),
+            "bin/elf.s",
+        );
+        emulate_step.dependOn(&asm_step.step);
     }
 
     // ============================================================
