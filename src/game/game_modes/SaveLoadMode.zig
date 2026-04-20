@@ -281,117 +281,129 @@ const Loading = struct {
         log.debug("Continue loading: {t}", .{self.progress});
         try self.draw();
         switch (self.progress) {
-            .load_session => {
-                self.file = try self.session.runtime.openFile(
-                    g.persistance.SESSION_FILE_NAME,
-                    .read,
-                    &self.io_buffer,
-                );
-                defer {
-                    self.session.runtime.closeFile(self.file);
-                    self.state = .file_closed;
-                }
-                self.state = .{ .reading = .init(&self.session.registry, self.session.runtime.readFile(self.file)) };
-                defer self.state.reading.deinit();
-
-                try self.state.reading.beginObject();
-                _ = try self.state.reading.readKey("seed");
-                self.session.seed = try self.state.reading.read(u64);
-                log.debug("A seed is {d}", .{self.session.seed});
-
-                _ = try self.state.reading.readKey("next_entity");
-                self.session.registry.next_entity = .{ .id = try self.state.reading.read(g.Entity.IdType) };
-
-                _ = try self.state.reading.readKey("depth");
-                self.level_depth = try self.state.reading.read(u8);
-
-                _ = try self.state.reading.readKey("max_depth");
-                self.session.max_depth = try self.state.reading.read(u8);
-
-                _ = try self.state.reading.readKey("player");
-                self.session.player = try self.state.reading.readEntity();
-                try self.state.reading.endObject();
-                log.debug("A game session was loaded.", .{});
-
-                self.session.level = g.Level.preInit(self.game_session_arena.?, &self.session.registry);
-                log.debug("A level was preinited.", .{});
-
-                self.progress = .session_loaded;
-            },
-            .session_loaded => {
-                var path_buf: [16]u8 = undefined;
-                self.file =
-                    try self.session.runtime.openFile(
-                        try g.persistance.pathToLevelFile(&path_buf, self.level_depth),
-                        .read,
-                        &self.io_buffer,
-                    );
-                self.state = .{ .reading = .init(&self.session.registry, self.session.runtime.readFile(self.file)) };
-
-                try self.state.reading.beginObject();
-                _ = try self.state.reading.readKey("seed");
-                const seed = try self.state.reading.read(u64);
-
-                self.session.level.reset();
-                try self.session.level.initWithEmptyDungeon(
-                    self.session.player,
-                    self.level_depth,
-                    seed,
-                );
-                self.progress = .level_inited;
-            },
-            .level_inited => {
-                _ = try self.state.reading.readKey("entities");
-                const alloc = self.session.level.arena.allocator();
-                try self.state.reading.beginCollection();
-                while (!try self.state.reading.isCollectionEnd()) {
-                    try self.session.level.entities_on_level.append(alloc, try self.state.reading.readEntity());
-                }
-                try self.state.reading.endCollection();
-                self.session.level.bindDoorsWithDoorways();
-                self.progress = .entities_loaded;
-            },
-            .entities_loaded => {
-                _ = try self.state.reading.readKey("visited_places");
-                try self.state.reading.beginCollection();
-                for (0..self.session.level.dungeon.rows) |i| {
-                    try self.state.reading.beginCollection();
-                    while (!try self.state.reading.isCollectionEnd())
-                        self.session.level.visited_places[i].set(try self.state.reading.read(usize));
-                    try self.state.reading.endCollection();
-                }
-                try self.state.reading.endCollection();
-                self.progress = .visited_places_loaded;
-            },
-            .visited_places_loaded => {
-                var buf: [128]u8 = undefined;
-                _ = try self.state.reading.readKey("remembered_objects");
-                try self.state.reading.beginCollection();
-                const alloc = self.session.level.arena.allocator();
-                while (!try self.state.reading.isCollectionEnd()) {
-                    try self.state.reading.beginObject();
-                    const entity = g.Entity{ .id = try self.state.reading.readKeyAsNumber(g.Entity.IdType, &buf) };
-                    const place = try self.state.reading.read(p.Point);
-                    try self.session.level.remembered_objects.put(alloc, place, entity);
-                    try self.state.reading.endObject();
-                }
-                try self.state.reading.endCollection();
-                self.progress = .remembered_objects_loaded;
-            },
-            .remembered_objects_loaded => {
-                try self.state.reading.endObject();
-                try self.session.level.completeInitialization(self.moving_direction);
-                if (self.moving_direction == null)
-                    try self.session.completeInitialization();
-
-                self.state.reading.deinit();
-                self.session.runtime.closeFile(self.file);
-                self.state = .file_closed;
-                self.progress = .completed;
-            },
+            .load_session => try self.loadingSession(),
+            .session_loaded => try self.initLevel(),
+            .level_inited => try self.loadingEntities(),
+            .entities_loaded => try self.loadingVisitedPlaces(),
+            .visited_places_loaded => try self.loadingRememberedObjects(),
+            .remembered_objects_loaded => try self.completeLevelInitialization(),
             .completed => return true,
         }
         return false;
+    }
+
+    noinline fn loadingSession(self: *Loading) !void {
+        self.file = try self.session.runtime.openFile(
+            g.persistance.SESSION_FILE_NAME,
+            .read,
+            &self.io_buffer,
+        );
+        defer {
+            self.session.runtime.closeFile(self.file);
+            self.state = .file_closed;
+        }
+        self.state = .{ .reading = .init(&self.session.registry, self.session.runtime.readFile(self.file)) };
+        defer self.state.reading.deinit();
+
+        try self.state.reading.beginObject();
+        _ = try self.state.reading.readKey("seed");
+        self.session.seed = try self.state.reading.read(u64);
+        log.debug("A seed is {d}", .{self.session.seed});
+
+        _ = try self.state.reading.readKey("next_entity");
+        self.session.registry.next_entity = .{ .id = try self.state.reading.read(g.Entity.IdType) };
+
+        _ = try self.state.reading.readKey("depth");
+        self.level_depth = try self.state.reading.read(u8);
+
+        _ = try self.state.reading.readKey("max_depth");
+        self.session.max_depth = try self.state.reading.read(u8);
+
+        _ = try self.state.reading.readKey("player");
+        self.session.player = try self.state.reading.readEntity();
+        try self.state.reading.endObject();
+        log.debug("A game session was loaded.", .{});
+
+        self.session.level = g.Level.preInit(self.game_session_arena.?, &self.session.registry);
+        log.debug("A level was preinited.", .{});
+
+        self.progress = .session_loaded;
+    }
+
+    noinline fn initLevel(self: *Loading) !void {
+        var path_buf: [16]u8 = undefined;
+        self.file =
+            try self.session.runtime.openFile(
+                try g.persistance.pathToLevelFile(&path_buf, self.level_depth),
+                .read,
+                &self.io_buffer,
+            );
+        self.state = .{ .reading = .init(&self.session.registry, self.session.runtime.readFile(self.file)) };
+
+        try self.state.reading.beginObject();
+        _ = try self.state.reading.readKey("seed");
+        const seed = try self.state.reading.read(u64);
+
+        self.session.level.reset();
+        try self.session.level.initWithEmptyDungeon(
+            self.session.player,
+            self.level_depth,
+            seed,
+        );
+        self.progress = .level_inited;
+    }
+
+    noinline fn loadingEntities(self: *Loading) !void {
+        _ = try self.state.reading.readKey("entities");
+        const alloc = self.session.level.arena.allocator();
+        try self.state.reading.beginCollection();
+        while (!try self.state.reading.isCollectionEnd()) {
+            try self.session.level.entities_on_level.append(alloc, try self.state.reading.readEntity());
+        }
+        try self.state.reading.endCollection();
+        self.session.level.bindDoorsWithDoorways();
+        self.progress = .entities_loaded;
+    }
+
+    noinline fn loadingVisitedPlaces(self: *Loading) !void {
+        _ = try self.state.reading.readKey("visited_places");
+        try self.state.reading.beginCollection();
+        for (0..self.session.level.dungeon.rows) |i| {
+            try self.state.reading.beginCollection();
+            while (!try self.state.reading.isCollectionEnd())
+                self.session.level.visited_places[i].set(try self.state.reading.read(usize));
+            try self.state.reading.endCollection();
+        }
+        try self.state.reading.endCollection();
+        self.progress = .visited_places_loaded;
+    }
+
+    noinline fn loadingRememberedObjects(self: *Loading) !void {
+        var buf: [128]u8 = undefined;
+        _ = try self.state.reading.readKey("remembered_objects");
+        try self.state.reading.beginCollection();
+        const alloc = self.session.level.arena.allocator();
+        while (!try self.state.reading.isCollectionEnd()) {
+            try self.state.reading.beginObject();
+            const entity = g.Entity{ .id = try self.state.reading.readKeyAsNumber(g.Entity.IdType, &buf) };
+            const place = try self.state.reading.read(p.Point);
+            try self.session.level.remembered_objects.put(alloc, place, entity);
+            try self.state.reading.endObject();
+        }
+        try self.state.reading.endCollection();
+        self.progress = .remembered_objects_loaded;
+    }
+
+    noinline fn completeLevelInitialization(self: *Loading) !void {
+        try self.state.reading.endObject();
+        try self.session.level.completeInitialization(self.moving_direction);
+        if (self.moving_direction == null)
+            try self.session.completeInitialization();
+
+        self.state.reading.deinit();
+        self.session.runtime.closeFile(self.file);
+        self.state = .file_closed;
+        self.progress = .completed;
     }
 
     fn draw(self: Loading) !void {
