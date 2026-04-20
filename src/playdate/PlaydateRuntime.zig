@@ -254,7 +254,7 @@ fn writeToFile(_: *anyopaque, file: *anyopaque) *std.Io.Writer {
 fn isFileExists(ptr: *anyopaque, file_path: [:0]const u8) anyerror!bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     var result = ExpectedFile{ .file_name = file_path };
-    if (self.playdate.file.listfiles("", validateFile, &result, 0) < 0) {
+    if (self.playdate.file.listfiles("./", validateFile, &result, 0) < 0) {
         log.err("Error on listing files: {s}", .{self.playdate.file.geterr() orelse ""});
         return error.IOError;
     }
@@ -288,5 +288,5 @@ const ExpectedFile = struct {
 fn validateFile(file_name: [*c]const u8, userdata: ?*anyopaque) callconv(.c) void {
     const expected_file: *ExpectedFile = @ptrCast(@alignCast(userdata));
     const actual_file = std.mem.sliceTo(file_name, 0);
-    expected_file.is_found = std.mem.eql(u8, expected_file.file_name, actual_file);
+    expected_file.is_found |= std.mem.eql(u8, expected_file.file_name, actual_file);
 }

@@ -31,7 +31,7 @@ pub const std_options = std.Options{
     },
 };
 
-var log_buffer: [128]u8 = undefined;
+var log_buffer: [256]u8 = undefined;
 
 fn writeLog(
     comptime _: std.log.Level,

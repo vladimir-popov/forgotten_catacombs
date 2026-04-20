@@ -181,11 +181,11 @@ pub fn build(b: *std.Build) !void {
         emulate_step.dependOn(b.getInstallStep());
 
         // --- Add this to generate ASM ---
-        const asm_step = b.addInstallFile(
-            elf.getEmittedAsm(),
-            "bin/elf.s",
-        );
-        emulate_step.dependOn(&asm_step.step);
+        // const asm_step = b.addInstallFile(
+        //     elf.getEmittedAsm(),
+        //     "bin/elf.s",
+        // );
+        // emulate_step.dependOn(&asm_step.step);
     }
 
     // ============================================================
