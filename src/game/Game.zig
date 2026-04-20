@@ -46,18 +46,18 @@ state_arena: g.GameStateArena,
 runtime: g.Runtime,
 /// Buffered render to draw the game
 render: g.Render,
-/// The seed is used to generate a new game session.
+/// If defined this seed is used to generate a new game session.
 /// This seed can be passed by the user.
-seed: u64,
+custom_seed: ?u64,
 /// The current state of the game
 state: State,
 
-pub fn init(gpa: std.mem.Allocator, runtime: g.Runtime, seed: u64) !Self {
+pub fn init(gpa: std.mem.Allocator, runtime: g.Runtime, seed: ?u64) !Self {
     return .{
         .state_arena = .init(gpa),
         .runtime = runtime,
         .render = try .init(gpa, runtime),
-        .seed = seed,
+        .custom_seed = seed,
         .state = .inited,
     };
 }
@@ -146,6 +146,13 @@ pub fn startWithPreset(self: *Self, archetype: g.meta.PlayerArchetype, skills: c
 }
 
 fn startGameSession(self: *Self, stats: c.Stats, skills: c.Skills, health: c.Health) !void {
+    const seed: u64 = self.custom_seed orelse self.runtime.currentMillis();
+    // custom seed should be used only once
+    self.custom_seed = null;
+    log.info(
+        "========================================\nSeed of the game is {d}\n========================================",
+        .{seed},
+    );
     try self.render.clearDisplay();
     try self.deleteSessionFileIfExists();
     log.debug("Init menu", .{});
@@ -155,7 +162,7 @@ fn startGameSession(self: *Self, stats: c.Stats, skills: c.Skills, health: c.Hea
     self.state = .{ .game_session = try self.state_arena.allocator().create(g.GameSession) };
     try self.state.game_session.initNew(
         &self.state_arena,
-        self.seed,
+        seed,
         self.runtime,
         self.render,
         stats,
