@@ -471,97 +471,109 @@ const Saving = struct {
         log.debug("Continue saving: {t}", .{self.progress});
         try self.draw();
         switch (self.progress) {
-            .inited => {
-                self.file = try self.session.runtime.openFile(
-                    g.persistance.SESSION_FILE_NAME,
-                    .write,
-                    &self.io_buffer,
-                );
-                log.debug("File opened", .{});
-                self.state = .{
-                    .writing = .init(&self.session.registry, self.session.runtime.writeToFile(self.file)),
-                };
-                try self.state.writing.beginObject();
-                try self.state.writing.writeStringKey("seed");
-                try self.state.writing.write(self.session.seed);
-                try self.state.writing.writeStringKey("next_entity");
-                try self.state.writing.write(self.session.registry.next_entity.id);
-                try self.state.writing.writeStringKey("depth");
-                try self.state.writing.write(self.session.level.depth);
-                try self.state.writing.writeStringKey("max_depth");
-                try self.state.writing.write(self.session.max_depth);
-                try self.state.writing.writeStringKey("player");
-                try self.state.writing.writeEntity(self.session.player);
-                try self.state.writing.endObject();
-                self.session.runtime.closeFile(self.file);
-                self.state = .file_closed;
-                self.progress = .session_saved;
-            },
-            .session_saved => {
-                var buf: [16]u8 = undefined;
-                self.file = try self.session.runtime.openFile(
-                    try g.persistance.pathToLevelFile(&buf, self.session.level.depth),
-                    .write,
-                    &self.io_buffer,
-                );
-                self.state = .{
-                    .writing = .init(&self.session.registry, self.session.runtime.writeToFile(self.file)),
-                };
-
-                try self.state.writing.beginObject();
-                try self.state.writing.writeStringKey("seed");
-                try self.state.writing.write(self.session.level.dungeon.seed);
-                self.progress = .level_seed_saved;
-            },
-            .level_seed_saved => {
-                try self.state.writing.writeStringKey("entities");
-                try self.state.writing.beginCollection();
-                for (self.session.level.entities_on_level.items) |entity| {
-                    try self.state.writing.writeEntity(entity);
-                }
-                try self.state.writing.endCollection();
-                self.progress = .entities_saved;
-            },
-            .entities_saved => {
-                try self.state.writing.writeStringKey("visited_places");
-                try self.state.writing.beginCollection();
-                for (self.session.level.visited_places) |row| {
-                    var itr = row.iterator(.{});
-                    try self.state.writing.beginCollection();
-                    while (itr.next()) |idx| {
-                        try self.state.writing.write(idx);
-                    }
-                    try self.state.writing.endCollection();
-                }
-                try self.state.writing.endCollection();
-                self.progress = .visited_places_saved;
-            },
-            .visited_places_saved => {
-                try self.state.writing.writeStringKey("remembered_objects");
-                var itr = self.session.level.remembered_objects.iterator();
-                try self.state.writing.beginCollection();
-                while (itr.next()) |kv| {
-                    try self.state.writing.beginObject();
-                    try self.state.writing.writeNumericKey(kv.value_ptr.id);
-                    try self.state.writing.write(kv.key_ptr.*);
-                    try self.state.writing.endObject();
-                }
-                try self.state.writing.endCollection();
-                self.progress = .remembered_objects_saved;
-            },
-            .remembered_objects_saved => {
-                try self.state.writing.endObject();
-                for (self.session.level.entities_on_level.items) |entity| {
-                    if (!entity.eql(self.session.player))
-                        try self.session.registry.removeEntity(entity);
-                }
-                self.session.runtime.closeFile(self.file);
-                self.state = .file_closed;
-                self.progress = .completed;
-            },
+            .inited => try self.savingSession(),
+            .session_saved => try self.savingLevelSeed(),
+            .level_seed_saved => try self.savingEntities(),
+            .entities_saved => try self.savingVisitedPlaces(),
+            .visited_places_saved => try self.savingRememberedObjects(),
+            .remembered_objects_saved => try self.completeSaving(),
             .completed => return true,
         }
         return false;
+    }
+
+    noinline fn savingSession(self: *Saving) !void {
+        self.file = try self.session.runtime.openFile(
+            g.persistance.SESSION_FILE_NAME,
+            .write,
+            &self.io_buffer,
+        );
+        log.debug("File opened", .{});
+        self.state = .{
+            .writing = .init(&self.session.registry, self.session.runtime.writeToFile(self.file)),
+        };
+        try self.state.writing.beginObject();
+        try self.state.writing.writeStringKey("seed");
+        try self.state.writing.write(self.session.seed);
+        try self.state.writing.writeStringKey("next_entity");
+        try self.state.writing.write(self.session.registry.next_entity.id);
+        try self.state.writing.writeStringKey("depth");
+        try self.state.writing.write(self.session.level.depth);
+        try self.state.writing.writeStringKey("max_depth");
+        try self.state.writing.write(self.session.max_depth);
+        try self.state.writing.writeStringKey("player");
+        try self.state.writing.writeEntity(self.session.player);
+        try self.state.writing.endObject();
+        self.session.runtime.closeFile(self.file);
+        self.state = .file_closed;
+        self.progress = .session_saved;
+    }
+
+    noinline fn savingLevelSeed(self: *Saving) !void {
+        var buf: [16]u8 = undefined;
+        self.file = try self.session.runtime.openFile(
+            try g.persistance.pathToLevelFile(&buf, self.session.level.depth),
+            .write,
+            &self.io_buffer,
+        );
+        self.state = .{
+            .writing = .init(&self.session.registry, self.session.runtime.writeToFile(self.file)),
+        };
+
+        try self.state.writing.beginObject();
+        try self.state.writing.writeStringKey("seed");
+        try self.state.writing.write(self.session.level.dungeon.seed);
+        self.progress = .level_seed_saved;
+    }
+
+    noinline fn savingEntities(self: *Saving) !void {
+        try self.state.writing.writeStringKey("entities");
+        try self.state.writing.beginCollection();
+        for (self.session.level.entities_on_level.items) |entity| {
+            try self.state.writing.writeEntity(entity);
+        }
+        try self.state.writing.endCollection();
+        self.progress = .entities_saved;
+    }
+
+    noinline fn savingVisitedPlaces(self: *Saving) !void {
+        try self.state.writing.writeStringKey("visited_places");
+        try self.state.writing.beginCollection();
+        for (self.session.level.visited_places) |row| {
+            var itr = row.iterator(.{});
+            try self.state.writing.beginCollection();
+            while (itr.next()) |idx| {
+                try self.state.writing.write(idx);
+            }
+            try self.state.writing.endCollection();
+        }
+        try self.state.writing.endCollection();
+        self.progress = .visited_places_saved;
+    }
+
+    noinline fn savingRememberedObjects(self: *Saving) !void {
+        try self.state.writing.writeStringKey("remembered_objects");
+        var itr = self.session.level.remembered_objects.iterator();
+        try self.state.writing.beginCollection();
+        while (itr.next()) |kv| {
+            try self.state.writing.beginObject();
+            try self.state.writing.writeNumericKey(kv.value_ptr.id);
+            try self.state.writing.write(kv.key_ptr.*);
+            try self.state.writing.endObject();
+        }
+        try self.state.writing.endCollection();
+        self.progress = .remembered_objects_saved;
+    }
+
+    noinline fn completeSaving(self: *Saving) !void {
+        try self.state.writing.endObject();
+        for (self.session.level.entities_on_level.items) |entity| {
+            if (!entity.eql(self.session.player))
+                try self.session.registry.removeEntity(entity);
+        }
+        self.session.runtime.closeFile(self.file);
+        self.state = .file_closed;
+        self.progress = .completed;
     }
 
     fn draw(self: Saving) !void {
