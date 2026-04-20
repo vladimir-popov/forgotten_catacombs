@@ -277,6 +277,7 @@ const Loading = struct {
 
     /// Returns `true` when the loading is completed.
     pub fn tick(self: *Loading) !bool {
+        self.session.runtime.printStackSize(0, "loading");
         log.debug("Continue loading: {t}", .{self.progress});
         try self.draw();
         switch (self.progress) {
@@ -454,9 +455,9 @@ const Saving = struct {
 
     /// Returns `true` when saving is completed.
     pub fn tick(self: *Saving) !bool {
+        self.session.runtime.printStackSize(0, "saving");
         log.debug("Continue saving: {t}", .{self.progress});
         try self.draw();
-        log.debug("Drawn", .{});
         switch (self.progress) {
             .inited => {
                 self.file = try self.session.runtime.openFile(

@@ -108,7 +108,7 @@ pub fn tick(self: *Self) !void {
 
 /// Changes the current state to the `welcome`,
 /// removes all items from the global menu, and draws the Welcome screen.
-fn welcome(self: *Self) !void {
+noinline fn welcome(self: *Self) !void {
     log.debug("Welcome screen. The game state is {t}", .{self.state});
     _ = self.state_arena.reset(.retain_capacity);
     self.state = .{ .welcome = try self.state_arena.allocator().create(WelcomeScreen) };

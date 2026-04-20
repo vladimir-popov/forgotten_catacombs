@@ -285,9 +285,11 @@ fn doMove(
     };
 }
 
-// actor - is who is stepping in the trap
-// returns true if the actor is dead.
-pub fn handleTrap(
+/// Applies damage to the actor stepped to the trap.
+///  * actor - is who is stepping in the trap.
+///  * action - must be the `step_in_trap`.
+/// Returns true if the actor is dead.
+noinline fn handleTrap(
     self: *Self,
     actor: g.Entity,
     action: *const g.Action,
@@ -322,7 +324,8 @@ pub fn handleTrap(
     }
 }
 
-fn tryToHit(
+// noinline is used to avoid extra local variables in the `doAction` function
+noinline fn tryToHit(
     self: *Self,
     actor: g.Entity,
     action: *const g.Action,
@@ -418,7 +421,7 @@ fn isMissed(self: *Self, actor: g.Entity, target: g.Entity) !bool {
     return false;
 }
 
-fn applyWeaponDamage(
+noinline fn applyWeaponDamage(
     self: *Self,
     actor: g.Entity,
     weapon_id: g.Entity,

@@ -303,7 +303,7 @@ pub inline fn sendEvent(self: *Self, event: g.events.Event) !void {
 }
 
 /// Handles events on the end of the `tick`
-fn handleEvent(self: *Self, event_idx: usize) !void {
+noinline fn handleEvent(self: *Self, event_idx: usize) !void {
     var event = self.events.items[event_idx];
     switch (event) {
         .player_turn_completed => {
