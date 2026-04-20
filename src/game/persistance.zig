@@ -300,20 +300,20 @@ pub const Reader = struct {
         return try self.json_reader.peekNextTokenType() == .object_end;
     }
 
-    pub fn beginCollection(self: *Self) Error!void {
+    pub noinline fn beginCollection(self: *Self) Error!void {
         try assertEql(self.json_reader.next(), .array_begin);
     }
 
-    pub fn endCollection(self: *Self) Error!void {
+    pub noinline fn endCollection(self: *Self) Error!void {
         try assertEql(self.json_reader.next(), .array_end);
     }
 
-    pub fn isCollectionEnd(self: *Self) Error!bool {
+    pub noinline fn isCollectionEnd(self: *Self) Error!bool {
         return try self.json_reader.peekNextTokenType() == .array_end;
     }
 
-    pub fn readKey(self: *Self, expected: []const u8) Error![]const u8 {
-        var buf: [128]u8 = undefined;
+    pub noinline fn readKey(self: *Self, expected: []const u8) Error![]const u8 {
+        var buf: [64]u8 = undefined;
         const key = try self.readBytes(&buf);
         try assertEql(key, expected);
         return expected;
@@ -327,7 +327,7 @@ pub const Reader = struct {
         return try std.fmt.parseInt(N, try self.readKeyAsString(buffer), 10);
     }
 
-    pub fn readBytes(self: *Self, buffer: []u8) Error![]const u8 {
+    pub noinline fn readBytes(self: *Self, buffer: []u8) Error![]const u8 {
         var capacity: usize = 0;
         while (true) {
             switch (try self.json_reader.next()) {

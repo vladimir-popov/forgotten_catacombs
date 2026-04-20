@@ -75,7 +75,7 @@ pub const Weapons = struct {
         .sprite = .{ .codepoint = cp.weapon_melee },
         .weight = .{ .value = 100 },
         .price = .{ .value = 15 },
-        .weapon = .melee(.primitive, .effects(.{ .physical = .range(3, 5) })),
+        .weapon = .melee(.primitive, .effects(.{ .physical = .range(5, 9) })),
     }),
 
     torch: c.Components = archetype.weapon(.{

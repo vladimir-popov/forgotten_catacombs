@@ -179,7 +179,7 @@ pub fn addExperience(registry: *g.Registry, player: g.Entity, exp: u16) !bool {
 
 pub fn initialHealth(constitution: i4) c.Health {
     const constitution_factor = (@as(f32, @floatFromInt(constitution)) * 0.6 + 4.4) / 4.0;
-    return .init(@intFromFloat(@round(constitution_factor * 20)));
+    return .init(@intFromFloat(@round(constitution_factor * 50)));
 }
 
 pub fn movePointsForAction(registry: *const g.Registry, actor: g.Entity, _: *const g.Action) g.MovePoints {

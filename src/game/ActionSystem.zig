@@ -301,9 +301,12 @@ noinline fn handleTrap(
     const protection = self.session().registry.get(actor, c.Protection) orelse &c.Protection.zeros;
     const health = self.session().registry.getUnsafe(actor, c.Health);
     const health_before = health.current_hp;
+    var x: u16 = trap.power;
+    x = (1 + x) * health.max;
+    x = x / 10;
     const damage = p.Range(u8){
         .min = health.max / 10,
-        .max = (health.max + trap.power * health.max) / 10,
+        .max = @intCast(x),
     };
 
     const is_actor_dead = try self.applyEffect(trap_id, trap_id, trap.effect, damage, actor, protection, health);

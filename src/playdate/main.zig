@@ -12,7 +12,7 @@ pub const std_options = std.Options{
     .log_scope_levels = &[_]std.log.ScopeLevel{
         // .{ .scope = .default, .level = .debug },
         .{ .scope = .stack, .level = .debug },
-        // .{ .scope = .playdate, .level = .debug },
+        .{ .scope = .playdate, .level = .info },
         // .{ .scope = .game, .level = .debug },
         // .{ .scope = .game_session, .level = .debug },
         // .{ .scope = .playdate_io, .level = .debug },
@@ -92,16 +92,17 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
             global_state = @ptrCast(@alignCast(playdate.system.realloc(null, @sizeOf(GlobalState))));
             global_state.playdate_runtime = PlaydateRuntime.init(playdate) catch
                 @panic("Error on creating Runtime");
+            const seed = playdate.system.getCurrentTimeMilliseconds();
             global_state.game = g.Game.init(
                 global_state.playdate_runtime.alloc,
                 global_state.playdate_runtime.runtime(),
-                playdate.system.getCurrentTimeMilliseconds(),
+                seed,
             ) catch
                 @panic("Error on creating game session");
 
             playdate.display.setRefreshRate(0);
             playdate.system.setUpdateCallback(updateAndRender, global_state);
-            log.info("Run game", .{});
+            log.info("\nRun game with seed {d}\n", .{seed});
         },
         .EventPause => {
             global_state.playdate_runtime.last_button.is_menu_shown = true;

@@ -236,7 +236,9 @@ const Loading = struct {
     session: *g.GameSession,
     progress: Progress,
     state: union(enum) { reading: g.persistance.Reader, file_closed } = .file_closed,
+    /// A file to load from
     file: g.Runtime.OpaqueFile = undefined,
+    /// Buffer for reading the file
     io_buffer: [128]u8 = undefined,
     level_depth: u8 = undefined,
     /// This arena is used to manage memory for the Game.State, including the GameSession.
@@ -293,6 +295,7 @@ const Loading = struct {
     }
 
     noinline fn loadingSession(self: *Loading) !void {
+        self.session.runtime.printStackSize(1, "loading session");
         self.file = try self.session.runtime.openFile(
             g.persistance.SESSION_FILE_NAME,
             .read,
@@ -331,7 +334,8 @@ const Loading = struct {
     }
 
     noinline fn initLevel(self: *Loading) !void {
-        var path_buf: [16]u8 = undefined;
+        self.session.runtime.printStackSize(1, "init level");
+        var path_buf: [32]u8 = undefined;
         self.file =
             try self.session.runtime.openFile(
                 try g.persistance.pathToLevelFile(&path_buf, self.level_depth),
@@ -354,6 +358,7 @@ const Loading = struct {
     }
 
     noinline fn loadingEntities(self: *Loading) !void {
+        self.session.runtime.printStackSize(1, "loading entities");
         _ = try self.state.reading.readKey("entities");
         const alloc = self.session.level.arena.allocator();
         try self.state.reading.beginCollection();
@@ -366,6 +371,7 @@ const Loading = struct {
     }
 
     noinline fn loadingVisitedPlaces(self: *Loading) !void {
+        self.session.runtime.printStackSize(1, "loading visited places");
         _ = try self.state.reading.readKey("visited_places");
         try self.state.reading.beginCollection();
         for (0..self.session.level.dungeon.rows) |i| {
@@ -379,7 +385,8 @@ const Loading = struct {
     }
 
     noinline fn loadingRememberedObjects(self: *Loading) !void {
-        var buf: [128]u8 = undefined;
+        self.session.runtime.printStackSize(1, "loading remembered objects");
+        var buf: [32]u8 = undefined;
         _ = try self.state.reading.readKey("remembered_objects");
         try self.state.reading.beginCollection();
         const alloc = self.session.level.arena.allocator();
@@ -483,6 +490,7 @@ const Saving = struct {
     }
 
     noinline fn savingSession(self: *Saving) !void {
+        self.session.runtime.printStackSize(1, "saving session");
         self.file = try self.session.runtime.openFile(
             g.persistance.SESSION_FILE_NAME,
             .write,
@@ -527,6 +535,7 @@ const Saving = struct {
     }
 
     noinline fn savingEntities(self: *Saving) !void {
+        self.session.runtime.printStackSize(1, "saving entities");
         try self.state.writing.writeStringKey("entities");
         try self.state.writing.beginCollection();
         for (self.session.level.entities_on_level.items) |entity| {
@@ -537,6 +546,7 @@ const Saving = struct {
     }
 
     noinline fn savingVisitedPlaces(self: *Saving) !void {
+        self.session.runtime.printStackSize(1, "saving visited places");
         try self.state.writing.writeStringKey("visited_places");
         try self.state.writing.beginCollection();
         for (self.session.level.visited_places) |row| {
@@ -552,6 +562,7 @@ const Saving = struct {
     }
 
     noinline fn savingRememberedObjects(self: *Saving) !void {
+        self.session.runtime.printStackSize(1, "saving remembered objects");
         try self.state.writing.writeStringKey("remembered_objects");
         var itr = self.session.level.remembered_objects.iterator();
         try self.state.writing.beginCollection();
