@@ -65,7 +65,14 @@ pub fn deinit(self: *Self) void {
 pub fn drawScene(self: *const Self, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
     const level = &session.level;
     try self.drawDungeonToBuffer(session.viewport, level);
-    try self.drawEntitiesToBuffer(session.viewport, &session.journal, session.prng.random(), level, entity_in_focus);
+    try self.drawEntitiesToBuffer(
+        session.viewport,
+        &session.journal,
+        session.prng.random(),
+        level,
+        entity_in_focus,
+        session.spent_turns,
+    );
     try self.drawChangedSymbols();
 }
 
@@ -116,7 +123,7 @@ fn compareZOrder(_: void, a: ZOrderedSprites, b: ZOrderedSprites) std.math.Order
     else
         return .gt;
 }
-/// Draw entities inside the screen
+/// Draws entities inside the screen to the render buffer
 pub fn drawEntitiesToBuffer(
     self: *const Self,
     viewport: g.Viewport,
@@ -125,6 +132,7 @@ pub fn drawEntitiesToBuffer(
     rand: std.Random,
     level: *const g.Level,
     entity_in_focus: ?g.Entity,
+    current_turn: u32,
 ) !void {
     var itr = level.registry.query2(cm.Position, cm.Sprite);
     while (itr.next()) |tuple| {
@@ -140,6 +148,7 @@ pub fn drawEntitiesToBuffer(
             position.place,
             place_visibility,
             level.player,
+            current_turn,
         );
         try self.drawSpriteToBuffer(
             viewport,

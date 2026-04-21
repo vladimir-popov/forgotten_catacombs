@@ -1,6 +1,6 @@
 # Forgotten Catacombs
 
-A simple roguelike targeted for desktop terminal and [playdate console](https://play.date/).
+A simple rogue-like targeted for desktop terminal and [playdate console](https://play.date/).
 
 <p align="right">
 <img src="docs/manual/images/playdate.png" width=200 />
@@ -17,7 +17,7 @@ A simple roguelike targeted for desktop terminal and [playdate console](https://
 
 Build and run the game in terminal mode:
 ```sh
-zig build run
+zig build run -Doptimize=ReleaseFast
 ```
 Output binary will be located in: `zig-out/bin/`
 
@@ -33,7 +33,7 @@ export PLAYDATE_SDK=~/PlaydateSDK
 ```
 **Build and run in emulator:**
 ```sh
-zig build emulate
+zig build emulate -Doptimize=ReleaseFast
 ```
 This will:
 

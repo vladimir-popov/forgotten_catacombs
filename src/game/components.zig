@@ -548,6 +548,8 @@ pub const Trap = struct {
     /// The trap with power 0 is always visible and easy to disarm.
     power: u3,
     effect: Effects.Type,
+    /// The turn when its visibility was checked last time
+    last_checked_turn: u32 = 0,
 };
 
 pub const Weight = struct {

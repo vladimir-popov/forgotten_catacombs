@@ -21,9 +21,11 @@ pub fn calculateQuickActionForTarget(
     const target_position =
         self.session().registry.get(target_entity, c.Position) orelse return null;
 
+    // Any action can be applied only to a visible entity
     if (self.session().level.checkPlaceVisibility(target_position.place) != .visible)
         return null;
 
+    // An action for an entity under the foot
     if (player_place.eql(target_position.place)) {
         if (g.meta.isItem(&self.session().registry, target_entity)) {
             return .action(.pickup, target_entity);
@@ -36,8 +38,10 @@ pub fn calculateQuickActionForTarget(
         }
     }
 
+    // An action cannot be performed diagonally towards an object
     const is_near4 = player_place.near4(target_position.place);
 
+    // Is it an enemy?
     if (g.meta.getEnemyType(&self.session().registry, target_entity)) |_| {
         // It's always possible to hit neighbors in 4 directions
         if (is_near4) return .action(.hit, target_entity);
@@ -68,6 +72,13 @@ pub fn calculateQuickActionForTarget(
                 .opened => .action(.close, .{ .id = target_entity, .place = target_position.place }),
                 .closed => .action(.open, .{ .id = target_entity, .place = target_position.place }),
             };
+        }
+        if (self.session().registry.get(target_entity, c.Trap)) |_| {
+            // the player should not be able to disarm a trap staying on it
+            if (player_place.eql(target_position.place)) {
+                return null;
+            }
+            return .action(.disarm_trap, target_entity);
         }
     }
     return null;
@@ -135,7 +146,15 @@ pub fn doAction(
             return self.tryToMove(actor, from_position, action, move_points_for_action);
         },
         .step_in_trap => {
-            return try self.handleTrap(actor, action, move_points_for_action);
+            return try self.stepInTrap(
+                actor,
+                action.payload.step_in_trap.trap_entity,
+                action.payload.step_in_trap.moving_target,
+                move_points_for_action,
+            );
+        },
+        .disarm_trap => {
+            return try self.tryToDisarmTrap(actor, action.payload.disarm_trap, move_points_for_action);
         },
         .move_to_level => {
             try self.session().movePlayerToLevel(action.payload.move_to_level);
@@ -247,10 +266,10 @@ fn checkCollision(self: *Self, place: p.Point, action: *g.Action) bool {
             }
             // Check traps
             if (entities[c.Position.ZOrder.item.index()]) |entity| {
-                if (self.session().registry.get(entity, c.Trap)) |trap| {
+                if (self.session().registry.get(entity, c.Trap)) |_| {
                     action.set(
                         .step_in_trap,
-                        .{ .trap_entity = entity, .trap = trap.*, .moving_target = action.payload.move.target },
+                        .{ .trap_entity = entity, .moving_target = action.payload.move.target },
                     );
                     return true;
                 }
@@ -285,18 +304,50 @@ fn doMove(
     };
 }
 
-/// Applies damage to the actor stepped to the trap.
-///  * actor - is who is stepping in the trap.
-///  * action - must be the `step_in_trap`.
-/// Returns true if the actor is dead.
-noinline fn handleTrap(
+noinline fn tryToDisarmTrap(
     self: *Self,
     actor: g.Entity,
-    action: *const g.Action,
+    trap_id: g.Entity,
     move_points_for_action: g.MovePoints,
 ) !g.actions.ActionResult {
-    const trap_id: g.Entity = action.payload.step_in_trap.trap_entity;
-    const trap: c.Trap = action.payload.step_in_trap.trap;
+    const rand = self.session().prng.random();
+    const trap: *const c.Trap = self.session().registry.getUnsafe(trap_id, c.Trap);
+    const pw: f32 = @floatFromInt(trap.power);
+    const dex: f32 = @floatFromInt(self.session().registry.getUnsafe(actor, c.Stats).dexterity);
+    const mec: f32 = @floatFromInt(self.session().registry.getUnsafe(actor, c.Skills).values.get(.mechanics));
+    const chance: f32 = 0.584 - 0.06 * pw + 0.053125 * dex + 0.0568 * mec;
+    if (rand.float(f32) < chance) {
+        if (try self.handleTrap(actor, trap_id, trap))
+            return .actor_is_dead;
+    } else {
+        try self.session().showPopUpNotification(.disarmed_trap);
+        try self.session().registry.removeEntity(trap_id);
+    }
+    return .{ .done = move_points_for_action };
+}
+
+noinline fn stepInTrap(
+    self: *Self,
+    actor: g.Entity,
+    trap_id: g.Entity,
+    moving_target: g.Action.Payload.Move.Target,
+    move_points_for_action: g.MovePoints,
+) !g.actions.ActionResult {
+    const trap: *const c.Trap = self.session().registry.getUnsafe(trap_id, c.Trap);
+    if (try self.handleTrap(actor, trap_id, trap)) {
+        return .actor_is_dead;
+    } else {
+        const from_position = self.session().registry.get(actor, c.Position).?;
+        try self.doMove(actor, from_position, moving_target);
+        return .{ .done = move_points_for_action };
+    }
+}
+
+/// Applies damage to the actor stepped to the trap, and shows a pop-up message.
+///  * actor - who is stepping in the trap.
+///  * trap_id - id of the trap.
+/// Returns true if the actor is dead.
+fn handleTrap(self: *Self, actor: g.Entity, trap_id: g.Entity, trap: *const c.Trap) !bool {
     log.debug("The entity {d} stepped to the trap {d} {any}", .{ actor.id, trap_id.id, trap });
     const protection = self.session().registry.get(actor, c.Protection) orelse &c.Protection.zeros;
     const health = self.session().registry.getUnsafe(actor, c.Health);
@@ -318,13 +369,7 @@ noinline fn handleTrap(
             .{ .trap = .{ .name = name, .damage = health_before - health.current_hp } },
         );
     }
-    if (is_actor_dead) {
-        return .actor_is_dead;
-    } else {
-        const from_position = self.session().registry.get(actor, c.Position).?;
-        try self.doMove(actor, from_position, action.payload.step_in_trap.moving_target);
-        return .{ .done = move_points_for_action };
-    }
+    return is_actor_dead;
 }
 
 // noinline is used to avoid extra local variables in the `doAction` function

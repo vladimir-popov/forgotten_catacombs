@@ -38,7 +38,7 @@ pub fn player(
         .speed = .{ .move_points = g.MOVE_POINTS_IN_TURN },
         .sprite = .{ .codepoint = cp.human },
         .stats = stats,
-        .wallet = .{ .money = rand.uintAtMost(u16, 20) + 30 },
+        .wallet = .{ .money = rand.uintAtMost(u16, 50) + 100 },
     };
 }
 

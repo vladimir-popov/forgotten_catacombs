@@ -276,7 +276,7 @@ pub fn generateNew(
             log.debug("Generate traps", .{});
             for (0..(rand.uintLessThan(u8, 10) + 2 * self.depth)) |_| {
                 if (self.randomEmptyPlace(rand)) |place| {
-                    _ = try self.addRandomTrap(rand, place);
+                    _ = try self.addRandomTrap(rand, place, depth);
                 }
             }
             return .complete;
@@ -591,8 +591,8 @@ fn addRandomItem(self: *g.Level, rand: std.Random, place: p.Point, proportions: 
     return entity;
 }
 
-pub fn addRandomTrap(self: *g.Level, rand: std.Random, place: p.Point) !g.Entity {
-    const entity = try g.entities.random.generateTrap(self.registry, rand, place);
+pub fn addRandomTrap(self: *g.Level, rand: std.Random, place: p.Point, depth: u8) !g.Entity {
+    const entity = try g.entities.random.generateTrap(self.registry, rand, place, depth);
     try self.entities_on_level.append(self.arena.allocator(), entity);
     return entity;
 }

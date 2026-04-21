@@ -133,8 +133,7 @@ fn enemiesTurn(self: *Self) !void {
 
 /// Draws the whole screen.
 ///
-/// Returns true if the drawing is not completed,
-/// and the input should be ignored.
+/// Returns `true` if the drawing is not completed, and the input should be ignored.
 fn isDrawing(self: *Self) !bool {
     // the quick_actions_window is drawn during handleInput
     if (self.quick_actions_window != null) return false;
@@ -148,6 +147,7 @@ fn isDrawing(self: *Self) !bool {
         self.session.prng.random(),
         level,
         self.target,
+        self.session.spent_turns,
     );
     const now = self.session.runtime.currentMillis();
     const is_blocked_animation = try self.drawAnimationsFramesToBuffer(now);

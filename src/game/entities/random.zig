@@ -21,9 +21,11 @@ pub fn generateEnemy(registry: *g.Registry, rand: std.Random, depth: u8) !g.Enti
     return try registry.addNewEntity(enemy);
 }
 
-pub fn generateTrap(registry: *g.Registry, rand: std.Random, place: p.Point) !g.Entity {
+pub fn generateTrap(registry: *g.Registry, rand: std.Random, place: p.Point, depth: u8) !g.Entity {
+    var power: u3 = rand.int(u3);
+    power +|= @intCast(@min(5, depth / 3));
     return try registry.addNewEntity(
-        g.entities.trap(place, rand.int(u3), c.Effects.chooseRandomType(rand)),
+        g.entities.trap(place, power, c.Effects.chooseRandomType(rand)),
     );
 }
 

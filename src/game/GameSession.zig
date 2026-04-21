@@ -68,7 +68,7 @@ player: g.Entity,
 level: g.Level,
 /// The deepest achieved level
 max_depth: u8,
-/// How many turns have passed from the start of this game session
+/// How many turns have been passed from the start of this game session
 spent_turns: u32,
 // How many move points spent within the current turn
 spent_move_points: g.MovePoints,

@@ -69,9 +69,11 @@ pub const Action = struct {
         //
         modify_recognize: void,
         //
-        step_in_trap: struct { trap_entity: g.Entity, trap: c.Trap, moving_target: Move.Target },
+        step_in_trap: struct { trap_entity: g.Entity, moving_target: Move.Target },
         //
         trade: g.Entity,
+        //
+        disarm_trap: g.Entity,
     };
 
     pub const Tag = blk: {
@@ -112,6 +114,7 @@ pub const Action = struct {
             .do_nothing => 0,
             .hit => 10,
             .move_to_level => 9,
+            .disarm_trap => 8,
             .pickup => 5,
             .modify_recognize, .trade => 4,
             else => 1,
@@ -134,6 +137,7 @@ pub const Action = struct {
             .trade => "Trade",
             .wait => "Wait",
             .modify_recognize => "Mod/Rec",
+            .disarm_trap => "Disarm",
             .get_angry, .chill, .go_sleep, .do_nothing, .move, .step_in_trap => "???",
         };
     }

@@ -13,11 +13,11 @@ const log = std.log.scoped(.visibility);
 /// This global flag is used for cheating.
 pub var turn_light_on: bool = false;
 
-/// Check the visibility status of an entity according to the visibility of the place
+/// Checks the visibility status of an entity according to the visibility of the place
 /// occupied by the entity.
 ///
-/// If the entity is trap, randomly decides its visibility status, and in case of first time of
-/// visibility adds it to known list.
+/// If the entity is a trap, randomly decides its visibility status, and in case of first time of
+/// visibility adds it to the list of known entities.
 pub fn isEntityVisibile(
     journal: *g.Journal,
     rand: std.Random,
@@ -26,18 +26,31 @@ pub fn isEntityVisibile(
     place: p.Point,
     place_visibility: g.Render.Visibility,
     player: g.Entity,
+    current_turn: u32,
 ) !bool {
     if (turn_light_on) return true;
 
     switch (place_visibility) {
+        // If the place is visible, we should check visibility of the trap, but only once per turn
         .visible => if (journal.registry.get(entity, c.Trap)) |trap| {
             if (journal.known_entities.contains(entity)) return true;
+            if (trap.last_checked_turn == current_turn) {
+                return false;
+            } else {
+                trap.last_checked_turn = current_turn;
+            }
 
             const perception: f32 = u.ff32(journal.registry.getUnsafe(player, c.Stats).perception);
             const player_place = journal.registry.getUnsafe(player, c.Position).place;
             const distance: f32 = player_place.distanceTo(place);
-            const chance: f32 = (u.ff32(trap.power) + 1.0) / (@max(1.0, distance - perception) * 2.0);
-            const is_visible = rand.float(f32) < chance;
+            const pw: f32 = @floatFromInt(trap.power);
+            // The lowest powered trap can be noticed by a player with perception 0 with a chance 0.5
+            // It means, it can be noticed in 2 steps around the trap.
+            // The highest powered trap has a chance 0.05.
+            // It means, it can be noticed in 20 steps around the trap.
+            const chance: f32 = 0.00892857 * pw * pw - 0.144643 * pw + 0.635714;
+            // The distance reduces the chance, but the perception reduces the distance
+            const is_visible = rand.float(f32) < chance / @max(1.0, distance - perception);
             if (is_visible) {
                 try journal.markTrapAsKnown(entity);
             }

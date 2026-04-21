@@ -21,6 +21,7 @@ pub const Notification = union(enum) {
         name: []const u8,
         damage: u8,
     },
+    disarmed_trap,
     /// The player received experience points
     exp: u16,
     level_up,
@@ -45,6 +46,7 @@ pub const Notification = union(enum) {
             .no_ammo => _ = try writer.write("No ammo!"),
             .trap => |trap| try writer.print("{s} -{d}", .{ trap.name, trap.damage }),
             .wrong_ammo => _ = try writer.write("Wrong ammo!"),
+            .disarmed_trap => _ = try writer.write("Disarmed"),
         }
     }
 };
