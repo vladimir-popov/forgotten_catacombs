@@ -11,7 +11,7 @@ const u = g.utils;
 const log = std.log.scoped(.visibility);
 
 /// This global flag is used for cheating.
-pub var turn_light_on: bool = true;
+pub var turn_light_on: bool = false;
 
 /// Check the visibility status of an entity according to the visibility of the place
 /// occupied by the entity.

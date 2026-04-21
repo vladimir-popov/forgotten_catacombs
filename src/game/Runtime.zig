@@ -59,7 +59,8 @@ pub inline fn stackSize(self: *const Self) usize {
 }
 
 pub inline fn printStackSize(self: *const Self, comptime depth: u4, tag: []const u8) void {
-    stack_log.debug(("  " ** depth) ++ "{s} {d}", .{ tag, self.stackSize() });
+    if (comptime g.utils.isDebug())
+        stack_log.debug(("  " ** depth) ++ "{s} {d}", .{ tag, self.stackSize() });
 }
 
 pub inline fn popCheat(self: *const Self) ?g.Cheat {

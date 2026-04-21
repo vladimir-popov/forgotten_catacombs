@@ -74,10 +74,6 @@ pub fn reset(self: *Self) void {
     self.dijkstra_map = .empty;
 }
 
-inline fn session(self: *Self) *g.GameSession {
-    return @alignCast(@fieldParentPtr("level", self));
-}
-
 /// Generates a dungeon with the passed seed and sets up a dungeon to the preinited level.
 /// The type of the dungeon depends on the depth.
 /// This is the first step in loading a level.
@@ -87,7 +83,6 @@ pub fn initWithEmptyDungeon(
     depth: u8,
     seed: u64,
 ) !void {
-    self.session().runtime.printStackSize(2, "init with empty dungeon");
     const dungeon = try generateDungeon(&self.arena, depth, seed) orelse {
         log.err("A dungeon was not generate from the saved seed {d}", .{seed});
         return error.BrokenSeed;
@@ -103,7 +98,6 @@ pub fn setupDungeon(
     dungeon: d.Dungeon,
     player: g.Entity,
 ) !void {
-    self.session().runtime.printStackSize(3, "setup dungeon");
     log.debug(
         "Setting up a dungeon with type {s} to the level on depth {d}. Player id is {d}",
         .{ @tagName(dungeon.type), depth, player.id },
@@ -212,7 +206,6 @@ pub fn generateNew(
     from_ladder: c.Ladder,
     progress: GeneratingProgress,
 ) !GeneratingProgress {
-    self.session().runtime.printStackSize(2, "generate new");
     switch (progress) {
         .start, .generate_dungeon => {
             const dungeon: d.Dungeon = (try generateDungeon(&self.arena, depth, rand.int(u64))) orelse {
