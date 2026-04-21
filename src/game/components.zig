@@ -378,9 +378,9 @@ pub const Hunger = struct {
 
     pub fn level(self: Hunger) Level {
         return switch (self.turns_after_eating) {
-            0...500 => .well_fed,
-            501...850 => .hunger,
-            851...1000 => .severe_hunger,
+            0...1000 => .well_fed,
+            1001...1850 => .hunger,
+            1851...2500 => .severe_hunger,
             else => .critical_starvation,
         };
     }

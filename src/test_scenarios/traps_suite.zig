@@ -26,7 +26,7 @@ test "A trap should not be removed when player leave it" {
     var test_session: TestSession = undefined;
     try test_session.initWithTestArea(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
-    _ = try addTrapInFrontOfPlayer(&test_session);
+    const trap_entity = try addTrapInFrontOfPlayer(&test_session);
 
     // move into the trap:
     try test_session.pressButton(.up);
@@ -47,6 +47,7 @@ test "A trap should not be removed when player leave it" {
         \\•^•
         \\•••
     , .{ .region = .init(3, 19, 3, 3) });
+    try std.testing.expectEqual(trap_entity, test_session.player.target());
 }
 
 test "Should not notice the trap without moving or waiting" {
@@ -68,6 +69,7 @@ test "Should not notice the trap without moving or waiting" {
             std.log.err("The trap was noticed on {d} iteration", .{iteration});
             return err;
         };
+        try std.testing.expectEqual(null, test_session.player.target());
     }
 }
 
@@ -94,7 +96,9 @@ test "Should notice the trap moving around" {
         try test_session.completeRound();
         is_left_btn = !is_left_btn;
         if (try test_session.runtime.display.isEqualToString("•••••••••••••••••••^••••••••••••••••••••", .{ .line = 4 }))
-            break;
+            break
+        else
+            try std.testing.expectEqual(null, test_session.player.target());
     }
     // finally the trap must become visible:
     try test_session.runtime.display.expectLooksLike("•••••••••••••••••••^••••••••••••••••••••", .{ .line = 4 });

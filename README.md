@@ -1,10 +1,10 @@
 # Forgotten Catacombs
 
-<img src="docs/manual/images/playdate.png" width=200 style="float: right;" />
+<p align="right">
+<img src="docs/manual/images/playdate.png" width=200/>
+</p>
 
 A simple rogue-like targeted for desktop terminal and [playdate console](https://play.date/).
-
-<div style="clear: both;" />
 
 ### 🛠️ Building from source
 

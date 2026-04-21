@@ -118,7 +118,7 @@ pub const Food = struct {
         .sprite = .{ .codepoint = cp.food },
         .weight = .{ .value = 5 },
         .price = .{ .value = 10 },
-        .consumable = .{ .consumable_type = .food, .calories = 150 },
+        .consumable = .{ .consumable_type = .food, .calories = 350 },
     }),
 
     food_ration: c.Components = archetype.food(.{
@@ -128,7 +128,7 @@ pub const Food = struct {
         .sprite = .{ .codepoint = cp.food },
         .weight = .{ .value = 50 },
         .price = .{ .value = 50 },
-        .consumable = .{ .consumable_type = .food, .calories = 750 },
+        .consumable = .{ .consumable_type = .food, .calories = 1250 },
     }),
 };
 

@@ -73,7 +73,7 @@ pub fn calculateQuickActionForTarget(
                 .closed => .action(.open, .{ .id = target_entity, .place = target_position.place }),
             };
         }
-        if (self.session().registry.get(target_entity, c.Trap)) |_| {
+        if (self.session().registry.has(target_entity, c.Trap) and self.session().journal.known_entities.contains(target_entity)) {
             // the player should not be able to disarm a trap staying on it
             if (player_place.eql(target_position.place)) {
                 return null;
@@ -105,9 +105,9 @@ pub fn onTurnCompleted(self: *Self) !void {
         // how often the entity should be damaged by hunger
         const damage_every_turn: u8 = switch (hunger.level()) {
             .well_fed => 0,
-            .hunger => 8,
-            .severe_hunger => 5,
-            .critical_starvation => 3,
+            .hunger => 15,
+            .severe_hunger => 10,
+            .critical_starvation => 5,
         };
 
         if (damage_every_turn == 0 or hunger.turns_after_eating % damage_every_turn != 0) continue;
@@ -349,6 +349,7 @@ noinline fn stepInTrap(
 /// Returns true if the actor is dead.
 fn handleTrap(self: *Self, actor: g.Entity, trap_id: g.Entity, trap: *const c.Trap) !bool {
     log.debug("The entity {d} stepped to the trap {d} {any}", .{ actor.id, trap_id.id, trap });
+    try self.session().journal.markTrapAsKnown(trap_id);
     const protection = self.session().registry.get(actor, c.Protection) orelse &c.Protection.zeros;
     const health = self.session().registry.getUnsafe(actor, c.Health);
     const health_before = health.current_hp;
