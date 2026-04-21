@@ -323,7 +323,7 @@ const Loading = struct {
         self.session.max_depth = try self.state.reading.read(u8);
 
         _ = try self.state.reading.readKey("player");
-        self.session.player = try self.state.reading.readEntity();
+        self.session.player = try self.state.reading.readEntityStruct(&self.session.registry);
         try self.state.reading.endObject();
         log.debug("A game session was loaded.", .{});
 
@@ -363,7 +363,10 @@ const Loading = struct {
         const alloc = self.session.level.arena.allocator();
         try self.state.reading.beginCollection();
         while (!try self.state.reading.isCollectionEnd()) {
-            try self.session.level.entities_on_level.append(alloc, try self.state.reading.readEntity());
+            try self.session.level.entities_on_level.append(
+                alloc,
+                try self.state.reading.readEntityStruct(&self.session.registry),
+            );
         }
         try self.state.reading.endCollection();
         self.session.level.bindDoorsWithDoorways();

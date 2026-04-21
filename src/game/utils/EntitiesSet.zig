@@ -45,7 +45,7 @@ pub fn load(reader: anytype) !Self {
     const set = try init(reader.registry.allocator());
     try reader.beginCollection();
     while (!try reader.isCollectionEnd()) {
-        try set.add(try reader.readEntity());
+        try set.add(try reader.readEntityStruct(reader.registry));
     }
     try reader.endCollection();
     return set;

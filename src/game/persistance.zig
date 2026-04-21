@@ -180,15 +180,27 @@ pub const Reader = struct {
         try assertEql(self.json_reader.next(), .object_end);
     }
 
-    pub fn readEntity(self: *Self) anyerror!g.Entity {
+    pub fn readEntityStruct(self: *Self, registry: *g.Registry) anyerror!g.Entity {
         var buf: [128]u8 = undefined;
         try self.beginObject();
         const entity = g.Entity{ .id = try self.readKeyAsNumber(g.Entity.IdType, &buf) };
-        const components = self.read(c.Components) catch |err| {
-            log.err("Error on reading components of the entity {d}", .{entity.id});
-            return err;
-        };
-        try self.registry.setComponentsToEntity(entity, components);
+        try self.beginObject();
+        loop: while (!try self.isObjectEnd()) {
+            const key = try self.readKeyAsString(&buf);
+            inline for (@typeInfo(c.Components).@"struct".fields) |field| {
+                if (std.mem.eql(u8, field.name, key)) {
+                    const component = self.read(field.type) catch |err| {
+                        log.err("Error on reading value of the field {s}", .{field.name});
+                        return err;
+                    };
+                    try registry.set(entity, component.?);
+                    continue :loop;
+                }
+            }
+            log.err("Unexpected key {s} in Components object", .{key});
+            return error.WrongInput;
+        }
+        try self.endObject();
         try self.endObject();
         return entity;
     }
@@ -316,6 +328,7 @@ pub const Reader = struct {
         var buf: [64]u8 = undefined;
         const key = try self.readBytes(&buf);
         try assertEql(key, expected);
+        log.debug("Reading key {s}", .{expected});
         return expected;
     }
 
