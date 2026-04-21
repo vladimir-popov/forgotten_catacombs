@@ -1,10 +1,10 @@
 # Forgotten Catacombs
 
+<img src="docs/manual/images/playdate.png" width=200 style="float: right;" />
+
 A simple rogue-like targeted for desktop terminal and [playdate console](https://play.date/).
 
-<p align="right">
-<img src="docs/manual/images/playdate.png" width=200 />
-</p>
+<div style="clear: both;" />
 
 ### 🛠️ Building from source
 
@@ -48,7 +48,7 @@ zig-out/forgotten_catacombs.pdx
 
 ### 📖 Manual
 
-🇷🇺 [Русская версия](manual/manual.ru.pdf)
+🇷🇺 [Русская версия](docs/manual/manual.ru.pdf)
 
 
 ### 📬 Contacts & Contributions

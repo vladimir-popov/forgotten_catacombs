@@ -116,10 +116,8 @@ pub fn build(b: *std.Build) !void {
     try addCopyDirectory(writer, b.graph.io, "assets", ".");
 
     // ------------------------------------------------------------
-    //                Build pdex lib for emulator
+    //                Build pdex lib
     // ------------------------------------------------------------
-
-    // TODO: build the lib for all possible host OS
 
     const playdate_em_module = b.createModule(.{
         .root_source_file = b.path("src/playdate/main.zig"),
@@ -142,10 +140,44 @@ pub fn build(b: *std.Build) !void {
     });
 
     // ------------------------------------------------------------
-    //                Step to run on emulator
+    //              Step to build pdx for Playdate
     // ------------------------------------------------------------
+
     if (b.graph.environ_map.get(PLAYDATE_SDK_PATH)) |playdate_sdk_path| {
+
+        // The path to playdate compiler
         const pdc_path = b.pathJoin(&.{ playdate_sdk_path, "bin", if (native_os_tag == .windows) "pdc.exe" else "pdc" });
+
+        const pdc = b.addSystemCommand(&.{pdc_path});
+        pdc.addDirectoryArg(source_dir);
+        pdc.setName("pdc");
+        const pdx_path = pdc.addOutputFileArg(pdx_file_name);
+
+        b.installDirectory(.{
+            .source_dir = source_dir,
+            .install_dir = .prefix,
+            .install_subdir = "pdx_source_dir",
+        });
+        b.installDirectory(.{
+            .source_dir = pdx_path,
+            .install_dir = .prefix,
+            .install_subdir = pdx_file_name,
+        });
+
+        const pdx_step = b.step("pdx", "Builds pdx for Playdate");
+        pdx_step.dependOn(b.getInstallStep());
+
+        // // --- Add this to generate ASM ---
+        // const asm_step = b.addInstallFile(
+        //     elf.getEmittedAsm(),
+        //     "bin/elf.s",
+        // );
+        // playdate_step.dependOn(&asm_step.step);
+
+        // ------------------------------------------------------------
+        //                Step to run on emulator
+        // ------------------------------------------------------------
+
         const pd_simulator_path = switch (native_os_tag) {
             .linux => b.pathJoin(&.{ playdate_sdk_path, "bin", "PlaydateSimulator" }),
             // .macos => "open", // `open` focuses the window, while running the simulator directry doesn't.
@@ -156,36 +188,13 @@ pub fn build(b: *std.Build) !void {
             else => @panic("Unsupported OS"),
         };
 
-        const pdc = b.addSystemCommand(&.{pdc_path});
-        pdc.addDirectoryArg(source_dir);
-        pdc.setName("pdc");
-        const pdx_path = pdc.addOutputFileArg(pdx_file_name);
-
-        b.installDirectory(.{
-            .source_dir = pdx_path,
-            .install_dir = .prefix,
-            .install_subdir = pdx_file_name,
-        });
-        b.installDirectory(.{
-            .source_dir = source_dir,
-            .install_dir = .prefix,
-            .install_subdir = "pdx_source_dir",
-        });
-
         const emulate_cmd = b.addSystemCommand(&.{pd_simulator_path});
         emulate_cmd.addDirectoryArg(pdx_path);
         emulate_cmd.setName("PlaydateSimulator");
 
         const emulate_step = b.step("emulate", "Run the Forgotten Catacomb in the Playdate Simulator");
+        emulate_step.dependOn(pdx_step);
         emulate_step.dependOn(&emulate_cmd.step);
-        emulate_step.dependOn(b.getInstallStep());
-
-        // --- Add this to generate ASM ---
-        // const asm_step = b.addInstallFile(
-        //     elf.getEmittedAsm(),
-        //     "bin/elf.s",
-        // );
-        // emulate_step.dependOn(&asm_step.step);
     }
 
     // ============================================================
@@ -255,6 +264,13 @@ pub fn build(b: *std.Build) !void {
     check.dependOn(&terminal_game_exe.step);
     check.dependOn(&test_scenarios_lib.step);
     check.dependOn(&elf.step);
+
+    // ============================================================
+    //                Step to generate manual
+    // ============================================================
+    const typst_cmd = b.addSystemCommand(&.{ "typst", "c", "docs/manual/manual.ru.typ" });
+    const typst_step = b.step("pdf", "Generates manual.pdf");
+    typst_step.dependOn(&typst_cmd.step);
 }
 
 fn addCopyDirectory(
