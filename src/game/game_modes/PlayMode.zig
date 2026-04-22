@@ -234,14 +234,16 @@ fn drawInfoBar(self: *const Self) !void {
 
     // Draw the name or health of the target entity
     if (self.target) |entity| {
-        if (!entity.eql(self.session.player)) {
-            if (self.session.registry.get2(entity, c.Sprite, c.Health)) |tuple| {
-                try self.session.render.drawEnemyHealth(tuple[0].codepoint, tuple[1]);
-                return;
-            }
+        if (self.session.registry.get2(entity, c.Sprite, c.Health)) |tuple| {
+            try self.session.render.drawEnemyHealth(tuple[0].codepoint, tuple[1]);
+            return;
+        } else {
+            var buf: [32]u8 = undefined;
+            try self.session.render.drawInfo(try g.meta.printActualName(&buf, self.session.journal, entity));
         }
+    } else if (qa.tag == .pickup) {
         var buf: [32]u8 = undefined;
-        try self.session.render.drawInfo(try g.meta.printActualName(&buf, self.session.journal, entity));
+        try self.session.render.drawInfo(try g.meta.printActualName(&buf, self.session.journal, qa.payload.pickup));
     } else if (self.session.registry.get(self.session.player, c.Hunger)) |hunger| {
         // Draw the hunger level
         switch (hunger.level()) {
