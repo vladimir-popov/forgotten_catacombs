@@ -19,6 +19,7 @@
 //!   --stdout                          Print output to the stdout. Default.
 //!   --stderr                          Print output to the stderr.
 //!   --file=<file path>                Create and open a file <file path> to print an output to it.
+//!   --timeout=<seconds>               Limits duration of a single test. Panics after this timeout.
 //!
 //! Configuration example:
 //! ```zig
@@ -73,19 +74,19 @@ pub fn writeLog(
     if (global_logger.writer) |*writer| {
         const level_txt = comptime message_level.asText();
         const prefix2 = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
-        writer.interface.print(level_txt ++ prefix2 ++ format ++ "\n", args) catch {
-            @panic("Error on write log");
+        writer.interface.print(level_txt ++ prefix2 ++ format ++ "\n", args) catch |err| {
+            std.debug.panic("Error on write log: {any}", .{err});
         };
-        writer.interface.flush() catch {
-            @panic("Error on flushing log buffer");
+        writer.interface.flush() catch |err| {
+            std.debug.panic("Error on flushing log buffer: {any}", .{err});
         };
     } else {
         const file = std.Io.Dir.cwd().createFile(
             global_logger.io,
             Logger.log_file,
             .{ .read = false, .truncate = true },
-        ) catch {
-            @panic("Error on open log file.");
+        ) catch |err| {
+            std.debug.panic("Error on open log file: {any}", .{err});
         };
         global_logger.writer = file.writer(global_logger.io, &global_logger.buffer);
         writeLog(message_level, scope, format, args);
@@ -118,6 +119,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
     var failed_only: bool = false;
     var no_colors: bool = false;
     var no_stack_trace: bool = false;
+    var timeout_seconds: u8 = 10;
 
     while (args.next()) |arg| {
         if (std.mem.eql(u8, "-t", arg)) {
@@ -142,6 +144,8 @@ pub fn main(init: std.process.Init.Minimal) !void {
             custom_out = std.Io.File.stderr();
         } else if (std.mem.startsWith(u8, arg, "--file=")) {
             custom_out = try std.Io.Dir.cwd().createFile(threaded.io(), arg[7..], .{ .truncate = false });
+        } else if (std.mem.startsWith(u8, arg, "--timeout=")) {
+            timeout_seconds = try std.fmt.parseInt(u8, arg[10..], 10);
         } else {
             std.debug.print("Unsupported option '{s}'.\n", .{arg});
             std.process.exit(1);
@@ -172,7 +176,17 @@ pub fn main(init: std.process.Init.Minimal) !void {
         reporter.mode = .no_color;
     }
 
-    try run(&arena, threaded.io(), init.environ, process_name, test_filter, &reporter, failed_only, no_stack_trace);
+    try run(
+        &arena,
+        threaded.io(),
+        init.environ,
+        process_name,
+        test_filter,
+        &reporter,
+        failed_only,
+        no_stack_trace,
+        std.Io.Duration.fromSeconds(timeout_seconds),
+    );
 }
 
 pub fn run(
@@ -184,6 +198,7 @@ pub fn run(
     reporter: anytype,
     failed_only: bool,
     no_stack_trace: bool,
+    timeout: std.Io.Duration,
 ) !void {
     var arena_alloc = arena.allocator();
     var tests: []const TestFn = builtin.test_functions;
@@ -207,7 +222,7 @@ pub fn run(
     };
 
     try reporter.writeTitle(report.process_name, test_filter, tests.len);
-    try runTests(arena, io, environ, tests, &report, no_stack_trace);
+    try runTests(arena, io, environ, tests, &report, no_stack_trace, timeout);
     try writeTestResults(arena, reporter, report, failed_only);
     try reporter.writeSummary(
         report.passed_count,
@@ -226,6 +241,7 @@ fn runTests(
     tests: []const TestFn,
     report: *Report,
     no_stack_trace: bool,
+    timeout: std.Io.Duration,
 ) !void {
     if (tests.len == 0) return;
 
@@ -234,7 +250,7 @@ fn runTests(
         const t = Test.wrap(test_fn);
 
         // Run tests:
-        report.test_results[idx] = try t.run(arena, io, environ, no_stack_trace);
+        report.test_results[idx] = try t.run(arena, io, environ, no_stack_trace, timeout);
 
         switch (report.test_results[idx]) {
             .passed => {
@@ -318,6 +334,7 @@ const Test = struct {
         io: std.Io,
         environ: std.process.Environ,
         no_stack_trace: bool,
+        timeout: std.Io.Duration,
     ) !TestResult {
         var is_mem_leak: bool = false;
         std.testing.allocator_instance = .{};
@@ -328,9 +345,14 @@ const Test = struct {
         }
         var test_result: TestResult = undefined;
 
+        var abort = try io.concurrent(abortOnTimeout, .{ self, io, timeout });
+        defer abort.cancel(io) catch {};
+
         const start_time = std.Io.Clock.real.now(io);
         const result = self.test_fn.func();
         const duration = start_time.untilNow(io, .real);
+
+        abort.cancel(io) catch {};
 
         if (result) |_| {
             test_result = .{
@@ -381,6 +403,11 @@ const Test = struct {
             return result;
         }
         return false;
+    }
+
+    fn abortOnTimeout(self: Test, io: std.Io, timeout: std.Io.Duration) std.Io.Cancelable!void {
+        try io.sleep(timeout, .real);
+        std.debug.panic("Timeout for test '{s}' after {f}", .{ self.name, AltDuration.fromDuration(timeout) });
     }
 };
 
