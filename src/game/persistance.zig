@@ -185,20 +185,19 @@ pub const Reader = struct {
         try self.beginObject();
         const entity = g.Entity{ .id = try self.readKeyAsNumber(g.Entity.IdType, &buf) };
         try self.beginObject();
-        loop: while (!try self.isObjectEnd()) {
-            const key = try self.readKeyAsString(&buf);
-            inline for (@typeInfo(c.Components).@"struct".fields) |field| {
-                if (std.mem.eql(u8, field.name, key)) {
-                    const component = self.read(field.type) catch |err| {
-                        log.err("Error on reading value of the field {s}", .{field.name});
-                        return err;
-                    };
-                    try registry.set(entity, component.?);
-                    continue :loop;
-                }
+        var key: ?[]const u8 = null;
+        inline for (std.meta.fields(c.Components)) |field| {
+            if (key == null and !try self.isObjectEnd()) {
+                key = try self.readKeyAsString(&buf);
             }
-            log.err("Unexpected key {s} in Components object", .{key});
-            return error.WrongInput;
+            if (key != null and std.mem.eql(u8, field.name, key.?)) {
+                const component = self.read(field.type) catch |err| {
+                    log.err("Error on reading value of the field {s}", .{field.name});
+                    return err;
+                };
+                try registry.set(entity, component.?);
+                key = null;
+            }
         }
         try self.endObject();
         try self.endObject();
