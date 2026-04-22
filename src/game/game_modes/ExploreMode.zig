@@ -22,7 +22,6 @@ entities_window: ?w.ModalWindow(w.OptionsArea(g.Entity)) = null,
 description_window: ?w.ModalWindow(w.TextArea) = null,
 
 pub fn init(self: *ExploreMode, session: *g.GameSession) !void {
-    log.debug("Init LookingAroundMode", .{});
     self.* = .{
         .session = session,
         .entity_in_focus = session.player,
@@ -53,7 +52,7 @@ pub fn tick(self: *ExploreMode) anyerror!void {
             }
         } else {
             switch (btn.game_button) {
-                .b => {
+                .a => {
                     if (btn.state == .hold and self.countOfEntitiesInFocus() > 1) {
                         if (self.entitiesInFocus()) |entities| {
                             self.entities_window = try self.windowWithEntities(entities);
@@ -62,7 +61,7 @@ pub fn tick(self: *ExploreMode) anyerror!void {
                         self.description_window = try self.windowWithDescription();
                     }
                 },
-                .a => {
+                .b => {
                     try self.session.continuePlay(self.entity_in_focus, null);
                     return;
                 },
@@ -91,11 +90,11 @@ fn draw(self: *const ExploreMode) !void {
         try window.draw(self.session.render);
     } else {
         try self.session.render.drawScene(self.session, self.entity_in_focus);
-        try self.session.render.drawLeftButton("Describe", self.countOfEntitiesInFocus() > 1);
+        try self.session.render.drawRightButton("Describe", self.countOfEntitiesInFocus() > 1);
         if (self.canBeATarget()) {
-            try self.session.render.drawRightButton("Target", false);
+            try self.session.render.drawLeftButton("Target", false);
         } else {
-            try self.session.render.drawRightButton("Cancel", false);
+            try self.session.render.drawLeftButton("Cancel", false);
         }
         // Draw the name or health of the entity in focus
         var buf: [g.DISPLAY_COLS]u8 = undefined;

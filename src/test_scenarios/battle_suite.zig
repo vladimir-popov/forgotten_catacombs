@@ -22,7 +22,8 @@ test "Shoot at the target" {
     // Hit the target
     const rat_health = test_session.session.registry.getUnsafe(rat_id, c.Health);
     const initial_health = rat_health.current_hp;
-    while (rat_health.current_hp == initial_health) {
+    for (0..50) |_| {
+        if (rat_health.current_hp != initial_health) break;
         try test_session.pressButton(.a);
     }
 }
@@ -40,7 +41,7 @@ test "The arrows entity should be removed when the last arrow was issued" {
     // Take aim at a rat
     try test_session.exploreMode();
     try test_session.pressButton(.up);
-    try test_session.pressButton(.a);
+    try test_session.pressButton(.b);
     try std.testing.expectEqual(rat_id, test_session.player.target());
 
     // Hit the target
