@@ -72,13 +72,13 @@ pub fn next(self: *Self) ?Point {
     }
     // exclude the end
     if (self.x0 == self.x1 and self.y0 == self.y1) return null;
-    return Point.init(@intCast(self.y0), @intCast(self.x0));
+    return .point(@intCast(self.y0), @intCast(self.x0));
 }
 
 test "test case 1" {
-    const start = Point.init(0, 0);
-    const end = Point.init(4, 4);
-    const expected = [_]Point{ .init(1, 1), .init(2, 2), .init(3, 3) };
+    const start = Point.point(0, 0);
+    const end = Point.point(4, 4);
+    const expected = [_]Point{ .point(1, 1), .point(2, 2), .point(3, 3) };
     var actual: [expected.len]Point = undefined;
 
     var i: usize = 0;
@@ -92,9 +92,9 @@ test "test case 1" {
 }
 
 test "test case 2" {
-    const start = Point.init(0, 0);
-    const end = Point.init(2, 4);
-    const expected = [_]Point{ .init(1, 1), .init(1, 2), .init(2, 3) };
+    const start = Point.point(0, 0);
+    const end = Point.point(2, 4);
+    const expected = [_]Point{ .point(1, 1), .point(1, 2), .point(2, 3) };
     var actual: [expected.len]Point = undefined;
 
     var i: usize = 0;
@@ -108,15 +108,15 @@ test "test case 2" {
 }
 
 test "test case 3" {
-    const start = Point.init(0, 5);
-    const end = Point.init(2, 0);
-    const expected = [_]Point{ .init(0, 4), .init(1, 3), .init(1, 2), .init(2, 1) };
+    const start = Point.point(0, 5);
+    const end = Point.point(2, 0);
+    const expected = [_]Point{ .point(0, 4), .point(1, 3), .point(1, 2), .point(2, 1) };
     var actual: [expected.len]Point = undefined;
 
     var i: usize = 0;
     var itr = Self.init(start, end);
-    while (itr.next()) |point| {
-        actual[i] = point;
+    while (itr.next()) |pp| {
+        actual[i] = pp;
         i += 1;
     }
 

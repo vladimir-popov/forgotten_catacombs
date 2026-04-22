@@ -78,7 +78,7 @@ pub const Cheat = union(enum) {
                     if (tryParseDecimal(u8, a_str)) |a|
                         if (itr.next()) |b_str|
                             if (tryParseDecimal(u8, b_str)) |b| {
-                                return .{ .goto = p.Point.init(a, b) };
+                                return .{ .goto = p.Point.point(a, b) };
                             };
                 log.warn(
                     \\Wrong arguments '{s}' for 'goto' command. 
@@ -252,7 +252,7 @@ test "light on" {
 }
 
 test "goto" {
-    try std.testing.expectEqual(Cheat{ .goto = p.Point.init(2, 3) }, Cheat.parse("goto 2 3").?.cheat);
+    try std.testing.expectEqual(Cheat{ .goto = p.Point.point(2, 3) }, Cheat.parse("goto 2 3").?.cheat);
 }
 
 test "set health" {

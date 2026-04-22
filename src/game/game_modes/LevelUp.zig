@@ -139,9 +139,9 @@ fn decriseSkill(self: *@This(), skill: g.meta.Skill) void {
 
 pub fn draw(self: Self, render: g.Render) !void {
     try render.clearDisplay();
-    const title_point = p.Point.init(1, 1);
+    const title_point: p.Point = .point(1, 1);
     try render.drawHorizontalLine('═', title_point.movedTo(.down), g.DISPLAY_COLS);
-    try render.drawHorizontalLine('═', p.Point.init(g.DISPLAY_ROWS - 1, 1), g.DISPLAY_COLS);
+    try render.drawHorizontalLine('═', .point(g.DISPLAY_ROWS - 1, 1), g.DISPLAY_COLS);
     var buf: [g.DISPLAY_COLS]u8 = undefined;
     const title: []const u8 = if (self.levels.last_handled_level < self.current_level)
         try std.fmt.bufPrint(&buf, "New level: {d}", .{self.levels.last_handled_level + 1})

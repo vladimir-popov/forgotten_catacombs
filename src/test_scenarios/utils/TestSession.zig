@@ -69,9 +69,9 @@ pub fn initWithTestArea(self: *Self, gpa: std.mem.Allocator, io: std.Io) !void {
     const dungeon = try TestLocation.generateDungeon(&self.session.level.arena);
     try level.setupDungeon(0, dungeon, self.session.player);
     try level.completeInitialization(null);
-    const center = p.Point.init((g.DISPLAY_ROWS - 2) / 2, g.DISPLAY_COLS / 2);
+    const center = p.Point.point((g.DISPLAY_ROWS - 2) / 2, g.DISPLAY_COLS / 2);
     self.session.registry.getUnsafe(self.session.player, c.Position).place = center;
-    self.session.viewport.region.top_left = .init(1, 1);
+    self.session.viewport.region.top_left = .point(1, 1);
 }
 
 pub fn load(self: *Self, gpa: std.mem.Allocator, io: std.Io, working_dir: std.testing.TmpDir) !void {

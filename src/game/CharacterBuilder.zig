@@ -298,9 +298,9 @@ pub fn draw(self: Self, render: g.Render) !void {
         try description.draw(render);
     } else {
         try render.clearDisplay();
-        const title_point = p.Point.init(1, 1);
+        const title_point: p.Point = .point(1, 1);
         try render.drawHorizontalLine('═', title_point.movedTo(.down), g.DISPLAY_COLS);
-        try render.drawHorizontalLine('═', p.Point.init(g.DISPLAY_ROWS - 1, 1), g.DISPLAY_COLS);
+        try render.drawHorizontalLine('═', .point(g.DISPLAY_ROWS - 1, 1), g.DISPLAY_COLS);
         switch (self.step) {
             .archetype => |archetype| {
                 try render.drawTextWithAlign(

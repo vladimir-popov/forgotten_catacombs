@@ -367,25 +367,25 @@ pub fn hideRightButton(self: *const Self) !void {
 pub fn setBorderWithArrow(self: *const Self, viewport: g.Viewport, side: p.Direction) void {
     switch (side) {
         .left => self.scene_buffer.setSymbol(
-            p.Point.init(1 + viewport.region.rows / 2, 1),
+            p.Point.point(1 + viewport.region.rows / 2, 1),
             '<',
             .inverted,
             std.math.maxInt(SceneBuffer.ZOrder),
         ),
         .right => self.scene_buffer.setSymbol(
-            p.Point.init(1 + viewport.region.rows / 2, viewport.region.cols),
+            p.Point.point(1 + viewport.region.rows / 2, viewport.region.cols),
             '>',
             .inverted,
             std.math.maxInt(SceneBuffer.ZOrder),
         ),
         .up => self.scene_buffer.setSymbol(
-            p.Point.init(1, viewport.region.cols / 2),
+            p.Point.point(1, viewport.region.cols / 2),
             '^',
             .inverted,
             std.math.maxInt(SceneBuffer.ZOrder),
         ),
         .down => self.scene_buffer.setSymbol(
-            p.Point.init(viewport.region.rows, viewport.region.cols / 2),
+            p.Point.point(viewport.region.rows, viewport.region.cols / 2),
             'v',
             .inverted,
             std.math.maxInt(SceneBuffer.ZOrder),

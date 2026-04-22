@@ -42,8 +42,8 @@ pub fn dungeon(self: *Self) !d.Dungeon {
         .parent = self,
         .rows = self.area.region.rows,
         .cols = self.area.region.cols,
-        .entrance = .init(10, 23),
-        .exit = .init(1, 23),
+        .entrance = .point(10, 23),
+        .exit = .point(1, 23),
         .doorways = null,
         .vtable = .{
             .cellAtFn = cellAt,

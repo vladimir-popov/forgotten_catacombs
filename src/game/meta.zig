@@ -14,7 +14,7 @@ pub const Skill = g.descriptions.Skills.Enum;
 /// A numbers of required exp point for level up.
 /// The 0 element is a required amount of exp point to get the
 /// second level.
-pub const Levels = [_]u16{ 200, 500, 1000, 15000, std.math.maxInt(u16) };
+pub const Levels = [_]u16{ 200, 500, 1000, 1500, std.math.maxInt(u16) };
 
 pub inline fn experienceToNextLevel(current_level: u4) u16 {
     return Levels[current_level - 1];

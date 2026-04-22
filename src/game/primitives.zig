@@ -50,7 +50,7 @@ pub const Point = struct {
     row: u8,
     col: u8,
 
-    pub fn init(r: u8, c: u8) Point {
+    pub fn point(r: u8, c: u8) Point {
         return .{ .row = r, .col = c };
     }
 
@@ -81,33 +81,33 @@ pub const Point = struct {
     }
 
     pub fn movedTo(self: Point, direction: Direction) Point {
-        var point = self;
-        point.move(direction);
-        return point;
+        var pt = self;
+        pt.move(direction);
+        return pt;
     }
 
-    pub inline fn moveNTimes(point: *Point, direction: Direction, count: usize) void {
+    pub inline fn moveNTimes(pt: *Point, direction: Direction, count: usize) void {
         const n: u8 = @intCast(count);
         switch (direction) {
-            .up => if (point.row >= n) {
-                point.row -= n;
+            .up => if (pt.row >= n) {
+                pt.row -= n;
             },
-            .down => if (point.row <= (255 - n)) {
-                point.row += n;
+            .down => if (pt.row <= (255 - n)) {
+                pt.row += n;
             },
-            .left => if (point.col >= n) {
-                point.col -= n;
+            .left => if (pt.col >= n) {
+                pt.col -= n;
             },
-            .right => if (point.col <= (255 - n)) {
-                point.col += n;
+            .right => if (pt.col <= (255 - n)) {
+                pt.col += n;
             },
         }
     }
 
     pub fn movedToNTimes(self: Point, direction: Direction, n: usize) Point {
-        var point = self;
-        point.moveNTimes(direction, n);
-        return point;
+        var pt = self;
+        pt.moveNTimes(direction, n);
+        return pt;
     }
 
     /// Returns true if the `other` point is one of 4 neighbors:
@@ -274,7 +274,7 @@ pub const Region = struct {
     /// └───────────────────────┘
     pub fn innerRegion(self: Region, left_pad: u8, right_pad: u8, top_pad: u8, bottom_pad: u8) Region {
         return .{
-            .top_left = Point.init(self.top_left.row + top_pad, self.top_left.col + left_pad),
+            .top_left = Point.point(self.top_left.row + top_pad, self.top_left.col + left_pad),
             .rows = self.rows - top_pad - bottom_pad,
             .cols = self.cols - left_pad - right_pad,
         };

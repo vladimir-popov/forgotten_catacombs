@@ -267,7 +267,7 @@ pub fn playerMovedToLevel(self: *Self) !void {
         .entity_moved = .{
             .entity = self.player,
             .is_player = true,
-            .moved_from = g.primitives.Point.init(0, 0),
+            .moved_from = .point(0, 0),
             .target = .{ .new_place = self.level.playerPosition().place },
         },
     };

@@ -38,6 +38,7 @@ pub const State = union(enum) {
     /// The current game session
     game_session: *g.GameSession,
     game_over,
+    about,
 };
 
 /// Used to allocate memory for the current state
@@ -75,7 +76,7 @@ pub fn tick(self: *Self) !void {
             if (btn.game_button.isMove())
                 try self.state.welcome.menu.draw(self.render, WelcomeScreen.MENU_REGION, 0);
         },
-        .game_over => if (try self.runtime.readPushedButtons()) |btn| {
+        .game_over, .about => if (try self.runtime.readPushedButtons()) |btn| {
             switch (btn.game_button) {
                 .a => if (btn.state == .released) try self.welcome(),
                 else => {},
@@ -191,7 +192,11 @@ fn showManual(_: *anyopaque, _: usize, _: void) !bool {
     return false;
 }
 
-fn showAbout(_: *anyopaque, _: usize, _: void) !bool {
+fn showAbout(ptr: *anyopaque, _: usize, _: void) !bool {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    std.debug.assert(self.state == .welcome);
+    self.state = .about;
+    try self.drawAboutScreen();
     return false;
 }
 
@@ -228,6 +233,22 @@ fn deleteSessionFileIfExists(self: Self) !void {
     try self.runtime.deleteFileIfExists(g.persistance.SESSION_FILE_NAME);
 }
 
+///```
+///╔════════════════════════════════════════╗
+///║                                        ║
+///║                                        ║
+///║                Welcome                 ║
+///║                  to                    ║
+///║          Forgotten catacombs           ║
+///║                                        ║
+///║                                        ║
+///║               Continue                 ║
+///║               New game                 ║
+///║                Manual                  ║
+///║                About                   ║
+///║                                        ║
+///╚════════════════════════════════════════╝
+///```
 fn drawWelcomeScreen(self: Self) !void {
     try self.render.drawTextWithAlign(
         g.DISPLAY_COLS,
@@ -251,6 +272,36 @@ fn drawWelcomeScreen(self: Self) !void {
         .center,
     );
     try self.state.welcome.menu.draw(self.render, WelcomeScreen.MENU_REGION, 0);
+}
+
+///```
+///╔════════════════════════════════════════╗
+///║                                        ║
+///║          Forgotten Catacombs           ║
+///║                                        ║
+///║ This is a hobby project developed in   ║
+///║ free time. Feedback, bug reports, and  ║
+///║ suggestions are very welcome!          ║
+///║                                        ║
+///║ Author: Vladimir Popov                 ║
+///║                                        ║
+///║ Github: dokwork/forgotten_catacombs    ║
+///║                                        ║
+///║                                   Back ║
+///╚════════════════════════════════════════╝
+///```
+fn drawAboutScreen(self: Self) !void {
+    try self.render.clearDisplay();
+    try self.render.drawTextWithAlign(g.DISPLAY_COLS, "Forgotten Catacombs", .point(2, 1), .normal, .center);
+
+    try self.render.drawText("This is a hobby project developed in", .point(4, 2), .normal);
+    try self.render.drawText("free time. Feedback, bug reports, and", .point(5, 2), .normal);
+    try self.render.drawText("suggestions are very welcome!", .point(6, 2), .normal);
+
+    try self.render.drawText("Author: Vladimir Popov", .point(8, 2), .normal);
+    try self.render.drawText("Github: dokwork/forgotten_catacombs", .point(10, 2), .normal);
+
+    try self.render.drawText(" Back ", .point(12, 35), .inverted);
 }
 
 fn drawGameOverScreen(self: Self) !void {

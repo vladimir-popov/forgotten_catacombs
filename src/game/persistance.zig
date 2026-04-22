@@ -440,7 +440,7 @@ test "All components should be serializable" {
         .modification = c.Modification.init(.{ .fire = -3 }),
         .pile = pile,
         .price = .{ .value = 100 },
-        .position = c.Position{ .place = p.Point.init(12, 42), .zorder = .item },
+        .position = c.Position{ .place = p.Point.point(12, 42), .zorder = .item },
         .rarity = .common,
         .regeneration = .regular,
         .shop = shop,
