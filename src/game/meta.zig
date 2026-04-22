@@ -14,7 +14,7 @@ pub const Skill = g.descriptions.Skills.Enum;
 /// A numbers of required exp point for level up.
 /// The 0 element is a required amount of exp point to get the
 /// second level.
-pub const Levels = [_]u16{ 500, 1000, 15000, std.math.maxInt(u16) };
+pub const Levels = [_]u16{ 200, 500, 1000, 15000, std.math.maxInt(u16) };
 
 pub inline fn experienceToNextLevel(current_level: u4) u16 {
     return Levels[current_level - 1];
@@ -364,6 +364,8 @@ pub fn describeEntity(
         try describeItem(alloc, journal, entity, text_area);
     } else if (g.meta.getEnemyType(journal.registry, entity)) |enemy_type| {
         try describeEnemy(alloc, journal, entity, enemy_type, text_area);
+    } else if (journal.registry.get(entity, c.Trap)) |trap| {
+        try describeTrap(alloc, trap, text_area);
     }
 }
 
@@ -525,6 +527,22 @@ fn describeArmor(
     }
 }
 
+pub fn describeTrap(
+    alloc: std.mem.Allocator,
+    trap: *const c.Trap,
+    text_area: *g.windows.TextArea,
+) !void {
+    _ = try text_area.addEmptyLine(alloc);
+    const line = try text_area.addEmptyLine(alloc);
+    const label = switch (trap.power) {
+        0, 1 => "easy to disarm",
+        2, 3 => "have to tinker",
+        4, 5 => "risky to touch",
+        6, 7 => "God help me",
+    };
+    _ = try std.fmt.bufPrint(line, "Difficulty: {s}", .{label});
+}
+
 /// Adds lines with not zero effects to the `text_area`.
 /// It check the knowing status of the entity and merge modifications to the effects before showing
 /// their values.
@@ -638,7 +656,7 @@ pub fn describeEnemy(
             // | Too slow | Slow | Not so fast | Fast | Very fast |
             //            |      |             |      |
             //          +10     +5           Normal  -5
-            const diff: i16 = speed.move_points - c.Speed.default.move_points;
+            const diff: i16 = @as(i16, speed.move_points) - c.Speed.default.move_points;
             const line = try text_area.addEmptyLine(alloc);
             if (diff >= 0) {
                 if (diff < 5)
@@ -684,7 +702,7 @@ test "Describe a player" {
     // then:
     try expectContent(text_area,
         \\Level: 1
-        \\Experience: 0/500
+        \\Experience: 0/200
         \\
         \\Health: 30/30
         \\

@@ -550,6 +550,16 @@ pub const Trap = struct {
     effect: Effects.Type,
     /// The turn when its visibility was checked last time
     last_checked_turn: u32 = 0,
+
+    pub fn damage(self: *const Trap, target_max_health: u8) p.Range(u8) {
+        var x: u16 = self.power;
+        x = (1 + x) * target_max_health;
+        x = x / 10;
+        return p.Range(u8){
+            .min = target_max_health / 10,
+            .max = @intCast(x),
+        };
+    }
 };
 
 pub const Weight = struct {

@@ -353,13 +353,7 @@ fn handleTrap(self: *Self, actor: g.Entity, trap_id: g.Entity, trap: *const c.Tr
     const protection = self.session().registry.get(actor, c.Protection) orelse &c.Protection.zeros;
     const health = self.session().registry.getUnsafe(actor, c.Health);
     const health_before = health.current_hp;
-    var x: u16 = trap.power;
-    x = (1 + x) * health.max;
-    x = x / 10;
-    const damage = p.Range(u8){
-        .min = health.max / 10,
-        .max = @intCast(x),
-    };
+    const damage = trap.damage(health.max);
 
     const is_actor_dead = try self.applyEffect(trap_id, trap_id, trap.effect, damage, actor, protection, health);
 
