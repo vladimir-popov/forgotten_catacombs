@@ -39,6 +39,7 @@ pub fn player(
         .sprite = .{ .codepoint = cp.human },
         .stats = stats,
         .wallet = .{ .money = rand.uintAtMost(u16, 50) + 100 },
+        .weapon = .melee(.tricky, .effects(.{ .physical = .range(1, 3) })),
     };
 }
 
