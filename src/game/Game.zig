@@ -19,13 +19,12 @@ const WelcomeScreen = struct {
     const MENU_REGION = p.Region.init(VERTICAL_MIDDLE + 2, HORIZONTAL_MIDDLE - 6, 5, 12);
 
     menu: w.OptionsArea(void),
-    selected_option: usize = 0,
 
     fn menuOption(self: WelcomeScreen) MenuOption {
         return if (self.menu.lines.items.len == 2)
-            @enumFromInt(self.selected_option + 1)
+            @enumFromInt(self.menu.selected_line + 1)
         else
-            @enumFromInt(self.selected_option);
+            @enumFromInt(self.menu.selected_line);
     }
 };
 
@@ -38,6 +37,7 @@ pub const State = union(enum) {
     /// The current game session
     game_session: *g.GameSession,
     game_over,
+    manual,
     about,
 };
 
@@ -76,7 +76,7 @@ pub fn tick(self: *Self) !void {
             if (btn.game_button.isMove())
                 try self.state.welcome.menu.draw(self.render, WelcomeScreen.MENU_REGION, 0);
         },
-        .game_over, .about => if (try self.runtime.readPushedButtons()) |btn| {
+        .game_over, .manual, .about => if (try self.runtime.readPushedButtons()) |btn| {
             switch (btn.game_button) {
                 .a => if (btn.state == .released) try self.welcome(),
                 else => {},
@@ -111,10 +111,10 @@ pub fn tick(self: *Self) !void {
 /// removes all items from the global menu, and draws the Welcome screen.
 noinline fn welcome(self: *Self) !void {
     log.debug("Welcome screen. The game state is {t}", .{self.state});
+    const from_state: std.meta.Tag(State) = self.state;
     _ = self.state_arena.reset(.retain_capacity);
     self.state = .{ .welcome = try self.state_arena.allocator().create(WelcomeScreen) };
     self.state.welcome.menu = .init(self, .center);
-    self.state.welcome.menu.selected_line = 0;
 
     self.runtime.removeAllMenuItems();
 
@@ -126,6 +126,12 @@ noinline fn welcome(self: *Self) !void {
     try self.state.welcome.menu.addOption(alloc, "  Manual  ", {}, showManual, null);
     try self.state.welcome.menu.addOption(alloc, "  About   ", {}, showAbout, null);
 
+    // keep menu item selected
+    switch (from_state) {
+        .about => try self.state.welcome.menu.selectLine(self.state.welcome.menu.options.items.len - 1),
+        .manual => try self.state.welcome.menu.selectLine(self.state.welcome.menu.options.items.len - 2),
+        else => try self.state.welcome.menu.selectLine(0),
+    }
     try self.render.clearDisplay();
     try self.drawWelcomeScreen();
 }
@@ -188,7 +194,11 @@ fn continueGame(ptr: *anyopaque, _: usize, _: void) !bool {
     return false;
 }
 
-fn showManual(_: *anyopaque, _: usize, _: void) !bool {
+fn showManual(ptr: *anyopaque, _: usize, _: void) !bool {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    std.debug.assert(self.state == .welcome);
+    self.state = .manual;
+    try self.runtime.showManual();
     return false;
 }
 

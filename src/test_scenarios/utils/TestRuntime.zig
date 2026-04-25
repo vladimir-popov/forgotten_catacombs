@@ -56,6 +56,7 @@ pub fn runtime(self: *Self) g.Runtime {
             .isFileExists = isFileExists,
             .deleteFileIfExists = deleteFileIfExists,
             .stackSize = stackSize,
+            .showManual = showManual,
         },
     };
 }
@@ -177,3 +178,5 @@ fn stackSize(ptr: *anyopaque) usize {
     const stack: usize = @intFromPtr(&self);
     return if (stack > self.stack_start) stack - self.stack_start else self.stack_start - stack;
 }
+
+fn showManual(_: *anyopaque) !void {}

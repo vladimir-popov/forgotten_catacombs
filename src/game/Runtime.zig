@@ -36,7 +36,6 @@ const VTable = struct {
     isDevMode: *const fn (context: *anyopaque) bool,
     popCheat: *const fn (context: *anyopaque) ?g.Cheat,
     // --------- FS operations ---------
-    // All paths should be relative to a directory with save files
     openFile: *const fn (context: *anyopaque, file_path: [:0]const u8, mode: FileMode, buffer: []u8) anyerror!OpaqueFile,
     closeFile: *const fn (context: *anyopaque, file: OpaqueFile) void,
     readFile: *const fn (context: *anyopaque, file: OpaqueFile) *std.Io.Reader,
@@ -45,6 +44,9 @@ const VTable = struct {
     deleteFileIfExists: *const fn (context: *anyopaque, path: [:0]const u8) anyerror!void,
     //  ----------------------------------
     stackSize: *const fn (context: *anyopaque) usize,
+    // different platforms have different ways to show URLs.
+    // For the Playdate it can be a QR code, for TTY OSC8 sequence or open URL in browser...
+    showManual: *const fn (context: *anyopaque) anyerror!void,
 };
 
 context: *anyopaque,
@@ -122,4 +124,8 @@ pub fn isFileExists(self: *const Self, path: [:0]const u8) anyerror!bool {
 
 pub fn deleteFileIfExists(self: *const Self, path: [:0]const u8) anyerror!void {
     try self.vtable.deleteFileIfExists(self.context, path);
+}
+
+pub fn showManual(self: *const Self) anyerror!void {
+    try self.vtable.showManual(self.context);
 }

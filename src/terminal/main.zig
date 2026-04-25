@@ -35,9 +35,10 @@ pub const std_options: std.Options = .{
             // .{ .scope = .save_load_mode, .level = .debug },
             // .{ .scope = .visibility, .level = .debug },
             // .{ .scope = .meta, .level = .debug },
-            .{ .scope = .journal, .level = .debug },
+            // .{ .scope = .journal, .level = .debug },
             .{ .scope = .cmd, .level = .debug },
             // .{ .scope = .windows, .level = .debug },
+            .{ .scope = .tty_runtime, .level = .debug },
         },
 };
 
@@ -53,24 +54,20 @@ pub fn handlePanic(
     std.debug.defaultPanic(msg, first_trace_addr);
 }
 
-pub fn main(init: std.process.Init.Minimal) !void {
-    const args: Args = .{ .args = init.args };
-
-    var gpa = std.heap.DebugAllocator(.{}){};
-    defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK DETECTED!");
-    const alloc = gpa.allocator();
-
-    var single_threaded_io: std.Io.Threaded = .init_single_threaded;
+pub fn main(init: std.process.Init) !void {
+    const alloc = init.gpa;
+    const io = init.io;
+    const args: Args = .{ .args = init.minimal.args };
 
     const seed: u64 = try args.int(u64, "seed") orelse
-        @intCast(std.Io.Clock.awake.now(single_threaded_io.io()).toMilliseconds());
+        @intCast(std.Io.Clock.awake.now(io).toMilliseconds());
     const devmode = args.flag("devmode");
     Logger.enabled = devmode;
     const use_mouse = devmode and args.flag("mouse");
     const preset = if (args.str("preset")) |preset| parsePreset(preset) else null;
 
     var runtime = try TtyRuntime.TtyRuntime(g.DISPLAY_ROWS + 2, g.DISPLAY_COLS + 2)
-        .init(alloc, single_threaded_io.io(), true, true, devmode, use_mouse);
+        .init(alloc, io, true, true, devmode, use_mouse);
     defer runtime.deinit();
 
     if (devmode) {

@@ -13,7 +13,9 @@ var window_size: tty.Display.RowsCols = undefined;
 var act: std.posix.Sigaction = undefined;
 /// true if the game should be rendered in the center of the terminal window:
 var should_render_in_center: bool = true;
+/// The global variable contains vertical pad within terminal to start drawing the game.
 var rows_pad: u8 = 1;
+/// The global variable contains horizontal pad within terminal to start drawing the game.
 var cols_pad: u8 = 1;
 
 pub fn enableGameMode(use_mouse: bool) !void {
@@ -118,6 +120,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                     .isFileExists = isFileExists,
                     .deleteFileIfExists = deleteFileIfExists,
                     .stackSize = stackSize,
+                    .showManual = openManualLink,
                 },
             };
         }
@@ -207,14 +210,14 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                 const button: ?g.Button = switch (key) {
                     .char => switch (key.char.char) {
                         // (B) (A)
-                        's', 'i' => .{ .game_button = .a, .state = .released },
-                        'a', 'u' => .{ .game_button = .b, .state = .released },
-                        'S', 'I' => .{ .game_button = .a, .state = .hold },
-                        'A', 'U' => .{ .game_button = .b, .state = .hold },
-                        'h' => .{ .game_button = .left, .state = .released },
-                        'j' => .{ .game_button = .down, .state = .released },
-                        'k' => .{ .game_button = .up, .state = .released },
-                        'l' => .{ .game_button = .right, .state = .released },
+                        'i', '.' => .{ .game_button = .a, .state = .released },
+                        'I', '>' => .{ .game_button = .a, .state = .hold },
+                        'u', ',' => .{ .game_button = .b, .state = .released },
+                        'U', '<' => .{ .game_button = .b, .state = .hold },
+                        'h', 'a' => .{ .game_button = .left, .state = .released },
+                        'j', 's' => .{ .game_button = .down, .state = .released },
+                        'k', 'w' => .{ .game_button = .up, .state = .released },
+                        'l', 'd' => .{ .game_button = .right, .state = .released },
                         else => null,
                     },
                     .control => switch (key.control) {
@@ -344,6 +347,25 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
         fn stackSize(_: *anyopaque) usize {
             // TODO
             return 0;
+        }
+
+        fn openManualLink(ptr: *anyopaque) !void {
+            const self: *Self = @ptrCast(@alignCast(ptr));
+            const url = "https://github.com/dokwork/forgotten_catacombs/tree/main/manual";
+            const argv = switch (@import("builtin").os.tag) {
+                .linux => &[_][]const u8{ "xdg-open", url },
+                .macos => &[_][]const u8{ "open", url },
+                .windows => &[_][]const u8{ "cmd", "/c", "start", url },
+                else => @compileError("Unsupported OS"),
+            };
+
+            var child = try std.process.spawn(
+                self.io,
+                .{ .argv = argv, .stdin = .ignore, .stdout = .ignore, .stderr = .ignore },
+            );
+            _ = try child.wait(self.io);
+            // we have to emulate pressing 'A' button to return to the main screen
+            self.keyboard_buffer = .{ .char = .{ .char = 'i' } };
         }
     };
 }

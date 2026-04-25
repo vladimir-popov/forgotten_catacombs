@@ -38,6 +38,9 @@ pub const Text = struct {
     const MOUSE_TRACK_ON = csi("?1000;1006;1015h");
     const MOUSE_TRACK_OFF = csi("?1000;1006;1015l");
 
+    // OSC8
+    const OSC8 = [_]u8{ESC} ++ "]8;;";
+
     /// Control Sequence Introducer
     inline fn csi(comptime sfx: []const u8) *const [2 + sfx.len:0]u8 {
         comptime {
@@ -93,8 +96,19 @@ pub const Text = struct {
         }
     }
 
-    pub fn writeSetCursorPosition(wr: *std.Io.Writer, row: u16, col: u16) !void {
+    pub fn writeSetCursorPosition(wr: *std.Io.Writer, row: usize, col: usize) !void {
         try wr.print("\x1b[{d};{d}H", .{ row, col });
+    }
+
+    // +14 symbols
+    pub inline fn url(address: []const u8, label: ?[]const u8) []const u8 {
+        comptime {
+            const lbl = label orelse address;
+            return std.fmt.comptimePrint(
+                OSC8 ++ "{s}" ++ [_]u8{ESC} ++ "\\{s}" ++ OSC8 ++ [_]u8{ESC} ++ "\\",
+                .{ address, lbl },
+            );
+        }
     }
 };
 

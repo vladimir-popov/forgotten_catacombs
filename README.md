@@ -6,11 +6,11 @@
 </p>
 
 Forgotten Catacombs is an old-school roguelike single-player dungeon adventure inspired by [Umoria](https://umoria.org/) and [Shattered Pixel Dungeon](https://shatteredpixel.com/), 
-and designed for [playdate console](https://play.date/) and desktop terminal.
+and designed for [Playdate console](https://play.date/) and desktop terminal.
 
 ### Game manual
 
-🇷🇺 [Русская версия](docs/manual/manual.ru.pdf)
+🇷🇺 [Русская версия](manual/manual.ru.pdf)
 
 
 ### Building from source

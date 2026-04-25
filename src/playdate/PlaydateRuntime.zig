@@ -19,6 +19,7 @@ var cheat: ?g.Cheat = null;
 playdate: *api.PlaydateAPI,
 alloc: std.mem.Allocator,
 bitmap_table: *api.LCDBitmapTable,
+manual_qrcode: *api.LCDBitmap,
 last_button: *LastButton,
 is_dev_mode: bool = false,
 stack_start: usize = 0,
@@ -31,6 +32,12 @@ pub fn init(playdate: *api.PlaydateAPI) !Self {
         std.debug.panic("Bitmap table was not created because of {s}", .{reason});
     };
     errdefer _ = playdate.system.realloc(bitmap_table, 0);
+
+    const manual_qrcode: *api.LCDBitmap = playdate.graphics.loadBitmap("manual_qr", err) orelse {
+        const reason = err orelse "unknown reason";
+        std.debug.panic("manual_qr was not created because of {s}", .{reason});
+    };
+    errdefer _ = playdate.system.realloc(manual_qrcode, 0);
 
     if (err) |err_msg| {
         std.debug.panic("Error on loading image to the bitmap table: {s}", .{err_msg});
@@ -48,6 +55,7 @@ pub fn init(playdate: *api.PlaydateAPI) !Self {
         .playdate = playdate,
         .alloc = alloc,
         .bitmap_table = bitmap_table,
+        .manual_qrcode = manual_qrcode,
         .last_button = last_button,
     };
 }
@@ -77,6 +85,7 @@ pub fn runtime(self: *Self) g.Runtime {
             .isFileExists = isFileExists,
             .deleteFileIfExists = deleteFileIfExists,
             .stackSize = stackSize,
+            .showManual = showManualQrCode,
         },
     };
 }
@@ -278,6 +287,11 @@ fn stackSize(ptr: *anyopaque) usize {
     // we get the first address on the stack here, this is why take the point on the pointer here
     const stack: usize = @intFromPtr(&self);
     return if (stack > self.stack_start) stack - self.stack_start else self.stack_start - stack;
+}
+
+fn showManualQrCode(ptr: *anyopaque) !void {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    self.playdate.graphics.drawBitmap(self.manual_qrcode, 100, 18, .BitmapUnflipped);
 }
 
 const ExpectedFile = struct {
