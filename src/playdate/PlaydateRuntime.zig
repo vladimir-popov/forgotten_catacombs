@@ -291,7 +291,9 @@ fn stackSize(ptr: *anyopaque) usize {
 
 fn showManualQrCode(ptr: *anyopaque) !void {
     const self: *Self = @ptrCast(@alignCast(ptr));
+    const render = try g.Render.init(self.alloc, self.runtime());
     self.playdate.graphics.drawBitmap(self.manual_qrcode, 100, 18, .BitmapUnflipped);
+    try render.drawText(" Back ", .point(12, 35), .inverted);
 }
 
 const ExpectedFile = struct {

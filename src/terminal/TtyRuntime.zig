@@ -351,7 +351,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
 
         fn openManualLink(ptr: *anyopaque) !void {
             const self: *Self = @ptrCast(@alignCast(ptr));
-            const url = "https://github.com/dokwork/forgotten_catacombs/tree/main/manual";
+            const url = "https://github.com/dokwork/forgotten_catacombs/blob/main/manual/manual.ru.pdf";
             const argv = switch (@import("builtin").os.tag) {
                 .linux => &[_][]const u8{ "xdg-open", url },
                 .macos => &[_][]const u8{ "open", url },

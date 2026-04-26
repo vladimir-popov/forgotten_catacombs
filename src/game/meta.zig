@@ -179,7 +179,7 @@ pub fn addExperience(registry: *g.Registry, player: g.Entity, exp: u16) !bool {
 
 pub fn initialHealth(constitution: i4) c.Health {
     const constitution_factor = (@as(f32, @floatFromInt(constitution)) * 0.6 + 4.4) / 4.0;
-    return .init(@intFromFloat(@round(constitution_factor * 50)));
+    return .init(@intFromFloat(@round(constitution_factor * 30)));
 }
 
 pub fn movePointsForAction(registry: *const g.Registry, actor: g.Entity, _: *const g.Action) g.MovePoints {
@@ -710,7 +710,7 @@ test "Describe a player" {
         \\This is a primitive weapon.
         \\Damage:
         \\  physical 1
-        \\  fire 1
+        \\  fire 1-2
         \\
         \\Equiped armor: Jacket
         \\Protection:
@@ -817,7 +817,7 @@ test "Describe a melee weapon" {
         \\This is a primitive weapon.
         \\Damage:
         \\  physical 1
-        \\  fire 1
+        \\  fire 1-2
         \\
         \\Radius of light: 3
         \\

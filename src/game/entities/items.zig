@@ -54,7 +54,7 @@ pub const Weapons = struct {
         .tier = .{ .value = 1 },
         .sprite = .{ .codepoint = cp.weapon_melee },
         .weight = .{ .value = 80 },
-        .price = .{ .value = 28 },
+        .price = .{ .value = 42 },
         .weapon = .melee(.primitive, .effects(.{ .physical = .range(5, 8) })),
     }),
 
@@ -74,8 +74,8 @@ pub const Weapons = struct {
         .tier = .{ .value = 1 },
         .sprite = .{ .codepoint = cp.weapon_melee },
         .weight = .{ .value = 100 },
-        .price = .{ .value = 15 },
-        .weapon = .melee(.primitive, .effects(.{ .physical = .range(5, 9) })),
+        .price = .{ .value = 25 },
+        .weapon = .melee(.primitive, .effects(.{ .physical = .range(2, 4) })),
     }),
 
     torch: c.Components = archetype.weapon(.{
@@ -86,7 +86,7 @@ pub const Weapons = struct {
         .weight = .{ .value = 20 },
         .source_of_light = .{ .radius = 3 },
         .price = .{ .value = 5 },
-        .weapon = .melee(.primitive, .effects(.{ .physical = .range(1, 1), .fire = .range(1, 1) })),
+        .weapon = .melee(.primitive, .effects(.{ .physical = .range(1, 1), .fire = .range(1, 2) })),
     }),
 
     poisoned_dagger: c.Components = archetype.weapon(.{
@@ -95,7 +95,7 @@ pub const Weapons = struct {
         .tier = .{ .value = 1 },
         .sprite = .{ .codepoint = cp.weapon_melee },
         .weight = .{ .value = 50 },
-        .price = .{ .value = 50 },
+        .price = .{ .value = 30 },
         .weapon = .melee(.tricky, .effects(.{ .physical = .range(2, 3), .poison = .range(1, 3) })),
     }),
 

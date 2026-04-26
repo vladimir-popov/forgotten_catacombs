@@ -7,7 +7,7 @@ on:
       - develop
   pull_request:
     paths-ignore:
-      - docs
+      - assets
       - misc
       - 'LICENSE'
       - 'README.md'
@@ -20,5 +20,5 @@ jobs:
       - uses: actions/checkout@v3
       - uses: mlugg/setup-zig@v2
         with:
-          version: 0.16.0-dev.2984+cb7d2b056
+          version: 0.16.0
       - run: zig build test

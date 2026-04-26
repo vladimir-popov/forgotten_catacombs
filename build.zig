@@ -268,7 +268,12 @@ pub fn build(b: *std.Build) !void {
     // ============================================================
     //                Step to generate manual
     // ============================================================
-    const typst_cmd = b.addSystemCommand(&.{ "typst", "c", "docs/manual/manual.ru.typ" });
+    const typst_cmd = b.addSystemCommand(&.{
+        "typst",
+        "c",
+        "misc/manual_src/manual.ru.typ",
+        "manual/manual.ru.pdf",
+    });
     const typst_step = b.step("pdf", "Generates manual.pdf");
     typst_step.dependOn(&typst_cmd.step);
 }
