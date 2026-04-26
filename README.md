@@ -1,8 +1,8 @@
 # Forgotten Catacombs
 
 <p align="center">
-<img src="docs/manual/images/playdate.png" height=150/>
-<img src="docs/manual/images/terminal.png" height=150/>
+<img src="misc/manual_src/images/playdate.png" height=150/>
+<img src="misc/manual_src/images/terminal.png" height=150/>
 </p>
 
 Forgotten Catacombs is an old-school roguelike single-player dungeon adventure inspired by [Umoria](https://umoria.org/) and [Shattered Pixel Dungeon](https://shatteredpixel.com/), 

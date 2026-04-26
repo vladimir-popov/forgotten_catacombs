@@ -369,11 +369,11 @@ const Test = struct {
                         var stack_trace_writer = std.Io.Writer.Allocating.init(arena.allocator());
                         if (std.debug.getSelfDebugInfo()) |di| {
                             // skip frame from the testing.zig:
-                            while (isTestingZig(io, di, trace.instruction_addresses[0])) {
+                            while (try isStdTesting(arena.allocator(), io, di, trace.instruction_addresses[0])) {
                                 trace.index -= 1;
                                 trace.instruction_addresses = trace.instruction_addresses[1..];
                             }
-                            try std.debug.writeStackTrace(
+                            try std.debug.writeErrorReturnTrace(
                                 trace,
                                 .{ .writer = &stack_trace_writer.writer, .mode = .no_color },
                             );
@@ -396,11 +396,41 @@ const Test = struct {
     }
 
     /// Returns true only if the address is point on some place inside `testing.zig` file.
-    fn isTestingZig(io: std.Io, debug_info: *std.debug.SelfInfo, address: usize) bool {
-        const symbol = debug_info.getSymbol(io, address) catch return false;
-        if (symbol.source_location) |sl| {
-            const result = std.mem.endsWith(u8, sl.file_name, "testing.zig");
-            return result;
+    fn isStdTesting(
+        alloc: std.mem.Allocator,
+        io: std.Io,
+        debug_info: *std.debug.SelfInfo,
+        address: usize,
+    ) !bool {
+        var arena = std.heap.ArenaAllocator.init(alloc);
+        defer arena.deinit();
+        const symbol_allocator = arena.allocator();
+        var symbols: std.ArrayList(std.debug.Symbol) = .empty;
+
+        debug_info.getSymbols(
+            io,
+            symbol_allocator,
+            symbol_allocator,
+            address,
+            false,
+            &symbols,
+        ) catch |err| switch (err) {
+            error.MissingDebugInfo,
+            error.UnsupportedDebugInfo,
+            error.InvalidDebugInfo,
+            => {},
+            error.ReadFailed, error.Unexpected, error.Canceled => {
+                std.debug.print("Failed to read debug info from filesystem, trace may be incomplete\n\n", .{});
+            },
+            error.OutOfMemory => {
+                std.debug.print("Ran out of memory loading debug info, trace may be incomplete\n\n", .{});
+            },
+        };
+        for (symbols.items) |symbol| {
+            if (symbol.source_location) |sl| {
+                const result = std.mem.endsWith(u8, sl.file_name, "testing.zig");
+                return result;
+            }
         }
         return false;
     }
