@@ -1,0 +1,17 @@
+RND Weight;Название;Food;Calories;Price;Описание;Description
+100;Сушёные ягоды;Dried Berries;80;18;Сладкие сушёные ягоды для быстрого перекуса.;Sweet dried berries for a quick snack.
+90;Сушёные фрукты;Dried Fruits;90;20;Липкие сушёные фрукты с насыщенным вкусом.;Sticky dried fruits packed with flavor.
+80;Сыр;Cheese;120;24;Плотный кусок выдержанного сыра.;A dense piece of aged cheese.
+80;Чёрствый хлеб;Stale Bread;140;24;Твёрдый хлеб, который всё ещё можно съесть.;Hard bread that is still edible.
+70;Крысиный шашлык;Rat Skewer;220;32;Жареное крысиное мясо на деревянной шпажке.;Roasted rat meat on a wooden skewer.
+60;Вяленое мясо;Jerky;240;38;Жёсткие полоски солёного мяса.;Tough strips of salted meat.
+55;Сэндвич;Sandwich;260;42;Хлеб с простой, но сытной начинкой.;Bread stuffed with a simple but filling meal.
+50;Похлёбка;Stew;300;46;Тёплая похлёбка с мясом и овощами.;A warm stew of meat and vegetables.
+45;Жареное мясо;Cooked Meat;320;52;Сытная порция жареного мяса.;A hearty portion of roasted meat.
+25;Консервы;Traveler’s Rations;600;88;Запечатанные банки с готовой едой.;Sealed cans filled with prepared food.
+24;Дорожный паёк;Tins;520;82;Надёжный набор еды для дальних походов.;Reliable food prepared for long journeys.
+20;Солонина;Salted Meat Pack;640;96;Солёное мясо с резким вкусом и плотной текстурой.;Salted meat with a strong flavor and dense texture.
+18;Шахтёрский паёк;Miner’s Rations;680;102;Тяжёлый и питательный паёк для работы под землёй.;Filling rations made for exhausting labor.
+10;Древние запасы;Ancient Preserved Supplies;800;132;Старые припасы из давно забытых времён.;Ancient supplies from long-forgotten times.
+8;Насекомая паста;Insect Paste;820;118;Густая паста из перемолотых насекомых.;A thick paste made from crushed insects.
+6;Жареное мясо броненосца;Armadillo Roast;850;148;Жирное мясо под толстым панцирем.;Fatty roasted meat beneath a thick shell.

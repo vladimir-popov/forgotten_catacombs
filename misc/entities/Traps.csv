@@ -1,0 +1,21 @@
+Traps
+;;;;
+4 power tiers;;;;
+D chance to notice;"clamp(     base_chance / effective_distance,      0.05,      0.85 )";"effective_distance = max(1, distance − perception)
+
+base_chance = 0.42 − 0.08 × trap_power";;
+S chance to disarm;"clamp(
+    0.30 + 0.06 × dexterity + 0.07 × mechanic − 0.10 × power,
+    0.05,
+    0.90
+)";;;
+Tier;S;;;
+easy to disarm;≥ 0.65;;;
+have to tinker;0.45 – 0.65;;;
+risky to touch;0.25 – 0.45;;;
+God help me;≤ 0.25;;;
+Power;Урон (% HP);Ощущение;;
+0;5–8%;фоновая угроза;;
+1;10–15%;заметная;;
+2;18–25%;опасная;;
+3;30–45%;критическая;;
