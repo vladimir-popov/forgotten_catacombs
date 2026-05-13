@@ -8,7 +8,7 @@ Source of truth split:
 
 - `misc/game_mechanics.md`: formulas, balancing rules, and
   table-driven mechanic functions.
-- `misc/balance.numbers`: item/content tables and editable content data.
+- `misc/entities/**.csv`: item/content tables and editable content data.
 
 When a formula or mechanic changes, update this file first, then update
 code and dependent content.
@@ -17,14 +17,15 @@ code and dependent content.
 
 Dungeon-level constants used across multiple systems:
 
-| Rule               | Value                                                       |
-| ------------------ | -----------------------------------                         |
-| Total dungeon size | `36 x 120`                                                  |
-| Actual cells       | `30 .. 40%`, roughly `1296 .. 1728`                         |
-| Enemies per level  | `7 .. 15`                                                   |
-| Two biomes         | 4 levels of Caves, 4 levels of Catacombs                    |
-| Two extra levels   | Zero level where the game begins, 9th level with final Boss |
-| Max depth          | `9`, the first level has number 0                           |
+| Rule                   | Value                                                       |
+| ------------------     | -----------------------------------                         |
+| Total dungeon size     | `36 x 120`                                                  |
+| Actual cells           | `30 .. 40%`, roughly `1296 .. 1728`                         |
+| Enemies per level      | `7 .. 15`                                                   |
+| Two biomes             | 4 levels of Caves, 4 levels of Catacombs                    |
+| Two extra levels       | Zero level where the game begins, 9th level with final Boss |
+| Max depth              | `9`, the first level has number 0                           |
+| Max inventory capacity | 30                                                          |
 
 ## 3. Feature Codes
 
@@ -143,8 +144,8 @@ Target values:
 | Enemy type | TTK        |
 | ---------- | ---------- |
 | weak       | `1 .. 3`   |
-| medium     | `3 .. 5`   |
-| strong     | `4 .. 8`   |
+| medium     | `2 .. 5`   |
+| strong     | `3 .. 6`   |
 
 Floor distribution:
 
@@ -158,6 +159,8 @@ Floor distribution:
 | `6`   | Abandoned catacombs | Repair Drone, Cave Spider, Mechatron, Robot      | Turret                          |
 | `7`   | Tech depths         | Robot, Turret, Mechatron                         | Cyborg                          |
 | `8`   | Tech depths         | Cyborg, Robot, Turret                            | Terminator                      |
+
+
 ## 7. Enemy Scaling Formulas
 
 Enemy XP:
@@ -247,7 +250,7 @@ faster actions cost less.
 ## 10. Economy Model
 
 Item base prices are defined in item/content tables in
-`misc/balance.numbers`.
+`misc/entities/**.csv`.
 
 Starting player gold:
 
