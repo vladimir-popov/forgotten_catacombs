@@ -89,7 +89,7 @@ pub fn load(self: *Self, gpa: std.mem.Allocator, io: std.Io, working_dir: std.te
 }
 
 pub fn deinit(self: *Self) void {
-    self.tmp_dir.cleanup();
+    // self.tmp_dir.cleanup();
     self.arena.deinit();
 }
 

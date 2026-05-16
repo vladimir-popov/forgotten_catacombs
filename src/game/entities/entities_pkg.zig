@@ -35,7 +35,7 @@ pub fn player(
         .inventory = try c.Inventory.empty(alloc),
         .regeneration = .regular,
         .skills = skills,
-        .speed = .{ .move_points = g.MOVE_POINTS_IN_TURN },
+        .speed = .default,
         .sprite = .{ .codepoint = cp.human },
         .stats = stats,
         .wallet = .{ .money = rand.uintAtMost(u16, 50) + 100 },

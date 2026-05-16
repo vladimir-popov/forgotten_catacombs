@@ -128,9 +128,11 @@ pub const Regeneration = struct {
 
 pub const Speed = struct {
     /// How many move points are needed for moving on the neighbor position
-    move_points: g.MovePoints,
+    moving_speed: g.MovePoints,
+    /// How many move points are needed to hit an enemy
+    atack_speed: g.MovePoints,
 
-    pub const default: Speed = .{ .move_points = g.MOVE_POINTS_IN_TURN };
+    pub const default: Speed = .{ .moving_speed = g.MOVE_POINTS_IN_TURN, .atack_speed = g.MOVE_POINTS_IN_TURN };
 };
 
 pub const Pile = struct {

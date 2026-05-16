@@ -445,7 +445,7 @@ test "All components should be serializable" {
         .regeneration = .regular,
         .shop = shop,
         .source_of_light = c.SourceOfLight{ .radius = 4 },
-        .speed = c.Speed{ .move_points = 12 },
+        .speed = c.Speed.default,
         .sprite = c.Sprite{ .codepoint = g.codepoints.human },
         .skills = .init(1, 2, 3, 4),
         .state = .walking,

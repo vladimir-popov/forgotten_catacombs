@@ -68,7 +68,7 @@ test "the global turns counter should NOT be incremented after player moved on e
     try setup(&test_session);
     defer test_session.deinit();
     // note, that x2 speed means /2 less points in turn!
-    test_session.session.registry.getUnsafe(test_session.player.id, c.Speed).move_points = g.MOVE_POINTS_IN_TURN / 2;
+    test_session.session.registry.getUnsafe(test_session.player.id, c.Speed).moving_speed = g.MOVE_POINTS_IN_TURN / 2;
     const initial_counter = test_session.session.spent_turns;
 
     // when:
@@ -85,7 +85,7 @@ test "the global turns counter should be incremented after player moved on empty
     errdefer test_session.printDisplay();
     defer test_session.deinit();
     // note, that x2 speed means /2 less points in turn!
-    test_session.session.registry.getUnsafe(test_session.player.id, c.Speed).move_points = g.MOVE_POINTS_IN_TURN / 2;
+    test_session.session.registry.getUnsafe(test_session.player.id, c.Speed).moving_speed = g.MOVE_POINTS_IN_TURN / 2;
     const initial_counter = test_session.session.spent_turns;
 
     // when:
@@ -102,7 +102,7 @@ test "the global turns counter should be incremented twice after player moved on
     var test_session: TestSession = undefined;
     try setup(&test_session);
     defer test_session.deinit();
-    test_session.session.registry.getUnsafe(test_session.player.id, c.Speed).move_points = g.MOVE_POINTS_IN_TURN * 2;
+    test_session.session.registry.getUnsafe(test_session.player.id, c.Speed).moving_speed = g.MOVE_POINTS_IN_TURN * 2;
     const initial_counter = test_session.session.spent_turns;
 
     // when:

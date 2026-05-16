@@ -383,7 +383,7 @@ pub fn doTurn(
 
     self.session.runtime.printStackSize(1, "doTurn");
 
-    const move_points_for_action = g.meta.movePointsForAction(&self.session.registry, actor, action);
+    const move_points_for_action = g.meta.movePointsForAction(&self.session.registry, actor, action.tag);
     if (move_points_for_action > initiative)
         return .not_enough_points;
 

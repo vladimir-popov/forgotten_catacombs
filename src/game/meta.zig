@@ -182,9 +182,11 @@ pub fn initialHealth(constitution: i4) c.Health {
     return .init(@intFromFloat(@round(constitution_factor * 30)));
 }
 
-pub fn movePointsForAction(registry: *const g.Registry, actor: g.Entity, _: *const g.Action) g.MovePoints {
-    // TODO: return different mp for attacks
-    return registry.getUnsafe(actor, c.Speed).move_points;
+pub fn movePointsForAction(registry: *const g.Registry, actor: g.Entity, action: g.Action.Tag) g.MovePoints {
+    return switch (action) {
+        .hit => registry.getUnsafe(actor, c.Speed).atack_speed,
+        else => registry.getUnsafe(actor, c.Speed).moving_speed,
+    };
 }
 
 /// Adds a random modification to the entity.
@@ -653,24 +655,13 @@ pub fn describeEnemy(
         }
         if (journal.registry.get(enemy, c.Speed)) |speed| {
             _ = try text_area.addEmptyLine(alloc);
-            // | Too slow | Slow | Not so fast | Fast | Very fast |
-            //            |      |             |      |
-            //          +10     +5           Normal  -5
-            const diff: i16 = @as(i16, speed.move_points) - c.Speed.default.move_points;
             const line = try text_area.addEmptyLine(alloc);
-            if (diff >= 0) {
-                if (diff < 5)
-                    _ = try std.fmt.bufPrint(line, "Not too fast.", .{})
-                else if (diff < 10)
-                    _ = try std.fmt.bufPrint(line, "Slow.", .{})
-                else
-                    _ = try std.fmt.bufPrint(line, "Too slow.", .{});
-            } else {
-                if (diff > -5)
-                    _ = try std.fmt.bufPrint(line, "Fast.", .{})
-                else
-                    _ = try std.fmt.bufPrint(line, "Very fast.", .{});
-            }
+            if (speed.moving_speed > c.Speed.default.moving_speed)
+                _ = try std.fmt.bufPrint(line, "Fast.", .{})
+            else if (speed.moving_speed < c.Speed.default.moving_speed)
+                _ = try std.fmt.bufPrint(line, "Slow.", .{})
+            else
+                _ = try std.fmt.bufPrint(line, "Not too fast.", .{});
         }
     } else {
         _ = try text_area.addEmptyLine(alloc);

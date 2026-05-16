@@ -204,7 +204,7 @@ fn tryToMove(
     entity: g.Entity,
     from_position: *c.Position,
     action: *g.Action,
-    move_speed: g.MovePoints,
+    moving_speed: g.MovePoints,
 ) anyerror!g.actions.ActionResult {
     std.debug.assert(action.tag == .move);
     self.session().runtime.printStackSize(3, "tryToMove");
@@ -221,7 +221,7 @@ fn tryToMove(
         return .repeat_action_handler;
     }
     try self.doMove(entity, from_position, action.payload.move.target);
-    return .{ .done = move_speed };
+    return .{ .done = moving_speed };
 }
 
 /// If a collision happens, this method changes the action to an actual one
