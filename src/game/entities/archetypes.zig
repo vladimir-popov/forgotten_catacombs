@@ -28,7 +28,6 @@ pub fn enemy(components: c.Components) c.Components {
         defined(components, "experience");
         defined(components, "health");
         defined(components, "initiative");
-        defined(components, "protection");
         defined(components, "regeneration");
         defined(components, "skills");
         defined(components, "speed");
@@ -57,7 +56,6 @@ pub inline fn food(components: c.Components) c.Components {
     comptime {
         _ = item(components);
         defined(components, "consumable");
-        std.debug.assert(components.consumable.?.consumable_type == .food);
         return components;
     }
 }
@@ -65,7 +63,7 @@ pub inline fn food(components: c.Components) c.Components {
 pub inline fn armor(components: c.Components) c.Components {
     comptime {
         _ = item(components);
-        defined(components, "protection");
+        defined(components, "armor");
         return components;
     }
 }
@@ -93,9 +91,7 @@ pub inline fn weapon(components: c.Components) c.Components {
 pub inline fn potion(components: c.Components) c.Components {
     comptime {
         _ = item(components);
-        hasType(g.meta.PotionType, components);
-        defined(components, "consumable");
-        std.debug.assert(components.consumable.?.consumable_type == .potion);
+        defined(components, "potion");
         return components;
     }
 }

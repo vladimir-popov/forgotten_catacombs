@@ -418,10 +418,9 @@ test "All components should be serializable" {
 
     // Random components to check serialization:
     const expected = c.Components{
-        .protection = .init(.{ .physical = .range(0, 1), .poison = .range(2, 2), .fire = .range(1, 3) }),
         .ammunition = .{ .amount = 42, .ammunition_type = .arrows },
         .animation = c.Animation{ .preset = .hit },
-        .consumable = .{ .calories = 12, .consumable_type = .food },
+        .consumable = .{ .calories = 12 },
         .description = c.Description{ .preset = .player },
         .door = c.Door{ .state = .opened },
         .equipment = c.Equipment{
@@ -437,7 +436,6 @@ test "All components should be serializable" {
         .inventory = inventory,
         .ladder = c.Ladder{ .id = .{ .id = 2 }, .direction = .down, .target_ladder = .{ .id = 3 } },
         .level_up = .{ .last_handled_level = 3 },
-        .modification = c.Modification.init(.{ .fire = -3 }),
         .pile = pile,
         .price = .{ .value = 100 },
         .position = c.Position{ .place = p.Point.point(12, 42), .zorder = .item },
@@ -451,9 +449,9 @@ test "All components should be serializable" {
         .state = .walking,
         .stats = .init(1, 2, 3, 4, 5),
         .tier = .{ .value = 12 },
-        .trap = .{ .power = 3, .effect = .fire },
+        .trap = .{ .power = 3 },
         .wallet = .{ .money = 321 },
-        .weapon = .ranged(5, .arrows, .tricky, .effects(.{ .physical = .range(1, 2) })),
+        .weapon = .ranged(5, .arrows, .tricky, .range(1, 2)),
         .weight = .{ .value = 55 },
     };
 

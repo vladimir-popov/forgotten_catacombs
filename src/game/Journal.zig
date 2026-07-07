@@ -11,7 +11,7 @@ const Self = @This();
 
 const TURNS_TO_KNOW = 100;
 
-const potions_count = @typeInfo(g.descriptions.Potions.Enum).@"enum".fields.len;
+const potions_count = std.enums.values(c.Potion).len;
 
 registry: *g.Registry,
 potion_colors: [potions_count]g.Color,
@@ -21,8 +21,8 @@ potion_colors: [potions_count]g.Color,
 unknown_equipment: std.AutoHashMapUnmanaged(g.Entity, u8) = .empty,
 /// A set of already known entities
 known_entities: std.AutoHashMapUnmanaged(g.Entity, void) = .empty,
-/// A set of known effect of potions.
-known_potions: std.AutoHashMapUnmanaged(g.meta.PotionType, void) = .empty,
+/// A set of known effects of potions.
+known_potions: std.AutoHashMapUnmanaged(c.Potion, void) = .empty,
 /// A set of known class of enemies.
 known_enemies: std.AutoHashMapUnmanaged(g.meta.EnemyType, void) = .empty,
 
@@ -46,13 +46,13 @@ pub fn isKnown(self: *const Self, entity: g.Entity) bool {
     if (self.known_entities.contains(entity)) {
         return true;
     }
-    if (g.meta.getPotionType(self.registry, entity)) |potion_type| {
-        return self.known_potions.contains(potion_type);
+    if (self.registry.get(entity, c.Potion)) |potion| {
+        return self.known_potions.contains(potion.*);
     }
     if (g.meta.getEnemyType(self.registry, entity)) |enemy_type| {
         return self.known_enemies.contains(enemy_type);
     }
-    if (self.registry.has(entity, c.Modification)) {
+    if (g.meta.hasModifications(self.registry, entity)) {
         return false;
     }
     return true;
@@ -64,7 +64,7 @@ pub fn addUnknownEquipment(self: *Self, entity: g.Entity) !void {
 }
 
 /// Returns a color for an unknown potion, or null if the potion is known.
-pub fn unknownPotionColor(self: *const Self, potion_type: g.meta.PotionType) ?g.Color {
+pub fn unknownPotionColor(self: *const Self, potion_type: c.Potion) ?g.Color {
     if (!self.known_potions.contains(potion_type))
         return self.potion_colors[@intFromEnum(potion_type)];
     return null;
@@ -75,7 +75,7 @@ pub fn markEnemyAsKnown(self: *Self, enemy_type: g.meta.EnemyType) !void {
     try self.known_enemies.put(self.registry.allocator(), enemy_type, {});
 }
 
-pub fn markPotionAsKnown(self: *Self, potion_type: g.meta.PotionType) !void {
+pub fn markPotionAsKnown(self: *Self, potion_type: c.Potion) !void {
     log.debug("Mark the potion {t} as known", .{potion_type});
     try self.known_potions.put(self.registry.allocator(), potion_type, {});
 }

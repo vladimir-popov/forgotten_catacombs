@@ -8,20 +8,10 @@ const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
 
-pub const Description = struct {
-    /// A short name of the entity.
-    name: []const u8,
-
-    // A line should have no more 36 symbols
-
-    /// A short description of the entity.
-    description: []const []const u8 = &.{},
-};
-
 pub const Archetypes = struct {
     pub const Enum = std.meta.FieldEnum(Archetypes);
 
-    adventurer: Description = .{
+    adventurer: g.Description = .{
         .name = "Adventurer",
         .description = &.{
             "You are  forever  in  search of new",
@@ -35,7 +25,7 @@ pub const Archetypes = struct {
             "catacombs.",
         },
     },
-    archeologist: Description = .{
+    archeologist: g.Description = .{
         .name = "Archeologist",
         .description = &.{
             "You live for  discoveries.  Nothing",
@@ -53,7 +43,7 @@ pub const Archetypes = struct {
             "forgotten catacombs.",
         },
     },
-    vandal: Description = .{
+    vandal: g.Description = .{
         .name = "Vandal",
         .description = &.{
             "You  are  a   straightforward   and",
@@ -69,7 +59,7 @@ pub const Archetypes = struct {
             "dangerous opponent in close combat.",
         },
     },
-    rogue: Description = .{
+    rogue: g.Description = .{
         .name = "Rogue",
         .description = &.{
             "You are agile and cunning.Dexterity",
@@ -90,7 +80,7 @@ pub const Archetypes = struct {
 
 pub const Skills = struct {
     pub const Enum = std.meta.FieldEnum(Skills);
-    weapon_mastery: Description = .{
+    weapon_mastery: g.Description = .{
         .name = "Weapon Mastery",
         .description = &.{
             "Possessing this skill  allows  you",
@@ -98,7 +88,7 @@ pub const Skills = struct {
             "and miss less often.",
         },
     },
-    mechanics: Description = .{
+    mechanics: g.Description = .{
         .name = "Mechanics",
         .description = &.{
             "Knowledge in the field of mechanics",
@@ -106,7 +96,7 @@ pub const Skills = struct {
             "traps.",
         },
     },
-    stealth: Description = .{
+    stealth: g.Description = .{
         .name = "Stealth",
         .description = &.{
             "Stealth  is the ability  to  remain",
@@ -115,7 +105,7 @@ pub const Skills = struct {
             "inhabitants of the dungeons.",
         },
     },
-    echo_of_knowledge: Description = .{
+    echo_of_knowledge: g.Description = .{
         .name = "Echo of knowledge",
         .description = &.{
             "The character possesses  an  innate",
@@ -134,7 +124,7 @@ pub const Enemies = struct {
     /// Enum of all enemies types
     pub const Enum = std.meta.FieldEnum(Enemies);
 
-    rat: Description = .{
+    rat: g.Description = .{
         .name = "Rat",
         .description = &.{
             "A big, nasty rat with vicious eyes",
@@ -142,7 +132,7 @@ pub const Enemies = struct {
             "forgotten cellars.",
         },
     },
-    snake: Description = .{
+    snake: g.Description = .{
         .name = "Snake",
         .description = &.{
             "A silent reptile with a venomous",
@@ -150,7 +140,7 @@ pub const Enemies = struct {
             "range.",
         },
     },
-    wolf: Description = .{
+    wolf: g.Description = .{
         .name = "Wolf",
         .description = &.{
             "Wild predator. Its fur is smeared",
@@ -161,21 +151,21 @@ pub const Enemies = struct {
 };
 
 pub const Weapon = struct {
-    arrows: Description = .{
+    arrows: g.Description = .{
         .name = "Arrows",
         .description = &.{
             "Wooden arrows with metal tips.",
             "Standard ammunition for bows.",
         },
     },
-    bolts: Description = .{
+    bolts: g.Description = .{
         .name = "Bolts",
         .description = &.{
             "Wooden arrows with metal tips.",
             "Standard ammunition for bows.",
         },
     },
-    club: Description = .{
+    club: g.Description = .{
         .name = "Club",
         .description = &.{
             "A gnarled piece of wood, scarred",
@@ -183,7 +173,7 @@ pub const Weapon = struct {
             "Cheap and easy to use.",
         },
     },
-    dagger: Description = .{
+    dagger: g.Description = .{
         .name = "Dagger",
         .description = &.{
             "A light,  sharp  blade.  Fast,",
@@ -191,21 +181,21 @@ pub const Weapon = struct {
             "close.",
         },
     },
-    light_crossbow: Description = .{
+    light_crossbow: g.Description = .{
         .name = "Light crossbow",
         .description = &.{
             "Compact crossbow for steady and",
             "accurate targeting.",
         },
     },
-    pickaxe: Description = .{
+    pickaxe: g.Description = .{
         .name = "Pickaxe",
         .description = &.{
             "Heavy tool for mining stone and",
             "ore. Can double as a weapon.",
         },
     },
-    torch: Description = .{
+    torch: g.Description = .{
         .name = "Torch",
         .description = &.{
             "Wooden handle, cloth wrap, burning",
@@ -214,7 +204,7 @@ pub const Weapon = struct {
             "despair.",
         },
     },
-    short_bow: Description = .{
+    short_bow: g.Description = .{
         .name = "Short bow",
         .description = &.{
             "A compact bow. Quick to draw,",
@@ -226,10 +216,7 @@ pub const Weapon = struct {
 
 // All descriptions for potions MUST be declared here
 pub const Potions = struct {
-    /// Enum of all potion types
-    pub const Enum = std.meta.FieldEnum(Potions);
-
-    healing_potion: Description = .{
+    healing_potion: g.Description = .{
         .name = "A healing potion",
         .description = &.{
             "A brew that glows faintly, as if",
@@ -237,14 +224,14 @@ pub const Potions = struct {
             "and your wounds instantly.",
         },
     },
-    poisoning_potion: Description = .{
+    poisoning_potion: g.Description = .{
         .name = "A poison",
         .description = &.{
             "A vial filled with a thick, bitter",
             "liquid that smells of decay.",
         },
     },
-    oil_potion: Description = .{
+    oil_potion: g.Description = .{
         .name = "Oil",
         .description = &.{
             "Glass bottle filled with viscous",
@@ -254,7 +241,7 @@ pub const Potions = struct {
 };
 
 pub const Food = struct {
-    apple: Description = .{
+    apple: g.Description = .{
         .name = "Apple",
         .description = &.{
             "A  simple  apple.  Briefly  eases",
@@ -264,41 +251,7 @@ pub const Food = struct {
     },
 };
 
-pub const Traps = struct {
-    trap: Description = .{
-        .name = "Trap",
-        .description = &.{
-            "Hidden spikes burst from the ground",
-            "impaling anything standing above.",
-        },
-    },
-    fire_trap: Description = .{
-        .name = "Fire trap",
-        .description = &.{
-            "A  sudden  burst  of  flame  erupts",
-            "without      warning,     engulfing",
-            "everything nearby in searing heat.",
-        },
-    },
-    acid_trap: Description = .{
-        .name = "Acid trap",
-        .description = &.{
-            "A  pressurized  jet of  acid bursts",
-            "forth, leaving sizzling  scars.",
-        },
-    },
-    poison_trap: Description = .{
-        .name = "Poison trap",
-        .description = &.{
-            "A   nearly   invisible   mechanism",
-            "releases a cloud of toxic gas that",
-            "slowly poisons its victim.",
-        },
-    },
-    healing_trap: Description = .{ .name = "Healing trap" },
-};
-
-closed_door: Description = .{
+closed_door: g.Description = .{
     .name = "Closed door",
     .description = &.{
         "The  door  stands shut, silent  and",
@@ -306,7 +259,7 @@ closed_door: Description = .{
         "beyond.",
     },
 },
-food_ration: Description = .{
+food_ration: g.Description = .{
     .name = "Food ration",
     .description = &.{
         "A compact bundle of preserved food.",
@@ -315,7 +268,7 @@ food_ration: Description = .{
         "long period.",
     },
 },
-coctail_molotov: Description = .{
+coctail_molotov: g.Description = .{
     .name = "Molotov cocktail",
     .description = &.{
         "A dark glass bottle sealed with a",
@@ -324,7 +277,7 @@ coctail_molotov: Description = .{
         "and flames leap up",
     },
 },
-jacket: Description = .{
+jacket: g.Description = .{
     .name = "Jacket",
     .description = &.{
         "A sturdy, time-worn leather jacket.",
@@ -334,10 +287,10 @@ jacket: Description = .{
         "resistance to fire and heat.",
     },
 },
-ladder_down: Description = .{ .name = "Ladder down" },
-ladder_to_caves: Description = .{ .name = "Entrance to caves" },
-ladder_up: Description = .{ .name = "Ladder up" },
-oil_lamp: Description = .{
+ladder_down: g.Description = .{ .name = "Ladder down" },
+ladder_to_caves: g.Description = .{ .name = "Entrance to caves" },
+ladder_up: g.Description = .{ .name = "Ladder up" },
+oil_lamp: g.Description = .{
     .name = "Oil lamp",
     .description = &.{
         "A simple metal lamp filled with",
@@ -345,7 +298,7 @@ oil_lamp: Description = .{
         "light into the darkest corners.",
     },
 },
-opened_door: Description = .{
+opened_door: g.Description = .{
     .name = "Opened door",
     .description = &.{
         "A  doorway  stands open, offering a",
@@ -353,19 +306,26 @@ opened_door: Description = .{
         "ahead.",
     },
 },
-pile: Description = .{
+pile: g.Description = .{
     .name = "Pile of items",
     .description = &.{
         "A heap of miscellaneous gear.",
         "Search it to see what’s useful.",
     },
 },
-player: Description = .{ .name = "You" },
-scientist: Description = .{ .name = "Scientist" },
-teleport: Description = .{ .name = "Teleport" },
-traider: Description = .{ .name = "Traider" },
-unknown_key: Description = .{ .name = "Unknown" },
-wharf: Description = .{ .name = "Wharf" },
+player: g.Description = .{ .name = "You" },
+scientist: g.Description = .{ .name = "Scientist" },
+teleport: g.Description = .{ .name = "Teleport" },
+traider: g.Description = .{ .name = "Traider" },
+trap: g.Description = .{
+    .name = "Trap",
+    .description = &.{
+        "Hidden spikes burst from the ground",
+        "impaling anything standing above.",
+    },
+},
+unknown_key: g.Description = .{ .name = "Unknown" },
+wharf: g.Description = .{ .name = "Wharf" },
 
 test "All descriptions should have lines with no more than 35 symbols" {
     var itr = g.components.Description.Preset.iterator();

@@ -149,7 +149,7 @@ fn newGame(ptr: *anyopaque, _: usize, _: void) !bool {
 
 pub fn startWithPreset(self: *Self, archetype: g.meta.PlayerArchetype, skills: c.Skills) !void {
     const stats = g.meta.statsFromArchetype(archetype);
-    try self.startGameSession(stats, skills, g.meta.initialHealth(stats.constitution));
+    try self.startGameSession(stats, skills, g.meta.initialHealth(stats.get(.constitution)));
 }
 
 fn startGameSession(self: *Self, stats: c.Stats, skills: c.Skills, health: c.Health) !void {

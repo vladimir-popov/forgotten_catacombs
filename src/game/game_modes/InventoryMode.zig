@@ -168,7 +168,7 @@ const inventory_line_fmt = std.fmt.comptimePrint(
 fn formatInventoryLine(self: *Self, line: *w.TextArea.Line, item: g.Entity) ![]const u8 {
     const sprite = self.session.registry.getUnsafe(item, c.Sprite);
     var buf: [32]u8 = undefined;
-    const name = try g.meta.printActualName(&buf, self.session.journal, item);
+    const name = try g.Description.printActualName(&buf, self.session.journal, item);
     const using = if (item.eql(self.equipment.weapon))
         "weapon"
     else if (item.eql(self.equipment.light))
@@ -199,14 +199,13 @@ fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
         if (self.session.registry.has(item, c.Ammunition)) {
             try area.addOption(self.session.mode_arena.allocator(), "Put to quiver", item, putToQuiver, null);
         }
-        if (self.session.registry.has(item, c.Protection)) {
+        if (self.session.registry.has(item, c.Armor)) {
             try area.addOption(self.session.mode_arena.allocator(), "Wear", item, useAsArmor, null);
         }
-        if (self.session.registry.get(item, c.Consumable)) |consumable| {
-            switch (consumable.consumable_type) {
-                .potion => try area.addOption(self.session.mode_arena.allocator(), "Drink", item, consumeItem, null),
-                .food => try area.addOption(self.session.mode_arena.allocator(), "Eat", item, consumeItem, null),
-            }
+        if (self.session.registry.has(item, c.Potion)) {
+            try area.addOption(self.session.mode_arena.allocator(), "Drink", item, drinkPotion, null);
+        } else if (self.session.registry.has(item, c.Consumable)) {
+            try area.addOption(self.session.mode_arena.allocator(), "Eat", item, consumeFood, null);
         }
     }
     try area.addOption(self.session.mode_arena.allocator(), "Drop", item, dropSelectedItem, null);
@@ -277,18 +276,22 @@ fn putToQuiver(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     return true;
 }
 
-fn consumeItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn consumeFood(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    if (self.session.registry.get(item, c.Consumable)) |consumable| {
-        log.debug("Consume the item {d} {any}. (current equipment: {any})", .{ item.id, consumable, self.equipment });
-        switch (consumable.consumable_type) {
-            .potion => {
-                self.action = .action(.drink, item);
-            },
-            .food => {
-                self.action = .action(.eat, item);
-            },
-        }
+    if (self.session.registry.get(item, c.Consumable)) |food| {
+        log.debug("Consume the item {d} {any}. (current equipment: {any})", .{ item.id, food, self.equipment });
+        self.action = .action(.eat, item);
+        _ = self.inventory.items.remove(item);
+    }
+    try self.updateInventoryTab();
+    return true;
+}
+
+fn drinkPotion(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    if (self.session.registry.get(item, c.Potion)) |potion| {
+        log.debug("Drink the item {d} {any}. (current equipment: {any})", .{ item.id, potion, self.equipment });
+        self.action = .action(.drink, item);
         _ = self.inventory.items.remove(item);
     }
     try self.updateInventoryTab();
@@ -336,7 +339,7 @@ fn updateDropTab(self: *Self, drop: g.Entity) !void {
 fn addDropOption(self: *Self, tab: *w.WindowWithTabs.Tab, item: g.Entity) !void {
     var buffer: w.TextArea.Line = undefined;
     var len = (try std.fmt.bufPrint(&buffer, "{u} ", .{self.session.registry.getUnsafe(item, c.Sprite).codepoint})).len;
-    len += (try g.meta.printActualName(buffer[len..], self.session.journal, item)).len;
+    len += (try g.Description.printActualName(buffer[len..], self.session.journal, item)).len;
     try tab.scrollable_area.content.addOption(
         self.session.mode_arena.allocator(),
         buffer[0..len],

@@ -46,6 +46,18 @@ pub fn addEmptyLine(self: *Self, alloc: std.mem.Allocator) !*Line {
     return line;
 }
 
+pub fn printLine(self: *Self, alloc: std.mem.Allocator, text: []const u8) !void {
+    const line = try self.lines.addOne(alloc);
+    line.* = @splat(' ');
+    @memcpy(line[0..text.len], text);
+}
+
+pub fn printLineFmt(self: *Self, alloc: std.mem.Allocator, comptime fmt: []const u8, args: anytype) !void {
+    const line = try self.lines.addOne(alloc);
+    line.* = @splat(' ');
+    _ = try std.fmt.bufPrint(line, fmt, args);
+}
+
 // for compatibility with required interface used by the ModalWindow
 pub fn handleButton(_: *Self, _: g.Button) !bool {
     return false;

@@ -39,7 +39,7 @@ pub fn player(
         .sprite = .{ .codepoint = cp.human },
         .stats = stats,
         .wallet = .{ .money = rand.uintAtMost(u16, 50) + 100 },
-        .weapon = .melee(.tricky, .effects(.{ .physical = .range(1, 3) })),
+        .weapon = .melee(.tricky, .range(1, 3)),
     };
 }
 
@@ -126,17 +126,11 @@ pub fn trader(
     };
 }
 
-pub fn trap(place: p.Point, power: u3, effect: c.Effects.Type) c.Components {
+pub fn trap(place: p.Point, power: u2) c.Components {
     return .{
-        .description = .{ .preset = switch (effect) {
-            .physical => .trap,
-            .fire => .fire_trap,
-            .acid => .acid_trap,
-            .poison => .poison_trap,
-            .heal => .healing_trap,
-        } },
+        .description = .{ .preset = .trap },
         .sprite = .{ .codepoint = cp.trap },
-        .trap = .{ .power = power, .effect = effect },
+        .trap = .{ .power = power },
         .position = .{ .place = place, .zorder = .item },
     };
 }

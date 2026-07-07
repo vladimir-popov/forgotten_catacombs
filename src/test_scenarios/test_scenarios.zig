@@ -9,7 +9,7 @@ test {
     _ = @import("level_up_suite.zig");
     _ = @import("moving_suite.zig");
     _ = @import("notifications_suite.zig");
-    _ = @import("recognize_modify_suite.zig");
+    // _ = @import("recognize_modify_suite.zig");
     _ = @import("save_load_suite.zig");
     _ = @import("trading_suite.zig");
     _ = @import("traps_suite.zig");

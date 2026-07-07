@@ -39,7 +39,7 @@ pub const Sprite = struct {
 };
 
 pub const Description = struct {
-    pub const Preset = g.utils.Preset(g.descriptions.Description, g.descriptions);
+    pub const Preset = g.utils.Preset(g.Description, g.descriptions);
 
     preset: Preset.Tag,
 };
@@ -221,6 +221,84 @@ pub const Ammunition = struct {
     }
 };
 
+// THESE ARE NOT COMPONENTS
+pub const Resistance = enum { weak, normal, resist };
+
+/// Bonuses for a weapon, or weaknesses/resistances for am armor.
+pub const ElementalEffect = enum { fire, acid, poison };
+
+/// The enum with all possible modification types.
+pub const Modification = g.utils.MergeEnums(.{
+    ElementalEffect,
+    Stats.Stat,
+    enum { speed, attack },
+});
+
+/// A wrapper with additional methods around the std.enums.EnumSet(Modification)
+pub const Modifications = struct {
+    items: std.enums.EnumSet(Modification),
+
+    inline fn cast(modification: anytype) Modification {
+        const idx_shift = switch (@TypeOf(modification)) {
+            Modification, ElementalEffect => 0,
+            Stats.Stat => std.enums.values(ElementalEffect).len,
+            enum { speed, attack } => std.enums.values(ElementalEffect).len + std.enums.values(Stats.Stat).len,
+            else => @compileError("Unexpected modification type"),
+        };
+        const idx = @intFromEnum(modification) + idx_shift;
+        return @enumFromInt(idx);
+    }
+
+    pub fn initEmpty() Modifications {
+        return .{ .items = .initEmpty() };
+    }
+
+    pub fn contains(self: Modifications, modification: anytype) bool {
+        return self.items.contains(cast(modification));
+    }
+
+    pub fn add(self: *Modifications, modification: anytype) void {
+        self.items.insert(cast(modification));
+    }
+
+    pub fn remove(self: *Modifications, modification: anytype) void {
+        self.items.remove(cast(modification));
+    }
+
+    pub fn iterator(self: Modifications) std.enums.EnumSet(Modification).Iterator {
+        return self.items.iterator();
+    }
+};
+//
+
+pub const Improvements = struct {
+    modifications: Modifications,
+
+    pub const proportions: [std.enums.values(Modification).len]u8 = blk: {
+        var ps: [std.enums.values(Modification).len]u8 = @splat(5);
+        ps[@intFromEnum(Modification.fire)] = 10;
+        ps[@intFromEnum(Modification.poison)] = 10;
+        ps[@intFromEnum(Modification.acid)] = 10;
+        ps[@intFromEnum(Modification.speed)] = 3;
+        ps[@intFromEnum(Modification.attack)] = 3;
+        break :blk ps;
+    };
+};
+
+pub const Breakages = struct {
+    modifications: Modifications,
+
+    pub const proportions: [std.enums.values(Modification).len]u8 = blk: {
+        var ps: [std.enums.values(Modification).len]u8 = @splat(5);
+        ps[@intFromEnum(Modification.fire)] = 10;
+        ps[@intFromEnum(Modification.poison)] = 10;
+        ps[@intFromEnum(Modification.acid)] = 10;
+        ps[@intFromEnum(Modification.speed)] = 7;
+        ps[@intFromEnum(Modification.attack)] = 7;
+        break :blk ps;
+    };
+};
+
 pub const Weapon = struct {
     /// The damage depends on the weapon class
     pub const Class = enum {
@@ -231,130 +309,47 @@ pub const Weapon = struct {
         /// The intelligence is used
         ancient,
     };
+
     class: Class,
     /// A type of required ammunition.
     /// The null means that the weapon is melee.
     ammunition_type: ?Ammunition.Type,
     max_distance: u8,
-    damage: Effects,
+    damage: p.Range(u8),
+    // Always known effects like the `fire` on a torch
+    effects: std.EnumSet(ElementalEffect) = .{},
 
-    pub fn melee(class: Class, damage: Effects) Weapon {
+    pub fn melee(class: Class, damage: p.Range(u8)) Weapon {
         return .{ .max_distance = 1, .ammunition_type = null, .class = class, .damage = damage };
     }
 
-    pub fn ranged(max_distance: u8, ammunition_type: Ammunition.Type, class: Class, damage: Effects) Weapon {
+    pub fn meleeWithEffect(class: Class, damage: p.Range(u8), effect: ElementalEffect) Weapon {
+        var effs: std.EnumSet(ElementalEffect) = .{};
+        effs.insert(effect);
+        return .{ .max_distance = 1, .ammunition_type = null, .class = class, .damage = damage, .effects = effs };
+    }
+
+    pub fn ranged(max_distance: u8, ammunition_type: Ammunition.Type, class: Class, damage: p.Range(u8)) Weapon {
         std.debug.assert(max_distance > 1);
         return .{ .max_distance = max_distance, .ammunition_type = ammunition_type, .class = class, .damage = damage };
     }
 };
 
-// THIS IS NOT A COMPONENT!
-pub const Effects = struct {
-    pub const Type = enum { physical, fire, acid, poison, heal };
-    pub const TypesCount = @typeInfo(Type).@"enum".fields.len;
-    /// Example:
-    /// ```
-    /// .{ .fire = .{ .min = 0, .max = 3 } };
-    /// ```
-    pub const InitStruct = std.enums.EnumFieldStruct(Type, ?p.Range(u8), @as(?p.Range(u8), null));
+pub const Armor = struct {
+    pub const zeros = Armor{ .protection = p.Range(u8).range(0, 0) };
 
-    pub const no_effects: Effects = .{ .values = .initFull(.empty) };
-
-    pub const proportions: [TypesCount]u8 = blk: {
-        var arr: [TypesCount]u8 = undefined;
-        @memset(&arr, 0);
-        arr[@intFromEnum(Type.physical)] = 20;
-        arr[@intFromEnum(Type.fire)] = 8;
-        arr[@intFromEnum(Type.poison)] = 10;
-        arr[@intFromEnum(Type.acid)] = 5;
-        break :blk arr;
-    };
-
-    values: std.EnumMap(Type, p.Range(u8)),
-
-    /// Example:
-    /// ```
-    /// .init(.{ .fire = .{ .min = 0, .max = 3 } });
-    /// ```
-    pub fn effects(values: std.enums.EnumFieldStruct(Type, ?p.Range(u8), @as(?p.Range(u8), null))) Effects {
-        return .{ .values = .init(values) };
-    }
-
-    /// Adds the modificator to min and max values of the effect with specified type.
-    pub fn modify(self: *Effects, effect_type: Type, modificator: i8) void {
-        if (self.values.getPtr(effect_type)) |values| {
-            values.min = @max(0, @as(i8, @intCast(values.min)) + modificator);
-            values.max = @max(0, @as(i8, @intCast(values.max)) + modificator);
-        } else if (modificator > 0) {
-            self.values.put(effect_type, .range(0, @intCast(modificator)));
-        }
-    }
-
-    pub fn chooseRandomType(rand: std.Random) Type {
-        return @enumFromInt(rand.weightedIndex(u8, &proportions));
-    }
-
-    pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
-        _ = try writer.write("Effects{ ");
-        const effect_types = std.enums.values(Effects.Type);
-        for (effect_types) |effect_type| {
-            try writer.print("{t}={any}, ", .{ effect_type, self.values.get(effect_type) });
-        }
-        _ = try writer.write(" }");
-    }
+    protection: p.Range(u8),
 };
 
-pub const Protection = struct {
-    pub const zeros: Protection = .{ .resistance = .no_effects };
-
-    resistance: Effects,
-
-    pub fn init(values: Effects.InitStruct) Protection {
-        return .{ .resistance = .effects(values) };
-    }
-};
-
-pub const Modification = struct {
-    modificators: std.EnumMap(Effects.Type, i8),
-
-    /// Example:
-    /// ```
-    /// .init(.{ .fire = -3 });
-    /// ```
-    pub fn init(modificators: std.enums.EnumFieldStruct(Effects.Type, ?i8, @as(?i8, null))) Modification {
-        return .{ .modificators = .init(modificators) };
-    }
-
-    pub fn applyTo(self: *Modification, effects: *Effects) void {
-        var itr = self.modificators.iterator();
-        while (itr.next()) |modificator| {
-            effects.modify(modificator.key, modificator.value.*);
-        }
-    }
-
-    pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
-        _ = try writer.write("Modificators{ ");
-        const effect_types = std.enums.values(Effects.Type);
-        for (effect_types) |effect_type| {
-            try writer.print("{t}={d}, ", .{ effect_type, self.modificators.get(effect_type) orelse 0 });
-        }
-        _ = try writer.write(" }");
-    }
-};
-
+/// The property of a food with calories.
 pub const Consumable = struct {
-    pub const Type = enum { food, potion };
-    consumable_type: Type,
     calories: u16,
-    effects: Effects = .no_effects,
+};
 
-    pub fn food(calories: u16) Consumable {
-        return .{ .consumable_type = .food, .calories = calories };
-    }
-
-    pub fn potion(effects: Effects.InitStruct, calories: u16) Consumable {
-        return .{ .consumable_type = .potion, .calories = calories, .effects = .effects(effects) };
-    }
+pub const Potion = enum {
+    healing,
+    poison,
+    oil,
 };
 
 pub const Hunger = struct {
@@ -520,15 +515,18 @@ pub const Skills = struct {
 };
 
 pub const Stats = struct {
+    pub const Stat = enum {
+        strength,
+        dexterity,
+        perception,
+        intelligence,
+        constitution,
+    };
     pub const zeros: Stats = .init(0, 0, 0, 0, 0);
 
-    strength: i4,
-    dexterity: i4,
-    perception: i4,
-    intelligence: i4,
-    constitution: i4,
+    values: std.EnumMap(Stat, i4),
 
-    pub fn init(
+    pub inline fn init(
         strength: i4,
         dexterity: i4,
         perception: i4,
@@ -536,30 +534,45 @@ pub const Stats = struct {
         constitution: i4,
     ) Stats {
         return .{
-            .strength = strength,
-            .dexterity = dexterity,
-            .perception = perception,
-            .intelligence = intelligence,
-            .constitution = constitution,
+            .values = .init(.{
+                .strength = strength,
+                .dexterity = dexterity,
+                .perception = perception,
+                .intelligence = intelligence,
+                .constitution = constitution,
+            }),
         };
+    }
+
+    pub inline fn get(self: Stats, key: Stat) i4 {
+        return self.values.get(key) orelse 0;
+    }
+
+    pub fn add(self: *Stats, stat: Stat, value: i4) void {
+        const old = self.get(stat);
+        self.values.put(stat, old + value);
+    }
+
+    pub fn merge(self: *Stats, other: Stats) void {
+        for (std.enums.values(Stat)) |stat| {
+            const v = other.get(stat);
+            self.add(stat, v);
+        }
     }
 };
 
 pub const Trap = struct {
     /// The likelihood of detecting and disarming the trap depend on how powerful the trap is.
-    /// The trap with power 0 is always visible and easy to disarm.
-    power: u3,
-    effect: Effects.Type,
+    power: u2,
     /// The turn when its visibility was checked last time
     last_checked_turn: u32 = 0,
 
-    pub fn damage(self: *const Trap, target_max_health: u8) p.Range(u8) {
-        var x: u16 = self.power;
-        x = (1 + x) * target_max_health;
-        x = x / 10;
-        return p.Range(u8){
-            .min = target_max_health / 10,
-            .max = @intCast(x),
+    pub fn damagePercent(self: *const Trap) p.Range(u8) {
+        return switch (self.power) {
+            0 => p.Range(u8).range(5, 8),
+            1 => p.Range(u8).range(10, 15),
+            2 => p.Range(u8).range(18, 25),
+            3 => p.Range(u8).range(30, 45),
         };
     }
 };
@@ -571,6 +584,8 @@ pub const Weight = struct {
 pub const Components = struct {
     ammunition: ?Ammunition = null,
     animation: ?Animation = null,
+    armor: ?Armor = null,
+    breakages: ?Breakages = null,
     consumable: ?Consumable = null,
     description: ?Description, // must be provided for every entity
     door: ?Door = null,
@@ -578,15 +593,15 @@ pub const Components = struct {
     experience: ?Experience = null,
     health: ?Health = null,
     hunger: ?Hunger = null,
+    improvements: ?Improvements = null,
     initiative: ?Initiative = null,
     inventory: ?Inventory = null,
     ladder: ?Ladder = null,
     level_up: ?LevelUp = null,
-    modification: ?Modification = null,
     pile: ?Pile = null,
     position: ?Position = null,
+    potion: ?Potion = null,
     price: ?Price = null,
-    protection: ?Protection = null,
     rarity: ?Rarity = null,
     regeneration: ?Regeneration = null,
     shop: ?Shop = null,

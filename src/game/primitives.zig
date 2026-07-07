@@ -174,6 +174,10 @@ pub fn Range(comptime T: type) type {
             std.debug.assert(min <= max);
             return .{ .min = min, .max = max };
         }
+
+        pub fn choose(self: @This(), rand: std.Random) T {
+            return rand.intRangeAtMost(T, self.min, self.max);
+        }
     };
 }
 

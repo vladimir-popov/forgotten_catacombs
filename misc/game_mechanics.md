@@ -38,9 +38,6 @@ Dungeon-level constants used across multiple systems:
 | `F+`     | fire resistance                        |
 | `A+`     | acid resistance                        |
 | `P+`     | poison resistance                      |
-| `F!`     | fire immunity                          |
-| `A!`     | acid immunity                          |
-| `P!`     | poison immunity                        |
 | `SPD-`   | low movement speed                     |
 | `SPD+`   | high movement speed                    |
 | `ATK-`   | low attack speed                       |
@@ -198,9 +195,8 @@ Damage:
 physical_damage = base_damage x (1 +  + 0.05 × STR + 0.1 x stat)
 
 damage = max(
-    poison_min,
-    physical_damage x fire_multiplier
-        - enemy_armor x acid_factor
+    poison_multiplier x base_damage,
+    physical_damage x fire_multiplier - enemy_armor x acid_factor
 )
 ```
 
@@ -215,11 +211,12 @@ poison_min  = minimum additional poison damage
 
 Effect multipliers:
 
-| Target relation | `fire_multiplier` | `acid_factor` |
-| --------------- | ----------------- | ------------- |
-| Normal          | `1.10`            | `0.85`        |
-| Weak            | `1.25`            | `0.60`        |
-| Resistant       | `1.00`            | `1.00`        |
+| Target relation | `fire_multiplier` | `acid_factor` | `poison_multiplier` |
+| --------------- | ----------------- | ------------- | ------------------- |
+| Weak            | `1.25`            | `0.60`        | `0.30`              |
+| Normal          | `1.10`            | `0.85`        | `0.20`              |
+| Resistant       | `1.00`            | `1.00`        | `0.0`               |
+
 
 Enemy damage roles:
 

@@ -186,34 +186,17 @@ const line_fmt = std.fmt.comptimePrint(
 fn formatLine(self: *Self, buffer: []u8, item: g.Entity, price: u16) ![]const u8 {
     const sprite = self.session.registry.getUnsafe(item, c.Sprite);
     var name_buf: [24]u8 = undefined;
-    const name = try g.meta.printActualName(&name_buf, self.session.journal, item);
+    const name = try g.Description.printActualName(&name_buf, self.session.journal, item);
     return try std.fmt.bufPrint(buffer, line_fmt, .{ sprite.codepoint, name, price });
 }
 
-fn calculateModificationPrice(self: Self, item: g.Entity, multiplayer: f32) u16 {
-    var price: u16 = BASE_MODIFICATION_PRICE;
-    if (self.session.registry.get(item, c.Rarity)) |rarity| {
-        switch (rarity.*) {
-            .rare => price = 1.5 * BASE_MODIFICATION_PRICE,
-            .very_rare => price *|= 2,
-            .legendary => price *|= 3,
-            .unique => price *|= 5,
-            else => {},
-        }
-    }
-    if (self.session.registry.get(item, c.Modification)) |modification| {
-        var itr = modification.modificators.iterator();
-        while (itr.next()) |entry| {
-            if (entry.value.* != 0)
-                price +|= BASE_MODIFICATION_PRICE;
-        }
-    }
-    const pf: f32 = @floatFromInt(price);
-    return @intFromFloat(multiplayer * pf);
+fn calculateModificationPrice(_: Self, _: g.Entity, _: f32) u16 {
+    // TODO implement the new modification pricing
+    return 100;
 }
 
 inline fn canBeModified(self: *Self, item: g.Entity) bool {
-    return self.session.registry.has(item, c.Weapon) or self.session.registry.has(item, c.Protection);
+    return self.session.registry.has(item, c.Weapon) or self.session.registry.has(item, c.Armor);
 }
 
 fn recognizeDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
@@ -232,10 +215,10 @@ fn recognizeItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     if (wallet.money >= RECOGNITION_PRICE) {
         if (self.session.registry.has(item, c.Weapon))
             try self.session.journal.markWeaponAsKnown(item)
-        else if (self.session.registry.has(item, c.Protection))
+        else if (self.session.registry.has(item, c.Armor))
             try self.session.journal.markArmorAsKnown(item)
-        else if (g.meta.getPotionType(&self.session.registry, item)) |potion_type|
-            try self.session.journal.markPotionAsKnown(potion_type);
+        else if (self.session.registry.get(item, c.Potion)) |potion|
+            try self.session.journal.markPotionAsKnown(potion.*);
 
         wallet.money -= RECOGNITION_PRICE;
         try self.updateTabs();
@@ -340,12 +323,10 @@ fn modifyManually(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const options = &self.actions_window.?.scrollable_area.content;
     log.debug("Show the list of possible effects", .{});
     options.clearRetainingCapacity();
-    for (0..c.Effects.TypesCount) |idx| {
-        const effect_type: c.Effects.Type = @enumFromInt(idx);
-        if (effect_type == .heal) continue;
+    for (std.enums.values(c.Modification)) |modification| {
         try options.addOption(
             self.session.mode_arena.allocator(),
-            @tagName(effect_type),
+            @tagName(modification),
             item,
             modifyManuallyEffect,
             null,
@@ -357,36 +338,39 @@ fn modifyManually(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
 
 fn modifyManuallyEffect(ptr: *anyopaque, idx: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    const effect_type: c.Effects.Type = @enumFromInt(idx);
-    try self.modify(item, 0, effect_type, self.calculateModificationPrice(item, MANUAL_MULTIPLAYER));
+    const modification: c.Modification = @enumFromInt(idx);
+    try self.modify(item, 0, modification, self.calculateModificationPrice(item, MANUAL_MULTIPLAYER));
     return true;
 }
 
-fn modify(self: *Self, item: g.Entity, worsen_chance: u8, effect_type: ?c.Effects.Type, price: u16) !void {
+fn modify(self: *Self, item: g.Entity, breakage_chance: u8, modification: ?c.Modification, price: u16) !void {
+    _ = item;
+    _ = breakage_chance;
+    _ = modification;
     const wallet = self.session.registry.getUnsafe(self.session.player, c.Wallet);
     if (wallet.money >= price) {
-        var prng = std.Random.DefaultPrng.init(self.session.seed);
-        const rand = prng.random();
-        const range: p.Range(i8) = if (worsen_chance > 0 and rand.uintAtMost(u8, 100) < worsen_chance)
-            .range(-5, -1)
-        else
-            .range(1, 5);
-        if (self.session.registry.get(item, c.Weapon)) |weapon| {
-            const codepoint: g.Codepoint = if (weapon.ammunition_type) |_|
-                g.codepoints.weapon_ranged_unknown
-            else
-                g.codepoints.weapon_melee_unknown;
-            try g.meta.modifyEntity(
-                &self.session.registry,
-                prng.random(),
-                item,
-                codepoint,
-                range.min,
-                range.max,
-                effect_type,
-            );
-            try self.session.journal.forgetWeapon(item);
-        }
+        // var prng = std.Random.DefaultPrng.init(self.session.seed);
+        // const rand = prng.random();
+        // const range: p.Range(i8) = if (breakage_chance > 0 and rand.uintAtMost(u8, 100) < breakage_chance)
+        //     .range(-5, -1)
+        // else
+        //     .range(1, 5);
+        // if (self.session.registry.get(item, c.Weapon)) |weapon| {
+        //     const codepoint: g.Codepoint = if (weapon.ammunition_type) |_|
+        //         g.codepoints.weapon_ranged_unknown
+        //     else
+        //         g.codepoints.weapon_melee_unknown;
+        //     try g.meta.modifyEntity(
+        //         &self.session.registry,
+        //         prng.random(),
+        //         item,
+        //         codepoint,
+        //         range.min,
+        //         range.max,
+        //         effect_type,
+        //     );
+        //     try self.session.journal.forgetWeapon(item);
+        // }
         wallet.money -= price;
         // TODO: Modify an armor
         try self.updateTabs();

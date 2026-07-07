@@ -130,14 +130,15 @@ pub fn entityDescription(
 ) !ModalWindow(TextArea) {
     var area: TextArea = .empty;
     if (session.player.id == entity.id) {
-        try g.meta.describePlayer(alloc, session.journal, entity, &area);
+        try g.Description.describePlayer(alloc, session.journal, entity, &area);
     } else {
-        try g.meta.describeEntity(alloc, session.journal, entity, &area);
+        const is_equipped = g.meta.isEquipped(&session.registry, session.player, entity);
+        try g.Description.describeEntity(alloc, session.journal, entity, is_equipped, &area);
     }
     // A modal window with an entity description should always have the maximal possible width,
     // because all descriptions have fixed length lines
     var window = w.ModalWindow(TextArea).defaultModalWindow(area);
-    window.title_len = (try g.meta.printActualName(&window.title_buffer, session.journal, entity)).len;
+    window.title_len = (try g.Description.printActualName(&window.title_buffer, session.journal, entity)).len;
     return window;
 }
 

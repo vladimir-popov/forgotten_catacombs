@@ -1,4 +1,4 @@
-//! Contains method to generate random entities
+//! Contains methods to generate random entities
 const std = @import("std");
 const g = @import("../game_pkg.zig");
 const c = g.components;
@@ -21,12 +21,8 @@ pub fn generateEnemy(registry: *g.Registry, rand: std.Random, depth: u8) !g.Enti
     return try registry.addNewEntity(enemy);
 }
 
-pub fn generateTrap(registry: *g.Registry, rand: std.Random, place: p.Point, depth: u8) !g.Entity {
-    var power: u3 = rand.int(u3);
-    power +|= @intCast(@min(5, depth / 3));
-    return try registry.addNewEntity(
-        g.entities.trap(place, power, c.Effects.chooseRandomType(rand)),
-    );
+pub fn generateTrap(registry: *g.Registry, rand: std.Random, place: p.Point) !g.Entity {
+    return try registry.addNewEntity(g.entities.trap(place, rand.int(u2)));
 }
 
 /// Generates optional reward for killing an enemy.
@@ -54,18 +50,32 @@ pub fn generateItem(registry: *g.Registry, rand: std.Random, proportions: []cons
     const entity = try registry.addNewEntity(item.*);
     // Randomly modify a weapon:
     if (registry.get(entity, c.Weapon)) |weapon| {
-        if (rand.uintAtMost(u8, 100) < 15) {
+        const modification_chance = rand.uintAtMost(u8, 100);
+        if (modification_chance < 15) {
             const codepoint: g.Codepoint = if (weapon.ammunition_type) |_|
                 g.codepoints.weapon_ranged_unknown
             else
                 g.codepoints.weapon_melee_unknown;
-            try g.meta.modifyEntity(registry, rand, entity, codepoint, -5, 5, null);
+            try g.meta.improveItem(registry, rand, entity, codepoint, null);
+        }
+        if (modification_chance > 85) {
+            const codepoint: g.Codepoint = if (weapon.ammunition_type) |_|
+                g.codepoints.weapon_ranged_unknown
+            else
+                g.codepoints.weapon_melee_unknown;
+            try g.meta.breakItem(registry, rand, entity, codepoint, null);
         }
     }
     // Randomly modify an armor:
-    else if (registry.has(entity, c.Protection)) {
+    else if (registry.has(entity, c.Armor)) {
         if (rand.uintAtMost(u8, 100) < 15) {
-            try g.meta.modifyEntity(registry, rand, entity, g.codepoints.armor_unknown, -5, 5, null);
+            const modification_chance = rand.uintAtMost(u8, 100);
+            if (modification_chance < 15) {
+                try g.meta.improveItem(registry, rand, entity, g.codepoints.armor_unknown, null);
+            }
+            if (modification_chance > 85) {
+                try g.meta.breakItem(registry, rand, entity, g.codepoints.armor_unknown, null);
+            }
         }
     }
     return entity;

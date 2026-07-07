@@ -4,6 +4,7 @@ pub const BitMap = @import("BitMap.zig").BitMap;
 pub const Bresenham = @import("Bresenham.zig");
 pub const DijkstraMap = @import("DijkstraMap.zig");
 pub const EntitiesSet = @import("EntitiesSet.zig");
+pub const MergeEnums = @import("MergeEnums.zig").MergeEnums;
 pub const Preset = @import("Preset.zig").Preset;
 pub const Set = @import("Set.zig").Set;
 pub const SegmentedList = @import("segmented_list.zig").SegmentedList;

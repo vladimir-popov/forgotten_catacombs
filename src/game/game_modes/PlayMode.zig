@@ -239,11 +239,11 @@ fn drawInfoBar(self: *const Self) !void {
             return;
         } else {
             var buf: [32]u8 = undefined;
-            try self.session.render.drawInfo(try g.meta.printActualName(&buf, self.session.journal, entity));
+            try self.session.render.drawInfo(try g.Description.printActualName(&buf, self.session.journal, entity));
         }
     } else if (qa.tag == .pickup) {
         var buf: [32]u8 = undefined;
-        try self.session.render.drawInfo(try g.meta.printActualName(&buf, self.session.journal, qa.payload.pickup));
+        try self.session.render.drawInfo(try g.Description.printActualName(&buf, self.session.journal, qa.payload.pickup));
     } else if (self.session.registry.get(self.session.player, c.Hunger)) |hunger| {
         // Draw the hunger level
         switch (hunger.level()) {
@@ -348,11 +348,11 @@ fn handleInput(self: *Self) !bool {
             .recognize => |entity| {
                 if (g.meta.getEnemyType(&self.session.registry, entity)) |enemy_type| {
                     try self.session.journal.markEnemyAsKnown(enemy_type);
-                } else if (g.meta.getPotionType(&self.session.registry, entity)) |potion_type| {
-                    try self.session.journal.markPotionAsKnown(potion_type);
+                } else if (self.session.registry.get(entity, c.Potion)) |potion| {
+                    try self.session.journal.markPotionAsKnown(potion.*);
                 } else if (self.session.registry.has(entity, c.Weapon)) {
                     try self.session.journal.markWeaponAsKnown(entity);
-                } else if (self.session.registry.has(entity, c.Protection)) {
+                } else if (self.session.registry.has(entity, c.Armor)) {
                     try self.session.journal.markArmorAsKnown(entity);
                 }
             },

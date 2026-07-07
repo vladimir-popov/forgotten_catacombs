@@ -108,7 +108,7 @@ fn addTrapInFrontOfPlayer(test_session: *TestSession) !g.Entity {
     // Prepare a game session:
     const pp = test_session.player.position().place.movedTo(.up);
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
-    const trap_entity = try test_session.session.level.addRandomTrap(prng.random(), pp, 0);
+    const trap_entity = try test_session.session.level.addRandomTrap(prng.random(), pp);
 
     // The initial game state:
     try test_session.tick(.{});

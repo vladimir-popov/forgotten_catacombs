@@ -17,7 +17,7 @@ oil_lamp: c.Components = archetype.item(.{
 
 pub const Armor = struct {
     jacket: c.Components = archetype.armor(.{
-        .protection = .init(.{ .physical = .range(0, 5), .fire = .range(0, 2) }),
+        .armor = .{ .protection = .range(0, 5) },
         .description = .{ .preset = .jacket },
         .rarity = .common,
         .tier = .{ .value = 1 },
@@ -55,7 +55,7 @@ pub const Weapons = struct {
         .sprite = .{ .codepoint = cp.weapon_melee },
         .weight = .{ .value = 80 },
         .price = .{ .value = 42 },
-        .weapon = .melee(.primitive, .effects(.{ .physical = .range(5, 8) })),
+        .weapon = .melee(.primitive, .range(5, 8)),
     }),
 
     light_crossbow: c.Components = archetype.weapon(.{
@@ -64,7 +64,7 @@ pub const Weapons = struct {
         .rarity = .common,
         .tier = .{ .value = 1 },
         .sprite = .{ .codepoint = cp.weapon_ranged },
-        .weapon = .ranged(5, .bolts, .primitive, .effects(.{ .physical = .range(2, 3) })),
+        .weapon = .ranged(5, .bolts, .primitive, .range(2, 3)),
         .weight = .{ .value = 70 },
     }),
 
@@ -75,7 +75,7 @@ pub const Weapons = struct {
         .sprite = .{ .codepoint = cp.weapon_melee },
         .weight = .{ .value = 100 },
         .price = .{ .value = 25 },
-        .weapon = .melee(.primitive, .effects(.{ .physical = .range(2, 4) })),
+        .weapon = .melee(.primitive, .range(2, 4)),
     }),
 
     torch: c.Components = archetype.weapon(.{
@@ -86,7 +86,7 @@ pub const Weapons = struct {
         .weight = .{ .value = 20 },
         .source_of_light = .{ .radius = 3 },
         .price = .{ .value = 5 },
-        .weapon = .melee(.primitive, .effects(.{ .physical = .range(1, 1), .fire = .range(1, 2) })),
+        .weapon = .meleeWithEffect(.primitive, .range(1, 1), .fire),
     }),
 
     poisoned_dagger: c.Components = archetype.weapon(.{
@@ -96,7 +96,7 @@ pub const Weapons = struct {
         .sprite = .{ .codepoint = cp.weapon_melee },
         .weight = .{ .value = 50 },
         .price = .{ .value = 30 },
-        .weapon = .melee(.tricky, .effects(.{ .physical = .range(2, 3), .poison = .range(1, 3) })),
+        .weapon = .meleeWithEffect(.tricky, .range(2, 3), .poison),
     }),
 
     short_bow: c.Components = archetype.weapon(.{
@@ -105,7 +105,7 @@ pub const Weapons = struct {
         .rarity = .common,
         .tier = .{ .value = 1 },
         .sprite = .{ .codepoint = cp.weapon_ranged },
-        .weapon = .ranged(5, .arrows, .tricky, .effects(.{ .physical = .range(2, 3) })),
+        .weapon = .ranged(5, .arrows, .tricky, .range(2, 3)),
         .weight = .{ .value = 50 },
     }),
 };
@@ -118,7 +118,7 @@ pub const Food = struct {
         .sprite = .{ .codepoint = cp.food },
         .weight = .{ .value = 5 },
         .price = .{ .value = 10 },
-        .consumable = .{ .consumable_type = .food, .calories = 350 },
+        .consumable = .{ .calories = 350 },
     }),
 
     food_ration: c.Components = archetype.food(.{
@@ -128,7 +128,7 @@ pub const Food = struct {
         .sprite = .{ .codepoint = cp.food },
         .weight = .{ .value = 50 },
         .price = .{ .value = 50 },
-        .consumable = .{ .consumable_type = .food, .calories = 1250 },
+        .consumable = .{ .calories = 1250 },
     }),
 };
 
@@ -140,7 +140,7 @@ pub const Potions = struct {
         .sprite = .{ .codepoint = cp.potion },
         .weight = .{ .value = 10 },
         .price = .{ .value = 50 },
-        .consumable = .potion(.{ .heal = .range(20, 25) }, 50),
+        .potion = .healing,
     }),
 
     poisoning_potion: c.Components = archetype.potion(.{
@@ -150,7 +150,7 @@ pub const Potions = struct {
         .sprite = .{ .codepoint = cp.potion },
         .weight = .{ .value = 10 },
         .price = .{ .value = 30 },
-        .consumable = .potion(.{ .poison = .range(10, 20) }, 10),
+        .potion = .poison,
     }),
 
     oil_potion: c.Components = archetype.potion(.{
@@ -160,6 +160,6 @@ pub const Potions = struct {
         .sprite = .{ .codepoint = cp.potion },
         .weight = .{ .value = 10 },
         .price = .{ .value = 30 },
-        .consumable = .potion(.{ .poison = .range(20, 25) }, 100),
+        .potion = .oil,
     }),
 };

@@ -188,16 +188,16 @@ fn initSkillsStep(
 }
 
 fn initConfirmStep(self: *Self, stats: c.Stats, skills: c.Skills) !void {
-    const health: c.Health = g.meta.initialHealth(stats.constitution);
+    const health: c.Health = g.meta.initialHealth(stats.values.getAssertContains(.constitution));
     const alloc = self.arena.allocator();
     var text_area: w.TextArea = .empty;
-    try g.meta.describeProgression(alloc, 1, 0, &text_area);
+    try g.Description.describeProgression(alloc, 1, 0, &text_area);
     _ = try text_area.addEmptyLine(alloc);
-    try g.meta.describeHealth(alloc, &health, &text_area);
+    try g.Description.describeHealth(alloc, &health, &text_area);
     _ = try text_area.addEmptyLine(alloc);
-    try g.meta.describeSkills(alloc, &skills, &text_area);
+    try g.Description.describeSkills(alloc, &skills, &text_area);
     _ = try text_area.addEmptyLine(alloc);
-    try g.meta.describeStats(alloc, &stats, &text_area);
+    try g.Description.describeStats(alloc, &stats, &text_area);
     self.step = .{ .confirm = .init(text_area, stats, skills, health) };
 }
 
@@ -282,7 +282,7 @@ pub fn handleButton(self: *Self, btn: g.Button, render: g.Render) anyerror!?stru
     return null;
 }
 
-fn showDescription(self: *Self, description: *const g.descriptions.Description) !void {
+fn showDescription(self: *Self, description: *const g.Description) !void {
     var area: w.TextArea = .empty;
     for (description.description) |descr_line| {
         const line = try area.addEmptyLine(self.arena.allocator());

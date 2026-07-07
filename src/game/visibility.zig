@@ -40,7 +40,7 @@ pub fn isEntityVisibile(
                 trap.last_checked_turn = current_turn;
             }
 
-            const perception: f32 = u.ff32(journal.registry.getUnsafe(player, c.Stats).perception);
+            const perception: f32 = u.ff32(journal.registry.getUnsafe(player, c.Stats).get(.perception));
             const player_place = journal.registry.getUnsafe(player, c.Position).place;
             const distance: f32 = player_place.distanceTo(place);
             const pw: f32 = @floatFromInt(trap.power);

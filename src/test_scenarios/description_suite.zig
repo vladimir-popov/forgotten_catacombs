@@ -19,8 +19,8 @@ test "Describe an item" {
         \\│ despair.                            ░│
         \\│                                     ░│
         \\│ This is a primitive weapon.         ░│
-        \\│ Damage:                             ░│
-        \\│   physical 1                        ░│
+        \\│ Damage: 2-3                         ░│
+        \\│                                     ░│
         \\└──────────────────────────────────────┘
     , .game_area);
 }
@@ -42,9 +42,9 @@ test "Describe an unknown potion" {
         \\│                                      │
         \\│ Effects:                             │
         \\│     ?                                │
-        \\│ Calories: 50                         │
         \\│                                      │
         \\│ Weight: 10                           │
+        \\│                                      │
         \\└──────────────────────────────────────┘
     , .game_area);
 }
@@ -73,8 +73,8 @@ test "Describe a known potion (after drinking a similar)" {
         \\│ and your wounds instantly.          ░│
         \\│                                     ░│
         \\│ Effects:                            ░│
-        \\│   heal 20-25                        ░│
-        \\│ Calories: 50                        ░│
+        \\│   healing 20-25                     ░│
+        \\│                                     ░│
         \\│                                     ░│
         \\└──────────────────────────────────────┘
     , .game_area);
@@ -167,8 +167,8 @@ test "Describe a known enemy (after killing a similar creature)" {
         \\│                                     ░│
         \\│ Health: 10/10                       ░│
         \\│                                     ░│
-        \\│ Damage:                             ░│
-        \\│   physical 1-3                      ░│
+        \\│ Damage: 6-8                         ░│
+        \\│                                     ░│
         \\└──────────────────────────────────────┘
     , .game_area);
 }
