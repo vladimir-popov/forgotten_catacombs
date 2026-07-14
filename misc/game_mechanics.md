@@ -54,6 +54,8 @@ Dungeon-level constants used across multiple systems:
 | `POISON` | attacks guarantee minimum damage       |
 | `RNG(N)` | ranged attack with range `N`           |
 
+_stat +2 for modifications, and +4 for traits_
+
 ## 4. Player Progression Model
 
 Progression bounds:
@@ -187,13 +189,13 @@ base_HP = 12
 Hit chance:
 
 ```text
-hit_chance_percent = 60 + 4 x DEX + 2 x PER + 3 x skill
+hit_chance_percent = 60 + 2 x ACTOR PER + 2 x ACTOR skill - 3 x TARGET DEX
 ```
 
 Damage:
 
 ```text
-physical_damage = base_damage x (1 + 0.1 x stat)
+physical_damage = base_damage x (1 +  + 0.05 × STR + 0.1 x stat)
 
 damage = max(
     poison_min,
@@ -228,6 +230,22 @@ Enemy damage roles:
 | Base        | `0`      | `6 .. 8`  |
 | Strong      | `+0.20`  | `7 .. 10` |
 | Very strong | `+0.35`  | `8 .. 11` |
+
+## Character Identity
+
+Player characteristics are intentionally asymmetric. Each characteristic
+provides a distinct gameplay advantage rather than equal mathematical
+value.
+
+| Characteristic | Design role                                                                                     |
+| -------------- | -----------                                                                                     |
+| **STR**        | Access to the widest selection of weapons and gives bonus damage regardless of the weapon type. |
+| **DEX**        | Access to agile weapons, improves survivability, and helps disarm traps.                        |
+| **PER**        | Improves hit chance and exploration by detecting traps and secrets.                             |
+| **INT**        | Access to the rarest and most powerful weapons, and enables advanced item modification.         |
+
+Weapon distribution and supporting mechanics should be balanced to
+reinforce these identities.
 
 ## 9. Speed Model
 
