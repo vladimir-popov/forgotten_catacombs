@@ -253,6 +253,14 @@ pub const Modifications = struct {
         return .{ .items = .initEmpty() };
     }
 
+    pub fn init(init_modifications: []const Modification) Modifications {
+        var self = Modifications.initEmpty();
+        for (init_modifications) |modification| {
+            self.add(modification);
+        }
+        return self;
+    }
+
     pub fn contains(self: Modifications, modification: anytype) bool {
         return self.items.contains(cast(modification));
     }
@@ -302,6 +310,8 @@ pub const Breakages = struct {
 pub const Weapon = struct {
     /// The damage depends on the weapon class
     pub const Class = enum {
+        /// No bonuses
+        native,
         /// The strength is used
         primitive,
         /// The dexterity is used

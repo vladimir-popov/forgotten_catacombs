@@ -16,7 +16,7 @@ rat: c.Components = archetype.enemy(.{
     .sprite = .{ .codepoint = 'r' },
     .state = .sleeping,
     .stats = .zeros,
-    .weapon = .melee(.primitive, .range(3, 8)),
+    .weapon = .melee(.native, .range(3, 8)),
 }),
 
 snake: c.Components = archetype.enemy(.{
@@ -30,5 +30,5 @@ snake: c.Components = archetype.enemy(.{
     .regeneration = .regular,
     .speed = .default,
     .state = .sleeping,
-    .weapon = .melee(.tricky, .range(5, 7)),
+    .weapon = .melee(.native, .range(5, 7)),
 }),

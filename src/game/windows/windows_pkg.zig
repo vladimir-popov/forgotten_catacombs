@@ -131,9 +131,11 @@ pub fn entityDescription(
     var area: TextArea = .empty;
     if (session.player.id == entity.id) {
         try g.Description.describePlayer(alloc, session.journal, entity, &area);
+    } else if (session.registry.has(entity, c.EnemyState)) {
+        try g.Description.describeEnemy(alloc, session.journal, entity, &area);
     } else {
         const is_equipped = g.meta.isEquipped(&session.registry, session.player, entity);
-        try g.Description.describeEntity(alloc, session.journal, entity, is_equipped, &area);
+        try g.Description.describeItem(alloc, session.journal, entity, is_equipped, &area);
     }
     // A modal window with an entity description should always have the maximal possible width,
     // because all descriptions have fixed length lines

@@ -19,7 +19,7 @@ test "Describe an item" {
         \\│ despair.                            ░│
         \\│                                     ░│
         \\│ This is a primitive weapon.         ░│
-        \\│ Damage: 2-3                         ░│
+        \\│ Damage: 1-1                         ░│
         \\│                                     ░│
         \\└──────────────────────────────────────┘
     , .game_area);
@@ -36,16 +36,16 @@ test "Describe an unknown potion" {
     try options.choose("Describe");
 
     try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
         \\┌────────────A green potion────────────┐
         \\│ A swirling liquid of green color     │
         \\│ rests in a vial.                     │
         \\│                                      │
-        \\│ Effects:                             │
-        \\│     ?                                │
-        \\│                                      │
         \\│ Weight: 10                           │
-        \\│                                      │
         \\└──────────────────────────────────────┘
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
     , .game_area);
 }
 
@@ -67,16 +67,16 @@ test "Describe a known potion (after drinking a similar)" {
     try options.choose("Describe");
 
     try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
         \\┌───────────A healing potion───────────┐
-        \\│ A brew that glows faintly, as if    ▒│
-        \\│ mends alive. It warms your veins    ░│
-        \\│ and your wounds instantly.          ░│
-        \\│                                     ░│
-        \\│ Effects:                            ░│
-        \\│   healing 20-25                     ░│
-        \\│                                     ░│
-        \\│                                     ░│
+        \\│ A brew that glows faintly, as if     │
+        \\│ mends alive. It warms your veins     │
+        \\│ and your wounds instantly.           │
+        \\│                                      │
+        \\│ Weight: 10                           │
         \\└──────────────────────────────────────┘
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
     , .game_area);
 }
 
@@ -167,7 +167,7 @@ test "Describe a known enemy (after killing a similar creature)" {
         \\│                                     ░│
         \\│ Health: 10/10                       ░│
         \\│                                     ░│
-        \\│ Damage: 6-8                         ░│
+        \\│ Damage: 3-8                         ░│
         \\│                                     ░│
         \\└──────────────────────────────────────┘
     , .game_area);

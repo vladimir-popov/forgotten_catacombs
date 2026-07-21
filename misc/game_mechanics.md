@@ -404,12 +404,16 @@ Armor distribution:
 | `2`      | `5`    |
 | `3`      | `0`    |
 
+## Modifications
+
+Weapons and armors can have few modifications. Every type of modification can be
+applied only once.
+
 Modification function:
 
 | Modification         | Value                    | Weight |
 | -------------------- | ------------------------ | ------ |
 | Stat bonus           | `+1`                     | `5`    |
-| Skill bonus          | `+2`                     | `7`    |
 | Extra effect         | `FIRE`, `ACID`, `POISON` | `10`   |
 | Movement speed bonus | `2`                      | `3`    |
 | Attack speed bonus   | `2`                      | `3`    |
@@ -419,7 +423,6 @@ Breakage function:
 | Breakage               | Value                    | Weight |
 | ---------------------- | ------------------------ | ------ |
 | Stat penalty           | `-1`                     | `5`    |
-| Skill penalty          | `-2`                     | `3`    |
 | Effect vulnerability   | `FIRE`, `ACID`, `POISON` | `10`   |
 | Movement speed penalty | `2`                      | `7`    |
 | Attack speed penalty   | `2`                      | `7`    |

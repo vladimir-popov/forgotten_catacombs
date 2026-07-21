@@ -546,6 +546,7 @@ fn drinkPotion(
         .poison => null,
         .oil => null,
     };
+    try self.session().journal.markPotionAsKnown(potion);
     // try to remove from the inventory
     if (self.session().registry.get(actor, c.Inventory)) |inventory| {
         _ = inventory.items.remove(potion_id);

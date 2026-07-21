@@ -150,72 +150,101 @@ pub fn describeStats(
     _ = try std.fmt.bufPrint(line, "  Constitution:       {d}", .{stats.get(.constitution)});
 }
 
-/// Builds an actual description of the entity, and writes it to the text_area.
-/// `is_equipped` is used to mark a modified equipped and not equipped item in different ways
-/// **Note**, that to describe the player the `describePlayer` method should be used.
-pub fn describeEntity(
+pub fn describeEnemy(
     alloc: std.mem.Allocator,
     journal: g.Journal,
-    entity: g.Entity,
-    is_equipped: bool,
+    enemy: g.Entity,
     text_area: *g.windows.TextArea,
 ) !void {
-    const entity_type = g.meta.getEntityType(journal.registry, entity) orelse return;
-
-    // Write the text of description at first:
-    try writeActualDescription(alloc, journal, entity, entity_type, text_area);
+    try writeDescription(alloc, journal, enemy, text_area);
     _ = try text_area.addEmptyLine(alloc);
+    const enemy_type = g.meta.getEnemyType(journal.registry, enemy) orelse @panic("Unknown enemy");
+    if (journal.known_enemies.contains(enemy_type)) {
+        if (journal.registry.get(enemy, c.Health)) |health| {
+            try describeHealth(alloc, health, text_area);
+        }
+        if (journal.registry.get(enemy, c.Weapon)) |weapon| {
+            _ = try text_area.addEmptyLine(alloc);
+            try describeWeapon(alloc, journal, enemy, weapon, true, text_area);
+        }
+        if (journal.registry.get(enemy, c.Armor)) |armor| {
+            _ = try text_area.addEmptyLine(alloc);
+            try describeArmor(alloc, journal, enemy, armor, true, text_area);
+        }
+        try describeModificationsAndTraits(alloc, journal.registry, enemy, text_area);
 
-    // Then write properties:
-    switch (entity_type) {
-        .enemy => try describeEnemy(alloc, journal, entity, text_area),
-        .weapon => try describeWeapon(alloc, journal, entity, is_equipped, text_area),
-        .armor => try describeArmor(alloc, journal, entity, is_equipped, text_area),
-        .trap => try describeTrap(alloc, journal.registry, entity, text_area),
-        .potion => {}, // the description is enough
-        .light => {
-            const light = journal.registry.getUnsafe(entity, c.SourceOfLight);
-            try text_area.printLineFmt(alloc, "Radius of light: {d}", .{light.radius});
-        },
-        .food => {
-            const consumable = journal.registry.getUnsafe(entity, c.Consumable);
-            try text_area.printLineFmt(alloc, "Calories: {d}", .{consumable.calories});
-        },
-    }
-
-    // Finally write a weight if the entity has it
-    if (journal.registry.get(entity, c.Weight)) |weight| {
-        _ = try text_area.addEmptyLine(alloc);
-        const line = try text_area.addEmptyLine(alloc);
-        _ = try std.fmt.bufPrint(line, "Weight: {d}", .{weight.value});
+        if (journal.registry.get(enemy, c.Speed)) |speed| {
+            _ = try text_area.addEmptyLine(alloc);
+            if (speed.moving_speed > c.Speed.default.moving_speed)
+                try text_area.printLine(alloc, "Fast.")
+            else if (speed.moving_speed < c.Speed.default.moving_speed)
+                try text_area.printLine(alloc, "Slow.")
+            else
+                try text_area.printLine(alloc, "Not too fast.");
+        }
+    } else {
+        try text_area.printLine(alloc, "Who knows what to expect from this");
+        try text_area.printLine(alloc, "creature?");
     }
 }
 
-/// Writes the known description of an entity.
-/// Known and unknown items and enemies have different descriptions.
-fn writeActualDescription(
+/// Builds an actual description of an item, and writes it to the text_area.
+/// `is_equipped` is used to mark a modified equipped and not equipped item in different ways
+pub fn describeItem(
+    alloc: std.mem.Allocator,
+    journal: g.Journal,
+    item: g.Entity,
+    is_equipped: bool,
+    text_area: *g.windows.TextArea,
+) !void {
+    if (journal.registry.get(item, c.Potion)) |potion| {
+        if (journal.unknownPotionColor(potion.*)) |color| {
+            try text_area.printLineFmt(alloc, "A swirling liquid of {t} color", .{color});
+            try text_area.printLineFmt(alloc, "rests in a vial.", .{});
+        } else {
+            try writeDescription(alloc, journal, item, text_area);
+        }
+    } else {
+        try writeDescription(alloc, journal, item, text_area);
+    }
+
+    // Then write properties:
+    if (journal.registry.get(item, c.Weapon)) |weapon| {
+        _ = try text_area.addEmptyLine(alloc);
+        try describeWeapon(alloc, journal, item, weapon, is_equipped, text_area);
+    }
+    if (journal.registry.get(item, c.Armor)) |armor| {
+        _ = try text_area.addEmptyLine(alloc);
+        try describeArmor(alloc, journal, item, armor, is_equipped, text_area);
+    }
+    if (journal.registry.get(item, c.Trap)) |trap| {
+        _ = try text_area.addEmptyLine(alloc);
+        try describeTrap(alloc, trap, text_area);
+    }
+    if (journal.registry.get(item, c.SourceOfLight)) |light| {
+        _ = try text_area.addEmptyLine(alloc);
+        try text_area.printLineFmt(alloc, "Radius of light: {d}", .{light.radius});
+    }
+    if (journal.registry.get(item, c.Consumable)) |consumable| {
+        _ = try text_area.addEmptyLine(alloc);
+        try text_area.printLineFmt(alloc, "Calories: {d}", .{consumable.calories});
+    }
+    if (journal.registry.get(item, c.Weight)) |weight| {
+        _ = try text_area.addEmptyLine(alloc);
+        try text_area.printLineFmt(alloc, "Weight: {d}", .{weight.value});
+    }
+}
+
+fn writeDescription(
     alloc: std.mem.Allocator,
     journal: g.Journal,
     entity: g.Entity,
-    entity_type: g.meta.EntityType,
     text_area: *g.windows.TextArea,
 ) !void {
-    if (entity_type == .potion) {
-        if (journal.registry.get(entity, c.Potion)) |potion| {
-            if (journal.unknownPotionColor(potion.*)) |color| {
-                try text_area.printLineFmt(alloc, "A swirling liquid of {t} color", .{color});
-                try text_area.printLineFmt(alloc, "rests in a vial.", .{});
-                return;
-            }
-        }
-    }
-    const description = if (journal.registry.get(entity, c.Description)) |descr|
-        g.components.Description.Preset.fields.get(descr.preset).description
-    else
-        &.{};
-    for (description) |str| {
-        var line = try text_area.addEmptyLine(alloc);
-        @memmove(line[0..str.len], str);
+    if (journal.registry.get(entity, c.Description)) |descr| {
+        const description = g.components.Description.Preset.fields.get(descr.preset).description;
+        for (description) |str|
+            try text_area.printLine(alloc, str);
     }
 }
 
@@ -267,15 +296,16 @@ fn describeWeapon(
     alloc: std.mem.Allocator,
     journal: g.Journal,
     entity: g.Entity,
+    weapon: *const c.Weapon,
     is_equipped: bool,
     text_area: *g.windows.TextArea,
 ) !void {
-    const weapon = journal.registry.getUnsafe(entity, c.Weapon);
     log.debug("Describe a weapon {d} {any}", .{ entity.id, weapon });
 
-    const article = if (weapon.class == .ancient) "an" else "a";
-    try text_area.printLineFmt(alloc, "This is {s} {t} weapon.", .{ article, weapon.class });
-
+    if (weapon.class != .native) {
+        const article = if (weapon.class == .ancient) "an" else "a";
+        try text_area.printLineFmt(alloc, "This is {s} {t} weapon.", .{ article, weapon.class });
+    }
     try text_area.printLineFmt(alloc, "Damage: {d}-{d}", .{ weapon.damage.min, weapon.damage.max });
     if (weapon.max_distance > 1) {
         try text_area.printLineFmt(alloc, "Max range: {d}", .{weapon.max_distance});
@@ -285,6 +315,7 @@ fn describeWeapon(
     const has_modifications = g.meta.hasModifications(journal.registry, entity);
 
     if (weapon.effects.count() > 0 or has_modifications) {
+        _ = try text_area.addEmptyLine(alloc);
         try text_area.printLineFmt(alloc, "Effects:", .{});
         var effs = weapon.effects.iterator();
         while (effs.next()) |effect| {
@@ -341,10 +372,10 @@ fn describeArmor(
     alloc: std.mem.Allocator,
     journal: g.Journal,
     entity: g.Entity,
+    armor: *const c.Armor,
     is_equipped: bool,
     text_area: *g.windows.TextArea,
 ) !void {
-    const armor = journal.registry.getUnsafe(entity, c.Armor);
     log.debug("Describe an armor {d} {any}", .{ entity.id, armor });
 
     try text_area.printLineFmt(alloc, "Protection: {d}-{d}", .{ armor.protection.min, armor.protection.max });
@@ -405,80 +436,42 @@ pub fn describeEquipedItems(
     equipment: *const c.Equipment,
     text_area: *g.windows.TextArea,
 ) !void {
-    var line = try text_area.addEmptyLine(alloc);
     if (equipment.weapon) |weapon_id| {
+        var line = try text_area.addEmptyLine(alloc);
         @memcpy(line[0..16], "Equiped weapon: ");
         _ = try printActualName(line[16..], journal, weapon_id);
-        try describeWeapon(alloc, journal, weapon_id, true, text_area);
+        const weapon = journal.registry.getUnsafe(weapon_id, c.Weapon);
+        try describeWeapon(alloc, journal, weapon_id, weapon, true, text_area);
     } else {
-        _ = try std.fmt.bufPrint(line, "Equiped weapon: none", .{});
+        try text_area.printLine(alloc, "Equiped weapon: none");
     }
+    _ = try text_area.addEmptyLine(alloc);
     if (equipment.armor) |armor_id| {
-        _ = try text_area.addEmptyLine(alloc);
-        line = try text_area.addEmptyLine(alloc);
+        var line = try text_area.addEmptyLine(alloc);
         @memcpy(line[0..15], "Equiped armor: ");
         _ = try printActualName(line[15..], journal, armor_id);
-        try describeArmor(alloc, journal, armor_id, true, text_area);
+        const armor = journal.registry.getUnsafe(armor_id, c.Armor);
+        try describeArmor(alloc, journal, armor_id, armor, true, text_area);
+    } else {
+        try text_area.printLine(alloc, "Equiped armor: none");
     }
+    _ = try text_area.addEmptyLine(alloc);
     const light_id, const light_radius = g.meta.getLight(journal.registry, equipment);
     if (light_id) |id| {
-        _ = try text_area.addEmptyLine(alloc);
-        line = try text_area.addEmptyLine(alloc);
+        var line = try text_area.addEmptyLine(alloc);
         @memcpy(line[0..17], "Source of light: ");
         _ = try g.Description.printActualName(line[17..], journal, id);
         try text_area.printLineFmt(alloc, "       radius: {d}", .{light_radius});
-    }
-}
-
-pub fn describeEnemy(
-    alloc: std.mem.Allocator,
-    journal: g.Journal,
-    entity: g.Entity,
-    text_area: *g.windows.TextArea,
-) !void {
-    const enemy_type = g.meta.getEnemyType(journal.registry, entity) orelse @panic("Unknown enemy type");
-    if (journal.known_enemies.contains(enemy_type)) {
-        if (journal.registry.get(entity, c.Health)) |health| {
-            _ = try text_area.addEmptyLine(alloc);
-            try describeHealth(alloc, health, text_area);
-        }
-        if (journal.registry.has(entity, c.Weapon)) {
-            _ = try text_area.addEmptyLine(alloc);
-            try describeWeapon(alloc, journal, entity, false, text_area);
-        }
-        if (journal.registry.has(entity, c.Armor)) {
-            _ = try text_area.addEmptyLine(alloc);
-            try describeArmor(alloc, journal, entity, false, text_area);
-        }
-        try describeModificationsAndTraits(alloc, journal.registry, entity, text_area);
-
-        if (journal.registry.get(entity, c.Speed)) |speed| {
-            _ = try text_area.addEmptyLine(alloc);
-            const line = try text_area.addEmptyLine(alloc);
-            if (speed.moving_speed > c.Speed.default.moving_speed)
-                _ = try std.fmt.bufPrint(line, "Fast.", .{})
-            else if (speed.moving_speed < c.Speed.default.moving_speed)
-                _ = try std.fmt.bufPrint(line, "Slow.", .{})
-            else
-                _ = try std.fmt.bufPrint(line, "Not too fast.", .{});
-        }
     } else {
-        _ = try text_area.addEmptyLine(alloc);
-        var line = try text_area.addEmptyLine(alloc);
-        _ = try std.fmt.bufPrint(line[0..], "Who knows what to expect from this", .{});
-        line = try text_area.addEmptyLine(alloc);
-        _ = try std.fmt.bufPrint(line[0..], "creature?", .{});
+        try text_area.printLine(alloc, "Source of light: none");
     }
 }
 
 pub fn describeTrap(
     alloc: std.mem.Allocator,
-    registry: *const g.Registry,
-    entity: g.Entity,
+    trap: *const c.Trap,
     text_area: *g.windows.TextArea,
 ) !void {
-    const trap: *const c.Trap = registry.getUnsafe(entity, c.Trap);
-    _ = try text_area.addEmptyLine(alloc);
     const label = switch (trap.power) {
         0 => "easy to disarm",
         1 => "have to tinker",
@@ -544,7 +537,7 @@ test "Describe an unknown rat" {
     defer text_area.deinit(std.testing.allocator);
 
     // when:
-    try describeEntity(std.testing.allocator, journal, id, false, &text_area);
+    try describeEnemy(std.testing.allocator, journal, id, &text_area);
 
     // then:
     try expectContent(text_area,
@@ -571,7 +564,7 @@ test "Describe a known rat" {
     defer text_area.deinit(std.testing.allocator);
 
     // when:
-    try describeEntity(std.testing.allocator, journal, id, false, &text_area);
+    try describeEnemy(std.testing.allocator, journal, id, &text_area);
 
     // then:
     try expectContent(text_area,
@@ -581,7 +574,7 @@ test "Describe a known rat" {
         \\
         \\Health: 10/10
         \\
-        \\Damage: 1-3
+        \\Damage: 3-8
         \\
         \\Not too fast.
     );
@@ -600,7 +593,7 @@ test "Describe a melee weapon" {
     defer text_area.deinit(std.testing.allocator);
 
     // when:
-    try describeEntity(std.testing.allocator, journal, id, false, &text_area);
+    try describeItem(std.testing.allocator, journal, id, false, &text_area);
 
     // then:
     try expectContent(text_area,
@@ -610,7 +603,7 @@ test "Describe a melee weapon" {
         \\despair.
         \\
         \\This is a primitive weapon.
-        \\Damage: 1-2
+        \\Damage: 1-1
         \\
         \\Effects:
         \\  fire
@@ -634,7 +627,7 @@ test "Describe a bow" {
     defer text_area.deinit(std.testing.allocator);
 
     // when:
-    try describeEntity(std.testing.allocator, journal, id, false, &text_area);
+    try describeItem(std.testing.allocator, journal, id, false, &text_area);
 
     // then:
     try expectContent(text_area,
@@ -644,8 +637,7 @@ test "Describe a bow" {
         \\
         \\This is a tricky weapon.
         \\Damage: 2-3
-        \\
-        \\Max distance: 5
+        \\Max range: 5
         \\
         \\Weight: 50
     );
@@ -664,7 +656,7 @@ test "Describe an armor" {
     defer text_area.deinit(std.testing.allocator);
 
     // when:
-    try describeEntity(std.testing.allocator, journal, id, false, &text_area);
+    try describeItem(std.testing.allocator, journal, id, false, &text_area);
 
     // then:
     try expectContent(text_area,

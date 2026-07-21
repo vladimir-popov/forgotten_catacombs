@@ -95,19 +95,6 @@ fn statsFromModifications(registry: *const g.Registry, entity: g.Entity) c.Stats
     return stats;
 }
 
-pub const EntityType = enum { enemy, food, potion, weapon, armor, light, trap };
-
-pub fn getEntityType(registry: *const g.Registry, entity: g.Entity) ?EntityType {
-    if (registry.has(entity, c.EnemyState)) return .enemy;
-    if (registry.has(entity, c.Weapon)) return .weapon;
-    if (registry.has(entity, c.Armor)) return .armor;
-    if (registry.has(entity, c.Potion)) return .potion;
-    if (registry.has(entity, c.Consumable)) return .food;
-    if (registry.has(entity, c.SourceOfLight)) return .light;
-    if (registry.has(entity, c.Trap)) return .trap;
-    return null;
-}
-
 /// An Item is any entity with weight is item.
 /// It is something, that could be taken, buying or selling.
 pub inline fn isItem(registry: *const g.Registry, entity: g.Entity) bool {
@@ -344,6 +331,7 @@ pub fn calculateDamage(
         .primitive => actor_stats.get(.strength),
         .tricky => actor_stats.get(.dexterity),
         .ancient => actor_stats.get(.intelligence),
+        .native => 0,
     });
     const poison_min: f32 = if (weapon_effects.contains(.poison))
         switch (protection_resistances.get(.poison) orelse .normal) {
