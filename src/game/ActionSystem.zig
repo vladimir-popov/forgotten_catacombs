@@ -352,7 +352,7 @@ fn handleTrap(self: *Self, actor: g.Entity, trap_id: g.Entity, trap: *const c.Tr
     const health = self.session().registry.getUnsafe(actor, c.Health);
     const health_before = health.current_hp;
     const damage_percent: f32 = @floatFromInt(trap.damagePercent().choose(self.session().prng.random()));
-    const damage: u8 = @intFromFloat(damage_percent * health.max);
+    const damage: u8 = @intFromFloat(health.max * damage_percent / 100.0);
     const is_actor_dead = try self.applyDamage(trap_id, actor, health, damage);
 
     // Show pop-up notifications about hit/damage

@@ -57,12 +57,14 @@ test "Saving a game session and go back to the main menu" {
 
 test "Loading a game session" {
     const tmp_dir = std.testing.tmpDir(.{});
-    const session_file = try tmp_dir.dir.createFile(std.testing.io, g.persistance.SESSION_FILE_NAME, .{});
-    _ = try session_file.writeStreamingAll(std.testing.io, @embedFile("resources/session.json"));
-
-    var buf: [64]u8 = undefined;
-    const level0_file = try tmp_dir.dir.createFile(std.testing.io, try g.persistance.pathToLevelFile(&buf, 0), .{});
-    _ = try level0_file.writeStreamingAll(std.testing.io, @embedFile("resources/level_0.json"));
+    try generateSaveFiles(tmp_dir);
+    // TODO: We have to control compatability
+    // const session_file = try tmp_dir.dir.createFile(std.testing.io, g.persistance.SESSION_FILE_NAME, .{});
+    // _ = try session_file.writeStreamingAll(std.testing.io, @embedFile("resources/session.json"));
+    //
+    // var buf: [64]u8 = undefined;
+    // const level0_file = try tmp_dir.dir.createFile(std.testing.io, try g.persistance.pathToLevelFile(&buf, 0), .{});
+    // _ = try level0_file.writeStreamingAll(std.testing.io, @embedFile("resources/level_0.json"));
 
     var test_session: TestSession = undefined;
     try test_session.load(std.testing.allocator, std.testing.io, tmp_dir);
@@ -112,4 +114,21 @@ test "Loading a game session" {
     try std.testing.expectEqual(.completed, test_session.session.mode.save_load.process.loading.progress);
     try test_session.tick(.{});
     try std.testing.expect(test_session.session.mode == .play);
+}
+
+// This is a temp solution to avoid manual recreation of the files during the developing process.
+// This method must be removed after the first release, and versioning of the saves must be
+// implemented and controlled.
+fn generateSaveFiles(test_dir: std.testing.TmpDir) !void {
+    var test_session: TestSession = undefined;
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
+    test_session.tmp_dir = test_dir;
+    test_session.runtime.test_dir = test_dir.dir;
+    defer test_session.arena.deinit();
+
+    try test_session.session.switchModeToSavingSession();
+
+    while (test_session.session.mode.save_load.process.saving.progress != .completed) {
+        try test_session.tick(.{});
+    }
 }
