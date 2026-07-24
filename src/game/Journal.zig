@@ -101,14 +101,17 @@ pub fn markWeaponAsKnown(self: *Self, weapon: g.Entity) !void {
         g.codepoints.weapon_ranged;
 }
 
-pub fn forgetWeapon(self: *Self, weapon: g.Entity) !void {
-    log.debug("Mark the weapon {d} as unknown", .{weapon.id});
-    _ = self.known_entities.remove(weapon);
-    const sprite = self.registry.getUnsafe(weapon, c.Sprite);
-    sprite.codepoint = if (self.registry.getUnsafe(weapon, c.Weapon).ammunition_type == null)
-        g.codepoints.weapon_melee_unknown
-    else
-        g.codepoints.weapon_ranged_unknown;
+pub fn forgetWeapon(self: *Self, entity: g.Entity) !void {
+    log.debug("Mark the weapon {d} as unknown", .{entity.id});
+    _ = self.known_entities.remove(entity);
+    if (self.registry.get(entity, c.Weapon)) |weapon|
+        g.meta.setCodepointOfUnknownWeapon(self.registry, entity, weapon);
+}
+
+pub fn forgetArmor(self: *Self, armor: g.Entity) !void {
+    log.debug("Mark the armor {d} as unknown", .{armor.id});
+    _ = self.known_entities.remove(armor);
+    g.meta.setCodepointOfUnknownArmor(self.registry, armor);
 }
 
 pub fn onTurnCompleted(self: *Self) !void {

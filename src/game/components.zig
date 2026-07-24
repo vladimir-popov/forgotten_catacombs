@@ -282,6 +282,8 @@ pub const Modifications = struct {
 pub const Improvements = struct {
     modifications: Modifications,
 
+    pub const empty: Improvements = .{ .modifications = .initEmpty() };
+
     pub const proportions: [std.enums.values(Modification).len]u8 = blk: {
         var ps: [std.enums.values(Modification).len]u8 = @splat(5);
         ps[@intFromEnum(Modification.fire)] = 10;
@@ -295,6 +297,8 @@ pub const Improvements = struct {
 
 pub const Breakages = struct {
     modifications: Modifications,
+
+    pub const empty: Breakages = .{ .modifications = .initEmpty() };
 
     pub const proportions: [std.enums.values(Modification).len]u8 = blk: {
         var ps: [std.enums.values(Modification).len]u8 = @splat(5);

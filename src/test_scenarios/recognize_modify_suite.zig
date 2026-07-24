@@ -16,7 +16,7 @@ test "Init near the scientist" {
         \\╔═══════════════════╗══════════════════╗
         \\║     Recognize     ║     Modify       ║
         \\║                   ╚══════════════════║
-        \\║¿ A green potion                 100$ ║
+        \\║¿ A yellow potion                 22$ ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
@@ -50,7 +50,7 @@ test "Recognize an unknown item when enough money" {
         \\║                                      ║
         \\╚══════════════════════════════════════╝
         \\════════════════════════════════════════
-        \\ Your money:  900$              Close   
+        \\ Your money:  978$              Close   
     , .whole_display);
 }
 
@@ -90,8 +90,8 @@ test "Modification should be applicable only to weapons or armor" {
         \\╔══════════════════╔═══════════════════╗
         \\║     Recognize    ║      Modify       ║
         \\║══════════════════╝                   ║
-        \\║/ Pickaxe                        100$ ║
-        \\║¡ Torch                          100$ ║
+        \\║/ Pickaxe                             ║
+        \\║¡ Torch                               ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
@@ -124,15 +124,15 @@ test "Modify an item somehow when enough money" {
         \\╔═══════════════════╗══════════════════╗
         \\║     Recognize     ║     Modify       ║
         \\║                   ╚══════════════════║
-        \\║\ Pickaxe                        100$ ║
-        \\║¿ A green potion                 100$ ║
+        \\║\ Pickaxe                         11$ ║
+        \\║¿ A yellow potion                 22$ ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
         \\╚══════════════════════════════════════╝
         \\════════════════════════════════════════
-        \\ Your money:  900$    Close  �� Choose ⇧
+        \\ Your money:  992$    Close  �� Choose ⇧
     , .whole_display);
 }
 
@@ -163,39 +163,9 @@ test "Modify an item when NOT enough money" {
     , .whole_display);
 }
 
-test "The price should grow after modification" {
-    var test_session: TestSession = undefined;
-    const recognize_modify, _, const known_weapon_id = try initNearScientistWithMoney(&test_session, 1000);
-    defer test_session.deinit();
-    errdefer test_session.printDisplay();
-
-    try recognize_modify.chooseModifyTab();
-    try std.testing.expect(!test_session.session.registry.has(known_weapon_id, c.Modification));
-
-    var options = try recognize_modify.chooseItemById(known_weapon_id);
-    try options.choose("Modify");
-    try options.choose("Somehow");
-    try recognize_modify.chooseRecognizeTab();
-    options = try recognize_modify.chooseItemById(known_weapon_id);
-    try options.choose("Recognize");
-    try recognize_modify.chooseModifyTab();
-
-    try test_session.runtime.display.expectLooksLike(
-        \\╔══════════════════╔═══════════════════╗
-        \\║     Recognize    ║      Modify       ║
-        \\║══════════════════╝                   ║
-        \\║/ Pickaxe                        200$ ║
-        \\║¡ Torch                          100$ ║
-        \\║                                      ║
-        \\║                                      ║
-        \\║                                      ║
-        \\║                                      ║
-        \\╚══════════════════════════════════════╝
-        \\════════════════════════════════════════
-        \\ Your money:  800$    Close     Choose ⇧
-    , .whole_display);
-}
-
+/// Initializes a test session with the player on the start level near the scientist.
+/// Set puts the money to the player's wallet, and adds a healing potion as unknown to the player's inventory.
+/// Returns the new test session, id of the healing potion, and id of the player's weapon.
 fn initNearScientistWithMoney(test_session: *TestSession, money: u16) !struct { RecognizeModify, g.Entity, g.Entity } {
     std.testing.random_seed = 100500;
     try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);

@@ -10,6 +10,81 @@ pub const GeneratingTarget = union(enum) {
     reward: struct { enemy_level: u8 },
 };
 
+// The general proportions:
+const general_proportions = [_]u8{
+    // Gold - main neutral loot
+    28,
+    // Weapons - regular weapons
+    14,
+    // Modified - weapons with modifications
+    6,
+    // Broken - broken weapons, vendor loot
+    8,
+    // Armor - regular armor
+    12,
+    // Modified - armor with modifications
+    4,
+    // Broken - broken armor, vendor loot
+    8,
+    // Food - hunger remains a threat
+    12,
+    // Potions - rare utility resources
+    8,
+    // Ammo - ranged build support
+    10,
+    // Torches - critical light source
+    10,
+    // Oil - rare lamp resource
+    6,
+};
+
+/// Min and max size of the gold piles depending on the depth
+const gold_piles = [_]p.Range(u16){
+    .range(0, 0),
+    .range(6, 15),
+    .range(14, 36),
+    .range(24, 64),
+    .range(36, 94),
+    .range(48, 128),
+    .range(62, 162),
+    .range(76, 200),
+    .range(91, 239),
+    .range(107, 281),
+};
+
+/// Chooses a random item from the presets using the weighted index and adds that item
+/// as a new entity to the registry. If the item is a weapon or an armor, this method adds a random
+/// modification with 20% chance.
+/// Returns the id of the generated item.
+pub fn generateItem(registry: *g.Registry, rand: std.Random, proportions: []const u8) !g.Entity {
+    const idx = rand.weightedIndex(u8, proportions);
+    const item = g.entities.presets.Items.fields.values[idx];
+    const entity = try registry.addNewEntity(item.*);
+    // Randomly modify a weapon:
+    if (registry.has(entity, c.Weapon)) {
+        const modification_chance = rand.uintAtMost(u8, 100);
+        if (modification_chance < 10) {
+            try g.meta.improveItem(registry, rand, entity, null);
+        }
+        if (modification_chance > 90) {
+            try g.meta.breakItem(registry, rand, entity, null);
+        }
+    }
+    // Randomly modify an armor:
+    else if (registry.has(entity, c.Armor)) {
+        if (rand.uintAtMost(u8, 100) < 15) {
+            const modification_chance = rand.uintAtMost(u8, 100);
+            if (modification_chance < 15) {
+                try g.meta.improveItem(registry, rand, entity, null);
+            }
+            if (modification_chance > 85) {
+                try g.meta.breakItem(registry, rand, entity, null);
+            }
+        }
+    }
+    return entity;
+}
+
 /// Chooses a random enemy from the preset according to the specified depth,
 /// and adds that enemy to the registry as a new entity.
 /// Return the id of the generated enemy.
@@ -38,47 +113,6 @@ pub fn generateReward(
     var proportions: [g.entities.presets.Items.fields.values.len]u8 = undefined;
     itemsChanceProportions(&proportions, depth, target, player_level);
     return try generateItem(registry, rand, &proportions);
-}
-
-/// Chooses a random item from the preset using the weighted index and adds that item
-/// as a new entity to the registry. If the item is a weapon or an armor, this method adds a random
-/// modification with 20% chance.
-/// Returns the id of the generated item.
-pub fn generateItem(registry: *g.Registry, rand: std.Random, proportions: []const u8) !g.Entity {
-    const idx = rand.weightedIndex(u8, proportions);
-    const item = g.entities.presets.Items.fields.values[idx];
-    const entity = try registry.addNewEntity(item.*);
-    // Randomly modify a weapon:
-    if (registry.get(entity, c.Weapon)) |weapon| {
-        const modification_chance = rand.uintAtMost(u8, 100);
-        if (modification_chance < 15) {
-            const codepoint: g.Codepoint = if (weapon.ammunition_type) |_|
-                g.codepoints.weapon_ranged_unknown
-            else
-                g.codepoints.weapon_melee_unknown;
-            try g.meta.improveItem(registry, rand, entity, codepoint, null);
-        }
-        if (modification_chance > 85) {
-            const codepoint: g.Codepoint = if (weapon.ammunition_type) |_|
-                g.codepoints.weapon_ranged_unknown
-            else
-                g.codepoints.weapon_melee_unknown;
-            try g.meta.breakItem(registry, rand, entity, codepoint, null);
-        }
-    }
-    // Randomly modify an armor:
-    else if (registry.has(entity, c.Armor)) {
-        if (rand.uintAtMost(u8, 100) < 15) {
-            const modification_chance = rand.uintAtMost(u8, 100);
-            if (modification_chance < 15) {
-                try g.meta.improveItem(registry, rand, entity, g.codepoints.armor_unknown, null);
-            }
-            if (modification_chance > 85) {
-                try g.meta.breakItem(registry, rand, entity, g.codepoints.armor_unknown, null);
-            }
-        }
-    }
-    return entity;
 }
 
 /// Builds a weighted index for all items.

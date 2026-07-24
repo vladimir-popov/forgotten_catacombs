@@ -19,7 +19,7 @@ test "Init near the shop" {
         \\║¿ A green potion                 45$ ░║
         \\║¡ Oil lamp                       75$ ░║
         \\║{ Light crossbow                 75$ ░║
-        \\║\ Dagger                         45$ ░║
+        \\║/ Dagger                         45$ ░║
         \\╚══════════════════════════════════════╝
         \\════════════════════════════════════════
         \\ Your money:   40$    Close  �� Choose ⇧

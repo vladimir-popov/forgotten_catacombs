@@ -21,21 +21,33 @@ pub fn rawName(registry: *g.Registry, entity: g.Entity) ![]const u8 {
     }
 }
 
+pub const ActualNameFormatter = struct {
+    journal: g.Journal,
+    entity: g.Entity,
+
+    pub fn format(self: ActualNameFormatter, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+        if (self.journal.registry.get(self.entity, c.Potion)) |potion| {
+            if (self.journal.unknownPotionColor(potion.*)) |color|
+                return try writer.print("A {t} potion", .{color});
+        }
+        if (self.journal.registry.get(self.entity, c.Ammunition)) |ammo| {
+            return try writer.print(
+                "{s} {d}",
+                .{ try g.Description.rawName(self.journal.registry, self.entity), ammo.amount },
+            );
+        }
+        return try writer.writeAll(try g.Description.rawName(self.journal.registry, self.entity));
+    }
+};
+
+pub fn actualNameFormatter(journal: g.Journal, entity: g.Entity) ActualNameFormatter {
+    return .{ .journal = journal, .entity = entity };
+}
+
 /// Writes an actual name of the entity according to its "known" status in the journal
 /// to the `dest` buffer and returns a slice with result.
 pub fn printActualName(dest: []u8, journal: g.Journal, entity: g.Entity) ![]u8 {
-    if (journal.registry.get(entity, c.Potion)) |potion| {
-        if (journal.unknownPotionColor(potion.*)) |color|
-            return try std.fmt.bufPrint(dest, "A {t} potion", .{color});
-    }
-    if (journal.registry.get(entity, c.Ammunition)) |ammo| {
-        return try std.fmt.bufPrint(
-            dest,
-            "{s} {d}",
-            .{ try rawName(journal.registry, entity), ammo.amount },
-        );
-    }
-    return try std.fmt.bufPrint(dest, "{s}", .{try rawName(journal.registry, entity)});
+    return try std.fmt.bufPrint(dest, "{f}", .{actualNameFormatter(journal, entity)});
 }
 
 pub fn describePlayer(
@@ -437,9 +449,7 @@ pub fn describeEquipedItems(
     text_area: *g.windows.TextArea,
 ) !void {
     if (equipment.weapon) |weapon_id| {
-        var line = try text_area.addEmptyLine(alloc);
-        @memcpy(line[0..16], "Equiped weapon: ");
-        _ = try printActualName(line[16..], journal, weapon_id);
+        try text_area.printLineFmt(alloc, "Equiped weapon: {f}", .{actualNameFormatter(journal, weapon_id)});
         const weapon = journal.registry.getUnsafe(weapon_id, c.Weapon);
         try describeWeapon(alloc, journal, weapon_id, weapon, true, text_area);
     } else {
@@ -447,9 +457,7 @@ pub fn describeEquipedItems(
     }
     _ = try text_area.addEmptyLine(alloc);
     if (equipment.armor) |armor_id| {
-        var line = try text_area.addEmptyLine(alloc);
-        @memcpy(line[0..15], "Equiped armor: ");
-        _ = try printActualName(line[15..], journal, armor_id);
+        try text_area.printLineFmt(alloc, "Equiped armor: {f}", .{actualNameFormatter(journal, armor_id)});
         const armor = journal.registry.getUnsafe(armor_id, c.Armor);
         try describeArmor(alloc, journal, armor_id, armor, true, text_area);
     } else {
@@ -458,10 +466,8 @@ pub fn describeEquipedItems(
     _ = try text_area.addEmptyLine(alloc);
     const light_id, const light_radius = g.meta.getLight(journal.registry, equipment);
     if (light_id) |id| {
-        var line = try text_area.addEmptyLine(alloc);
-        @memcpy(line[0..17], "Source of light: ");
-        _ = try g.Description.printActualName(line[17..], journal, id);
-        try text_area.printLineFmt(alloc, "       radius: {d}", .{light_radius});
+        try text_area.printLineFmt(alloc, "Source of light: {f}", .{actualNameFormatter(journal, id)});
+        try text_area.printLineFmt(alloc, "         radius: {d}", .{light_radius});
     } else {
         try text_area.printLine(alloc, "Source of light: none");
     }
@@ -479,6 +485,24 @@ pub fn describeTrap(
         3 => "God help me",
     };
     try text_area.printLineFmt(alloc, "Difficulty: {s}", .{label});
+}
+
+test ActualNameFormatter {
+    // given:
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var buffer: [64]u8 = undefined;
+    var registry = try g.Registry.init(&arena);
+    const journal = try g.Journal.init(&registry, std.testing.random_seed);
+
+    const entity = try registry.addNewEntity(g.entities.presets.Items.get(.torch));
+    const raw_name = try g.Description.rawName(&registry, entity);
+
+    // when:
+    const actual_name = try std.fmt.bufPrint(&buffer, "{f}", .{g.Description.actualNameFormatter(journal, entity)});
+
+    // then:
+    try std.testing.expectEqualStrings(raw_name, actual_name);
 }
 
 test "Describe a player" {

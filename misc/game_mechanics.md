@@ -304,20 +304,6 @@ Sell multipliers:
 | Broken Armor         | `0.05`     |
 | Unidentified Armor   | `0.20`     |
 
-Gold piles:
-
-| Floor | Avg gold | Range      |
-| ----- | -------- | ---------- |
-| `1`   | `10`     | `6 .. 15`  |
-| `2`   | `25`     | `14 .. 36` |
-| `3`   | `44`     | `24 .. 64` |
-| `4`   | `65`     | `36 .. 94` |
-| `5`   | `88`     | `48 .. 128` |
-| `6`   | `112`    | `62 .. 162` |
-| `7`   | `138`    | `76 .. 200` |
-| `8`   | `165`    | `91 .. 239` |
-| `9`   | `194`    | `107 .. 281` |
-
 Modify/recognize services:
 
 ```text
@@ -325,13 +311,11 @@ identify_cost = round(item_price x 0.45)
 
 repair_break_cost = round(item_price x 0.50)
 
-base_mod_cost = item_price x 0.35
-
 crude_mod_cost = round(item_price x 0.35)
 
 careful_mod_cost = round(item_price x 1.05)
 
-precision_mod_cost = round(item_price x 2.80)
+manual_mod_cost = round(item_price x 2.80)
 ```
 
 ## 11. Generation Model
@@ -356,6 +340,20 @@ Item category generation:
 | Ammo             | `10`   | ranged build support        |
 | Torches          | `10`   | critical light source       |
 | Oil              | `6`    | rare lamp resource          |
+
+Gold piles:
+
+| Floor | Avg gold | Range      |
+| ----- | -------- | ---------- |
+| `1`   | `10`     | `6 .. 15`  |
+| `2`   | `25`     | `14 .. 36` |
+| `3`   | `44`     | `24 .. 64` |
+| `4`   | `65`     | `36 .. 94` |
+| `5`   | `88`     | `48 .. 128` |
+| `6`   | `112`    | `62 .. 162` |
+| `7`   | `138`    | `76 .. 200` |
+| `8`   | `165`    | `91 .. 239` |
+| `9`   | `194`    | `107 .. 281` |
 
 Spawn weight function:
 

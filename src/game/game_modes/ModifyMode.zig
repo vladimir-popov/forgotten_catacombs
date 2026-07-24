@@ -57,12 +57,14 @@ const log = std.log.scoped(.modify_mode);
 
 const MODAL_WINDOW_REGION: p.Region = p.Region.init(3, 2, g.DISPLAY_ROWS - 5, g.DISPLAY_COLS - 2);
 
-const RECOGNITION_PRICE = 100;
+const IDENTIFY_COST = 0.45;
+const REPAIR_BREAK_COST = 0.50;
+const MOD_SOMEHOW_COST = 0.35;
+const MOD_CAREFUL_COST = 1.05;
+const MOD_MANUAL_COST = 2.80;
 
-const BASE_MODIFICATION_PRICE = 100;
-
-const CAREFUL_MULTIPLAYER = 1.5;
-const MANUAL_MULTIPLAYER = 2.0;
+const CHANCE_TO_BREAK_ON_SOMEHOW = 30;
+const CHANCE_TO_BREAK_ON_CAREFUL = 10;
 
 const Self = @This();
 
@@ -137,6 +139,8 @@ inline fn tabModify(self: *Self) *w.WindowWithTabs.Tab {
     return &self.main_window.tabs[1];
 }
 
+/// Recalculates the content of the both tabs.
+/// It should be done after every modification/recognition.
 pub fn updateTabs(self: *Self) !void {
     const active_tab = self.main_window.activeTab();
     const selected_line = active_tab.scrollable_area.content.selected_line;
@@ -148,20 +152,20 @@ pub fn updateTabs(self: *Self) !void {
         const item = item_ptr.*;
         var buffer: [w.WindowWithTabs.CONTENT_AREA_REGION.cols + 4]u8 = undefined;
         if (self.session.journal.isKnown(item)) {
-            if (self.canBeModified(item)) {
-                const price = self.calculateModificationPrice(item, 1.0);
+            if (self.isWeaponOrArmor(item)) {
                 try self.tabModify().scrollable_area.content.addOption(
                     self.session.mode_arena.allocator(),
-                    try self.formatLine(&buffer, item, price),
+                    try self.formatLine(&buffer, item),
                     item,
                     modifyDescribe,
                     describeItem,
                 );
             }
         } else {
+            const price = self.calculateIdentificationPrice(item);
             try self.tabRecognize().scrollable_area.content.addOption(
                 self.session.mode_arena.allocator(),
-                try self.formatLine(&buffer, item, RECOGNITION_PRICE),
+                try self.formatLineWithPrice(&buffer, item, price),
                 item,
                 recognizeDescribe,
                 describeItem,
@@ -178,24 +182,28 @@ pub fn updateTabs(self: *Self) !void {
     }
 }
 
-const line_fmt = std.fmt.comptimePrint(
+const line_with_price_fmt = std.fmt.comptimePrint(
     "{{u}} {{s:<{d}}}{{d:4}}$",
     .{w.WindowWithTabs.CONTENT_AREA_REGION.cols - 8}, // "{u} ".len == 2 + "0000$".len == 5 + 1 for the right pad
 );
 
-fn formatLine(self: *Self, buffer: []u8, item: g.Entity, price: u16) ![]const u8 {
+fn formatLineWithPrice(self: *Self, buffer: []u8, item: g.Entity, price: u16) ![]const u8 {
     const sprite = self.session.registry.getUnsafe(item, c.Sprite);
     var name_buf: [24]u8 = undefined;
     const name = try g.Description.printActualName(&name_buf, self.session.journal, item);
-    return try std.fmt.bufPrint(buffer, line_fmt, .{ sprite.codepoint, name, price });
+    return try std.fmt.bufPrint(buffer, line_with_price_fmt, .{ sprite.codepoint, name, price });
 }
 
-fn calculateModificationPrice(_: Self, _: g.Entity, _: f32) u16 {
-    // TODO implement the new modification pricing
-    return 100;
+fn formatLine(self: *Self, buffer: []u8, item: g.Entity) ![]const u8 {
+    const sprite = self.session.registry.getUnsafe(item, c.Sprite);
+    return try std.fmt.bufPrint(
+        buffer,
+        "{u} {f}",
+        .{ sprite.codepoint, g.Description.actualNameFormatter(self.session.journal, item) },
+    );
 }
 
-inline fn canBeModified(self: *Self, item: g.Entity) bool {
+inline fn isWeaponOrArmor(self: *Self, item: g.Entity) bool {
     return self.session.registry.has(item, c.Weapon) or self.session.registry.has(item, c.Armor);
 }
 
@@ -212,7 +220,8 @@ fn recognizeDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
 fn recognizeItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const wallet = self.session.registry.getUnsafe(self.session.player, c.Wallet);
-    if (wallet.money >= RECOGNITION_PRICE) {
+    const price = self.calculateIdentificationPrice(item);
+    if (wallet.money >= price) {
         if (self.session.registry.has(item, c.Weapon))
             try self.session.journal.markWeaponAsKnown(item)
         else if (self.session.registry.has(item, c.Armor))
@@ -220,7 +229,7 @@ fn recognizeItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
         else if (self.session.registry.get(item, c.Potion)) |potion|
             try self.session.journal.markPotionAsKnown(potion.*);
 
-        wallet.money -= RECOGNITION_PRICE;
+        wallet.money -= price;
         try self.updateTabs();
     } else {
         self.modal_window = try w.notification(
@@ -255,7 +264,7 @@ fn showHelp(ptr: *anyopaque, _: usize, _: g.Entity) !bool {
         \\performed.
         \\
         \\An arbitrary  modification  has a 
-        \\50%    chance  of  worsening  the 
+        \\30%    chance  of  worsening  the 
         \\effect.
         \\
         \\A  careful  modification  reduces 
@@ -280,7 +289,7 @@ fn modificationMode(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     try area.addOptionFmt(
         self.session.mode_arena.allocator(),
         "Somehow   {d}$",
-        .{self.calculateModificationPrice(item, 1.0)},
+        .{self.calculateSomehowModificationPrice(item)},
         item,
         modifySomehow,
         null,
@@ -288,7 +297,7 @@ fn modificationMode(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     try area.addOptionFmt(
         self.session.mode_arena.allocator(),
         "Carefully {d}$",
-        .{self.calculateModificationPrice(item, CAREFUL_MULTIPLAYER)},
+        .{self.calculateCarefulModificationPrice(item)},
         item,
         modifyCarefully,
         null,
@@ -296,7 +305,7 @@ fn modificationMode(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     try area.addOptionFmt(
         self.session.mode_arena.allocator(),
         "Manually  {d}$",
-        .{self.calculateModificationPrice(item, MANUAL_MULTIPLAYER)},
+        .{self.calculateManualModificationPrice(item)},
         item,
         modifyManually,
         null,
@@ -308,13 +317,13 @@ fn modificationMode(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
 
 fn modifySomehow(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    try self.modify(item, 50, null, self.calculateModificationPrice(item, 1.0));
+    try self.modify(item, CHANCE_TO_BREAK_ON_SOMEHOW, null, self.calculateSomehowModificationPrice(item));
     return true;
 }
 
 fn modifyCarefully(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    try self.modify(item, 10, null, self.calculateModificationPrice(item, CAREFUL_MULTIPLAYER));
+    try self.modify(item, CHANCE_TO_BREAK_ON_CAREFUL, null, self.calculateCarefulModificationPrice(item));
     return true;
 }
 
@@ -339,48 +348,62 @@ fn modifyManually(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
 fn modifyManuallyEffect(ptr: *anyopaque, idx: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const modification: c.Modification = @enumFromInt(idx);
-    try self.modify(item, 0, modification, self.calculateModificationPrice(item, MANUAL_MULTIPLAYER));
+    try self.modify(item, 0, modification, self.calculateManualModificationPrice(item));
     return true;
 }
 
-fn modify(self: *Self, item: g.Entity, breakage_chance: u8, modification: ?c.Modification, price: u16) !void {
-    _ = item;
-    _ = breakage_chance;
-    _ = modification;
+fn modify(self: *Self, item: g.Entity, breakage_chance: u8, manual_modification: ?c.Modification, price: u16) !void {
     const wallet = self.session.registry.getUnsafe(self.session.player, c.Wallet);
-    if (wallet.money >= price) {
-        // var prng = std.Random.DefaultPrng.init(self.session.seed);
-        // const rand = prng.random();
-        // const range: p.Range(i8) = if (breakage_chance > 0 and rand.uintAtMost(u8, 100) < breakage_chance)
-        //     .range(-5, -1)
-        // else
-        //     .range(1, 5);
-        // if (self.session.registry.get(item, c.Weapon)) |weapon| {
-        //     const codepoint: g.Codepoint = if (weapon.ammunition_type) |_|
-        //         g.codepoints.weapon_ranged_unknown
-        //     else
-        //         g.codepoints.weapon_melee_unknown;
-        //     try g.meta.modifyEntity(
-        //         &self.session.registry,
-        //         prng.random(),
-        //         item,
-        //         codepoint,
-        //         range.min,
-        //         range.max,
-        //         effect_type,
-        //     );
-        //     try self.session.journal.forgetWeapon(item);
-        // }
-        wallet.money -= price;
-        // TODO: Modify an armor
-        try self.updateTabs();
-    } else {
+    if (wallet.money < price) {
         self.modal_window = try w.notification(
             self.session.mode_arena.allocator(),
             "You have not enough\nmoney.",
             .{ .max_region = MODAL_WINDOW_REGION },
         );
+        return;
     }
+    var prng = std.Random.DefaultPrng.init(self.session.seed);
+    const rand = prng.random();
+
+    const should_become_broken = breakage_chance > 0 and rand.uintAtMost(u8, 100) < breakage_chance;
+    const modifications = if (should_become_broken)
+        &(try self.session.registry.getOrSet(item, c.Breakages, .empty)).modifications
+    else
+        &(try self.session.registry.getOrSet(item, c.Improvements, .empty)).modifications;
+    const modification = if (manual_modification) |mm|
+        mm
+    else
+        self.chooseModification(rand, item, should_become_broken, modifications);
+
+    modifications.add(modification);
+
+    if (self.session.registry.has(item, c.Weapon)) {
+        try self.session.journal.forgetWeapon(item);
+    } else if (self.session.registry.has(item, c.Armor)) {
+        try self.session.journal.forgetArmor(item);
+    }
+    wallet.money -= price;
+    try self.updateTabs();
+}
+
+fn chooseModification(
+    self: Self,
+    rand: std.Random,
+    item: g.Entity,
+    should_become_broken: bool,
+    modifications: *const c.Modifications,
+) c.Modification {
+    var proportions = if (should_become_broken) c.Breakages.proportions else c.Improvements.proportions;
+    var itr = modifications.iterator();
+    while (itr.next()) |m| {
+        proportions[@intFromEnum(m)] = 0;
+    }
+    if (should_become_broken and self.session.registry.has(item, c.Weapon)) {
+        for (std.enums.values(c.ElementalEffect)) |e| {
+            proportions[@intFromEnum(e)] = 0;
+        }
+    }
+    return @enumFromInt(rand.weightedIndex(u8, &proportions));
 }
 
 fn describeItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
@@ -404,4 +427,29 @@ fn draw(self: *Self) !void {
         const money = self.session.registry.getUnsafe(self.session.player, c.Wallet).money;
         try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "Your money: {d:4}$", .{money}));
     }
+}
+
+fn calculateIdentificationPrice(self: Self, item: g.Entity) u16 {
+    const item_price: f32 = @floatFromInt(self.session.registry.getUnsafe(item, c.Price).value);
+    return @intFromFloat(item_price * IDENTIFY_COST);
+}
+
+fn calculateRepairPrice(self: Self, item: g.Entity) u16 {
+    const item_price: f32 = @floatFromInt(self.session.registry.getUnsafe(item, c.Price).value);
+    return @intFromFloat(item_price * REPAIR_BREAK_COST);
+}
+
+fn calculateSomehowModificationPrice(self: Self, item: g.Entity) u16 {
+    const item_price: f32 = @floatFromInt(self.session.registry.getUnsafe(item, c.Price).value);
+    return @intFromFloat(item_price * MOD_SOMEHOW_COST);
+}
+
+fn calculateCarefulModificationPrice(self: Self, item: g.Entity) u16 {
+    const item_price: f32 = @floatFromInt(self.session.registry.getUnsafe(item, c.Price).value);
+    return @intFromFloat(item_price * MOD_CAREFUL_COST);
+}
+
+fn calculateManualModificationPrice(self: Self, item: g.Entity) u16 {
+    const item_price: f32 = @floatFromInt(self.session.registry.getUnsafe(item, c.Price).value);
+    return @intFromFloat(item_price * MOD_MANUAL_COST);
 }

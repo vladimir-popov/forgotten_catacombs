@@ -251,16 +251,29 @@ pub fn hasModifications(registry: *const g.Registry, entity: g.Entity) bool {
     return registry.has(entity, c.Improvements) or registry.has(entity, c.Breakages);
 }
 
+pub fn getUnknownCodepoint(registry: *const g.Registry, entity: g.Entity) ?u21 {
+    if (registry.get(entity, c.Weapon)) |weapon| {
+        return if (weapon.ammunition_type) |_|
+            g.codepoints.weapon_ranged_unknown
+        else
+            g.codepoints.weapon_melee_unknown;
+    }
+    if (registry.has(entity, c.Armor))
+        return g.codepoints.armor_unknown;
+
+    return null;
+}
+
 /// Adds an optional effect as an breakage to the item and changes the codepoint of the item to
-/// the unknown_codepoint.
+/// an unknown codepoint.
 /// If the effect is omitted, it will be randomly selected.
 pub fn breakItem(
     registry: *g.Registry,
     rand: std.Random,
     item: g.Entity,
-    unknown_codepoint: g.Codepoint,
     modified_effect: ?c.Modification,
 ) !void {
+    // a weapon should not have an elemental breakage
     const is_weapon = registry.has(item, c.Weapon);
     const modification: c.Modification = if (modified_effect) |eff| eff else blk: {
         const proportions = if (is_weapon) c.Breakages.proportions[3..] else &c.Breakages.proportions;
@@ -271,17 +284,19 @@ pub fn breakItem(
     const breakages = try registry.getOrSet(item, c.Breakages, .{ .modifications = .initEmpty() });
     breakages.modifications.add(modification);
     log.debug("Add the breakage {t} to {d}", .{ modification, item.id });
-    try registry.set(item, c.Sprite{ .codepoint = unknown_codepoint });
+    if (registry.get(item, c.Weapon)) |weapon|
+        setCodepointOfUnknownWeapon(registry, item, weapon);
+    if (registry.has(item, c.Armor))
+        setCodepointOfUnknownArmor(registry, item);
 }
 
 /// Adds an optional effect as an improvement to the item and changes the codepoint of the item to
-/// the unknown_codepoint.
+/// an unknown codepoint.
 /// If the effect is omitted, it will be randomly selected.
 pub fn improveItem(
     registry: *g.Registry,
     rand: std.Random,
     item: g.Entity,
-    unknown_codepoint: g.Codepoint,
     modified_effect: ?c.Modification,
 ) !void {
     const effect = if (modified_effect) |eff| eff else blk: {
@@ -291,7 +306,23 @@ pub fn improveItem(
     const improvements = try registry.getOrSet(item, c.Improvements, .{ .modifications = .initEmpty() });
     improvements.modifications.add(effect);
     log.debug("Add the improvement {t} to {d}", .{ effect, item.id });
-    try registry.set(item, c.Sprite{ .codepoint = unknown_codepoint });
+    if (registry.get(item, c.Weapon)) |weapon|
+        setCodepointOfUnknownWeapon(registry, item, weapon);
+    if (registry.has(item, c.Armor))
+        setCodepointOfUnknownArmor(registry, item);
+}
+
+pub fn setCodepointOfUnknownWeapon(registry: *g.Registry, entity: g.Entity, weapon: *const c.Weapon) void {
+    const sprite = registry.getUnsafe(entity, c.Sprite);
+    sprite.codepoint = if (weapon.ammunition_type == null)
+        g.codepoints.weapon_melee_unknown
+    else
+        g.codepoints.weapon_ranged_unknown;
+}
+
+pub fn setCodepointOfUnknownArmor(registry: *g.Registry, entity: g.Entity) void {
+    const sprite = registry.getUnsafe(entity, c.Sprite);
+    sprite.codepoint = g.codepoints.armor_unknown;
 }
 
 pub fn healingPoints(rand: std.Random, max_hp: u8) u8 {
