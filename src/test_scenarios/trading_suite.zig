@@ -15,11 +15,11 @@ test "Init near the shop" {
         \\║        Buy        ║      Sell        ║
         \\║                   ╚══════════════════║
         \\║¿ A green potion                 45$ ▒║
-        \\║] Jacket                         52$ ░║
+        \\║% Apple                          15$ ░║
+        \\║} Light crossbow                 75$ ░║
+        \\║/ Pickaxe                        37$ ░║
         \\║¿ A green potion                 45$ ░║
-        \\║¡ Oil lamp                       75$ ░║
-        \\║{ Light crossbow                 75$ ░║
-        \\║/ Dagger                         45$ ░║
+        \\║- Bolts 20                       30$ ░║
         \\╚══════════════════════════════════════╝
         \\════════════════════════════════════════
         \\ Your money:   40$    Close  �� Choose ⇧

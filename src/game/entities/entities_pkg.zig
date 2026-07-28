@@ -7,13 +7,24 @@ const p = g.primitives;
 
 const entities = @This();
 
-const items = @import("items.zig");
+const ammo = @import("ammo.zig");
+const armor = @import("armor.zig");
 const enemies = @import("enemies.zig");
-pub const random = @import("random.zig");
+const food = @import("food.zig");
+const items = @import("items.zig");
+const potions = @import("potions.zig");
+const weapons = @import("weapons.zig");
+
+pub const generators = @import("generators.zig");
 
 pub const presets = struct {
-    pub const Items = g.utils.Preset(g.components.Components, entities.items);
+    pub const Ammo = g.utils.Preset(g.components.Components, entities.ammo);
+    pub const Armor = g.utils.Preset(g.components.Components, entities.armor);
     pub const Enemies = g.utils.Preset(g.components.Components, entities.enemies);
+    pub const Food = g.utils.Preset(g.components.Components, entities.food);
+    pub const Items = g.utils.Preset(g.components.Components, entities.items);
+    pub const Potions = g.utils.Preset(g.components.Components, entities.potions);
+    pub const Weapons = g.utils.Preset(g.components.Components, entities.weapons);
 };
 
 /// Creates components for the player with empty inventory and nothing equipped.

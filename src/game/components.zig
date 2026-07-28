@@ -208,7 +208,7 @@ pub const Equipment = struct {
 };
 
 pub const Ammunition = struct {
-    pub const Type = enum { arrows, bolts };
+    pub const Type = enum { arrows, bolts, bullets };
     amount: u8,
     ammunition_type: Type,
 
@@ -218,6 +218,10 @@ pub const Ammunition = struct {
 
     pub fn bolts(amount: u8) Ammunition {
         return .{ .amount = amount, .ammunition_type = .bolts };
+    }
+
+    pub fn bullets(amount: u8) Ammunition {
+        return .{ .amount = amount, .ammunition_type = .bullets };
     }
 };
 
@@ -412,61 +416,6 @@ pub const LevelUp = struct {
     last_handled_level: u4,
 };
 
-/// The chance of appearing an item somewhere (shop, dungeon, reward) depends on its tear and
-/// player's level. The high level tiers are for high level players. But, items with zero tear can
-/// appear at any moment. It makes possible to find something like arrows during the whole game.
-/// An approximate correlation between player's level and item's tear looks like this:
-/// tier 1 is for player with level between 1 and 4;
-/// tier 2 is for player with level between 5 and 9;
-/// and so on.
-pub const Tier = struct {
-    value: u4,
-};
-
-pub const Rarity = enum(u8) {
-    common = 15,
-    rare = 10,
-    very_rare = 5,
-    legendary = 1,
-    unique = 0,
-
-    const proportions: [std.meta.fields(Rarity).len]u8 = blk: {
-        var result: [std.meta.fields(Rarity).len]u8 = undefined;
-        for (std.meta.fields(Rarity), 0..) |f, i| {
-            result[i] = f.value;
-        }
-        break :blk result;
-    };
-};
-
-test Rarity {
-    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
-    const rand = prng.random();
-    var result: [std.meta.fields(Rarity).len]u8 = @splat(0);
-    for (0..255) |_| {
-        const i = rand.weightedIndex(u8, &Rarity.proportions);
-        result[i] += 1;
-    }
-    defer std.debug.print(
-        \\Common:       {d}
-        \\Rare:         {d}
-        \\Very rare:    {d}
-        \\Legendary:    {d}
-        \\Unique:       {d}
-        \\
-    , .{
-        result[0],
-        result[1],
-        result[2],
-        result[3],
-        result[4],
-    });
-    for (1..result.len) |i| {
-        try std.testing.expect(result[i - 1] > result[i]);
-    }
-    try std.testing.expectEqual(0, result[result.len - 1]);
-}
-
 pub const Initiative = struct {
     move_points: g.MovePoints,
 
@@ -591,10 +540,6 @@ pub const Trap = struct {
     }
 };
 
-pub const Weight = struct {
-    value: u8,
-};
-
 pub const Components = struct {
     ammunition: ?Ammunition = null,
     animation: ?Animation = null,
@@ -616,7 +561,6 @@ pub const Components = struct {
     position: ?Position = null,
     potion: ?Potion = null,
     price: ?Price = null,
-    rarity: ?Rarity = null,
     regeneration: ?Regeneration = null,
     shop: ?Shop = null,
     skills: ?Skills = null,
@@ -625,11 +569,9 @@ pub const Components = struct {
     sprite: ?Sprite, // must be provided for every entity
     state: ?EnemyState = null,
     stats: ?Stats = null,
-    tier: ?Tier = null,
     trap: ?Trap = null,
     wallet: ?Wallet = null,
     weapon: ?Weapon = null,
-    weight: ?Weight = null,
 
     pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
         _ = try writer.write("Components {\n");

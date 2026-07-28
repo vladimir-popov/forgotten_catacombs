@@ -35,6 +35,17 @@ pub inline fn reverse(array: anytype) @TypeOf(array) {
     }
 }
 
+pub inline fn enumIntValues(comptime E: type) []const @typeInfo(E).@"enum".tag_type {
+    comptime {
+        const T = @typeInfo(E).@"enum";
+        var values: [T.fields.len]T.tag_type = undefined;
+        for (T.fields, 0..) |field, i| {
+            values[i] = field.value;
+        }
+        return &values;
+    }
+}
+
 pub fn toStringWithListOf(tagged_unions: anytype) ToString.List(@typeInfo(@TypeOf(tagged_unions)).pointer.child) {
     return ToString.List(@typeInfo(@TypeOf(tagged_unions)).pointer.child){ .values = tagged_unions };
 }

@@ -100,13 +100,13 @@ test "Put arrows to quiver" {
     defer test_session.deinit();
 
     const inventory = try test_session.openInventory();
-    const arrows = try inventory.add(g.entities.presets.Items.get(.arrows));
+    const arrows = try inventory.add(g.entities.presets.Ammo.get(.arrows));
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
         \\║                                      ║
         \\║/ Pickaxe                     weapon  ║
-        \\║- Arrows 10                           ║
+        \\║- Arrows 30                           ║
         \\║¡ Torch                        light  ║
         \\║                                      ║
         \\║                                      ║
@@ -121,7 +121,7 @@ test "Put arrows to quiver" {
         \\║              Inventory               ║
         \\║                                      ║
         \\║/ Pickaxe                     weapon  ║
-        \\║- Arrows 10                     ammo  ║
+        \\║- Arrows 30                     ammo  ║
         \\║¡ Torch                        light  ║
         \\║                                      ║
         \\║                                      ║
@@ -136,7 +136,7 @@ test "Wear an armor" {
     defer test_session.deinit();
 
     const inventory = try test_session.openInventory();
-    const jacket = try inventory.add(g.entities.presets.Items.get(.jacket));
+    const jacket = try inventory.add(g.entities.presets.Armor.get(.jacket));
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
@@ -173,7 +173,7 @@ test "Drink a healing potion" {
 
     test_session.player.health().current_hp = 5;
     var inventory = try test_session.openInventory();
-    const potion = try inventory.add(g.entities.presets.Items.get(.healing_potion));
+    const potion = try inventory.add(g.entities.presets.Potions.get(.healing_potion));
     const options = try inventory.chooseItemById(potion);
     try options.choose("Drink");
     try std.testing.expect(inventory.isClosed());

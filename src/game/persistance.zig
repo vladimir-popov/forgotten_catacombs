@@ -443,7 +443,6 @@ test "All components should be serializable" {
         .price = .{ .value = 100 },
         .position = c.Position{ .place = p.Point.point(12, 42), .zorder = .item },
         .potion = .healing,
-        .rarity = .common,
         .regeneration = .regular,
         .shop = shop,
         .source_of_light = c.SourceOfLight{ .radius = 4 },
@@ -452,11 +451,9 @@ test "All components should be serializable" {
         .skills = .init(1, 2, 3, 4),
         .state = .walking,
         .stats = .init(1, 2, 3, 4, 5),
-        .tier = .{ .value = 12 },
         .trap = .{ .power = 3 },
         .wallet = .{ .money = 321 },
         .weapon = .ranged(5, .arrows, .tricky, .range(1, 2)),
-        .weight = .{ .value = 55 },
     };
 
     inline for (@typeInfo(c.Components).@"struct".fields) |field| {

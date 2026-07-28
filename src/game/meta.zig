@@ -95,10 +95,10 @@ fn statsFromModifications(registry: *const g.Registry, entity: g.Entity) c.Stats
     return stats;
 }
 
-/// An Item is any entity with weight is item.
+/// An Item is any entity with price.
 /// It is something, that could be taken, buying or selling.
 pub inline fn isItem(registry: *const g.Registry, entity: g.Entity) bool {
-    return registry.has(entity, c.Weight);
+    return registry.has(entity, c.Price);
 }
 
 /// Returns a type of the enemy if it has a description preset from an appropriate namespace.

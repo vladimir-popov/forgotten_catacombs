@@ -275,15 +275,19 @@ starting_gold = 35 .. 70
 
 Shop category weights:
 
-| Category | Weight |
-| -------- | ------ |
-| Weapons  | `14`   |
-| Armor    | `10`   |
-| Food     | `18`   |
-| Potions  | `12`   |
-| Ammo     | `24`   |
-| Torches  | `10`   |
-| Oil      | `5`    |
+| Category         | Weight |
+| --------         | ------ |
+| Weapons          | `14`   |
+| Modified Weapons | `10`   |
+| Broken Weapons   | `8`    |
+| Armor            | `10`   |
+| Modified Armor   | `8`    |
+| Broken Armor     | `6`    |
+| Food             | `18`   |
+| Potions          | `12`   |
+| Ammo             | `24`   |
+| Torches          | `10`   |
+| Oil              | `5`    |
 
 Sell multipliers:
 
@@ -329,31 +333,31 @@ Item category generation:
 | Category         | Weight | Comment                     |
 | ---------------- | ------ | --------------------------- |
 | Gold             | `28`   | main neutral loot           |
-| Weapons          | `14`   | regular weapons             |
+| Weapons          | `10`   | regular weapons             |
 | Modified Weapons | `6`    | weapons with modifications  |
 | Broken Weapons   | `8`    | broken weapons, vendor loot |
-| Armor            | `12`   | regular armor               |
+| Armor            | `8`    | regular armor               |
 | Modified Armor   | `4`    | armor with modifications    |
 | Broken Armor     | `8`    | broken armor, vendor loot   |
-| Food             | `12`   | hunger remains a threat     |
-| Potions          | `8`    | rare utility resources      |
-| Ammo             | `10`   | ranged build support        |
+| Food             | `10`   | hunger remains a threat     |
+| Potions          | `12`   | rare utility resources      |
+| Ammo             | `14`   | ranged build support        |
 | Torches          | `10`   | critical light source       |
 | Oil              | `6`    | rare lamp resource          |
 
 Gold piles:
 
-| Floor | Avg gold | Range      |
-| ----- | -------- | ---------- |
-| `1`   | `10`     | `6 .. 15`  |
-| `2`   | `25`     | `14 .. 36` |
-| `3`   | `44`     | `24 .. 64` |
-| `4`   | `65`     | `36 .. 94` |
-| `5`   | `88`     | `48 .. 128` |
-| `6`   | `112`    | `62 .. 162` |
-| `7`   | `138`    | `76 .. 200` |
-| `8`   | `165`    | `91 .. 239` |
-| `9`   | `194`    | `107 .. 281` |
+| Floor | Range        |
+| ----- | ------------ |
+| `1`   | `6 .. 15`    |
+| `2`   | `14 .. 36`   |
+| `3`   | `24 .. 64`   |
+| `4`   | `36 .. 94`   |
+| `5`   | `48 .. 128`  |
+| `6`   | `62 .. 162`  |
+| `7`   | `76 .. 200`  |
+| `8`   | `91 .. 239`  |
+| `9`   | `107 .. 281` |
 
 Spawn weight function:
 
@@ -391,7 +395,6 @@ Armor parameters:
 | `step_weight` | `50`   | weight decrease per floor away      |
 | `tail_weight` | `5`    | minimum rare spawn chance           |
 | `radius`      | `2`    | max distance from peak              |
-| `peak`        | varies | floor where the item is most likely |
 
 Armor distribution:
 

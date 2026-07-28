@@ -509,14 +509,13 @@ fn applyDamage(
             if (g.meta.getEnemyType(&self.session().registry, target)) |enemy_type|
                 try self.session().journal.markEnemyAsKnown(enemy_type);
             // ...and try to generate a reward
-            const optional_reward = try g.entities.random.generateReward(
-                &self.session().registry,
-                self.session().prng.random(),
-                .dungeon,
-                self.session().level.depth,
-                self.session().registry.getUnsafe(self.session().player, c.Experience).level,
-            );
-            if (optional_reward) |reward| {
+            const rand = self.session().prng.random();
+            if (rand.uintAtMost(u8, 100) < 30) {
+                const reward = try g.entities.generators.generateReward(
+                    &self.session().registry,
+                    self.session().prng.random(),
+                    self.session().level.depth,
+                );
                 const place = self.session().registry.getUnsafe(target, c.Position).place;
                 const is_dropped = try self.session().level.tryToPutItem(reward, place);
                 if (is_dropped)

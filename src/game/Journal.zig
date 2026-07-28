@@ -141,7 +141,7 @@ test "Move unknown equipment to known after N turns" {
 
     var registry = try g.Registry.init(&game_state_arena);
     var journal = try init(&registry, 0);
-    const equipment = try registry.addNewEntity(g.entities.presets.Items.get(.pickaxe));
+    const equipment = try registry.addNewEntity(g.entities.presets.Weapons.get(.pickaxe));
     try journal.addUnknownEquipment(equipment);
 
     // when:

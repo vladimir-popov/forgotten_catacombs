@@ -262,12 +262,9 @@ pub fn generateNew(
         },
         .generate_items => {
             log.debug("Generate items", .{});
-            var proportions: [g.entities.presets.Items.fields.values.len]u8 = undefined;
-            const player_level = self.registry.getUnsafe(self.player, c.Experience).level;
-            g.entities.random.itemsChanceProportions(&proportions, self.depth, .dungeon, player_level);
             for (0..rand.uintLessThan(u8, 5) + 1) |_| {
                 if (self.randomEmptyPlace(rand)) |place| {
-                    _ = try self.addRandomItem(rand, place, &proportions);
+                    _ = try self.addRandomItem(rand, place);
                 }
             }
             return .generate_traps;
@@ -578,21 +575,21 @@ pub fn addEnemy(self: *g.Level, state: c.EnemyState, enemy: c.Components) !g.Ent
 }
 
 pub fn addRandomEnemy(self: *g.Level, rand: std.Random, place: p.Point) !g.Entity {
-    const entity = try g.entities.random.generateEnemy(self.registry, rand, self.depth);
+    const entity = try g.entities.generators.generateEnemy(self.registry, rand, self.depth);
     try self.registry.set(entity, c.Position{ .place = place, .zorder = .obstacle });
     try self.entities_on_level.append(self.arena.allocator(), entity);
     return entity;
 }
 
-fn addRandomItem(self: *g.Level, rand: std.Random, place: p.Point, proportions: []const u8) !g.Entity {
-    const entity = try g.entities.random.generateItem(self.registry, rand, proportions);
+fn addRandomItem(self: *g.Level, rand: std.Random, place: p.Point) !g.Entity {
+    const entity = try g.entities.generators.generateItem(self.registry, rand, self.depth);
     try self.registry.set(entity, c.Position{ .place = place, .zorder = .item });
     try self.entities_on_level.append(self.arena.allocator(), entity);
     return entity;
 }
 
 pub fn addRandomTrap(self: *g.Level, rand: std.Random, place: p.Point) !g.Entity {
-    const entity = try g.entities.random.generateTrap(self.registry, rand, place);
+    const entity = try g.entities.generators.generateTrap(self.registry, rand, place);
     try self.entities_on_level.append(self.arena.allocator(), entity);
     return entity;
 }

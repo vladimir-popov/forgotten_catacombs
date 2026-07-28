@@ -44,10 +44,7 @@ pub inline fn item(components: c.Components) c.Components {
     comptime {
         defined(components, "description");
         defined(components, "price");
-        defined(components, "rarity");
-        defined(components, "tier");
         defined(components, "sprite");
-        defined(components, "weight");
         return components;
     }
 }

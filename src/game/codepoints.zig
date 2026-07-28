@@ -12,6 +12,7 @@ pub const door_opened = '\'';
 pub const floor_known = '·';
 pub const floor_visible = '•';
 pub const food = '%';
+pub const gold = '$';
 pub const human = '@';
 pub const ladder_down = '>';
 pub const ladder_up = '<';

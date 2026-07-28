@@ -352,6 +352,7 @@ fn addDropOption(self: *Self, tab: *w.WindowWithTabs.Tab, item: g.Entity) !void 
 fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Show info about item {d}", .{item.id});
+    try self.session.render.clearDisplay();
     self.description_window = try w.entityDescription(self.session.mode_arena.allocator(), self.session, item);
     // keep the main window opened
     return false;

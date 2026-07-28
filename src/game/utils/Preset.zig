@@ -60,6 +60,7 @@ pub fn Preset(comptime T: type, S: type) type {
             }
         };
 
+        /// Returns an iterator over preset values.
         pub fn iterator() Iterator {
             return .{};
         }
@@ -71,6 +72,8 @@ pub fn Preset(comptime T: type, S: type) type {
             }
             break :blk map;
         };
+
+        pub const count = fields.values.len;
 
         /// Returns a copy of the default value for the field `item`.
         pub inline fn get(item: Tag) T {

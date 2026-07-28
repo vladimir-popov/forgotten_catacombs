@@ -82,8 +82,8 @@ fn initFirstLevelWithRat(test_session: *TestSession) !g.Entity {
 
 fn equipBowAndArrows(test_session: *TestSession) !struct { g.Entity, g.Entity } {
     const inventory = try test_session.openInventory();
-    const arrows_id = try inventory.add(g.entities.presets.Items.get(.arrows));
-    const bow_id = try inventory.add(g.entities.presets.Items.get(.short_bow));
+    const arrows_id = try inventory.add(g.entities.presets.Ammo.get(.arrows));
+    const bow_id = try inventory.add(g.entities.presets.Weapons.get(.short_bow));
     var options = try inventory.chooseItemById(arrows_id);
     try options.choose("Put to quiver");
     try std.testing.expectEqual(arrows_id, test_session.player.equipment().ammunition);

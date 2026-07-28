@@ -165,6 +165,15 @@ pub const Weapon = struct {
             "Standard ammunition for bows.",
         },
     },
+    bullets: g.Description = .{
+        .name = "Bullets",
+        .description = &.{
+            "Cartridges  with  tarnished",
+            "casings  and  the  smell of",
+            "gunpowder.  Even  untouched,",
+            "they look dangerous.",
+        },
+    },
     club: g.Description = .{
         .name = "Club",
         .description = &.{
@@ -249,6 +258,15 @@ pub const Food = struct {
             "sustenance.",
         },
     },
+    traveler_ration: g.Description = .{
+        .name = "Traveler ration",
+        .description = &.{
+            "A compact bundle of preserved food.",
+            "Bland and meager, yet  designed to",
+            "provide  steady nourishment over a",
+            "long period.",
+        },
+    },
 };
 
 closed_door: g.Description = .{
@@ -257,15 +275,6 @@ closed_door: g.Description = .{
         "The  door  stands shut, silent  and",
         "uninviting,  hidding  whatever lies",
         "beyond.",
-    },
-},
-food_ration: g.Description = .{
-    .name = "Food ration",
-    .description = &.{
-        "A compact bundle of preserved food.",
-        "Bland and meager, yet  designed to",
-        "provide  steady nourishment over a",
-        "long period.",
     },
 },
 coctail_molotov: g.Description = .{
@@ -311,6 +320,14 @@ pile: g.Description = .{
     .description = &.{
         "A heap of miscellaneous gear.",
         "Search it to see what’s useful.",
+    },
+},
+gold_pile: g.Description = .{
+    .name = "Gold pile",
+    .description = &.{
+        "A  pile  of  dimly  glinting",
+        "coins, carelessly swept into",
+        "one place.",
     },
 },
 player: g.Description = .{ .name = "You" },

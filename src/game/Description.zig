@@ -241,10 +241,6 @@ pub fn describeItem(
         _ = try text_area.addEmptyLine(alloc);
         try text_area.printLineFmt(alloc, "Calories: {d}", .{consumable.calories});
     }
-    if (journal.registry.get(item, c.Weight)) |weight| {
-        _ = try text_area.addEmptyLine(alloc);
-        try text_area.printLineFmt(alloc, "Weight: {d}", .{weight.value});
-    }
 }
 
 fn writeDescription(
@@ -633,8 +629,6 @@ test "Describe a melee weapon" {
         \\  fire
         \\
         \\Radius of light: 3
-        \\
-        \\Weight: 20
     );
 }
 
@@ -646,7 +640,7 @@ test "Describe a bow" {
     var registry = try g.Registry.init(&game_state_arena);
     const journal = try g.Journal.init(&registry, std.testing.random_seed);
 
-    const id = try registry.addNewEntity(g.entities.presets.Items.fields.get(.short_bow).*);
+    const id = try registry.addNewEntity(g.entities.presets.Weapons.get(.short_bow));
     var text_area: g.windows.TextArea = .empty;
     defer text_area.deinit(std.testing.allocator);
 
@@ -662,8 +656,6 @@ test "Describe a bow" {
         \\This is a tricky weapon.
         \\Damage: 2-3
         \\Max range: 5
-        \\
-        \\Weight: 50
     );
 }
 
@@ -675,7 +667,7 @@ test "Describe an armor" {
     var registry = try g.Registry.init(&game_state_arena);
     const journal = try g.Journal.init(&registry, std.testing.random_seed);
 
-    const id = try registry.addNewEntity(g.entities.presets.Items.fields.get(.jacket).*);
+    const id = try registry.addNewEntity(g.entities.presets.Armor.get(.jacket));
     var text_area: g.windows.TextArea = .empty;
     defer text_area.deinit(std.testing.allocator);
 
@@ -691,21 +683,24 @@ test "Describe an armor" {
         \\resistance to fire and heat.
         \\
         \\Protection: 0-5
-        \\
-        \\Weight: 10
     );
 }
 
-fn expectContent(actual: g.windows.TextArea, comptime expectation: []const u8) !void {
+fn expectContent(actual: g.windows.TextArea, expectation: []const u8) !void {
+    var i: usize = 0;
     errdefer {
         var buffer: [4096]u8 = undefined;
         var writer = std.Io.Writer.fixed(&buffer);
         actual.write(&writer) catch unreachable;
-        std.debug.print("\nThe actual content was:\n--------------\n{s}\n--------------", .{buffer});
+        std.debug.print("\n\nThe last compared line was {d}\n", .{i});
+        std.debug.print("\nThe expectation is:\n--------------\n{s}\n--------------", .{expectation});
+        std.debug.print("\n\nThe actual content was:\n--------------\n{s}\n--------------", .{buffer});
     }
     var itr = std.mem.splitScalar(u8, expectation, '\n');
-    var i: usize = 0;
     while (itr.next()) |line| {
+        if (i >= actual.lines.items.len)
+            return error.AbsentLineInActual;
+
         try std.testing.expectEqualStrings(line, std.mem.trimEnd(u8, &actual.lines.items[i], " \n"));
         i += 1;
     }

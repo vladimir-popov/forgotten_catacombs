@@ -31,21 +31,21 @@ test "Describe an unknown potion" {
     defer test_session.deinit();
 
     const inventory = try test_session.openInventory();
-    const potion = try inventory.add(g.entities.presets.Items.get(.healing_potion));
+    const potion = try inventory.add(g.entities.presets.Potions.get(.healing_potion));
     const options = try inventory.chooseItemById(potion);
     try options.choose("Describe");
 
     try test_session.runtime.display.expectLooksLike(
-        \\╔══════════════════════════════════════╗
-        \\║              Inventory               ║
+        \\
+        \\
+        \\
         \\┌────────────A green potion────────────┐
         \\│ A swirling liquid of green color     │
         \\│ rests in a vial.                     │
-        \\│                                      │
-        \\│ Weight: 10                           │
         \\└──────────────────────────────────────┘
-        \\║                                      ║
-        \\╚══════════════════════════════════════╝
+        \\
+        \\
+        \\
     , .game_area);
 }
 
@@ -56,27 +56,26 @@ test "Describe a known potion (after drinking a similar)" {
 
     // Drink a potion:
     var inventory = try test_session.openInventory();
-    const potion_to_drink = try inventory.add(g.entities.presets.Items.get(.healing_potion));
+    const potion_to_drink = try inventory.add(g.entities.presets.Potions.get(.healing_potion));
     var options = try inventory.chooseItemById(potion_to_drink);
     try options.choose("Drink");
 
     // Check the description:
     inventory = try test_session.openInventory();
-    const potion_to_describe = try inventory.add(g.entities.presets.Items.get(.healing_potion));
+    const potion_to_describe = try inventory.add(g.entities.presets.Potions.get(.healing_potion));
     options = try inventory.chooseItemById(potion_to_describe);
     try options.choose("Describe");
 
     try test_session.runtime.display.expectLooksLike(
-        \\╔══════════════════════════════════════╗
+        \\
+        \\
         \\┌───────────A healing potion───────────┐
         \\│ A brew that glows faintly, as if     │
         \\│ mends alive. It warms your veins     │
         \\│ and your wounds instantly.           │
-        \\│                                      │
-        \\│ Weight: 10                           │
         \\└──────────────────────────────────────┘
-        \\║                                      ║
-        \\╚══════════════════════════════════════╝
+        \\
+        \\
     , .game_area);
 }
 

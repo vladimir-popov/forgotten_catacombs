@@ -2,14 +2,39 @@ const std = @import("std");
 const g = @import("game_pkg.zig");
 const p = g.primitives;
 const c = g.components;
+const ps = g.entities.presets;
 
 const log = std.log.scoped(.cheats);
 
-const items_suggestions: [g.entities.presets.Items.fields.values.len][]const u8 = blk: {
-    var suggestions: [g.entities.presets.Items.fields.values.len][]const u8 = undefined;
-    const items = std.enums.values(g.entities.presets.Items.Tag);
-    for (items, 0..) |item, i| {
+const total_items_count: usize =
+    ps.Items.count + ps.Weapons.count + ps.Armor.count + ps.Ammo.count + ps.Food.count + ps.Potions.count;
+
+const items_suggestions: [total_items_count][]const u8 = blk: {
+    var suggestions: [total_items_count][]const u8 = undefined;
+    var i: usize = 0;
+    for (std.enums.values(ps.Items.Tag)) |item| {
         suggestions[i] = @tagName(item);
+        i += 1;
+    }
+    for (std.enums.values(ps.Weapons.Tag)) |item| {
+        suggestions[i] = @tagName(item);
+        i += 1;
+    }
+    for (std.enums.values(ps.Ammo.Tag)) |item| {
+        suggestions[i] = @tagName(item);
+        i += 1;
+    }
+    for (std.enums.values(ps.Armor.Tag)) |item| {
+        suggestions[i] = @tagName(item);
+        i += 1;
+    }
+    for (std.enums.values(ps.Food.Tag)) |item| {
+        suggestions[i] = @tagName(item);
+        i += 1;
+    }
+    for (std.enums.values(ps.Potions.Tag)) |item| {
+        suggestions[i] = @tagName(item);
+        i += 1;
     }
     break :blk suggestions;
 };

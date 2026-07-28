@@ -67,11 +67,10 @@ pub fn init(
         .inventory = session.registry.getUnsafe(session.player, c.Inventory),
         .shop = session.registry.getUnsafe(shop, c.Shop),
     };
-    try g.entities.random.fillShop(
+    try g.entities.generators.fillShop(
         &session.registry,
         self.shop,
-        session.level.depth,
-        session.registry.getUnsafe(session.player, c.Experience).level,
+        session.max_depth,
     );
     self.main_window.addTab("Buy", self);
     try self.updateBuyingTab();
