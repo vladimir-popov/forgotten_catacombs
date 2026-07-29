@@ -19,6 +19,7 @@ var rows_pad: u8 = 1;
 var cols_pad: u8 = 1;
 
 pub fn enableGameMode(use_mouse: bool) !void {
+    try tty.Display.enterAlternateScreen();
     try tty.Display.hideCursor();
     tty.Display.handleWindowResize(&act, handleWindowResize);
     if (use_mouse) try tty.KeyboardAndMouse.enableMouseEvents();
@@ -26,6 +27,7 @@ pub fn enableGameMode(use_mouse: bool) !void {
 
 pub fn disableGameMode() !void {
     try tty.KeyboardAndMouse.disableMouseEvents();
+    try tty.Display.leaveAlternateScreen();
     try tty.Display.exitFromRawMode();
     try tty.Display.showCursor();
 }

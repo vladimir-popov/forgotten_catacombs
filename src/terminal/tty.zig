@@ -14,11 +14,17 @@ pub const Text = struct {
     const ED_TO_END = csi("1J");
     const ED_FULL = csi("2J");
 
-    // SM – Set Mode
+    // SM – Set Mode: Show cursor
     const SM_SHOW_CU = csi("?25h");
 
-    // RM – Reset Mode
+    // RM – Reset Mode: Hide cursor
     const RM_HIDE_CU = csi("?25l");
+
+    // SM - Set Mode: Enter to the alternate screen buffer
+    const SM_ALT_SCREEN = csi("?1049h");
+
+    // RM - Reset Mode: Exit from the alternate screen buffer
+    const RM_ALT_SCREEN = csi("?1049l");
 
     // CUP – Cursor Position
     const CUP = csi("H");
@@ -177,9 +183,15 @@ pub const Display = struct {
     }
 
     pub fn exitFromRawMode() !void {
-        try clearScreen();
-        try showCursor();
         _ = c.tcsetattr(c.STDIN_FILENO, .FLUSH, &original_termios);
+    }
+
+    pub fn enterAlternateScreen() !void {
+        try write(Text.SM_ALT_SCREEN);
+    }
+
+    pub fn leaveAlternateScreen() !void {
+        try write(Text.RM_ALT_SCREEN);
     }
 
     pub fn clearScreen() !void {
