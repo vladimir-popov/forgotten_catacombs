@@ -59,8 +59,8 @@ pub fn printLineFmt(self: *Self, alloc: std.mem.Allocator, comptime fmt: []const
 }
 
 // for compatibility with required interface used by the ModalWindow
-pub fn handleButton(_: *Self, _: g.Button) !bool {
-    return false;
+pub fn handleButton(_: *Self, _: g.Button) !w.HandleButtonResult {
+    return .keep_open;
 }
 
 /// Uses the render to draw the text area directly to the screen.

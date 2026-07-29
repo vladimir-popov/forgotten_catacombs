@@ -204,7 +204,7 @@ fn initConfirmStep(self: *Self, stats: c.Stats, skills: c.Skills) !void {
 /// Handles the button and return chosen stats and skills on null if they are not selected yet.
 pub fn handleButton(self: *Self, btn: g.Button, render: g.Render) anyerror!?struct { c.Stats, c.Skills, c.Health } {
     if (self.description) |*window| {
-        if (try window.handleButton(btn)) {
+        if (try window.handleButton(btn) == .close_window) {
             try window.hide(render, .fill_region);
             window.deinit(self.arena.allocator());
             self.description = null;

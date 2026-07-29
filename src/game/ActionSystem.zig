@@ -18,8 +18,9 @@ pub fn calculateQuickActionForTarget(
     player_weapon: *const c.Weapon,
     target_entity: g.Entity,
 ) ?g.Action {
+    const registry = &self.session().registry;
     const target_position =
-        self.session().registry.get(target_entity, c.Position) orelse return null;
+        registry.get(target_entity, c.Position) orelse return null;
 
     // Any action can be applied only to a visible entity
     if (self.session().level.checkPlaceVisibility(target_position.place) != .visible)
@@ -27,10 +28,10 @@ pub fn calculateQuickActionForTarget(
 
     // An action for an entity under the foot
     if (player_place.eql(target_position.place)) {
-        if (g.meta.isItem(&self.session().registry, target_entity)) {
+        if (g.meta.isItem(registry, target_entity)) {
             return .action(.pickup, target_entity);
         }
-        if (self.session().registry.get(target_entity, c.Ladder)) |ladder| {
+        if (registry.get(target_entity, c.Ladder)) |ladder| {
             // It's impossible to go upper the first level
             if (ladder.direction == .up and self.session().level.depth == 0) return null;
 
@@ -42,7 +43,7 @@ pub fn calculateQuickActionForTarget(
     const is_near4 = player_place.near4(target_position.place);
 
     // Is it an enemy?
-    if (g.meta.getEnemyType(&self.session().registry, target_entity)) |_| {
+    if (g.meta.getEnemyType(registry, target_entity)) |_| {
         // It's always possible to hit neighbors in 4 directions
         if (is_near4) return .action(.hit, target_entity);
 
@@ -55,15 +56,15 @@ pub fn calculateQuickActionForTarget(
     }
 
     if (is_near4) {
-        if (self.session().registry.has(target_entity, c.Shop)) {
+        if (registry.has(target_entity, c.Shop)) {
             return .action(.trade, target_entity);
         }
-        if (self.session().registry.get(target_entity, c.Description)) |descr| {
+        if (registry.get(target_entity, c.Description)) |descr| {
             if (descr.preset == .scientist) {
                 return .action(.modify_recognize, {});
             }
         }
-        if (self.session().registry.get(target_entity, c.Door)) |door| {
+        if (registry.get(target_entity, c.Door)) |door| {
             // the player should not be able to open/close the door stay in the doorway
             if (player_place.eql(target_position.place)) {
                 return null;
@@ -73,7 +74,7 @@ pub fn calculateQuickActionForTarget(
                 .closed => .action(.open, .{ .id = target_entity, .place = target_position.place }),
             };
         }
-        if (self.session().registry.has(target_entity, c.Trap) and self.session().journal.known_entities.contains(target_entity)) {
+        if (registry.has(target_entity, c.Trap) and self.session().journal.known_entities.contains(target_entity)) {
             // the player should not be able to disarm a trap staying on it
             if (player_place.eql(target_position.place)) {
                 return null;
@@ -289,7 +290,6 @@ fn doMove(
     from_position: *c.Position,
     target: g.actions.Action.Payload.Move.Target,
 ) !void {
-    self.session().runtime.printStackSize(4, "doMove");
     try self.session().sendEvent(.{
         .entity_moved = .{
             .entity = entity,
@@ -623,14 +623,19 @@ fn closeDoor(
 
 fn pickup(
     self: *Self,
-    _: g.Entity,
+    actor: g.Entity,
     action: *const g.Action,
     move_points_for_action: g.MovePoints,
 ) !g.actions.ActionResult {
     const item = action.payload.pickup;
-    const inventory = self.session().registry.getUnsafe(self.session().player, c.Inventory);
+    const inventory = self.session().registry.getUnsafe(actor, c.Inventory);
     if (self.session().registry.get(item, c.Pile)) |_| {
         try self.session().manageInventory();
+    } else if (self.session().registry.get(item, c.Wallet)) |gold_pile| {
+        const wallet = self.session().registry.getUnsafe(actor, c.Wallet);
+        wallet.money += gold_pile.money;
+        try self.session().registry.removeEntity(item);
+        try self.session().level.removeEntity(item);
     } else {
         try inventory.items.add(item);
         try self.session().registry.remove(item, c.Position);

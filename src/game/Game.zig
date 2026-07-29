@@ -136,7 +136,7 @@ noinline fn welcome(self: *Self) !void {
     try self.drawWelcomeScreen();
 }
 
-fn newGame(ptr: *anyopaque, _: usize, _: void) !bool {
+fn newGame(ptr: *anyopaque, _: usize, _: void) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     std.debug.assert(self.state == .welcome);
     try self.render.clearDisplay();
@@ -144,7 +144,7 @@ fn newGame(ptr: *anyopaque, _: usize, _: void) !bool {
     self.state = .{ .create_character = try self.state_arena.allocator().create(g.CharacterBuilder) };
     try self.state.create_character.init(&self.state_arena);
     try self.state.create_character.draw(self.render);
-    return false;
+    return .keep_open;
 }
 
 pub fn startWithPreset(self: *Self, archetype: g.meta.PlayerArchetype, skills: c.Skills) !void {
@@ -179,7 +179,7 @@ fn startGameSession(self: *Self, stats: c.Stats, skills: c.Skills, health: c.Hea
     log.debug("New session inited", .{});
 }
 
-fn continueGame(ptr: *anyopaque, _: usize, _: void) !bool {
+fn continueGame(ptr: *anyopaque, _: usize, _: void) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     std.debug.assert(self.state == .welcome);
     self.initSideMenu();
@@ -191,23 +191,23 @@ fn continueGame(ptr: *anyopaque, _: usize, _: void) !bool {
         self.render,
     );
     try self.state.game_session.switchModeToLoadingSession(&self.state_arena);
-    return false;
+    return .keep_open;
 }
 
-fn showManual(ptr: *anyopaque, _: usize, _: void) !bool {
+fn showManual(ptr: *anyopaque, _: usize, _: void) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     std.debug.assert(self.state == .welcome);
     self.state = .manual;
     try self.runtime.showManual();
-    return false;
+    return .keep_open;
 }
 
-fn showAbout(ptr: *anyopaque, _: usize, _: void) !bool {
+fn showAbout(ptr: *anyopaque, _: usize, _: void) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     std.debug.assert(self.state == .welcome);
     self.state = .about;
     try self.drawAboutScreen();
-    return false;
+    return .keep_open;
 }
 
 fn initSideMenu(self: *Self) void {

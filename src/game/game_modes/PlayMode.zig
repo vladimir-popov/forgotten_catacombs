@@ -262,10 +262,8 @@ fn drawInfoBar(self: *const Self) !void {
 fn handleInput(self: *Self) !bool {
     // NOTE: the quick_actions_window can be drawn during this method
     if (try self.session.runtime.readPushedButtons()) |btn| {
-        self.session.runtime.printStackSize(1, "handleInput");
-
         if (self.quick_actions_window) |*window| {
-            if (try window.handleButton(btn)) {
+            if (try window.handleButton(btn) == .close_window) {
                 try window.hide(self.session.render, .from_buffer);
                 window.deinit(self.session.mode_arena.allocator());
                 self.quick_actions_window = null;
@@ -567,11 +565,11 @@ fn windowWithQuickActions(self: *Self) !w.ModalWindow(w.OptionsArea(void)) {
 }
 
 /// Sets the index of the current quick action to the currently selected item in the window
-fn chooseQuickAction(ptr: *anyopaque, line_idx: usize, _: void) anyerror!bool {
+fn chooseQuickAction(ptr: *anyopaque, line_idx: usize, _: void) anyerror!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     self.quick_actions.selected_idx = line_idx;
     log.debug("Chosen option {d}: {t}", .{ line_idx, self.quickAction().tag });
-    return true;
+    return .close_window;
 }
 
 pub const QuickActions = struct {

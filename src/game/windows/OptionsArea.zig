@@ -23,19 +23,17 @@ pub fn OptionsArea(comptime Item: type) type {
     return struct {
         const Self = @This();
 
-        /// Returns true to close the parent window.
         pub const OnReleaseButton = *const fn (
             owner: *anyopaque,
             line_idx: usize,
             item: Item,
-        ) anyerror!bool;
+        ) anyerror!w.HandleButtonResult;
 
-        /// Returns true to close the parent window.
         pub const OnHoldButton = *const fn (
             owner: *anyopaque,
             line_idx: usize,
             item: Item,
-        ) anyerror!bool;
+        ) anyerror!w.HandleButtonResult;
 
         pub const Option = struct {
             item: Item,
@@ -153,8 +151,8 @@ pub fn OptionsArea(comptime Item: type) type {
             return line;
         }
 
-        fn doNothing(_: *anyopaque, _: usize, _: Item) anyerror!bool {
-            return false;
+        fn doNothing(_: *anyopaque, _: usize, _: Item) anyerror!w.HandleButtonResult {
+            return .keep_open;
         }
 
         pub fn selectLine(self: *Self, idx: usize) !void {
@@ -181,7 +179,7 @@ pub fn OptionsArea(comptime Item: type) type {
         }
 
         /// Returns true to close the parent window.
-        pub fn handleButton(self: *Self, btn: g.Button) !bool {
+        pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
             switch (btn.game_button) {
                 .up => self.selectPreviousLine(),
                 .down => self.selectNextLine(),
@@ -195,7 +193,7 @@ pub fn OptionsArea(comptime Item: type) type {
                 },
                 else => {},
             }
-            return false;
+            return .keep_open;
         }
 
         /// Draws the options line by line inside the passed region. If the region has not enough

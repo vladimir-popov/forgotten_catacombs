@@ -36,7 +36,7 @@ pub fn tick(self: *ExploreMode) anyerror!void {
     // Nothing should happened until the player push a button
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (self.description_window) |*description_window| {
-            if (try description_window.handleButton(btn)) {
+            if (try description_window.handleButton(btn) == .close_window) {
                 try description_window.hide(self.session.render, .from_buffer);
                 description_window.deinit(self.session.mode_arena.allocator());
                 self.description_window = null;
@@ -45,7 +45,7 @@ pub fn tick(self: *ExploreMode) anyerror!void {
                     try self.session.levelUp();
             }
         } else if (self.entities_window) |*entities_window| {
-            if (try entities_window.handleButton(btn)) {
+            if (try entities_window.handleButton(btn) == .close_window) {
                 try entities_window.hide(self.session.render, .from_buffer);
                 entities_window.deinit(self.session.mode_arena.allocator());
                 self.entities_window = null;
@@ -244,11 +244,11 @@ fn windowWithEntities(
     return .defaultModalWindow(area);
 }
 
-fn showEntityDescription(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!bool {
+fn showEntityDescription(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!w.HandleButtonResult {
     const self: *ExploreMode = @ptrCast(@alignCast(ptr));
     self.entity_in_focus = entity;
     self.description_window = try self.windowWithDescription();
-    return false;
+    return .keep_open;
 }
 
 fn windowWithDescription(self: *ExploreMode) !w.ModalWindow(w.TextArea) {

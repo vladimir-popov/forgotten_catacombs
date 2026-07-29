@@ -79,20 +79,20 @@ pub fn ModalWindow(comptime Area: type) type {
 
         /// Returns true if the 'close' button was pressed, or the content requires closing after
         /// handling the button.
-        pub fn handleButton(self: *Self, btn: g.Button) !bool {
-            if (try self.scrollable_area.handleButton(btn))
-                return true;
+        pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
+            if (try self.scrollable_area.handleButton(btn) == .close_window)
+                return .close_window;
 
             switch (btn.game_button) {
                 // if the aria has a special handler for the right button, then
                 // pressing the right button should be handled by the content, or lead to closing
                 // this window
-                .a => return self.scrollable_area.button() == null,
+                .a => return if (self.scrollable_area.button() != null) .keep_open else .close_window,
                 // ...otherwise the left is 'Close' button
-                .b => return self.scrollable_area.button() != null,
+                .b => return if (self.scrollable_area.button() != null) .close_window else .keep_open,
                 else => {},
             }
-            return false;
+            return .keep_open;
         }
 
         /// Draws the window with a scrollbar and buttons if they are required.

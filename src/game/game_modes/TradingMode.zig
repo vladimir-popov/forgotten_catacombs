@@ -103,21 +103,21 @@ inline fn sellingTab(self: *Self) *w.WindowWithTabs.Tab {
 pub fn tick(self: *Self) !void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (self.modal_window) |*window| {
-            if (try window.handleButton(btn)) {
+            if (try window.handleButton(btn) == .close_window) {
                 std.log.debug("Close description window", .{});
                 try self.main_window.draw(self.session.render);
                 window.deinit(self.session.mode_arena.allocator());
                 self.modal_window = null;
             }
         } else if (self.actions_window) |*window| {
-            if (try window.handleButton(btn)) {
+            if (try window.handleButton(btn) == .close_window) {
                 std.log.debug("Close actions window", .{});
                 try self.main_window.draw(self.session.render);
                 window.deinit(self.session.mode_arena.allocator());
                 self.actions_window = null;
             }
         } else {
-            if (try self.main_window.handleButton(btn)) {
+            if (try self.main_window.handleButton(btn) == .close_window) {
                 try self.session.continuePlay(null, null);
                 return;
             }
@@ -239,7 +239,7 @@ fn updateSellingTab(self: *Self) !void {
     }
 }
 
-fn buyOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn buyOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Buttons is helt. Show modal window for {any}", .{item});
     var area = w.OptionsArea(g.Entity).centered(self);
@@ -247,20 +247,20 @@ fn buyOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     try area.addOption(self.session.mode_arena.allocator(), "Describe", item, describeSelectedItem, null);
     self.actions_window = .defaultModalWindow(area);
     // keep the main window opened
-    return false;
+    return .keep_open;
 }
 
-fn sellOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn sellOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     var area = w.OptionsArea(g.Entity).centered(self);
     try area.addOption(self.session.mode_arena.allocator(), "Sell", item, sellSelectedItem, null);
     try area.addOption(self.session.mode_arena.allocator(), "Describe", item, describeSelectedItem, null);
     self.actions_window = .defaultModalWindow(area);
     // keep the main window opened
-    return false;
+    return .keep_open;
 }
 
-fn buySelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn buySelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const price = self.actualPrice(self.session.registry.getUnsafe(item, c.Price), true);
     log.debug("Buying item {d}", .{item.id});
@@ -278,10 +278,10 @@ fn buySelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
         );
     }
     // close the modal window
-    return true;
+    return .close_window;
 }
 
-fn sellSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn sellSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const price = self.actualPrice(self.session.registry.getUnsafe(item, c.Price), false);
     log.debug("Selling {d}", .{item.id});
@@ -299,13 +299,13 @@ fn sellSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
         );
     }
     // close the modal window
-    return true;
+    return .close_window;
 }
 
-fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Show info about item {d}", .{item.id});
     self.modal_window = try w.entityDescription(self.session.mode_arena.allocator(), self.session, item);
     // keep the main window opened
-    return false;
+    return .keep_open;
 }

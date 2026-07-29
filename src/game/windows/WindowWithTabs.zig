@@ -83,14 +83,14 @@ pub fn activeTab(self: *Self) *Tab {
 }
 
 /// true means the window should be closed
-pub fn handleButton(self: *Self, btn: g.Button) !bool {
+pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
     const tab = &self.tabs[self.active_tab_idx];
-    if (try tab.scrollable_area.handleButton(btn))
-        return true;
+    if (try tab.scrollable_area.handleButton(btn) == .close_window)
+        return .close_window;
 
     switch (btn.game_button) {
-        .a => return tab.scrollable_area.button() == null,
-        .b => return true,
+        .a => return if (tab.scrollable_area.button() == null) .close_window else .keep_open,
+        .b => return .close_window,
         .left => if (self.active_tab_idx > 0) {
             self.active_tab_idx -= 1;
         },
@@ -99,7 +99,7 @@ pub fn handleButton(self: *Self, btn: g.Button) !bool {
         },
         else => {},
     }
-    return false;
+    return .keep_open;
 }
 
 pub fn draw(self: Self, render: g.Render) !void {

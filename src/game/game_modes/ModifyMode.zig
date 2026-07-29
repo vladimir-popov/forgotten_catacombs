@@ -107,21 +107,21 @@ pub fn deinit(self: *Self) void {
 pub fn tick(self: *Self) !void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (self.modal_window) |*window| {
-            if (try window.handleButton(btn)) {
+            if (try window.handleButton(btn) == .close_window) {
                 log.debug("Close modal window", .{});
                 try self.main_window.draw(self.session.render);
                 window.deinit(self.session.mode_arena.allocator());
                 self.modal_window = null;
             }
         } else if (self.actions_window) |*window| {
-            if (try window.handleButton(btn)) {
+            if (try window.handleButton(btn) == .close_window) {
                 log.debug("Close actions window", .{});
                 try self.main_window.draw(self.session.render);
                 window.deinit(self.session.mode_arena.allocator());
                 self.actions_window = null;
             }
         } else {
-            if (try self.main_window.handleButton(btn)) {
+            if (try self.main_window.handleButton(btn) == .close_window) {
                 // the  deinit method will be invoked here:
                 try self.session.continuePlay(null, null);
                 return;
@@ -207,17 +207,17 @@ inline fn isWeaponOrArmor(self: *Self, item: g.Entity) bool {
     return self.session.registry.has(item, c.Weapon) or self.session.registry.has(item, c.Armor);
 }
 
-fn recognizeDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn recognizeDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     var area = w.OptionsArea(g.Entity).centered(self);
     try area.addOption(self.session.mode_arena.allocator(), "Recognize", item, recognizeItem, null);
     try area.addOption(self.session.mode_arena.allocator(), "Describe", item, describeItem, null);
     self.actions_window = .modalWindow(area, MODAL_WINDOW_REGION);
     // keep the main window opened
-    return false;
+    return .keep_open;
 }
 
-fn recognizeItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn recognizeItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const wallet = self.session.registry.getUnsafe(self.session.player, c.Wallet);
     const price = self.calculateIdentificationPrice(item);
@@ -238,10 +238,10 @@ fn recognizeItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
             .{ .max_region = MODAL_WINDOW_REGION },
         );
     }
-    return true;
+    return .close_window;
 }
 
-fn modifyDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn modifyDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     var area = w.OptionsArea(g.Entity).centered(self);
     try area.addOption(self.session.mode_arena.allocator(), "Modify", item, modificationMode, null);
@@ -249,10 +249,10 @@ fn modifyDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     try area.addOption(self.session.mode_arena.allocator(), "Help", item, showHelp, null);
     self.actions_window = .modalWindow(area, MODAL_WINDOW_REGION);
     // keep the main window opened
-    return false;
+    return .keep_open;
 }
 
-fn showHelp(ptr: *anyopaque, _: usize, _: g.Entity) !bool {
+fn showHelp(ptr: *anyopaque, _: usize, _: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     self.modal_window = try w.notification(
         self.session.mode_arena.allocator(),
@@ -279,10 +279,10 @@ fn showHelp(ptr: *anyopaque, _: usize, _: g.Entity) !bool {
     ,
         .{ .title = "Help", .max_region = MODAL_WINDOW_REGION, .text_align = .left },
     );
-    return false;
+    return .keep_open;
 }
 
-fn modificationMode(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn modificationMode(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     self.actions_window.?.deinit(self.session.mode_arena.allocator());
     var area = w.OptionsArea(g.Entity).centered(self);
@@ -312,22 +312,22 @@ fn modificationMode(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     );
     self.actions_window = .modalWindow(area, MODAL_WINDOW_REGION);
     // keep the main window opened
-    return false;
+    return .keep_open;
 }
 
-fn modifySomehow(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn modifySomehow(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     try self.modify(item, CHANCE_TO_BREAK_ON_SOMEHOW, null, self.calculateSomehowModificationPrice(item));
-    return true;
+    return .close_window;
 }
 
-fn modifyCarefully(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn modifyCarefully(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     try self.modify(item, CHANCE_TO_BREAK_ON_CAREFUL, null, self.calculateCarefulModificationPrice(item));
-    return true;
+    return .close_window;
 }
 
-fn modifyManually(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn modifyManually(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const options = &self.actions_window.?.scrollable_area.content;
     log.debug("Show the list of possible effects", .{});
@@ -342,14 +342,14 @@ fn modifyManually(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
         );
     }
     // Do not close the action_window, because we recreate it here
-    return false;
+    return .keep_open;
 }
 
-fn modifyManuallyEffect(ptr: *anyopaque, idx: usize, item: g.Entity) !bool {
+fn modifyManuallyEffect(ptr: *anyopaque, idx: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const modification: c.Modification = @enumFromInt(idx);
     try self.modify(item, 0, modification, self.calculateManualModificationPrice(item));
-    return true;
+    return .close_window;
 }
 
 fn modify(self: *Self, item: g.Entity, breakage_chance: u8, manual_modification: ?c.Modification, price: u16) !void {
@@ -406,11 +406,11 @@ fn chooseModification(
     return @enumFromInt(rand.weightedIndex(u8, &proportions));
 }
 
-fn describeItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn describeItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Show info about item {d}", .{item.id});
     self.modal_window = try w.entityDescription(self.session.mode_arena.allocator(), self.session, item);
-    return false;
+    return .keep_open;
 }
 
 fn draw(self: *Self) !void {

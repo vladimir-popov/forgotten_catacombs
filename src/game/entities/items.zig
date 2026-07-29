@@ -24,4 +24,5 @@ gold_pile: c.Components = .{
     .description = .{ .preset = .gold_pile },
     .sprite = .{ .codepoint = cp.gold },
     .wallet = .empty,
+    .price = .{ .value = 0 },
 }

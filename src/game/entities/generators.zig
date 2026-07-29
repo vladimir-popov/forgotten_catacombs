@@ -130,7 +130,9 @@ const gold_piles = [_]p.Range(u16){
 fn generateGoldPile(registry: *g.Registry, rand: std.Random, depth: u8) !g.Entity {
     const gold_pile = gold_piles[depth];
     const pile_id = try registry.addNewEntity(g.entities.presets.Items.get(.gold_pile));
-    registry.getUnsafe(pile_id, c.Wallet).money = gold_pile.choose(rand);
+    const wallet = registry.getUnsafe(pile_id, c.Wallet);
+    wallet.money = gold_pile.choose(rand);
+    registry.getUnsafe(pile_id, c.Price).value = wallet.money;
     return pile_id;
 }
 

@@ -82,21 +82,21 @@ pub fn init(
 pub fn tick(self: *Self) !void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (self.description_window) |*window| {
-            if (try window.handleButton(btn)) {
+            if (try window.handleButton(btn) == .close_window) {
                 log.debug("Close description window", .{});
                 try window.hide(self.session.render, .fill_region);
                 window.deinit(self.session.mode_arena.allocator());
                 self.description_window = null;
             }
         } else if (self.actions_window) |*window| {
-            if (try window.handleButton(btn)) {
+            if (try window.handleButton(btn) == .close_window) {
                 log.debug("Close actions window", .{});
                 try window.hide(self.session.render, .fill_region);
                 window.deinit(self.session.mode_arena.allocator());
                 self.actions_window = null;
             }
         } else {
-            if (try self.main_window.handleButton(btn)) {
+            if (try self.main_window.handleButton(btn) == .close_window) {
                 try self.session.continuePlay(null, self.action);
                 return;
             }
@@ -183,7 +183,7 @@ fn formatInventoryLine(self: *Self, line: *w.TextArea.Line, item: g.Entity) ![]c
     return try std.fmt.bufPrint(line, inventory_line_fmt, .{ sprite.codepoint, name, using });
 }
 
-fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Buttons is helt. Show modal window for {any}", .{item});
     var area = w.OptionsArea(g.Entity).centered(self);
@@ -212,7 +212,7 @@ fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     try area.addOption(self.session.mode_arena.allocator(), "Describe", item, describeSelectedItem, null);
     self.actions_window = .modalWindow(area, MODAL_WINDOW_REGION);
     // keep the main window opened
-    return false;
+    return .keep_open;
 }
 
 inline fn isEquipped(self: Self, item: g.Entity) bool {
@@ -222,7 +222,7 @@ inline fn isEquipped(self: Self, item: g.Entity) bool {
         item.eql(self.equipment.ammunition);
 }
 
-fn unequipItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn unequipItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Unequip the item {d}. (current equipment: {any})", .{ item.id, self.equipment });
     if (item.eql(self.equipment.light))
@@ -235,18 +235,18 @@ fn unequipItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
         self.equipment.armor = null;
 
     try self.updateInventoryTab();
-    return true;
+    return .close_window;
 }
 
-fn useAsLight(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn useAsLight(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Use the item {d} as a source of light. (current equipment: {any})", .{ item.id, self.equipment });
     self.equipment.light = item;
     try self.updateInventoryTab();
-    return true;
+    return .close_window;
 }
 
-fn useAsWeapon(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn useAsWeapon(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Use the item {d} as weapon. (current equipment: {any})", .{ item.id, self.equipment });
     self.equipment.weapon = item;
@@ -257,26 +257,26 @@ fn useAsWeapon(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
     }
 
     try self.updateInventoryTab();
-    return true;
+    return .close_window;
 }
 
-fn useAsArmor(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn useAsArmor(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Use the item {d} as armor. (current equipment: {any})", .{ item.id, self.equipment });
     self.equipment.armor = item;
     try self.updateInventoryTab();
-    return true;
+    return .close_window;
 }
 
-fn putToQuiver(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn putToQuiver(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Use the item {d} as an ammunition. (current equipment: {any})", .{ item.id, self.equipment });
     self.equipment.ammunition = item;
     try self.updateInventoryTab();
-    return true;
+    return .close_window;
 }
 
-fn consumeFood(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn consumeFood(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     if (self.session.registry.get(item, c.Consumable)) |food| {
         log.debug("Consume the item {d} {any}. (current equipment: {any})", .{ item.id, food, self.equipment });
@@ -284,10 +284,10 @@ fn consumeFood(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
         _ = self.inventory.items.remove(item);
     }
     try self.updateInventoryTab();
-    return true;
+    return .close_window;
 }
 
-fn drinkPotion(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn drinkPotion(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     if (self.session.registry.get(item, c.Potion)) |potion| {
         log.debug("Drink the item {d} {any}. (current equipment: {any})", .{ item.id, potion, self.equipment });
@@ -295,16 +295,16 @@ fn drinkPotion(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
         _ = self.inventory.items.remove(item);
     }
     try self.updateInventoryTab();
-    return true;
+    return .close_window;
 }
 
-fn takeFromPileOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn takeFromPileOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     var area = w.OptionsArea(g.Entity).centered(self);
     try area.addOption(self.session.mode_arena.allocator(), "Take", item, takeSelectedItem, null);
     try area.addOption(self.session.mode_arena.allocator(), "Describe", item, describeSelectedItem, null);
     self.actions_window = .modalWindow(area, MODAL_WINDOW_REGION);
-    return true;
+    return .close_window;
 }
 
 fn addDropTab(self: *Self, drop: g.Entity) !void {
@@ -349,18 +349,18 @@ fn addDropOption(self: *Self, tab: *w.WindowWithTabs.Tab, item: g.Entity) !void 
     );
 }
 
-fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Show info about item {d}", .{item.id});
     try self.session.render.clearDisplay();
     self.description_window = try w.entityDescription(self.session.mode_arena.allocator(), self.session, item);
     // keep the main window opened
-    return false;
+    return .keep_open;
 }
 
 /// Moves an item from the inventory to the player's position on the level.
 /// Add the Drop tab
-fn dropSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn dropSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const place = self.session.level.playerPosition().place;
     log.debug("Drop item {d} at {any}", .{ item.id, place });
@@ -378,31 +378,37 @@ fn dropSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
         try self.addDropTab(item);
     }
     try self.updateInventoryTab();
-    return true;
+    return .close_window;
 }
 
 /// Moves entity from the pile to the inventory.
 /// Removes the Pile tab if the item was the last in the pile.
-fn takeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !bool {
+fn takeSelectedItem(ptr: *anyopaque, _: usize, selected_item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    try self.inventory.items.add(item);
-    const entity = self.drop orelse @panic("Attempt to take an undefined item");
-    if (self.session.registry.get(entity, c.Pile)) |pile| {
-        _ = pile.items.remove(item);
+    const dropped_entity = self.drop orelse @panic("Attempt to take an undefined item");
+    if (self.session.registry.get(selected_item, c.Wallet)) |gold_pile| {
+        const wallet = self.session.registry.getUnsafe(self.session.player, c.Wallet);
+        wallet.money += gold_pile.money;
+        try self.session.registry.removeEntity(selected_item);
+    } else {
+        try self.inventory.items.add(selected_item);
+    }
+    if (self.session.registry.get(dropped_entity, c.Pile)) |pile| {
+        _ = pile.items.remove(selected_item);
         // Remove the pile only if it is became empty
         if (pile.items.size() == 0) {
-            try self.session.registry.removeEntity(entity);
+            try self.session.registry.removeEntity(dropped_entity);
             self.main_window.removeLastTab(self.session.mode_arena.allocator());
             self.drop = null;
         } else {
-            try self.updateDropTab(self.drop.?);
+            try self.updateDropTab(dropped_entity);
         }
     } else {
-        std.debug.assert(entity.eql(item));
-        try self.session.registry.remove(item, c.Position);
-        try self.session.level.removeEntity(item);
+        std.debug.assert(dropped_entity.eql(selected_item));
+        try self.session.registry.remove(selected_item, c.Position);
+        try self.session.level.removeEntity(selected_item);
         self.main_window.removeLastTab(self.session.mode_arena.allocator());
     }
     try self.updateInventoryTab();
-    return true;
+    return .close_window;
 }

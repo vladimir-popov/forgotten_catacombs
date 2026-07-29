@@ -37,14 +37,14 @@ pub fn ScrollableArea(comptime Area: type) type {
             return self.content.button();
         }
 
-        pub fn handleButton(self: *Self, btn: g.Button) !bool {
-            if (try self.content.handleButton(btn))
-                return true;
+        pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
+            if (try self.content.handleButton(btn) == .close_window)
+                return .close_window;
 
-            if (!self.isScrollRequired()) return false;
+            if (!self.isScrollRequired()) return .keep_open;
             if (self.content.selectedLine()) |selected_line| {
                 if (self.region.rows + self.scrolled_lines > selected_line and selected_line >= self.scrolled_lines)
-                    return false;
+                    return .keep_open;
             }
 
             switch (btn.game_button) {
@@ -58,7 +58,7 @@ pub fn ScrollableArea(comptime Area: type) type {
                 },
                 else => {},
             }
-            return false;
+            return .keep_open;
         }
 
         pub fn draw(self: *const Self, render: g.Render) !void {

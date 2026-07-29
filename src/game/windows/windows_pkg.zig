@@ -11,7 +11,7 @@
 //! The interface of areas is:
 //! ```zig
 //! /// Should return a label of the `B` (right) button
-//! /// if the area has a handler of it. The secon boolean parameter
+//! /// if the area has a handler of it. The second boolean parameter
 //! /// means should be handler invoked on release (false), or hold (true)
 //! // the button.
 //! fn button(self: Self) ?struct { []const u8, bool }
@@ -23,7 +23,9 @@
 //! fn selectedLine(self: Self) ?usize
 //!
 //! /// A method to handle a pressed button
-//! fn handleButton(self: *Self, btn: g.Button) !void
+//! /// Should return `true` if the 'close' button was pressed, or the content requires closing after
+//! /// handling the button.
+//! fn handleButton(self: *Self, btn: g.Button) !HandleButtonResult
 //!
 //! /// Uses the render to draw the area directly to the screen.
 //! ///
@@ -51,6 +53,16 @@ const log = std.log.scoped(.windows);
 /// The first one is actual when a window is above the scene, the second - when the window is above
 /// another window.
 pub const HideMode = enum { from_buffer, fill_region };
+
+/// The result of handling a button. Some window can have default `Close` button (a Description
+/// window as example), or have another logic to request closing itself (a window with options).
+pub const HandleButtonResult = enum {
+    /// If the 'close' button was pressed, or the content requires closing after
+    /// handling the button.
+    close_window,
+    /// A button was handled, but the window should still be open.
+    keep_open,
+};
 
 pub const ModalWindow = @import("ModalWindow.zig").ModalWindow;
 pub const OptionsArea = @import("OptionsArea.zig").OptionsArea;

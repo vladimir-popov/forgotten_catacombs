@@ -290,16 +290,14 @@ pub fn drawPlayerHp(self: *const Self, health: *const cm.Health) !void {
 }
 
 pub fn drawEnemyHealth(self: *const Self, codepoint: g.Codepoint, health: *const cm.Health) !void {
-    var buf: [INFO_ZONE_LENGTH]u8 = undefined;
-    inline for (0..INFO_ZONE_LENGTH) |i| buf[i] = default_filler;
+    var buf: [INFO_ZONE_LENGTH]u8 = @splat(default_filler);
     // +1 for padding between the right zone
     var len: u8 = try std.unicode.utf8Encode(codepoint, buf[1..]) + 1;
 
     buf[len] = ':';
     len += 1;
-    const hp = @max(health.current_hp, 0);
-    const free_length = INFO_ZONE_LENGTH - 3; // padding + codepoint (usually 1 byte for enemies) + ':'
-    const hp_length = @divTrunc(free_length * hp, health.max);
+    const free_length: usize = INFO_ZONE_LENGTH - 3; // padding + codepoint (usually 1 byte for enemies) + ':'
+    const hp_length = @divTrunc(free_length * health.current_hp, health.max);
     for (0..hp_length) |i| {
         buf[len + i] = '|';
     }
