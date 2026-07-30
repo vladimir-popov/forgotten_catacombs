@@ -8,7 +8,7 @@ const Self = @This();
 options_area: *g.windows.OptionsArea(g.Entity),
 test_session: *TestSession,
 
-/// Selects an option with the passed name or throws error.
+/// Selects an option with the passed name or throws `OptionWasNotFound` error.
 /// If the options was found, a button is pressed to choose that option.
 /// To find an option this function checks the label of every item for containing the passed name.
 pub fn choose(self: Self, option_name: []const u8) !void {
@@ -45,4 +45,8 @@ pub fn contains(self: Self, item_id: g.Entity) bool {
         }
     }
     return false;
+}
+
+pub fn isEmpty(self: Self) bool {
+    return self.options_area.totalLines() == 0;
 }

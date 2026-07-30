@@ -323,7 +323,7 @@ pile: g.Description = .{
     },
 },
 gold_pile: g.Description = .{
-    .name = "Gold pile",
+    .name = "Gold",
     .description = &.{
         "A  pile  of  dimly  glinting",
         "coins, carelessly swept into",

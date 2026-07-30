@@ -58,6 +58,271 @@ test "Unequip torch" {
     , .game_area);
 }
 
+test "Drop an item" {
+    var test_session: TestSession = undefined;
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
+    defer test_session.deinit();
+
+    var inventory = try test_session.openInventory();
+    const options = try inventory.chooseItemByName("Torch");
+    try options.choose("Drop");
+    try test_session.runtime.display.expectLooksLike(
+        \\╔═══════════════════╗══════════════════╗
+        \\║     Inventory     ║      Drop        ║
+        \\║                   ╚══════════════════║
+        \\║/ Pickaxe                     weapon  ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+    try test_session.pressButton(.right);
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════╔═══════════════════╗
+        \\║     Inventory    ║       Drop        ║
+        \\║══════════════════╝                   ║
+        \\║¡ Torch                               ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+}
+
+test "Drop all items" {
+    var test_session: TestSession = undefined;
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
+    defer test_session.deinit();
+
+    var inventory = try test_session.openInventory();
+    while (!inventory.isInvetoryEmpty()) {
+        const options = try inventory.chooseItemByIndex(0);
+        try options.choose("Drop");
+    }
+    try test_session.runtime.display.expectLooksLike(
+        \\╔═══════════════════╗══════════════════╗
+        \\║     Inventory     ║      Drop        ║
+        \\║                   ╚══════════════════║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+}
+
+test "Pickup an item" {
+    var test_session: TestSession = undefined;
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
+    defer test_session.deinit();
+    // Drop:
+    var inventory = try test_session.openInventory();
+    var options = try inventory.chooseItemByName("Pickaxe");
+    try options.choose("Drop");
+    try test_session.pressButton(.right);
+    // Pickup:
+    options = try inventory.chooseItemByName("Pickaxe");
+    try options.choose("Take");
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║                                      ║
+        \\║/ Pickaxe                             ║
+        \\║¡ Torch                        light  ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+}
+
+test "Pickup a single item from a pile" {
+    var test_session: TestSession = undefined;
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
+    defer test_session.deinit();
+    // Drop everything from the inventory:
+    var inventory = try test_session.openInventory();
+    while (!inventory.isInvetoryEmpty()) {
+        const options = try inventory.chooseItemByIndex(0);
+        try options.choose("Drop");
+    }
+    try test_session.pressButton(.right);
+    // Pickup:
+    const options = try inventory.chooseItemByIndex(0);
+    try options.choose("Take");
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════╔═══════════════════╗
+        \\║     Inventory    ║       Drop        ║
+        \\║══════════════════╝                   ║
+    , .{ .region = .init(1, 1, 3, 40) });
+}
+
+test "Pickup all items from a pile" {
+    var test_session: TestSession = undefined;
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
+    defer test_session.deinit();
+    // Drop everything from the inventory:
+    var inventory = try test_session.openInventory();
+    while (!inventory.isInvetoryEmpty()) {
+        const options = try inventory.chooseItemByIndex(0);
+        try options.choose("Drop");
+    }
+    try test_session.pressButton(.right);
+    // Pickup everything back:
+    while (!inventory.isDropEmpty()) {
+        const options = try inventory.chooseItemByIndex(0);
+        try options.choose("Take");
+    }
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║                                      ║
+    , .{ .region = .init(1, 1, 3, 40) });
+}
+
+test "Pickup a gold pile" {
+    var test_session: TestSession = undefined;
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
+    defer test_session.deinit();
+
+    // Add a gold pile under the player:
+    const pile_id = try test_session.session.registry.addNewEntity(g.entities.goldPile(42));
+    // we expect that the gold pile is a single item on the place:
+    try std.testing.expectEqual(
+        null,
+        try test_session.session.level.addItemAtPlace(pile_id, test_session.player.position().place),
+    );
+
+    // Open inventory
+    var inventory = try test_session.openInventory();
+    try test_session.runtime.display.expectLooksLike(
+        \\╔═══════════════════╗══════════════════╗
+        \\║     Inventory     ║      Drop        ║
+        \\║                   ╚══════════════════║
+        \\║/ Pickaxe                     weapon  ║
+        \\║¡ Torch                        light  ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+        \\════════════════════════════════════════
+        \\        107$          Close  �� Choose ⇧
+    , .whole_display);
+
+    // Switch to the Drop Tab:
+    try test_session.pressButton(.right);
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════╔═══════════════════╗
+        \\║     Inventory    ║       Drop        ║
+        \\║══════════════════╝                   ║
+        \\║$ Gold 42                             ║
+    , .{ .region = .init(1, 1, 4, 40) });
+
+    // Pickup the gold:
+    const options = try inventory.chooseItemByIndex(0);
+    try options.choose("Take");
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║                                      ║
+        \\║/ Pickaxe                     weapon  ║
+        \\║¡ Torch                        light  ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+        \\════════════════════════════════════════
+        \\        149$          Close  �� Choose ⇧
+    , .whole_display);
+
+    // The gold pile should not exists anywhere:
+    try std.testing.expect(
+        !test_session.session.mode.inventory.inventory.items.contains(pile_id),
+    );
+    try std.testing.expect(
+        !test_session.session.registry.contains(pile_id),
+    );
+}
+
+test "Pickup gold from a pile of items" {
+    var test_session: TestSession = undefined;
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
+    errdefer test_session.printDisplay();
+    defer test_session.deinit();
+
+    // Add a gold pile under the player:
+    const gold_id = try test_session.session.registry.addNewEntity(g.entities.goldPile(42));
+    _ = try test_session.session.level.addItemAtPlace(gold_id, test_session.player.position().place);
+
+    // Drop everything from the inventory:
+    var inventory = try test_session.openInventory();
+    while (!inventory.isInvetoryEmpty()) {
+        const options = try inventory.chooseItemByIndex(0);
+        try options.choose("Drop");
+    }
+
+    // Switch to the Drop Tab:
+    try test_session.pressButton(.right);
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════╔═══════════════════╗
+        \\║     Inventory    ║       Drop        ║
+        \\║══════════════════╝                   ║
+        \\║/ Pickaxe                             ║
+        \\║$ Gold 42                             ║
+        \\║¡ Torch                               ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+        \\════════════════════════════════════════
+        \\        107$          Close  �� Choose ⇧
+    , .whole_display);
+
+    // Pickup the gold:
+    const options = try inventory.chooseItemByName("Gold");
+    try options.choose("Take");
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════╔═══════════════════╗
+        \\║     Inventory    ║       Drop        ║
+        \\║══════════════════╝                   ║
+        \\║/ Pickaxe                             ║
+        \\║¡ Torch                               ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+        \\════════════════════════════════════════
+        \\        149$          Close  �� Choose ⇧
+    , .whole_display);
+
+    // Switch back to the Inventory Tab:
+    try test_session.pressButton(.left);
+    try test_session.runtime.display.expectLooksLike(
+        \\╔═══════════════════╗══════════════════╗
+        \\║     Inventory     ║      Drop        ║
+        \\║                   ╚══════════════════║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+        \\════════════════════════════════════════
+        \\        149$                 �� Close   
+    , .whole_display);
+}
+
 test "Use torch as a weapon" {
     var test_session: TestSession = undefined;
     try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);

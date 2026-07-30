@@ -36,6 +36,16 @@ pub const ActualNameFormatter = struct {
                 .{ try g.Description.rawName(self.journal.registry, self.entity), ammo.amount },
             );
         }
+        if (self.journal.registry.get(self.entity, c.Description)) |description| {
+            if (description.preset == .gold_pile)
+                return try writer.print(
+                    "{s} {d}",
+                    .{
+                        g.components.Description.Preset.fields.get(description.preset).name,
+                        self.journal.registry.getUnsafe(self.entity, c.Wallet).money,
+                    },
+                );
+        }
         return try writer.writeAll(try g.Description.rawName(self.journal.registry, self.entity));
     }
 };

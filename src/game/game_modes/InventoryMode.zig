@@ -304,7 +304,7 @@ fn takeFromPileOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleBu
     try area.addOption(self.session.mode_arena.allocator(), "Take", item, takeSelectedItem, null);
     try area.addOption(self.session.mode_arena.allocator(), "Describe", item, describeSelectedItem, null);
     self.actions_window = .modalWindow(area, MODAL_WINDOW_REGION);
-    return .close_window;
+    return .keep_open;
 }
 
 fn addDropTab(self: *Self, drop: g.Entity) !void {
@@ -381,7 +381,7 @@ fn dropSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonRe
     return .close_window;
 }
 
-/// Moves entity from the pile to the inventory.
+/// Moves a selected entity from the drop or a pile to the inventory.
 /// Removes the Pile tab if the item was the last in the pile.
 fn takeSelectedItem(ptr: *anyopaque, _: usize, selected_item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));

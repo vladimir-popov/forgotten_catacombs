@@ -14,16 +14,7 @@ test "Init near the shop" {
         \\╔═══════════════════╗══════════════════╗
         \\║        Buy        ║      Sell        ║
         \\║                   ╚══════════════════║
-        \\║¿ A green potion                 45$ ▒║
-        \\║% Apple                          15$ ░║
-        \\║} Light crossbow                 75$ ░║
-        \\║/ Pickaxe                        37$ ░║
-        \\║¿ A green potion                 45$ ░║
-        \\║- Bolts 20                       30$ ░║
-        \\╚══════════════════════════════════════╝
-        \\════════════════════════════════════════
-        \\ Your money:   40$    Close  �� Choose ⇧
-    , .whole_display);
+    , .{ .region = .init(1, 1, 3, 40) });
 }
 
 test "Buy something" {
@@ -98,7 +89,7 @@ test "Trying to sell when the trader doesn't have enough money" {
     const items_before = test_session.player.inventory().items.size();
 
     // when:
-    shop.currentShop().balance = 0;
+    shop.shopWallet().money = 0;
     try test_session.pressButton(.right);
     const options = try shop.chooseItemByIndex(0);
     try options.choose("Sell");

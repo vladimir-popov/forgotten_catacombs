@@ -159,7 +159,7 @@ pub fn initAsFirstLevel(
 
     // Add the trader
     entity = try self.registry.addNewEntity(
-        try g.entities.trader(self.registry, d.FirstLocation.trader_place, 1.5, 200, self.dungeon.seed),
+        try g.entities.trader(self.registry, d.FirstLocation.trader_place, 200),
     );
     try self.entities_on_level.append(arena_alloc, entity);
 

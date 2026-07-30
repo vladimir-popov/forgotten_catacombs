@@ -47,9 +47,10 @@ const MODAL_WINDOW_REGION: p.Region = p.Region.init(3, 2, g.DISPLAY_ROWS - 5, g.
 const Self = @This();
 
 session: *g.GameSession,
-wallet: *c.Wallet,
+player_wallet: *c.Wallet,
 inventory: *c.Inventory,
 shop: *c.Shop,
+shop_wallet: *c.Wallet,
 main_window: w.WindowWithTabs = .{},
 /// Contains an entity description, or a notification.
 modal_window: ?w.ModalWindow(w.TextArea) = null,
@@ -63,12 +64,15 @@ pub fn init(
 ) !void {
     self.* = .{
         .session = session,
-        .wallet = session.registry.getUnsafe(session.player, c.Wallet),
+        .player_wallet = session.registry.getUnsafe(session.player, c.Wallet),
         .inventory = session.registry.getUnsafe(session.player, c.Inventory),
         .shop = session.registry.getUnsafe(shop, c.Shop),
+        .shop_wallet = session.registry.getUnsafe(shop, c.Wallet),
     };
+    var prng = std.Random.DefaultPrng.init(session.level.dungeon.seed);
     try g.entities.generators.fillShop(
         &session.registry,
+        prng.random(),
         self.shop,
         session.max_depth,
     );
@@ -129,9 +133,9 @@ pub fn tick(self: *Self) !void {
         switch (cheat) {
             .set_money => |money| {
                 if (self.main_window.active_tab_idx == 0) {
-                    self.shop.balance = money;
+                    self.shop_wallet.money = money;
                 } else {
-                    self.wallet.money = money;
+                    self.player_wallet.money = money;
                 }
                 try self.drawBalance();
             },
@@ -159,9 +163,9 @@ fn draw(self: *Self) !void {
 fn drawBalance(self: Self) !void {
     var buf: [30]u8 = undefined;
     if (self.main_window.active_tab_idx == 1) {
-        try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "Traider's:  {d:4}$", .{self.shop.balance}));
+        try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "Traider's:  {d:4}$", .{self.shop_wallet.money}));
     } else {
-        try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "Your money: {d:4}$", .{self.wallet.money}));
+        try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "Your money: {d:4}$", .{self.player_wallet.money}));
     }
 }
 
@@ -186,11 +190,11 @@ fn formatProduct(self: *Self, line: *w.TextArea.Line, item: g.Entity, for_buying
 }
 
 fn actualPrice(self: Self, price: *const c.Price, for_buying: bool) u16 {
+    _ = self;
+    _ = for_buying;
     const base_price: f32 = @floatFromInt(price.value);
-    return if (for_buying)
-        @intFromFloat(base_price * self.shop.price_multiplier)
-    else
-        @intFromFloat(base_price / self.shop.price_multiplier);
+    // TODO: Calculate an actual price
+    return @intFromFloat(base_price);
 }
 
 fn updateBuyingTab(self: *Self) !void {
@@ -264,10 +268,12 @@ fn buySelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonRes
     const self: *Self = @ptrCast(@alignCast(ptr));
     const price = self.actualPrice(self.session.registry.getUnsafe(item, c.Price), true);
     log.debug("Buying item {d}", .{item.id});
-    if (self.wallet.money >= price) {
+    if (self.player_wallet.money >= price) {
         _ = self.shop.items.remove(item);
         try self.inventory.items.add(item);
-        self.wallet.money -= price;
+        // TODO: create a test to control transaction
+        self.player_wallet.money -= price;
+        self.shop_wallet.money += price;
         try self.updateBuyingTab();
         try self.updateSellingTab();
     } else {
@@ -285,10 +291,12 @@ fn sellSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonRe
     const self: *Self = @ptrCast(@alignCast(ptr));
     const price = self.actualPrice(self.session.registry.getUnsafe(item, c.Price), false);
     log.debug("Selling {d}", .{item.id});
-    if (self.shop.balance >= price) {
+    if (self.shop_wallet.money >= price) {
         _ = self.inventory.items.remove(item);
         try self.shop.items.add(item);
-        self.wallet.money += price;
+        // TODO: create a test to control transaction
+        self.player_wallet.money += price;
+        self.shop_wallet.money -= price;
         try self.updateBuyingTab();
         try self.updateSellingTab();
     } else {

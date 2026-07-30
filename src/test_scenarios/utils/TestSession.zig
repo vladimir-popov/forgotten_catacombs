@@ -18,7 +18,8 @@ session: g.GameSession,
 player: Player,
 tmp_dir: std.testing.TmpDir,
 
-/// Creates a new game session with TestRuntime and the first level.
+/// Creates a new game session with TestRuntime and a player on the first level.
+/// The player has zero stats & skills, default equipment and 30 HP.
 pub fn initOnFirstLevel(self: *Self, gpa: std.mem.Allocator, io: std.Io) !void {
     self.tmp_dir = std.testing.tmpDir(.{});
     self.arena = std.heap.ArenaAllocator.init(gpa);

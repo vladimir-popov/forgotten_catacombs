@@ -27,9 +27,7 @@ pub fn generateReward(registry: *g.Registry, rand: std.Random, depth: u8) !g.Ent
     return generateRandomItem(registry, rand, depth, &general_proportions.values);
 }
 
-pub fn fillShop(registry: *g.Registry, shop: *c.Shop, depth: u8) !void {
-    var prng = std.Random.DefaultPrng.init(shop.seed);
-    const rand = prng.random();
+pub fn fillShop(registry: *g.Registry, rand: std.Random, shop: *c.Shop, depth: u8) !void {
     const count = rand.uintAtMost(usize, 5) + 10;
     var proportions = general_proportions.values;
     // we don't need gold here
@@ -129,11 +127,8 @@ const gold_piles = [_]p.Range(u16){
 
 fn generateGoldPile(registry: *g.Registry, rand: std.Random, depth: u8) !g.Entity {
     const gold_pile = gold_piles[depth];
-    const pile_id = try registry.addNewEntity(g.entities.presets.Items.get(.gold_pile));
-    const wallet = registry.getUnsafe(pile_id, c.Wallet);
-    wallet.money = gold_pile.choose(rand);
-    registry.getUnsafe(pile_id, c.Price).value = wallet.money;
-    return pile_id;
+    const coins = gold_pile.choose(rand);
+    return try registry.addNewEntity(g.entities.goldPile(coins));
 }
 
 const GenerateArmorAndWeaponOptions = struct {

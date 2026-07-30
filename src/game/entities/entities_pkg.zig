@@ -114,6 +114,15 @@ pub fn pile(alloc: std.mem.Allocator, place: p.Point) !c.Components {
     };
 }
 
+pub fn goldPile(value: u16) c.Components {
+    return .{
+        .description = .{ .preset = .gold_pile },
+        .sprite = .{ .codepoint = cp.gold },
+        .price = .{ .value = value },
+        .wallet = .{ .money = value },
+    };
+}
+
 pub fn scientist(place: p.Point) c.Components {
     return .{
         .position = .{ .place = place, .zorder = .obstacle },
@@ -125,15 +134,14 @@ pub fn scientist(place: p.Point) c.Components {
 pub fn trader(
     registry: *g.Registry,
     place: p.Point,
-    price_multiplier: f32,
     balance: u16,
-    seed: u64,
 ) !c.Components {
     return .{
         .position = .{ .place = place, .zorder = .obstacle },
         .sprite = .{ .codepoint = cp.human },
         .description = .{ .preset = .traider },
-        .shop = try c.Shop.empty(registry.allocator(), price_multiplier, balance, seed),
+        .shop = try c.Shop.empty(registry.allocator()),
+        .wallet = .{ .money = balance },
     };
 }
 

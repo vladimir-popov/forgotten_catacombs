@@ -19,10 +19,3 @@ oil_lamp: c.Components = archetype.item(.{
     .source_of_light = .{ .radius = 4 },
     .price = .{ .value = 50 },
 }),
-
-gold_pile: c.Components = .{
-    .description = .{ .preset = .gold_pile },
-    .sprite = .{ .codepoint = cp.gold },
-    .wallet = .empty,
-    .price = .{ .value = 0 },
-}

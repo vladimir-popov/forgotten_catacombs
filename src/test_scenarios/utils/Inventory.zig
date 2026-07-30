@@ -18,6 +18,14 @@ pub fn isClosed(self: Self) bool {
     return self.test_session.session.mode != .inventory;
 }
 
+pub fn isInvetoryEmpty(self: Self) bool {
+    return self.test_session.session.mode.inventory.inventory.items.size() == 0;
+}
+
+pub fn isDropEmpty(self: Self) bool {
+    return self.test_session.session.mode.inventory.drop == null;
+}
+
 pub fn close(self: Self) !void {
     std.debug.assert(self.inventoryMode().actions_window == null);
     std.debug.assert(self.inventoryMode().description_window == null);
@@ -44,6 +52,18 @@ pub fn chooseItemById(self: Self, item: g.Entity) !Options {
         .test_session = self.test_session,
     };
     try options.chooseById(item);
+    return .{
+        .test_session = self.test_session,
+        .options_area = &self.inventoryMode().actions_window.?.scrollable_area.content,
+    };
+}
+
+pub fn chooseItemByIndex(self: Self, idx: usize) !Options {
+    const options = Options{
+        .options_area = &self.inventoryMode().main_window.activeTab().scrollable_area.content,
+        .test_session = self.test_session,
+    };
+    try options.chooseByIndex(idx);
     return .{
         .test_session = self.test_session,
         .options_area = &self.inventoryMode().actions_window.?.scrollable_area.content,

@@ -23,8 +23,12 @@ pub fn close(self: Self) !void {
     try self.test_session.pressButton(.b);
 }
 
-pub fn currentShop(self: Self) *c.Shop {
+pub fn shop(self: Self) *c.Shop {
     return self.tradingMode().shop;
+}
+
+pub fn shopWallet(self: Self) *c.Wallet {
+    return self.tradingMode().shop_wallet;
 }
 
 /// Selects the item with passed name in the active tab, or throws an error.

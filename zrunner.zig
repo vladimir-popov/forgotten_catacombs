@@ -49,9 +49,9 @@ pub const std_options: std.Options = .{
     .log_level = .warn,
     .log_scope_levels = &[_]std.log.ScopeLevel{
         .{ .scope = .default, .level = .debug },
-        .{ .scope = .test_session, .level = .debug },
+        // .{ .scope = .test_session, .level = .debug },
         .{ .scope = .inventory_mode, .level = .debug },
-        .{ .scope = .windows, .level = .debug },
+        .{ .scope = .level, .level = .debug },
     },
 };
 

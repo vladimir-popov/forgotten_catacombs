@@ -256,26 +256,15 @@ fn showHelp(ptr: *anyopaque, _: usize, _: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     self.modal_window = try w.notification(
         self.session.mode_arena.allocator(),
-        \\The  damage of  the chosen weapon
-        \\or  the  protection  provided  by  
-        \\armor will be altered. The  final 
-        \\outcome     depends    on     how
-        \\carefully  the   modification  is 
-        \\performed.
-        \\
         \\An arbitrary  modification  has a 
-        \\30%    chance  of  worsening  the 
-        \\effect.
+        \\30% chance of breaking the item.
         \\
         \\A  careful  modification  reduces 
         \\this risk to 10%.
         \\
         \\A manual modification allows  you  
         \\to  choose  the  specific  effect 
-        \\that is guaranteed to be improved
-        \\
-        \\Every   additional   modification 
-        \\makes the next one more expensive
+        \\to add to the item.
     ,
         .{ .title = "Help", .max_region = MODAL_WINDOW_REGION, .text_align = .left },
     );
