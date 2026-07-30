@@ -165,6 +165,12 @@ pub const Inventory = struct {
 
 pub const Price = struct {
     value: u16,
+
+    pub inline fn multiply(self: *const Price, k: f32) u16 {
+        const valuef: f32 = @floatFromInt(self.value);
+        const result: u16 = @intFromFloat(valuef * k);
+        return @max(result, 0);
+    }
 };
 
 pub const Shop = struct {

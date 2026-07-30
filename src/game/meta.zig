@@ -325,6 +325,66 @@ pub fn setCodepointOfUnknownArmor(registry: *g.Registry, entity: g.Entity) void 
     sprite.codepoint = g.codepoints.armor_unknown;
 }
 
+/// Sell multipliers:
+///
+/// | Category                      | Multiplier |
+/// | --------------------          | ---------- |
+/// | Food                          | `0.25`     |
+/// | Potions                       | `0.20`     |
+/// | Unidentified Potions          | `0.10`     |
+/// | Ammo                          | `0.30`     |
+/// | Torches                       | `0.15`     |
+/// | Oil                           | `0.20`     |
+/// | Weapons                       | `0.35`     |
+/// | Improved Weapons              | `0.55`     |
+/// | Broken Weapons                | `0.05`     |
+/// | Unidentified Weapons          | `0.20`     |
+/// | Unidentified Modified Weapons | `0.40`     |
+/// | Armor                         | `0.30`     |
+/// | Improved Armor                | `0.45`     |
+/// | Broken Armor                  | `0.05`     |
+/// | Unidentified Armor            | `0.20`     |
+/// | Unidentified Modified Armor   | `0.35`     |
+pub fn sellingPrice(journal: g.Journal, entity: g.Entity, price: *const c.Price) u16 {
+    if (journal.registry.has(entity, c.Consumable)) {
+        return price.multiply(0.25);
+    }
+    if (journal.registry.get(entity, c.Potion)) |potion| {
+        return if (journal.known_potions.contains(potion.*))
+            price.multiply(0.2)
+        else
+            price.multiply(0.1);
+    }
+    if (journal.registry.has(entity, c.Ammunition)) {
+        return price.multiply(0.3);
+    }
+    if (journal.registry.has(entity, c.Weapon)) {
+        const is_known = journal.known_entities.contains(entity);
+        if (journal.registry.has(entity, c.Breakages))
+            return if (is_known) price.multiply(0.05) else price.multiply(0.4);
+        if (journal.registry.has(entity, c.Improvements))
+            return if (is_known) price.multiply(0.55) else price.multiply(0.4);
+
+        return if (is_known) price.multiply(0.35) else price.multiply(0.2);
+    }
+    if (journal.registry.has(entity, c.Armor)) {
+        const is_known = journal.known_entities.contains(entity);
+        if (journal.registry.has(entity, c.Breakages))
+            return if (is_known) price.multiply(0.05) else price.multiply(0.35);
+        if (journal.registry.has(entity, c.Improvements))
+            return if (is_known) price.multiply(0.45) else price.multiply(0.4);
+
+        return if (is_known) price.multiply(0.3) else price.multiply(0.2);
+    }
+    const description = journal.registry.getUnsafe(entity, c.Description);
+    if (description.preset == .torch)
+        return price.multiply(0.15);
+    if (description.preset == .oil_potion)
+        return price.multiply(0.2);
+
+    return price.multiply(0.2);
+}
+
 pub fn healingPoints(rand: std.Random, max_hp: u8) u8 {
     const percent: f32 = @floatFromInt(rand.intRangeAtMost(u8, 30, 60));
     const max_hp_f: f32 = max_hp;

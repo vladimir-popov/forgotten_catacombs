@@ -179,22 +179,15 @@ fn formatProduct(self: *Self, line: *w.TextArea.Line, item: g.Entity, for_buying
         const price, const sprite = tuple;
         var buf: [16]u8 = undefined;
         const name = try g.Description.printActualName(&buf, self.session.journal, item);
+        const price_value = if (for_buying) price.value else g.meta.sellingPrice(self.session.journal, item, price);
         return try std.fmt.bufPrint(
             line,
             product_fmt,
-            .{ sprite.codepoint, name, self.actualPrice(price, for_buying) },
+            .{ sprite.codepoint, name, price_value },
         );
     } else {
         std.debug.panic("Error on format product. Some component was not found", .{});
     }
-}
-
-fn actualPrice(self: Self, price: *const c.Price, for_buying: bool) u16 {
-    _ = self;
-    _ = for_buying;
-    const base_price: f32 = @floatFromInt(price.value);
-    // TODO: Calculate an actual price
-    return @intFromFloat(base_price);
 }
 
 fn updateBuyingTab(self: *Self) !void {
@@ -266,7 +259,7 @@ fn sellOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResu
 
 fn buySelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    const price = self.actualPrice(self.session.registry.getUnsafe(item, c.Price), true);
+    const price = self.session.registry.getUnsafe(item, c.Price).value;
     log.debug("Buying item {d}", .{item.id});
     if (self.player_wallet.money >= price) {
         _ = self.shop.items.remove(item);
@@ -289,7 +282,7 @@ fn buySelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonRes
 
 fn sellSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    const price = self.actualPrice(self.session.registry.getUnsafe(item, c.Price), false);
+    const price = g.meta.sellingPrice(self.session.journal, item, self.session.registry.getUnsafe(item, c.Price));
     log.debug("Selling {d}", .{item.id});
     if (self.shop_wallet.money >= price) {
         _ = self.inventory.items.remove(item);

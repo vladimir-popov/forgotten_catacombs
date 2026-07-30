@@ -291,22 +291,24 @@ Shop category weights:
 
 Sell multipliers:
 
-| Category             | Multiplier |
-| -------------------- | ---------- |
-| Food                 | `0.25`     |
-| Potions              | `0.20`     |
-| Unidentified Potions | `0.10`     |
-| Ammo                 | `0.30`     |
-| Torches              | `0.15`     |
-| Oil                  | `0.20`     |
-| Weapons              | `0.35`     |
-| Modified Weapons     | `0.45`     |
-| Broken Weapons       | `0.05`     |
-| Unidentified Weapons | `0.20`     |
-| Armor                | `0.35`     |
-| Modified Armor       | `0.45`     |
-| Broken Armor         | `0.05`     |
-| Unidentified Armor   | `0.20`     |
+| Category                      | Multiplier |
+| --------------------          | ---------- |
+| Food                          | `0.25`     |
+| Potions                       | `0.20`     |
+| Unidentified Potions          | `0.10`     |
+| Ammo                          | `0.30`     |
+| Torches                       | `0.15`     |
+| Oil                           | `0.20`     |
+| Weapons                       | `0.35`     |
+| Improved Weapons              | `0.55`     |
+| Broken Weapons                | `0.05`     |
+| Unidentified Weapons          | `0.20`     |
+| Unidentified Modified Weapons | `0.40`     |
+| Armor                         | `0.30`     |
+| Improved Armor                | `0.45`     |
+| Broken Armor                  | `0.05`     |
+| Unidentified Armor            | `0.20`     |
+| Unidentified Modified Armor   | `0.35`     |
 
 Modify/recognize services:
 
