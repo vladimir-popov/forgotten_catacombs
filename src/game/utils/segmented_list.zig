@@ -168,7 +168,6 @@ pub fn SegmentedList(comptime T: type, comptime prealloc_item_count: usize) type
         }
 
         /// Grows or shrinks capacity to match usage.
-        /// TODO update this and related methods to match the conventions set by ArrayList
         pub fn setCapacity(self: *Self, allocator: Allocator, new_capacity: usize) Allocator.Error!void {
             if (prealloc_item_count != 0) {
                 if (new_capacity <= @as(usize, 1) << (prealloc_exp + @as(ShelfIndex, @intCast(self.dynamic_segments.len)))) {
@@ -238,7 +237,6 @@ pub fn SegmentedList(comptime T: type, comptime prealloc_item_count: usize) type
 
         pub fn shrink(self: *Self, new_len: usize) void {
             assert(new_len <= self.len);
-            // TODO take advantage of the new realloc semantics
             self.len = new_len;
         }
 
@@ -520,8 +518,6 @@ test "clearRetainingCapacity" {
     try testing.expect(list.len == 0);
 }
 
-/// TODO look into why this std.math function was changed in
-/// fc9430f56798a53f9393a697f4ccd6bf9981b970.
 fn log2_int_ceil(comptime T: type, x: T) std.math.Log2Int(T) {
     assert(x != 0);
     const log2_val = std.math.log2_int(T, x);

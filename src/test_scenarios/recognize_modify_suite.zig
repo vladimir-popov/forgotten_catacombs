@@ -163,8 +163,40 @@ test "Modify an item when NOT enough money" {
     , .whole_display);
 }
 
-/// Initializes a test session with the player on the start level near the scientist.
-/// Set puts the money to the player's wallet, and adds a healing potion as unknown to the player's inventory.
+test "Modify an item when it has all possible modifications" {
+    var test_session: TestSession = undefined;
+    const recognize_modify, _, const known_weapon_id = try initNearScientistWithMoney(&test_session, 100);
+    defer test_session.deinit();
+    errdefer test_session.printDisplay();
+
+    // add all possible modifications:
+    const improvements = try test_session.session.registry.getOrSet(known_weapon_id, c.Improvements, .empty);
+    improvements.modifications.items.toggleAll();
+
+    try recognize_modify.chooseModifyTab();
+    const options = try recognize_modify.chooseItemById(known_weapon_id);
+    try options.choose("Modify");
+    try options.choose("Manually");
+    try options.choose("fire");
+
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════╔═══════════════════╗
+        \\║     Recognize    ║      Modify       ║
+        \\║══════════════════╝                   ║
+        \\║┌────────────────────────────────────┐║
+        \\║│       All possible modifications   │║
+        \\║│            already applied         │║
+        \\║└────────────────────────────────────┘║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+        \\════════════════════════════════════════
+        \\ Your money:  100$           �� Close   
+    , .whole_display);
+}
+
+/// Initializes a test session with a player on the start level near the scientist.
+/// Sets the money to the player's wallet, and adds a healing potion as unknown to the player's inventory.
 /// Returns the new test session, id of the healing potion, and id of the player's weapon.
 fn initNearScientistWithMoney(test_session: *TestSession, money: u16) !struct { RecognizeModify, g.Entity, g.Entity } {
     std.testing.random_seed = 100500;

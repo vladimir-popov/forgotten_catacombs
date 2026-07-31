@@ -240,7 +240,12 @@ pub const Modifications = struct {
             Modification, ElementalEffect => 0,
             Stats.Stat => std.enums.values(ElementalEffect).len,
             enum { speed, attack } => std.enums.values(ElementalEffect).len + std.enums.values(Stats.Stat).len,
-            else => @compileError("Unexpected modification type"),
+            else => @compileError(
+                std.fmt.comptimePrint(
+                    "Unexpected modification type {any} of {any}",
+                    .{ @TypeOf(modification), modification },
+                ),
+            ),
         };
         const idx = @intFromEnum(modification) + idx_shift;
         return @enumFromInt(idx);
@@ -253,7 +258,7 @@ pub const Modifications = struct {
     pub fn init(init_modifications: []const Modification) Modifications {
         var self = Modifications.initEmpty();
         for (init_modifications) |modification| {
-            self.add(modification);
+            _ = self.add(modification);
         }
         return self;
     }
@@ -262,8 +267,14 @@ pub const Modifications = struct {
         return self.items.contains(cast(modification));
     }
 
-    pub fn add(self: *Modifications, modification: anytype) void {
+    /// Inserts the modification and return true, if it was a new modification, or false if such
+    /// modification was already in the set.
+    pub fn add(self: *Modifications, modification: anytype) bool {
+        if (self.items.contains(modification))
+            return false;
+
         self.items.insert(cast(modification));
+        return true;
     }
 
     pub fn remove(self: *Modifications, modification: anytype) void {
@@ -273,6 +284,14 @@ pub const Modifications = struct {
     pub fn iterator(self: Modifications) std.enums.EnumSet(Modification).Iterator {
         return self.items.iterator();
     }
+
+    fn actualizeProportions(self: Modifications, proportions: []u8) []u8 {
+        for (std.enums.values(Modification), 0..) |modification, i| {
+            if (self.contains(modification))
+                proportions[i] = 0;
+        }
+        return proportions;
+    }
 };
 //
 
@@ -281,7 +300,7 @@ pub const Improvements = struct {
 
     pub const empty: Improvements = .{ .modifications = .initEmpty() };
 
-    pub const proportions: [std.enums.values(Modification).len]u8 = blk: {
+    const all_proportions: [std.enums.values(Modification).len]u8 = blk: {
         var ps: [std.enums.values(Modification).len]u8 = @splat(5);
         ps[@intFromEnum(Modification.fire)] = 10;
         ps[@intFromEnum(Modification.poison)] = 10;
@@ -290,6 +309,16 @@ pub const Improvements = struct {
         ps[@intFromEnum(Modification.attack)] = 3;
         break :blk ps;
     };
+
+    /// Returns a random modification absent in the current set, or null.
+    pub fn chooseRandomNew(self: Improvements, rand: std.Random) ?Modification {
+        var proportions: [std.enums.values(Modification).len]u8 = all_proportions;
+        _ = self.modifications.actualizeProportions(&proportions);
+        if (std.mem.max(u8, &proportions) == 0)
+            return null
+        else
+            return @enumFromInt(rand.weightedIndex(u8, &proportions));
+    }
 };
 
 pub const Breakages = struct {
@@ -297,15 +326,30 @@ pub const Breakages = struct {
 
     pub const empty: Breakages = .{ .modifications = .initEmpty() };
 
-    pub const proportions: [std.enums.values(Modification).len]u8 = blk: {
-        var ps: [std.enums.values(Modification).len]u8 = @splat(5);
-        ps[@intFromEnum(Modification.fire)] = 10;
-        ps[@intFromEnum(Modification.poison)] = 10;
-        ps[@intFromEnum(Modification.acid)] = 10;
-        ps[@intFromEnum(Modification.speed)] = 7;
-        ps[@intFromEnum(Modification.attack)] = 7;
-        break :blk ps;
+    const all_proportions: [std.enums.values(Modification).len]u8 = blk: {
+        var proportions: [std.enums.values(Modification).len]u8 = @splat(5);
+        proportions[@intFromEnum(Modification.fire)] = 10;
+        proportions[@intFromEnum(Modification.poison)] = 10;
+        proportions[@intFromEnum(Modification.acid)] = 10;
+        proportions[@intFromEnum(Modification.speed)] = 7;
+        proportions[@intFromEnum(Modification.attack)] = 7;
+        break :blk proportions;
     };
+
+    /// Returns a random modification absent in the current set, or null.
+    pub fn chooseRandomNew(self: Breakages, rand: std.Random, is_for_weapon: bool) ?Modification {
+        var proportions: [std.enums.values(Modification).len]u8 = all_proportions;
+        _ = self.modifications.actualizeProportions(&proportions);
+        if (is_for_weapon) {
+            proportions[@intFromEnum(Modification.fire)] = 0;
+            proportions[@intFromEnum(Modification.poison)] = 0;
+            proportions[@intFromEnum(Modification.acid)] = 0;
+        }
+        if (std.mem.max(u8, &proportions) == 0)
+            return null
+        else
+            return @enumFromInt(rand.weightedIndex(u8, &proportions));
+    }
 };
 
 pub const Weapon = struct {

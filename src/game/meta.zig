@@ -267,49 +267,59 @@ pub fn getUnknownCodepoint(registry: *const g.Registry, entity: g.Entity) ?u21 {
 /// Adds an optional effect as an breakage to the item and changes the codepoint of the item to
 /// an unknown codepoint.
 /// If the effect is omitted, it will be randomly selected.
+/// Returns `true` if an effect was added, else `false`. The `false` means that the item already has all
+/// possible effects.
 pub fn breakItem(
     registry: *g.Registry,
     rand: std.Random,
     item: g.Entity,
-    modified_effect: ?c.Modification,
-) !void {
+    custom_modification: ?c.Modification,
+) !bool {
     // a weapon should not have an elemental breakage
     const is_weapon = registry.has(item, c.Weapon);
-    const modification: c.Modification = if (modified_effect) |eff| eff else blk: {
-        const proportions = if (is_weapon) c.Breakages.proportions[3..] else &c.Breakages.proportions;
-        const idx = rand.weightedIndex(u8, proportions);
-        const effect_idx = if (is_weapon) idx + 3 else idx;
-        break :blk @as(c.Modification, @enumFromInt(effect_idx));
-    };
     const breakages = try registry.getOrSet(item, c.Breakages, .{ .modifications = .initEmpty() });
-    breakages.modifications.add(modification);
-    log.debug("Add the breakage {t} to {d}", .{ modification, item.id });
-    if (registry.get(item, c.Weapon)) |weapon|
-        setCodepointOfUnknownWeapon(registry, item, weapon);
-    if (registry.has(item, c.Armor))
-        setCodepointOfUnknownArmor(registry, item);
+    const maybe_modification = custom_modification orelse breakages.chooseRandomNew(rand, is_weapon);
+    const was_added = if (maybe_modification) |modification|
+        breakages.modifications.add(modification)
+    else
+        false;
+    if (was_added) {
+        if (registry.get(item, c.Weapon)) |weapon|
+            setCodepointOfUnknownWeapon(registry, item, weapon);
+        if (registry.has(item, c.Armor))
+            setCodepointOfUnknownArmor(registry, item);
+        return true;
+    } else {
+        return false;
+    }
 }
 
 /// Adds an optional effect as an improvement to the item and changes the codepoint of the item to
 /// an unknown codepoint.
-/// If the effect is omitted, it will be randomly selected.
+/// If the custom modification is omitted, it will be randomly selected.
+/// Returns `true` if an effect was added, else `false`. The `false` means that the item already has all
+/// possible effects.
 pub fn improveItem(
     registry: *g.Registry,
     rand: std.Random,
     item: g.Entity,
-    modified_effect: ?c.Modification,
-) !void {
-    const effect = if (modified_effect) |eff| eff else blk: {
-        const idx = rand.weightedIndex(u8, &c.Improvements.proportions);
-        break :blk @as(c.Modification, @enumFromInt(idx));
-    };
+    custom_modification: ?c.Modification,
+) !bool {
     const improvements = try registry.getOrSet(item, c.Improvements, .{ .modifications = .initEmpty() });
-    improvements.modifications.add(effect);
-    log.debug("Add the improvement {t} to {d}", .{ effect, item.id });
-    if (registry.get(item, c.Weapon)) |weapon|
-        setCodepointOfUnknownWeapon(registry, item, weapon);
-    if (registry.has(item, c.Armor))
-        setCodepointOfUnknownArmor(registry, item);
+    const maybe_modification = custom_modification orelse improvements.chooseRandomNew(rand);
+    const was_added = if (maybe_modification) |modification|
+        improvements.modifications.add(modification)
+    else
+        false;
+    if (was_added) {
+        if (registry.get(item, c.Weapon)) |weapon|
+            setCodepointOfUnknownWeapon(registry, item, weapon);
+        if (registry.has(item, c.Armor))
+            setCodepointOfUnknownArmor(registry, item);
+        return true;
+    } else {
+        return false;
+    }
 }
 
 pub fn setCodepointOfUnknownWeapon(registry: *g.Registry, entity: g.Entity, weapon: *const c.Weapon) void {
@@ -457,4 +467,61 @@ pub fn calculateDamage(
         poison_min,
         physical_damage * fire_multiplier - enemy_protection * acid_factor,
     ));
+}
+
+test "improveItem should apply a new modification every time" {
+    // given:
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
+    const rand = prng.random();
+
+    var registry: g.Registry = try .init(&arena);
+    const item = try registry.addNewEntity(g.entities.presets.Weapons.get(.pickaxe));
+    const improvements = try registry.getOrSet(item, c.Improvements, .empty);
+    errdefer std.debug.print("{f}", .{g.utils.formatEnumSet(improvements.modifications.items)});
+
+    const all_possible_modifications = std.enums.values(c.Modification);
+
+    // when:
+    while (improvements.modifications.items.count() < all_possible_modifications.len) {
+        const modifications_before = improvements.modifications.items.count();
+        try std.testing.expect(try improveItem(&registry, rand, item, null));
+        try std.testing.expect(improvements.modifications.items.count() > modifications_before);
+    }
+
+    // then:
+    for (all_possible_modifications) |modification| {
+        try std.testing.expect(improvements.modifications.contains(modification));
+    }
+}
+
+test "breakItem should apply a new modification every time (except elemental modifications for a weapon)" {
+    // given:
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
+    const rand = prng.random();
+
+    var registry: g.Registry = try .init(&arena);
+    const item = try registry.addNewEntity(g.entities.presets.Weapons.get(.pickaxe));
+    const breakages = try registry.getOrSet(item, c.Breakages, .empty);
+    errdefer std.debug.print("{f}", .{g.utils.formatEnumSet(breakages.modifications.items)});
+
+    const all_possible_modifications = std.enums.values(c.Modification);
+
+    // when:
+    while (breakages.modifications.items.count() < all_possible_modifications.len - 3) {
+        const modifications_before = breakages.modifications.items.count();
+        try std.testing.expect(try breakItem(&registry, rand, item, null));
+        try std.testing.expect(breakages.modifications.items.count() > modifications_before);
+    }
+
+    // then:
+    for (all_possible_modifications[3..]) |modification| {
+        try std.testing.expect(breakages.modifications.contains(modification));
+    }
+    try std.testing.expect(!breakages.modifications.contains(c.Modification.fire));
+    try std.testing.expect(!breakages.modifications.contains(c.Modification.poison));
+    try std.testing.expect(!breakages.modifications.contains(c.Modification.acid));
 }

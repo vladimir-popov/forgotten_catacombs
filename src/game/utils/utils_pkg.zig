@@ -46,6 +46,29 @@ pub inline fn enumIntValues(comptime E: type) []const @typeInfo(E).@"enum".tag_t
     }
 }
 
+pub fn EnumSetFormatter(comptime E: type) type {
+    return struct {
+        set: std.enums.EnumSet(E),
+
+        pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
+            _ = try writer.write("Set[");
+            const all_values = std.enums.values(E);
+            for (all_values, 0..) |e, i| {
+                if (self.set.contains(e)) {
+                    try writer.print("{t}", .{e});
+                    if (i + 1 < all_values.len)
+                        _ = try writer.write(", ");
+                }
+            }
+            _ = try writer.write("]\n");
+        }
+    };
+}
+
+pub fn formatEnumSet(set: anytype) EnumSetFormatter(@TypeOf(set).Indexer.Key) {
+    return EnumSetFormatter(@TypeOf(set).Indexer.Key){ .set = set };
+}
+
 pub fn toStringWithListOf(tagged_unions: anytype) ToString.List(@typeInfo(@TypeOf(tagged_unions)).pointer.child) {
     return ToString.List(@typeInfo(@TypeOf(tagged_unions)).pointer.child){ .values = tagged_unions };
 }

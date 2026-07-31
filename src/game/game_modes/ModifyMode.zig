@@ -36,10 +36,10 @@
 //! ║ ║   Recognize     ║       Modify      ║║ ║ ║   Recognize     ║       Modify      ║║
 //! ║╔╝═════════════════╝                   ║║ ║╔╝═════════════════╝                   ║║
 //! ║║ ┌───────────────────────────────────┐║║ ║║ ┌───────────────────────────────────┐║║
-//! ║║ │                                   │║║ ║║ │            Physic                 │║║
-//! ║║ │           Somehow    x1           │║║ ║║ │             Fire                  │║║
-//! ║║ │           Carefully  x2           │║║ ║║ │             Acid                  │║║
-//! ║║ │           Manually   x3           │║║ ║║ │            Poison                 │║║
+//! ║║ │                                   │║║ ║║ │                                   │║║
+//! ║║ │           Somehow                 │║║ ║║ │             Fire                  │║║
+//! ║║ │           Carefully               │║║ ║║ │             Acid                  │║║
+//! ║║ │           Manually                │║║ ║║ │            Poison                 │║║
 //! ║║ │                                   │║║ ║║ └───────────────────────────────────┘║║
 //! ║║ └───────────────────────────────────┘║║ ║║                                      ║║
 //! ║╚══════════════════════════════════════╝║ ║╚══════════════════════════════════════╝║
@@ -355,16 +355,20 @@ fn modify(self: *Self, item: g.Entity, breakage_chance: u8, manual_modification:
     const rand = prng.random();
 
     const should_become_broken = breakage_chance > 0 and rand.uintAtMost(u8, 100) < breakage_chance;
-    const modifications = if (should_become_broken)
-        &(try self.session.registry.getOrSet(item, c.Breakages, .empty)).modifications
+    const was_modified = if (should_become_broken)
+        try g.meta.breakItem(&self.session.registry, rand, item, manual_modification)
     else
-        &(try self.session.registry.getOrSet(item, c.Improvements, .empty)).modifications;
-    const modification = if (manual_modification) |mm|
-        mm
-    else
-        self.chooseModification(rand, item, should_become_broken, modifications);
+        try g.meta.improveItem(&self.session.registry, rand, item, manual_modification);
 
-    modifications.add(modification);
+    if (!was_modified) {
+        if (!should_become_broken)
+            self.modal_window = try w.notification(
+                self.session.mode_arena.allocator(),
+                "All possible modifications\nalready applied",
+                .{ .max_region = MODAL_WINDOW_REGION },
+            );
+        return;
+    }
 
     if (self.session.registry.has(item, c.Weapon)) {
         try self.session.journal.forgetWeapon(item);
@@ -373,26 +377,6 @@ fn modify(self: *Self, item: g.Entity, breakage_chance: u8, manual_modification:
     }
     wallet.money -= price;
     try self.updateTabs();
-}
-
-fn chooseModification(
-    self: Self,
-    rand: std.Random,
-    item: g.Entity,
-    should_become_broken: bool,
-    modifications: *const c.Modifications,
-) c.Modification {
-    var proportions = if (should_become_broken) c.Breakages.proportions else c.Improvements.proportions;
-    var itr = modifications.iterator();
-    while (itr.next()) |m| {
-        proportions[@intFromEnum(m)] = 0;
-    }
-    if (should_become_broken and self.session.registry.has(item, c.Weapon)) {
-        for (std.enums.values(c.ElementalEffect)) |e| {
-            proportions[@intFromEnum(e)] = 0;
-        }
-    }
-    return @enumFromInt(rand.weightedIndex(u8, &proportions));
 }
 
 fn describeItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {

@@ -347,7 +347,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
         }
 
         fn stackSize(_: *anyopaque) usize {
-            // TODO
+            // not interesting for tty
             return 0;
         }
 

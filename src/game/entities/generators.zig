@@ -84,23 +84,23 @@ fn generateRandomItem(registry: *g.Registry, rand: std.Random, depth: u8, propor
         .weapon => return try generateWeapon(registry, rand, depth),
         .improved_weapon => {
             const entity = try generateWeapon(registry, rand, depth);
-            try g.meta.improveItem(registry, rand, entity, null);
+            _ = try g.meta.improveItem(registry, rand, entity, null);
             return entity;
         },
         .broken_weapon => {
             const entity = try generateWeapon(registry, rand, depth);
-            try g.meta.breakItem(registry, rand, entity, null);
+            _ = try g.meta.breakItem(registry, rand, entity, null);
             return entity;
         },
         .armor => return try generateArmor(registry, rand, depth),
         .improved_armor => {
             const entity = try generateArmor(registry, rand, depth);
-            try g.meta.improveItem(registry, rand, entity, null);
+            _ = try g.meta.improveItem(registry, rand, entity, null);
             return entity;
         },
         .broken_armor => {
             const entity = try generateArmor(registry, rand, depth);
-            try g.meta.breakItem(registry, rand, entity, null);
+            _ = try g.meta.breakItem(registry, rand, entity, null);
             return entity;
         },
         .food => return try generateFood(registry, rand),

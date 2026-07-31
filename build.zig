@@ -299,7 +299,6 @@ fn addCopyDirectory(
             .directory => {
                 try addCopyDirectory(wf, io, new_src_path, new_dest_path);
             },
-            //TODO: possible support for sym links?
             else => {},
         }
     }

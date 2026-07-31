@@ -85,7 +85,6 @@ pub fn init(
     try self.draw();
 }
 
-// TODO use arena
 pub fn deinit(self: *Self) void {
     if (self.modal_window) |*window| {
         window.deinit(self.session.mode_arena.allocator());

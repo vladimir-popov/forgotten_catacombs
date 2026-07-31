@@ -65,7 +65,7 @@ pub fn dungeon(self: *Self, seed: u64) !?d.Dungeon {
             try stack.append(tmp_alloc, point.movedTo(.left));
             try stack.append(tmp_alloc, point.movedTo(.right));
         }
-        // TODO move this place far away of each other
+        // TODO move these places far away of each other
         self.entrance = self.randomEmptyPlace(rand);
         self.exit = self.randomEmptyPlace(rand);
         return .{
