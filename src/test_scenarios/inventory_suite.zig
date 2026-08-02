@@ -58,6 +58,60 @@ test "Unequip torch" {
     , .game_area);
 }
 
+test "Trying to unequip a broken weapon" {
+    var test_session: TestSession = undefined;
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
+    defer test_session.deinit();
+
+    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
+
+    const pickaxe_id = test_session.player.equipment().weapon.?;
+    try std.testing.expect(try g.meta.breakItem(&test_session.session.registry, prng.random(), pickaxe_id, null));
+
+    var inventory = try test_session.openInventory();
+    const options = try inventory.chooseItemByName("Pickaxe");
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║┌────────────────────────────────────┐║
+        \\║│              Unequip               │║
+        \\║│                Drop                │║
+        \\║│              Describe              │║
+        \\║└────────────────────────────────────┘║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+
+    try options.choose("Unequip");
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║                                      ║
+        \\┌────────────────Oops!─────────────────┐
+        \\│ Looks like it is broken and stuck.   │
+        \\│ You will need to repair  it first.   │
+        \\└──────────────────────────────────────┘
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+
+    try test_session.pressButton(.a);
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║                                      ║
+        \\║\ Pickaxe                     weapon  ║
+        \\║¡ Torch                        light  ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+}
+
 test "Drop an item" {
     var test_session: TestSession = undefined;
     try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
@@ -423,6 +477,62 @@ test "Wear an armor" {
         \\║                                      ║
         \\║/ Pickaxe                     weapon  ║
         \\║] Jacket                       armor  ║
+        \\║¡ Torch                        light  ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+}
+
+test "Trying to unequip a broken armor" {
+    var test_session: TestSession = undefined;
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
+    defer test_session.deinit();
+
+    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
+
+    var inventory = try test_session.openInventory();
+    const jacket_id = try inventory.add(g.entities.presets.Armor.get(.jacket));
+    try std.testing.expect(try g.meta.breakItem(&test_session.session.registry, prng.random(), jacket_id, null));
+
+    var options = try inventory.chooseItemById(jacket_id);
+    try options.choose("Wear");
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║                                      ║
+        \\║/ Pickaxe                     weapon  ║
+        \\║[ Jacket                       armor  ║
+        \\║¡ Torch                        light  ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+
+    options = try inventory.chooseItemById(jacket_id);
+    try options.choose("Unequip");
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║                                      ║
+        \\┌────────────────Oops!─────────────────┐
+        \\│ Looks like it is broken and stuck.   │
+        \\│ You will need to repair  it first.   │
+        \\└──────────────────────────────────────┘
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+
+    try test_session.pressButton(.a);
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║                                      ║
+        \\║/ Pickaxe                     weapon  ║
+        \\║[ Jacket                       armor  ║
         \\║¡ Torch                        light  ║
         \\║                                      ║
         \\║                                      ║

@@ -227,13 +227,22 @@ fn unequipItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult 
     log.debug("Unequip the item {d}. (current equipment: {any})", .{ item.id, self.equipment });
     if (item.eql(self.equipment.light))
         self.equipment.light = null;
-    if (item.eql(self.equipment.weapon))
-        self.equipment.weapon = null;
     if (item.eql(self.equipment.ammunition))
         self.equipment.ammunition = null;
-    if (item.eql(self.equipment.armor))
-        self.equipment.armor = null;
-
+    if (g.meta.isBroken(&self.session.registry, item)) {
+        self.description_window = try w.notification(
+            self.session.mode_arena.allocator(),
+            \\Looks like it is broken and stuck.
+            \\You will need to repair  it first.
+        ,
+            .{ .title = "Oops!", .text_align = .left },
+        );
+    } else {
+        if (item.eql(self.equipment.weapon))
+            self.equipment.weapon = null;
+        if (item.eql(self.equipment.armor))
+            self.equipment.armor = null;
+    }
     try self.updateInventoryTab();
     return .close_window;
 }

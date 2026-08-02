@@ -101,6 +101,13 @@ pub inline fn isItem(registry: *const g.Registry, entity: g.Entity) bool {
     return registry.has(entity, c.Price);
 }
 
+pub fn isBroken(registry: *const g.Registry, entity: g.Entity) bool {
+    if (registry.get(entity, c.Breakages)) |breakages|
+        return breakages.modifications.items.count() > 0;
+
+    return false;
+}
+
 /// Returns a type of the enemy if it has a description preset from an appropriate namespace.
 pub inline fn getEnemyType(registry: *const g.Registry, entity: g.Entity) ?EnemyType {
     return if (registry.get(entity, c.Description)) |descr|
