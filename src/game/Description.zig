@@ -298,7 +298,7 @@ fn writeDescription(
 ///   fire
 ///   ?
 ///
-/// It looks unusual(!)
+/// It looks modified...
 /// ```
 ///
 /// Example of a broken weapon:
@@ -347,11 +347,13 @@ fn describeWeapon(
     }
 
     if (has_modifications) {
-        _ = try text_area.addEmptyLine(alloc);
-        if ((is_known or is_equipped) and journal.registry.has(entity, c.Breakages))
-            try text_area.printLineFmt(alloc, "IT'S BROKEN!", .{})
-        else
+        if ((is_known or is_equipped) and journal.registry.has(entity, c.Breakages)) {
+            _ = try text_area.addEmptyLine(alloc);
+            try text_area.printLineFmt(alloc, "IT'S BROKEN!", .{});
+        } else if (!is_known) {
+            _ = try text_area.addEmptyLine(alloc);
             try text_area.printLineFmt(alloc, "It looks modified...", .{});
+        }
     }
 }
 
@@ -375,7 +377,7 @@ fn describeWeapon(
 /// Effects:
 ///   ?
 ///
-/// It looks unusual(!)
+/// It looks modified...
 /// ```
 ///
 /// Example of a broken armor:
@@ -410,11 +412,13 @@ fn describeArmor(
         try text_area.printLine(alloc, "  ?");
     }
 
-    _ = try text_area.addEmptyLine(alloc);
-    if ((is_known or is_equipped) and journal.registry.has(entity, c.Breakages))
-        try text_area.printLine(alloc, "IT'S BROKEN!")
-    else
-        try text_area.printLine(alloc, "It looks modified...");
+    if ((is_known or is_equipped) and journal.registry.has(entity, c.Breakages)) {
+        _ = try text_area.addEmptyLine(alloc);
+        try text_area.printLineFmt(alloc, "IT'S BROKEN!", .{});
+    } else if (!is_known) {
+        _ = try text_area.addEmptyLine(alloc);
+        try text_area.printLineFmt(alloc, "It looks modified...", .{});
+    }
 }
 
 /// Describes item's modifications, or enemy's traits.

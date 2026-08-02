@@ -59,12 +59,16 @@ const MODAL_WINDOW_REGION: p.Region = p.Region.init(3, 2, g.DISPLAY_ROWS - 5, g.
 
 const IDENTIFY_COST = 0.45;
 const REPAIR_BREAK_COST = 0.50;
-const MOD_SOMEHOW_COST = 0.35;
-const MOD_CAREFUL_COST = 1.05;
-const MOD_MANUAL_COST = 2.80;
+const MOD_SOMEHOW_PRICE = 100;
+const MOD_CAREFUL_PRICE = 200;
+const MOD_MANUAL_PRICE = 300;
 
 const CHANCE_TO_BREAK_ON_SOMEHOW = 30;
 const CHANCE_TO_BREAK_ON_CAREFUL = 10;
+
+const RECOGNIZE = 0;
+const MODIFY = 1;
+const REPAIR = 2;
 
 const Self = @This();
 
@@ -90,6 +94,7 @@ pub fn init(
     };
     self.main_window.addTab("Recognize", self);
     self.main_window.addTab("Modify", self);
+    self.main_window.addTab("Repair", self);
     try self.updateTabs();
     try self.draw();
 }
@@ -131,39 +136,43 @@ pub fn tick(self: *Self) !void {
     }
 }
 
-inline fn tabRecognize(self: *Self) *w.WindowWithTabs.Tab {
-    return &self.main_window.tabs[0];
-}
-
-inline fn tabModify(self: *Self) *w.WindowWithTabs.Tab {
-    return &self.main_window.tabs[1];
-}
-
-/// Recalculates the content of the both tabs.
-/// It should be done after every modification/recognition.
+/// Recalculates the content of all tabs.
+/// It should be done after every action.
 pub fn updateTabs(self: *Self) !void {
     const active_tab = self.main_window.activeTab();
     const selected_line = active_tab.scrollable_area.content.selected_line;
 
-    self.tabRecognize().scrollable_area.content.clearRetainingCapacity();
-    self.tabModify().scrollable_area.content.clearRetainingCapacity();
+    self.main_window.tabs[RECOGNIZE].scrollable_area.content.clearRetainingCapacity();
+    self.main_window.tabs[MODIFY].scrollable_area.content.clearRetainingCapacity();
+    self.main_window.tabs[REPAIR].scrollable_area.content.clearRetainingCapacity();
     var itr = self.inventory.items.iterator();
     while (itr.next()) |item_ptr| {
         const item = item_ptr.*;
         var buffer: [w.WindowWithTabs.CONTENT_AREA_REGION.cols + 4]u8 = undefined;
         if (self.session.journal.isKnown(item)) {
             if (self.isWeaponOrArmor(item)) {
-                try self.tabModify().scrollable_area.content.addOption(
-                    self.session.mode_arena.allocator(),
-                    try self.formatLine(&buffer, item),
-                    item,
-                    modifyDescribe,
-                    describeItem,
-                );
+                if (g.meta.isBroken(&self.session.registry, item)) {
+                    const price = self.calculateRepairingPrice(item);
+                    try self.main_window.tabs[REPAIR].scrollable_area.content.addOption(
+                        self.session.mode_arena.allocator(),
+                        try self.formatLineWithPrice(&buffer, item, price),
+                        item,
+                        repairDescribe,
+                        describeItem,
+                    );
+                } else {
+                    try self.main_window.tabs[MODIFY].scrollable_area.content.addOption(
+                        self.session.mode_arena.allocator(),
+                        try self.formatLine(&buffer, item),
+                        item,
+                        modifyDescribe,
+                        describeItem,
+                    );
+                }
             }
         } else {
             const price = self.calculateIdentificationPrice(item);
-            try self.tabRecognize().scrollable_area.content.addOption(
+            try self.main_window.tabs[RECOGNIZE].scrollable_area.content.addOption(
                 self.session.mode_arena.allocator(),
                 try self.formatLineWithPrice(&buffer, item, price),
                 item,
@@ -241,6 +250,41 @@ fn recognizeItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResul
     return .close_window;
 }
 
+fn repairDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    var area = w.OptionsArea(g.Entity).centered(self);
+    try area.addOption(self.session.mode_arena.allocator(), "Repair", item, repairItem, null);
+    try area.addOption(self.session.mode_arena.allocator(), "Describe", item, describeItem, null);
+    self.actions_window = .modalWindow(area, MODAL_WINDOW_REGION);
+    // keep the main window opened
+    return .keep_open;
+}
+
+fn repairItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    const wallet = self.session.registry.getUnsafe(self.session.player, c.Wallet);
+    const price = self.calculateRepairingPrice(item);
+    if (wallet.money >= price) {
+        const breakages = self.session.registry.getUnsafe(item, c.Breakages);
+        var itr = breakages.modifications.items.iterator();
+        if (itr.next()) |modification| {
+            breakages.modifications.remove(modification);
+        }
+        if (breakages.modifications.items.count() == 0)
+            try self.session.registry.remove(item, c.Breakages);
+
+        wallet.money -= price;
+        try self.updateTabs();
+    } else {
+        self.modal_window = try w.notification(
+            self.session.mode_arena.allocator(),
+            "You have not enough\nmoney.",
+            .{ .max_region = MODAL_WINDOW_REGION },
+        );
+    }
+    return .close_window;
+}
+
 fn modifyDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     var area = w.OptionsArea(g.Entity).centered(self);
@@ -278,7 +322,7 @@ fn modificationMode(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonRe
     try area.addOptionFmt(
         self.session.mode_arena.allocator(),
         "Somehow   {d}$",
-        .{self.calculateSomehowModificationPrice(item)},
+        .{self.calculateModificationPrice(item, MOD_SOMEHOW_PRICE)},
         item,
         modifySomehow,
         null,
@@ -286,7 +330,7 @@ fn modificationMode(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonRe
     try area.addOptionFmt(
         self.session.mode_arena.allocator(),
         "Carefully {d}$",
-        .{self.calculateCarefulModificationPrice(item)},
+        .{self.calculateModificationPrice(item, MOD_CAREFUL_PRICE)},
         item,
         modifyCarefully,
         null,
@@ -294,7 +338,7 @@ fn modificationMode(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonRe
     try area.addOptionFmt(
         self.session.mode_arena.allocator(),
         "Manually  {d}$",
-        .{self.calculateManualModificationPrice(item)},
+        .{self.calculateModificationPrice(item, MOD_MANUAL_PRICE)},
         item,
         modifyManually,
         null,
@@ -306,13 +350,13 @@ fn modificationMode(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonRe
 
 fn modifySomehow(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    try self.modify(item, CHANCE_TO_BREAK_ON_SOMEHOW, null, self.calculateSomehowModificationPrice(item));
+    try self.modify(item, CHANCE_TO_BREAK_ON_SOMEHOW, null, self.calculateModificationPrice(item, MOD_SOMEHOW_PRICE));
     return .close_window;
 }
 
 fn modifyCarefully(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    try self.modify(item, CHANCE_TO_BREAK_ON_CAREFUL, null, self.calculateCarefulModificationPrice(item));
+    try self.modify(item, CHANCE_TO_BREAK_ON_CAREFUL, null, self.calculateModificationPrice(item, MOD_CAREFUL_PRICE));
     return .close_window;
 }
 
@@ -337,7 +381,7 @@ fn modifyManually(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResu
 fn modifyManuallyEffect(ptr: *anyopaque, idx: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const modification: c.Modification = @enumFromInt(idx);
-    try self.modify(item, 0, modification, self.calculateManualModificationPrice(item));
+    try self.modify(item, 0, modification, self.calculateModificationPrice(item, MOD_MANUAL_PRICE));
     return .close_window;
 }
 
@@ -407,22 +451,16 @@ fn calculateIdentificationPrice(self: Self, item: g.Entity) u16 {
     return @intFromFloat(item_price * IDENTIFY_COST);
 }
 
-fn calculateRepairPrice(self: Self, item: g.Entity) u16 {
+fn calculateRepairingPrice(self: Self, item: g.Entity) u16 {
     const item_price: f32 = @floatFromInt(self.session.registry.getUnsafe(item, c.Price).value);
     return @intFromFloat(item_price * REPAIR_BREAK_COST);
 }
 
-fn calculateSomehowModificationPrice(self: Self, item: g.Entity) u16 {
-    const item_price: f32 = @floatFromInt(self.session.registry.getUnsafe(item, c.Price).value);
-    return @intFromFloat(item_price * MOD_SOMEHOW_COST);
-}
+fn calculateModificationPrice(self: Self, item: g.Entity, base_price: u16) u16 {
+    const modifications_count: u16 = if (self.session.registry.get(item, c.Improvements)) |improvements|
+        @truncate(improvements.modifications.items.count())
+    else
+        0;
 
-fn calculateCarefulModificationPrice(self: Self, item: g.Entity) u16 {
-    const item_price: f32 = @floatFromInt(self.session.registry.getUnsafe(item, c.Price).value);
-    return @intFromFloat(item_price * MOD_CAREFUL_COST);
-}
-
-fn calculateManualModificationPrice(self: Self, item: g.Entity) u16 {
-    const item_price: f32 = @floatFromInt(self.session.registry.getUnsafe(item, c.Price).value);
-    return @intFromFloat(item_price * MOD_MANUAL_COST);
+    return base_price * (modifications_count + 1);
 }

@@ -22,7 +22,7 @@ const w = g.windows;
 
 const log = std.log.scoped(.windows);
 
-pub const MAX_TABS = 2;
+pub const MAX_TABS = 3;
 pub const BORDERED_REGION = p.Region.init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS); // -2 rows for infoBar
 pub const CONTENT_AREA_REGION: p.Region = .{
     .top_left = .{
@@ -108,7 +108,7 @@ pub fn draw(self: Self, render: g.Render) !void {
         .{ BORDERED_REGION, self.active_tab_idx, self.tabs_count },
     );
     // Draw the tab titles
-    const tab_title_width: u8 = @intCast((BORDERED_REGION.cols - 2) / self.tabs_count);
+    const tab_title_width: u8 = (BORDERED_REGION.cols - 2) / self.tabs_count;
     try render.drawDoubledBorder(BORDERED_REGION, g.Render.default_filler);
     try render.drawHorizontalLine(
         '═',
@@ -127,34 +127,49 @@ pub fn draw(self: Self, render: g.Render) !void {
             .center,
         );
     }
-    // Draw the border around the active tab
-    const cursor = BORDERED_REGION.top_left
-        .movedTo(.down)
-        .movedToNTimes(.right, @intCast(self.active_tab_idx * tab_title_width));
-    const cursor_above = cursor.movedTo(.up);
-    const underline_cursor = cursor.movedTo(.down);
-    try render.drawSymbol('╔', cursor_above, .normal);
-    try render.drawSymbol('╗', cursor_above.movedToNTimes(.right, tab_title_width + 1), .normal);
-
-    try render.drawSymbol('║', cursor, .normal);
-    try render.drawSymbol('║', cursor.movedToNTimes(.right, tab_title_width + 1), .normal);
-
-    try render.drawHorizontalLine(' ', underline_cursor, tab_title_width + 1);
-    try render.drawSymbol(
-        if (self.active_tab_idx > 0) '╝' else '║',
-        underline_cursor,
-        .normal,
-    );
-    try render.drawSymbol(
-        if (self.active_tab_idx < self.tabs_count - 1) '╚' else '║',
-        underline_cursor.movedToNTimes(.right, tab_title_width + 1),
-        .normal,
-    );
+    // Draw the border around the left active tab
+    if (self.active_tab_idx == 0) {
+        var cursor = BORDERED_REGION.top_left
+            .movedToNTimes(.down, 2);
+        try render.drawHorizontalLine(' ', cursor.movedTo(.right), tab_title_width - 1);
+        cursor.moveNTimes(.right, tab_title_width);
+        try render.drawSymbol('╚', cursor, .normal);
+        cursor.move(.up);
+        try render.drawSymbol('║', cursor, .normal);
+        cursor.move(.up);
+        try render.drawSymbol('╗', cursor, .normal);
+    } // Draw the border around the right active tab
+    else if (self.active_tab_idx == self.tabs_count - 1) {
+        var cursor = BORDERED_REGION.topRight()
+            .movedToNTimes(.left, tab_title_width + 1);
+        try render.drawSymbol('╔', cursor, .normal);
+        cursor.move(.down);
+        try render.drawSymbol('║', cursor, .normal);
+        cursor.move(.down);
+        try render.drawHorizontalLine(' ', cursor, tab_title_width + 1);
+        try render.drawSymbol('╝', cursor, .normal);
+    } // Draw the border around middle tabs
+    else {
+        var cursor = BORDERED_REGION.top_left
+            .movedToNTimes(.right, @intCast(self.active_tab_idx * tab_title_width));
+        try render.drawSymbol('╔', cursor, .normal);
+        cursor.move(.down);
+        try render.drawSymbol('║', cursor, .normal);
+        cursor.move(.down);
+        try render.drawSymbol('╝', cursor, .normal);
+        try render.drawHorizontalLine(' ', cursor.movedTo(.right), tab_title_width);
+        cursor.moveNTimes(.right, tab_title_width + 1);
+        try render.drawSymbol('╚', cursor, .normal);
+        cursor.move(.up);
+        try render.drawSymbol('║', cursor, .normal);
+        cursor.move(.up);
+        try render.drawSymbol('╗', cursor, .normal);
+    }
 
     // Draw the content
     try self.tabs[self.active_tab_idx].scrollable_area.draw(render);
 
-    // Draw buttons
+    // Draw the buttons
     if (self.tabs[self.active_tab_idx].scrollable_area.button()) |button| {
         try render.drawRightButton(button[0], button[1]);
         try render.drawLeftButton("Close", false);
