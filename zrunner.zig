@@ -119,7 +119,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
     var failed_only: bool = false;
     var no_colors: bool = false;
     var no_stack_trace: bool = false;
-    var timeout_seconds: u8 = 10;
+    var timeout_seconds: u16 = 10;
 
     while (args.next()) |arg| {
         if (std.mem.eql(u8, "-t", arg)) {
@@ -346,7 +346,7 @@ const Test = struct {
         var test_result: TestResult = undefined;
 
         var abort = try io.concurrent(abortOnTimeout, .{ self, io, timeout });
-        defer abort.cancel(io) catch {};
+        errdefer abort.cancel(io) catch {};
 
         const start_time = std.Io.Clock.real.now(io);
         const result = self.test_fn.func();
@@ -369,7 +369,7 @@ const Test = struct {
                         var stack_trace_writer = std.Io.Writer.Allocating.init(arena.allocator());
                         if (std.debug.getSelfDebugInfo()) |di| {
                             // skip frame from the testing.zig:
-                            while (try isStdTesting(arena.allocator(), io, di, trace.instruction_addresses[0])) {
+                            while (try isStdTesting(io, di, trace.instruction_addresses[0])) {
                                 trace.index -= 1;
                                 trace.instruction_addresses = trace.instruction_addresses[1..];
                             }
@@ -397,20 +397,25 @@ const Test = struct {
 
     /// Returns true only if the address is point on some place inside `testing.zig` file.
     fn isStdTesting(
-        alloc: std.mem.Allocator,
         io: std.Io,
         debug_info: *std.debug.SelfInfo,
         address: usize,
     ) !bool {
-        var arena = std.heap.ArenaAllocator.init(alloc);
-        defer arena.deinit();
-        const symbol_allocator = arena.allocator();
+        var text_arena: std.heap.ArenaAllocator = .init(std.debug.getDebugInfoAllocator());
+        defer text_arena.deinit();
+
+        var symbol_fallback_allocator = std.heap.stackFallback(
+            @sizeOf(std.debug.Symbol) + @alignOf(std.debug.Symbol) - 1,
+            std.debug.getDebugInfoAllocator(),
+        );
+        const symbol_allocator = symbol_fallback_allocator.get();
+
         var symbols: std.ArrayList(std.debug.Symbol) = .empty;
 
         debug_info.getSymbols(
             io,
             symbol_allocator,
-            symbol_allocator,
+            text_arena.allocator(),
             address,
             false,
             &symbols,
