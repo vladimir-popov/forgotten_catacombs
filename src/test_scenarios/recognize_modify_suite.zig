@@ -195,6 +195,75 @@ test "Modify an item when it has all possible modifications" {
     , .whole_display);
 }
 
+test "Repair a broken known item from the inventory" {
+    var test_session: TestSession = undefined;
+    const recognize_modify, _, const weapon_id = try initNearScientistWithMoney(&test_session, 9000);
+    defer test_session.deinit();
+    errdefer test_session.printDisplay();
+
+    // break the weapon
+    const breakages = try test_session.session.registry.getOrSet(weapon_id, c.Breakages, .empty);
+    try std.testing.expect(breakages.modifications.add(c.Modification.speed));
+    try test_session.session.journal.markWeaponAsKnown(weapon_id);
+    try test_session.session.mode.modify_recognize.updateTabs();
+
+    try recognize_modify.chooseRepairTab();
+    try test_session.runtime.display.expectLooksLike(
+        \\╔═════════════════════════╔════════════╗
+        \\║ Recognize     Modify    ║ Repair     ║
+        \\║═════════════════════════╝            ║
+        \\║/ Pickaxe                         12$ ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+
+    const options = try recognize_modify.chooseItemById(weapon_id);
+    try options.choose("Repair");
+
+    try test_session.runtime.display.expectLooksLike(
+        \\╔═════════════════════════╔════════════╗
+        \\║ Recognize     Modify    ║ Repair     ║
+        \\║═════════════════════════╝            ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+}
+
+test "A broken unknown item can't be repaired" {
+    var test_session: TestSession = undefined;
+    const recognize_modify, _, const weapon_id = try initNearScientistWithMoney(&test_session, 9000);
+    defer test_session.deinit();
+    errdefer test_session.printDisplay();
+
+    // break the weapon
+    const breakages = try test_session.session.registry.getOrSet(weapon_id, c.Breakages, .empty);
+    try std.testing.expect(breakages.modifications.add(c.Modification.speed));
+    try test_session.session.mode.modify_recognize.updateTabs();
+
+    try recognize_modify.chooseRepairTab();
+    try test_session.runtime.display.expectLooksLike(
+        \\╔═════════════════════════╔════════════╗
+        \\║ Recognize     Modify    ║ Repair     ║
+        \\║═════════════════════════╝            ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+}
+
 /// Initializes a test session with a player on the start level near the scientist.
 /// Sets the money to the player's wallet, and adds a healing potion as unknown to the player's inventory.
 /// Returns the new test session, id of the healing potion, and id of the player's weapon.

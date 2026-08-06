@@ -33,9 +33,9 @@ const MOD_MANUAL_PRICE = 300;
 const CHANCE_TO_BREAK_ON_SOMEHOW = 30;
 const CHANCE_TO_BREAK_ON_CAREFUL = 10;
 
-const RECOGNIZE = 0;
-const MODIFY = 1;
-const REPAIR = 2;
+const TAB_RECOGNIZE = 0;
+const TAB_MODIFY = 1;
+const TAB_REPAIR = 2;
 
 const Self = @This();
 
@@ -109,9 +109,9 @@ pub fn updateTabs(self: *Self) !void {
     const active_tab = self.main_window.activeTab();
     const selected_line = active_tab.scrollable_area.content.selected_line;
 
-    self.main_window.tabs[RECOGNIZE].scrollable_area.content.clearRetainingCapacity();
-    self.main_window.tabs[MODIFY].scrollable_area.content.clearRetainingCapacity();
-    self.main_window.tabs[REPAIR].scrollable_area.content.clearRetainingCapacity();
+    self.main_window.tabs[TAB_RECOGNIZE].scrollable_area.content.clearRetainingCapacity();
+    self.main_window.tabs[TAB_MODIFY].scrollable_area.content.clearRetainingCapacity();
+    self.main_window.tabs[TAB_REPAIR].scrollable_area.content.clearRetainingCapacity();
     var itr = self.inventory.items.iterator();
     while (itr.next()) |item_ptr| {
         const item = item_ptr.*;
@@ -120,7 +120,7 @@ pub fn updateTabs(self: *Self) !void {
             if (self.isWeaponOrArmor(item)) {
                 if (g.meta.isBroken(&self.session.registry, item)) {
                     const price = self.calculateRepairingPrice(item);
-                    try self.main_window.tabs[REPAIR].scrollable_area.content.addOption(
+                    try self.main_window.tabs[TAB_REPAIR].scrollable_area.content.addOption(
                         self.session.mode_arena.allocator(),
                         try self.formatLineWithPrice(&buffer, item, price),
                         item,
@@ -128,7 +128,7 @@ pub fn updateTabs(self: *Self) !void {
                         describeItem,
                     );
                 } else {
-                    try self.main_window.tabs[MODIFY].scrollable_area.content.addOption(
+                    try self.main_window.tabs[TAB_MODIFY].scrollable_area.content.addOption(
                         self.session.mode_arena.allocator(),
                         try self.formatLine(&buffer, item),
                         item,
@@ -139,7 +139,7 @@ pub fn updateTabs(self: *Self) !void {
             }
         } else {
             const price = self.calculateIdentificationPrice(item);
-            try self.main_window.tabs[RECOGNIZE].scrollable_area.content.addOption(
+            try self.main_window.tabs[TAB_RECOGNIZE].scrollable_area.content.addOption(
                 self.session.mode_arena.allocator(),
                 try self.formatLineWithPrice(&buffer, item, price),
                 item,

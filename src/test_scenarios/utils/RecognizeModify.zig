@@ -24,13 +24,18 @@ pub fn close(self: Self) !void {
 }
 
 pub fn chooseRecognizeTab(self: Self) !void {
-    if (self.modifyMode().main_window.active_tab_idx == 1)
-        try self.test_session.pressButton(.left);
+    self.modifyMode().main_window.active_tab_idx = 0;
+    try self.test_session.pressButton(.up);
 }
 
 pub fn chooseModifyTab(self: Self) !void {
-    if (self.modifyMode().main_window.active_tab_idx == 0)
-        try self.test_session.pressButton(.right);
+    self.modifyMode().main_window.active_tab_idx = 1;
+    try self.test_session.pressButton(.up);
+}
+
+pub fn chooseRepairTab(self: Self) !void {
+    self.modifyMode().main_window.active_tab_idx = 2;
+    try self.test_session.pressButton(.up);
 }
 
 /// Selects the item with passed name in the active tab, or throws an error.
