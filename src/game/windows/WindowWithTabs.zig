@@ -110,11 +110,6 @@ pub fn draw(self: Self, render: g.Render) !void {
     // Draw the tab titles
     const tab_title_width: u8 = (BORDERED_REGION.cols - 2) / self.tabs_count;
     try render.drawDoubledBorder(BORDERED_REGION, g.Render.default_filler);
-    try render.drawHorizontalLine(
-        '═',
-        BORDERED_REGION.top_left.movedToNTimes(.down, 2).movedTo(.right),
-        BORDERED_REGION.cols - 2,
-    );
     for (self.tabs[0..self.tabs_count], 0..) |tab, idx| {
         const cursor = BORDERED_REGION.top_left
             .movedTo(.down)
@@ -127,43 +122,50 @@ pub fn draw(self: Self, render: g.Render) !void {
             .center,
         );
     }
-    // Draw the border around the left active tab
-    if (self.active_tab_idx == 0) {
-        var cursor = BORDERED_REGION.top_left
-            .movedToNTimes(.down, 2);
-        try render.drawHorizontalLine(' ', cursor.movedTo(.right), tab_title_width - 1);
-        cursor.moveNTimes(.right, tab_title_width);
-        try render.drawSymbol('╚', cursor, .normal);
-        cursor.move(.up);
-        try render.drawSymbol('║', cursor, .normal);
-        cursor.move(.up);
-        try render.drawSymbol('╗', cursor, .normal);
-    } // Draw the border around the right active tab
-    else if (self.active_tab_idx == self.tabs_count - 1) {
-        var cursor = BORDERED_REGION.topRight()
-            .movedToNTimes(.left, tab_title_width + 1);
-        try render.drawSymbol('╔', cursor, .normal);
-        cursor.move(.down);
-        try render.drawSymbol('║', cursor, .normal);
-        cursor.move(.down);
-        try render.drawHorizontalLine(' ', cursor, tab_title_width + 1);
-        try render.drawSymbol('╝', cursor, .normal);
-    } // Draw the border around middle tabs
-    else {
-        var cursor = BORDERED_REGION.top_left
-            .movedToNTimes(.right, @intCast(self.active_tab_idx * tab_title_width));
-        try render.drawSymbol('╔', cursor, .normal);
-        cursor.move(.down);
-        try render.drawSymbol('║', cursor, .normal);
-        cursor.move(.down);
-        try render.drawSymbol('╝', cursor, .normal);
-        try render.drawHorizontalLine(' ', cursor.movedTo(.right), tab_title_width);
-        cursor.moveNTimes(.right, tab_title_width + 1);
-        try render.drawSymbol('╚', cursor, .normal);
-        cursor.move(.up);
-        try render.drawSymbol('║', cursor, .normal);
-        cursor.move(.up);
-        try render.drawSymbol('╗', cursor, .normal);
+    if (self.tabs_count > 1) {
+        try render.drawHorizontalLine(
+            '═',
+            BORDERED_REGION.top_left.movedToNTimes(.down, 2).movedTo(.right),
+            BORDERED_REGION.cols - 2,
+        );
+        // Draw the border around the left active tab
+        if (self.active_tab_idx == 0) {
+            var cursor = BORDERED_REGION.top_left
+                .movedToNTimes(.down, 2);
+            try render.drawHorizontalLine(' ', cursor.movedTo(.right), tab_title_width - 1);
+            cursor.moveNTimes(.right, tab_title_width);
+            try render.drawSymbol('╚', cursor, .normal);
+            cursor.move(.up);
+            try render.drawSymbol('║', cursor, .normal);
+            cursor.move(.up);
+            try render.drawSymbol('╗', cursor, .normal);
+        } // Draw the border around the right active tab
+        else if (self.active_tab_idx == self.tabs_count - 1) {
+            var cursor = BORDERED_REGION.topRight()
+                .movedToNTimes(.left, tab_title_width + 1);
+            try render.drawSymbol('╔', cursor, .normal);
+            cursor.move(.down);
+            try render.drawSymbol('║', cursor, .normal);
+            cursor.move(.down);
+            try render.drawHorizontalLine(' ', cursor, tab_title_width + 1);
+            try render.drawSymbol('╝', cursor, .normal);
+        } // Draw the border around middle tabs
+        else {
+            var cursor = BORDERED_REGION.top_left
+                .movedToNTimes(.right, @intCast(self.active_tab_idx * tab_title_width));
+            try render.drawSymbol('╔', cursor, .normal);
+            cursor.move(.down);
+            try render.drawSymbol('║', cursor, .normal);
+            cursor.move(.down);
+            try render.drawSymbol('╝', cursor, .normal);
+            try render.drawHorizontalLine(' ', cursor.movedTo(.right), tab_title_width);
+            cursor.moveNTimes(.right, tab_title_width + 1);
+            try render.drawSymbol('╚', cursor, .normal);
+            cursor.move(.up);
+            try render.drawSymbol('║', cursor, .normal);
+            cursor.move(.up);
+            try render.drawSymbol('╗', cursor, .normal);
+        }
     }
 
     // Draw the content

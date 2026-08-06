@@ -13,9 +13,9 @@ test "Init near the scientist" {
 
     try std.testing.expect(!test_session.session.journal.isKnown(unknown_item_id));
     try test_session.runtime.display.expectLooksLike(
-        \\╔═══════════════════╗══════════════════╗
-        \\║     Recognize     ║     Modify       ║
-        \\║                   ╚══════════════════║
+        \\╔═══════════╗══════════════════════════╗
+        \\║ Recognize ║   Modify      Repair     ║
+        \\║           ╚══════════════════════════║
         \\║¿ A yellow potion                 22$ ║
         \\║                                      ║
         \\║                                      ║
@@ -39,9 +39,9 @@ test "Recognize an unknown item when enough money" {
 
     try std.testing.expect(test_session.session.journal.isKnown(unknown_item_id));
     try test_session.runtime.display.expectLooksLike(
-        \\╔═══════════════════╗══════════════════╗
-        \\║     Recognize     ║     Modify       ║
-        \\║                   ╚══════════════════║
+        \\╔═══════════╗══════════════════════════╗
+        \\║ Recognize ║   Modify      Repair     ║
+        \\║           ╚══════════════════════════║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
@@ -64,9 +64,9 @@ test "Recognize an unknown item when NOT enough money" {
     try options.choose("Recognize");
 
     try test_session.runtime.display.expectLooksLike(
-        \\╔═══════════════════╗══════════════════╗
-        \\║     Recognize     ║     Modify       ║
-        \\║                   ╚══════════════════║
+        \\╔═══════════╗══════════════════════════╗
+        \\║ Recognize ║   Modify      Repair     ║
+        \\║           ╚══════════════════════════║
         \\║┌────────────────────────────────────┐║
         \\║│          You have not enough       │║
         \\║│                 money.             │║
@@ -87,9 +87,9 @@ test "Modification should be applicable only to weapons or armor" {
 
     try recognize_modify.chooseModifyTab();
     try test_session.runtime.display.expectLooksLike(
-        \\╔══════════════════╔═══════════════════╗
-        \\║     Recognize    ║      Modify       ║
-        \\║══════════════════╝                   ║
+        \\╔═══════════╔════════════╗═════════════╗
+        \\║ Recognize ║   Modify   ║  Repair     ║
+        \\║═══════════╝            ╚═════════════║
         \\║/ Pickaxe                             ║
         \\║¡ Torch                               ║
         \\║                                      ║
@@ -121,9 +121,9 @@ test "Modify an item somehow when enough money" {
         test_session.session.registry.has(known_weapon_id, c.Breakages));
     try recognize_modify.chooseRecognizeTab();
     try test_session.runtime.display.expectLooksLike(
-        \\╔═══════════════════╗══════════════════╗
-        \\║     Recognize     ║     Modify       ║
-        \\║                   ╚══════════════════║
+        \\╔═══════════╗══════════════════════════╗
+        \\║ Recognize ║   Modify      Repair     ║
+        \\║           ╚══════════════════════════║
         \\║\ Pickaxe                         11$ ║
         \\║¿ A yellow potion                 22$ ║
         \\║                                      ║
@@ -132,7 +132,7 @@ test "Modify an item somehow when enough money" {
         \\║                                      ║
         \\╚══════════════════════════════════════╝
         \\════════════════════════════════════════
-        \\ Your money:  992$    Close  �� Choose ⇧
+        \\ Your money:  900$    Close  �� Choose ⇧
     , .whole_display);
 }
 
@@ -148,9 +148,9 @@ test "Modify an item when NOT enough money" {
     try options.choose("Somehow");
 
     try test_session.runtime.display.expectLooksLike(
-        \\╔══════════════════╔═══════════════════╗
-        \\║     Recognize    ║      Modify       ║
-        \\║══════════════════╝                   ║
+        \\╔═══════════╔════════════╗═════════════╗
+        \\║ Recognize ║   Modify   ║  Repair     ║
+        \\║═══════════╝            ╚═════════════║
         \\║┌────────────────────────────────────┐║
         \\║│          You have not enough       │║
         \\║│                 money.             │║
@@ -165,7 +165,7 @@ test "Modify an item when NOT enough money" {
 
 test "Modify an item when it has all possible modifications" {
     var test_session: TestSession = undefined;
-    const recognize_modify, _, const known_weapon_id = try initNearScientistWithMoney(&test_session, 100);
+    const recognize_modify, _, const known_weapon_id = try initNearScientistWithMoney(&test_session, 9000);
     defer test_session.deinit();
     errdefer test_session.printDisplay();
 
@@ -180,9 +180,9 @@ test "Modify an item when it has all possible modifications" {
     try options.choose("fire");
 
     try test_session.runtime.display.expectLooksLike(
-        \\╔══════════════════╔═══════════════════╗
-        \\║     Recognize    ║      Modify       ║
-        \\║══════════════════╝                   ║
+        \\╔═══════════╔════════════╗═════════════╗
+        \\║ Recognize ║   Modify   ║  Repair     ║
+        \\║═══════════╝            ╚═════════════║
         \\║┌────────────────────────────────────┐║
         \\║│       All possible modifications   │║
         \\║│            already applied         │║
@@ -191,7 +191,7 @@ test "Modify an item when it has all possible modifications" {
         \\║                                      ║
         \\╚══════════════════════════════════════╝
         \\════════════════════════════════════════
-        \\ Your money:  100$           �� Close   
+        \\ Your money: 9000$           �� Close   
     , .whole_display);
 }
 

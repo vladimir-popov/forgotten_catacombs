@@ -121,9 +121,9 @@ test "Drop an item" {
     const options = try inventory.chooseItemByName("Torch");
     try options.choose("Drop");
     try test_session.runtime.display.expectLooksLike(
-        \\╔═══════════════════╗══════════════════╗
-        \\║     Inventory     ║      Drop        ║
-        \\║                   ╚══════════════════║
+        \\╔══════════════════╗═══════════════════╗
+        \\║     Inventory    ║       Drop        ║
+        \\║                  ╚═══════════════════║
         \\║/ Pickaxe                     weapon  ║
         \\║                                      ║
         \\║                                      ║
@@ -158,9 +158,9 @@ test "Drop all items" {
         try options.choose("Drop");
     }
     try test_session.runtime.display.expectLooksLike(
-        \\╔═══════════════════╗══════════════════╗
-        \\║     Inventory     ║      Drop        ║
-        \\║                   ╚══════════════════║
+        \\╔══════════════════╗═══════════════════╗
+        \\║     Inventory    ║       Drop        ║
+        \\║                  ╚═══════════════════║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
@@ -257,9 +257,9 @@ test "Pickup a gold pile" {
     // Open inventory
     var inventory = try test_session.openInventory();
     try test_session.runtime.display.expectLooksLike(
-        \\╔═══════════════════╗══════════════════╗
-        \\║     Inventory     ║      Drop        ║
-        \\║                   ╚══════════════════║
+        \\╔══════════════════╗═══════════════════╗
+        \\║     Inventory    ║       Drop        ║
+        \\║                  ╚═══════════════════║
         \\║/ Pickaxe                     weapon  ║
         \\║¡ Torch                        light  ║
         \\║                                      ║
@@ -362,9 +362,9 @@ test "Pickup gold from a pile of items" {
     // Switch back to the Inventory Tab:
     try test_session.pressButton(.left);
     try test_session.runtime.display.expectLooksLike(
-        \\╔═══════════════════╗══════════════════╗
-        \\║     Inventory     ║      Drop        ║
-        \\║                   ╚══════════════════║
+        \\╔══════════════════╗═══════════════════╗
+        \\║     Inventory    ║       Drop        ║
+        \\║                  ╚═══════════════════║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║

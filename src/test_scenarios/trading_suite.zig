@@ -11,9 +11,9 @@ test "Init near the shop" {
     defer test_session.deinit();
 
     try test_session.runtime.display.expectLooksLike(
-        \\╔═══════════════════╗══════════════════╗
-        \\║        Buy        ║      Sell        ║
-        \\║                   ╚══════════════════║
+        \\╔══════════════════╗═══════════════════╗
+        \\║        Buy       ║       Sell        ║
+        \\║                  ╚═══════════════════║
     , .{ .region = .init(1, 1, 3, 40) });
 }
 
