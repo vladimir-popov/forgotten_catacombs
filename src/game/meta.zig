@@ -108,6 +108,12 @@ pub fn isBroken(registry: *const g.Registry, entity: g.Entity) bool {
     return false;
 }
 
+pub fn canBeCombined(journal: g.Journal, item: g.Entity) bool {
+    _ = journal;
+    _ = item;
+    return false;
+}
+
 /// Returns a type of the enemy if it has a description preset from an appropriate namespace.
 pub inline fn getEnemyType(registry: *const g.Registry, entity: g.Entity) ?EnemyType {
     return if (registry.get(entity, c.Description)) |descr|
@@ -123,20 +129,27 @@ pub fn isEquipped(registry: *const g.Registry, player: g.Entity, item: g.Entity)
     return false;
 }
 
-/// Returns the id of the item with maximal radius of light through all equipped sources of the light,
-/// or null and default value.
-pub fn getLight(registry: *const g.Registry, equipment: *const c.Equipment) struct { ?g.Entity, f32 } {
-    if (equipment.light) |id| {
-        if (registry.get(id, c.SourceOfLight)) |sol| {
-            return .{ id, sol.radius };
+/// Returns an optional id of the source of light, its radius and charge.
+/// If no source of light is equipped, return null as id, default radius and zero charge.
+pub fn getLight(registry: *const g.Registry, equipment: *const c.Equipment) struct { ?g.Entity, f32, u16 } {
+    const source_of_light_radius = getRadiusOfLightFromEntity(registry, equipment.light);
+    const weapon_radius = getRadiusOfLightFromEntity(registry, equipment.weapon);
+    if (source_of_light_radius[0] + weapon_radius[0] > 0.0) {
+        return if (source_of_light_radius[0] > weapon_radius[0])
+            .{ equipment.light, source_of_light_radius[0], source_of_light_radius[1] }
+        else
+            .{ equipment.weapon, weapon_radius[0], weapon_radius[1] };
+    }
+    return .{ null, 1.0, 0 };
+}
+
+fn getRadiusOfLightFromEntity(registry: *const g.Registry, item: ?g.Entity) struct { f32, u16 } {
+    if (item) |light_id| {
+        if (registry.get(light_id, c.SourceOfLight)) |sol| {
+            if (sol.charge > 0) return .{ sol.radius, sol.charge };
         }
     }
-    if (equipment.weapon) |id| {
-        if (registry.get(id, c.SourceOfLight)) |sol| {
-            return .{ id, sol.radius };
-        }
-    }
-    return .{ null, 1.0 };
+    return .{ 0.0, 0 };
 }
 
 /// Returns an id of the equipped weapon, or the `actor`, because any enemy must be able to provide

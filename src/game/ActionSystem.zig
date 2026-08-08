@@ -86,20 +86,21 @@ pub fn calculateQuickActionForTarget(
 }
 
 pub fn onTurnCompleted(self: *Self) !void {
+    const registry = &self.session().registry;
     // Regenerate health
-    var regen_itr = self.session().registry.query(c.Regeneration);
+    var regen_itr = registry.query(c.Regeneration);
     while (regen_itr.next()) |tuple| {
         const entity, const regeneration = tuple;
         regeneration.accumulated_turns += 1;
         if (regeneration.accumulated_turns > regeneration.turns_to_increase) {
             regeneration.accumulated_turns = 0;
-            const health = self.session().registry.get(entity, c.Health) orelse
+            const health = registry.get(entity, c.Health) orelse
                 std.debug.panic("Entity {d} has Regeneration, but doesn't have a Health component", .{entity.id});
             health.add(1);
         }
     }
     //  Handle hunger
-    var hunger_itr = self.session().registry.query(c.Hunger);
+    var hunger_itr = registry.query(c.Hunger);
     while (hunger_itr.next()) |tuple| {
         const entity, const hunger = tuple;
         hunger.turns_after_eating +|= 1;
@@ -113,9 +114,19 @@ pub fn onTurnCompleted(self: *Self) !void {
 
         if (damage_every_turn == 0 or hunger.turns_after_eating % damage_every_turn != 0) continue;
 
-        const health = self.session().registry.get(entity, c.Health) orelse
+        const health = registry.get(entity, c.Health) orelse
             std.debug.panic("Entity {d} has Hunger, but doesn't have a Health component", .{entity.id});
         _ = try self.applyDamage(entity, entity, health, 1);
+    }
+    // Dim the lights
+    if (registry.get(self.session().player, c.Equipment)) |equipment| {
+        if (equipment.light) |light| {
+            registry.getUnsafe(light, c.SourceOfLight).charge -|= 1;
+        }
+        if (equipment.weapon) |weapon_id| {
+            if (registry.get(weapon_id, c.SourceOfLight)) |sol|
+                sol.charge -|= 1;
+        }
     }
 }
 
@@ -208,7 +219,6 @@ fn tryToMove(
     moving_speed: g.MovePoints,
 ) anyerror!g.actions.ActionResult {
     std.debug.assert(action.tag == .move);
-    self.session().runtime.printStackSize(3, "tryToMove");
     const new_place = switch (action.payload.move.target) {
         .direction => |direction| from_position.place.movedTo(direction),
         .new_place => |place| place,
@@ -228,7 +238,7 @@ fn tryToMove(
 /// If a collision happens, this method changes the action to an actual one
 /// and return `true`. Otherwise return `false`, it means that the move is completed.
 ///
-/// {place} a place in the dungeon with which collision should be checked.
+/// `place` a place in the dungeon with which collision should be checked.
 fn checkCollision(self: *Self, place: p.Point, action: *g.Action) bool {
     std.debug.assert(action.tag == .move);
     self.session().runtime.printStackSize(4, "checkCollision");

@@ -474,10 +474,11 @@ pub fn describeEquipedItems(
         try text_area.printLine(alloc, "Equiped armor: none");
     }
     _ = try text_area.addEmptyLine(alloc);
-    const light_id, const light_radius = g.meta.getLight(journal.registry, equipment);
+    const light_id, const light_radius, const charge = g.meta.getLight(journal.registry, equipment);
     if (light_id) |id| {
         try text_area.printLineFmt(alloc, "Source of light: {f}", .{actualNameFormatter(journal, id)});
         try text_area.printLineFmt(alloc, "         radius: {d}", .{light_radius});
+        try text_area.printLineFmt(alloc, "         charge: {d}", .{charge});
     } else {
         try text_area.printLine(alloc, "Source of light: none");
     }

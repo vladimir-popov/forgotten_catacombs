@@ -137,7 +137,7 @@ pub fn showTheCurrentPlacement(level: *const g.Level, place: p.Point) g.Render.V
 pub fn showInRadiusOfSourceOfLight(level: *const g.Level, place: p.Point) g.Render.Visibility {
     if (turn_light_on) return .visible;
 
-    _, const radius = g.meta.getLight(level.registry, level.player_equipment);
+    _, const radius, _ = g.meta.getLight(level.registry, level.player_equipment);
     const pp = level.playerPosition().place;
     const is_visible = if (radius > 1.0)
         place.isInsideElipse(pp, radius, radius * 0.5)

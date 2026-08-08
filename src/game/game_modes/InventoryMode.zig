@@ -139,34 +139,24 @@ fn tabWithDrop(self: *Self) ?*w.WindowWithTabs.Tab {
 /// Rebuilds a list of items
 pub fn updateInventoryTab(self: *Self) !void {
     const tab = self.tabWithInventory();
-    const selected_line = tab.scrollable_area.content.selected_line;
-    tab.scrollable_area.content.clearRetainingCapacity();
-    var itr = self.inventory.items.iterator();
-    while (itr.next()) |item_ptr| {
-        var buffer: w.TextArea.Line = undefined;
-        try tab.scrollable_area.content.addOption(
-            self.session.mode_arena.allocator(),
-            try self.formatInventoryLine(&buffer, item_ptr.*),
-            item_ptr.*,
-            useDropDescribe,
-            describeSelectedItem,
-        );
-    }
-    if (tab.scrollable_area.content.options.items.len > 0) {
-        try tab.scrollable_area.content.selectLine(if (selected_line < tab.scrollable_area.content.options.items.len)
-            selected_line
-        else
-            tab.scrollable_area.content.options.items.len - 1);
-    }
+    try w.updateAreaWithItems(
+        &self.session.mode_arena,
+        self,
+        self.inventory.items,
+        formatInventoryLine,
+        useCombineDropDescribe,
+        describeSelectedItem,
+        &tab.scrollable_area,
+    );
 }
 
-const inventory_line_fmt = std.fmt.comptimePrint(
-    "{{u}} {{s:<{d}}}{{s}}",
-    .{w.WindowWithTabs.CONTENT_AREA_REGION.cols - 10}, // "{u} ".len == 2 + "light weapon".len == 6 + 2 for pads
-);
-
-fn formatInventoryLine(self: *Self, line: *w.TextArea.Line, item: g.Entity) ![]const u8 {
-    const sprite = self.session.registry.getUnsafe(item, c.Sprite);
+fn formatInventoryLine(
+    ptr: *anyopaque,
+    line: *w.TextArea.Line,
+    item: g.Entity,
+) ![]const u8 {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    const sprite = self.session.journal.registry.getUnsafe(item, c.Sprite);
     var buf: [32]u8 = undefined;
     const name = try g.Description.printActualName(&buf, self.session.journal, item);
     const using = if (item.eql(self.equipment.weapon))
@@ -179,11 +169,15 @@ fn formatInventoryLine(self: *Self, line: *w.TextArea.Line, item: g.Entity) ![]c
         " armor"
     else
         "      ";
-    log.debug("fromat line: {d}: {u}({d}) {s} {s}", .{ item.id, sprite.codepoint, sprite.codepoint, name, using });
     return try std.fmt.bufPrint(line, inventory_line_fmt, .{ sprite.codepoint, name, using });
 }
 
-fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+const inventory_line_fmt = std.fmt.comptimePrint(
+    "{{u}} {{s:<{d}}}{{s}}",
+    .{w.WindowWithTabs.CONTENT_AREA_REGION.cols - 10}, // 10 == ("{u} ".len == 2 + "light weapon".len == 6 + 2 for pads)
+);
+
+fn useCombineDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Buttons is helt. Show modal window for {any}", .{item});
     var area = w.OptionsArea(g.Entity).centered(self);
@@ -207,6 +201,9 @@ fn useDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonRes
         } else if (self.session.registry.has(item, c.Consumable)) {
             try area.addOption(self.session.mode_arena.allocator(), "Eat", item, consumeFood, null);
         }
+    }
+    if (g.meta.canBeCombined(self.session.journal, item)) {
+        try area.addOption(self.session.mode_arena.allocator(), "Combine", item, combineSelectedItem, null);
     }
     try area.addOption(self.session.mode_arena.allocator(), "Drop", item, dropSelectedItem, null);
     try area.addOption(self.session.mode_arena.allocator(), "Describe", item, describeSelectedItem, null);
@@ -365,6 +362,13 @@ fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButt
     self.description_window = try w.entityDescription(self.session.mode_arena.allocator(), self.session, item);
     // keep the main window opened
     return .keep_open;
+}
+
+fn combineSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    _ = self;
+    _ = item;
+    @panic("Unimplemented");
 }
 
 /// Moves an item from the inventory to the player's position on the level.

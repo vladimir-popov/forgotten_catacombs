@@ -189,50 +189,38 @@ fn formatProduct(self: *Self, line: *w.TextArea.Line, item: g.Entity, for_buying
     }
 }
 
+fn formatItemForBuying(ptr: *anyopaque, line: *w.TextArea.Line, item: g.Entity) ![]const u8 {
+    return try formatProduct(@ptrCast(@alignCast(ptr)), line, item, true);
+}
+
+fn formatItemForSelling(ptr: *anyopaque, line: *w.TextArea.Line, item: g.Entity) ![]const u8 {
+    return try formatProduct(@ptrCast(@alignCast(ptr)), line, item, false);
+}
+
 fn updateBuyingTab(self: *Self) !void {
     const tab = self.buyingTab();
-    const selected_line = tab.scrollable_area.content.selected_line;
-    tab.scrollable_area.content.clearRetainingCapacity();
-    var itr = self.shop.items.iterator();
-    while (itr.next()) |item_ptr| {
-        var buffer: w.TextArea.Line = undefined;
-        try tab.scrollable_area.content.addOption(
-            self.session.mode_arena.allocator(),
-            try self.formatProduct(&buffer, item_ptr.*, true),
-            item_ptr.*,
-            buyOrDescribe,
-            describeSelectedItem,
-        );
-    }
-    if (tab.scrollable_area.content.options.items.len > 0) {
-        try tab.scrollable_area.content.selectLine(if (selected_line < tab.scrollable_area.content.options.items.len)
-            selected_line
-        else
-            tab.scrollable_area.content.options.items.len - 1);
-    }
+    try w.updateAreaWithItems(
+        &self.session.mode_arena,
+        self,
+        self.shop.items,
+        formatItemForBuying,
+        buyOrDescribe,
+        describeSelectedItem,
+        &tab.scrollable_area,
+    );
 }
 
 fn updateSellingTab(self: *Self) !void {
     const tab = self.sellingTab();
-    const selected_line = tab.scrollable_area.content.selected_line;
-    tab.scrollable_area.content.clearRetainingCapacity();
-    var itr = self.inventory.items.iterator();
-    while (itr.next()) |item_ptr| {
-        var buffer: w.TextArea.Line = undefined;
-        try tab.scrollable_area.content.addOption(
-            self.session.mode_arena.allocator(),
-            try self.formatProduct(&buffer, item_ptr.*, false),
-            item_ptr.*,
-            sellOrDescribe,
-            describeSelectedItem,
-        );
-    }
-    if (tab.scrollable_area.content.options.items.len > 0) {
-        try tab.scrollable_area.content.selectLine(if (selected_line < tab.scrollable_area.content.options.items.len)
-            selected_line
-        else
-            tab.scrollable_area.content.options.items.len - 1);
-    }
+    try w.updateAreaWithItems(
+        &self.session.mode_arena,
+        self,
+        self.inventory.items,
+        formatItemForSelling,
+        sellOrDescribe,
+        describeSelectedItem,
+        &tab.scrollable_area,
+    );
 }
 
 fn buyOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {

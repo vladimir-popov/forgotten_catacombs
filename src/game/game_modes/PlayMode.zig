@@ -105,7 +105,6 @@ fn playerTurn(self: *Self) !bool {
 }
 
 fn enemiesTurn(self: *Self) !void {
-    self.session.runtime.printStackSize(0, "enemiesTurn");
     var itr = self.session.registry.query(c.Initiative);
     while (itr.next()) |tuple| {
         const npc, const initiative = tuple;
@@ -378,8 +377,6 @@ pub fn doTurn(
 ) !g.actions.ActionResult {
     log.info("The turn of the entity {d}.", .{actor.id});
     defer log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
-
-    self.session.runtime.printStackSize(1, "doTurn");
 
     const move_points_for_action = g.meta.movePointsForAction(&self.session.registry, actor, action.tag);
     if (move_points_for_action > initiative)

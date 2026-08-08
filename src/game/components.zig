@@ -490,6 +490,8 @@ pub const Experience = struct {
 
 pub const SourceOfLight = struct {
     radius: f32,
+    charge: u16,
+    chargable: bool = false,
 };
 
 pub const Skills = struct {

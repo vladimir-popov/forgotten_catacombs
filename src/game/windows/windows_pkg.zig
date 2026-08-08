@@ -41,7 +41,6 @@ const std = @import("std");
 const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
-const w = g.windows;
 
 const log = std.log.scoped(.windows);
 
@@ -151,7 +150,7 @@ pub fn entityDescription(
     }
     // A modal window with an entity description should always have the maximal possible width,
     // because all descriptions have fixed length lines
-    var window = w.ModalWindow(TextArea).defaultModalWindow(area);
+    var window = ModalWindow(TextArea).defaultModalWindow(area);
     window.title_len = (try g.Description.printActualName(&window.title_buffer, session.journal, entity)).len;
     return window;
 }
@@ -171,4 +170,40 @@ pub fn options(
     owner: *anyopaque,
 ) ModalWindow(OptionsArea(Item)) {
     return .{ .scrollable_area = OptionsArea(Item).init(owner, .center) };
+}
+
+pub const FormatItemLineFn = *const fn (
+    context: *anyopaque,
+    line: *TextArea.Line,
+    item: g.Entity,
+) anyerror![]const u8;
+
+pub fn updateAreaWithItems(
+    arena: *std.heap.ArenaAllocator,
+    context: *anyopaque,
+    items: g.utils.EntitiesSet,
+    formatLine: FormatItemLineFn,
+    onReleaseButton: OptionsArea(g.Entity).OnReleaseButton,
+    onHoldButton: OptionsArea(g.Entity).OnHoldButton,
+    area: *ScrollableArea(OptionsArea(g.Entity)),
+) !void {
+    const selected_line = area.content.selected_line;
+    area.content.clearRetainingCapacity();
+    var itr = items.iterator();
+    while (itr.next()) |item_ptr| {
+        var line: TextArea.Line = undefined;
+        try area.content.addOption(
+            arena.allocator(),
+            try formatLine(context, &line, item_ptr.*),
+            item_ptr.*,
+            onReleaseButton,
+            onHoldButton,
+        );
+    }
+    if (area.content.options.items.len > 0) {
+        try area.content.selectLine(if (selected_line < area.content.options.items.len)
+            selected_line
+        else
+            area.content.options.items.len - 1);
+    }
 }
