@@ -113,18 +113,19 @@ noinline fn welcome(self: *Self) !void {
     log.debug("Welcome screen. The game state is {t}", .{self.state});
     const from_state: std.meta.Tag(State) = self.state;
     _ = self.state_arena.reset(.retain_capacity);
-    self.state = .{ .welcome = try self.state_arena.allocator().create(WelcomeScreen) };
-    self.state.welcome.menu = .init(self, .center);
+
+    const alloc = self.state_arena.allocator();
+    self.state = .{ .welcome = try alloc.create(WelcomeScreen) };
+    self.state.welcome.menu = .initEmpty(alloc, self, .center);
 
     self.runtime.removeAllMenuItems();
 
-    const alloc = self.state_arena.allocator();
     // The choice will be handled manually in the `tick` method
     if (try self.isSessionFileExists())
-        try self.state.welcome.menu.addOption(alloc, " Continue ", {}, continueGame, null);
-    try self.state.welcome.menu.addOption(alloc, " New game ", {}, newGame, null);
-    try self.state.welcome.menu.addOption(alloc, "  Manual  ", {}, showManual, null);
-    try self.state.welcome.menu.addOption(alloc, "  About   ", {}, showAbout, null);
+        try self.state.welcome.menu.addOption(" Continue ", {}, continueGame, null);
+    try self.state.welcome.menu.addOption(" New game ", {}, newGame, null);
+    try self.state.welcome.menu.addOption("  Manual  ", {}, showManual, null);
+    try self.state.welcome.menu.addOption("  About   ", {}, showAbout, null);
 
     // keep menu item selected
     switch (from_state) {

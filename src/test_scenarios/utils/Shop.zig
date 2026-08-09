@@ -35,36 +35,46 @@ pub fn shopWallet(self: Self) *c.Wallet {
 /// If the item was found, the button is pressed and Options available for the item is returned.
 pub fn chooseItemByName(self: Self, name: []const u8) !Options {
     const options = Options{
-        .options_area = &self.tradingMode().main_window.activeTab().area.content,
+        .options_area = @ptrCast(@alignCast(
+            self.tradingMode().main_window.activeTab().area.content.underlying,
+        )),
         .test_session = self.test_session,
     };
     try options.choose(name);
     return .{
         .test_session = self.test_session,
-        .options_area = &self.tradingMode().actions_window.?.content.content,
+        .options_area = &self.tradingMode().modal_windows.topWindow().?.content.content,
     };
 }
 
 pub fn chooseItemById(self: Self, item: g.Entity) !Options {
     const options = Options{
-        .options_area = &self.tradingMode().main_window.activeTab().area.content,
+        .options_area = @ptrCast(@alignCast(
+            self.tradingMode().main_window.activeTab().area.content.underlying,
+        )),
         .test_session = self.test_session,
     };
     try options.chooseById(item);
     return .{
         .test_session = self.test_session,
-        .options_area = &self.tradingMode().actions_window.?.content.content,
+        .options_area = @ptrCast(@alignCast(
+            self.tradingMode().modal_windows.topWindow().?.content.content.underlying,
+        )),
     };
 }
 
 pub fn chooseItemByIndex(self: Self, idx: usize) !Options {
     const options = Options{
-        .options_area = &self.tradingMode().main_window.activeTab().scrollable_area.content,
+        .options_area = @ptrCast(@alignCast(
+            self.tradingMode().main_window.activeTab().scrollable_area.content.underlying,
+        )),
         .test_session = self.test_session,
     };
     try options.chooseByIndex(idx);
     return .{
         .test_session = self.test_session,
-        .options_area = &self.tradingMode().actions_window.?.scrollable_area.content,
+        .options_area = @ptrCast(@alignCast(
+            self.tradingMode().modal_windows.topWindow().?.scrollable_area.content.underlying,
+        )),
     };
 }

@@ -8,8 +8,8 @@ test "Describe an item" {
     defer test_session.deinit();
 
     const inventory = try test_session.openInventory();
-    const options = try inventory.chooseItemByName("Torch");
-    try options.choose("Describe");
+    const modal_window = try inventory.chooseItemByName("Torch");
+    try (try modal_window.asOptions()).choose("Describe");
 
     try test_session.runtime.display.expectLooksLike(
         \\┌────────────────Torch─────────────────┐
@@ -32,20 +32,20 @@ test "Describe an unknown potion" {
 
     const inventory = try test_session.openInventory();
     const potion = try inventory.add(g.entities.presets.Potions.get(.healing_potion));
-    const options = try inventory.chooseItemById(potion);
-    try options.choose("Describe");
+    const modal_window = try inventory.chooseItemById(potion);
+    try (try modal_window.asOptions()).choose("Describe");
 
     try test_session.runtime.display.expectLooksLike(
-        \\
-        \\
-        \\
         \\┌────────────A green potion────────────┐
         \\│ A swirling liquid of green color     │
         \\│ rests in a vial.                     │
+        \\│                                      │
+        \\│                                      │
+        \\│                                      │
+        \\│                                      │
+        \\│                                      │
+        \\│                                      │
         \\└──────────────────────────────────────┘
-        \\
-        \\
-        \\
     , .game_area);
 }
 
@@ -57,25 +57,26 @@ test "Describe a known potion (after drinking a similar)" {
     // Drink a potion:
     var inventory = try test_session.openInventory();
     const potion_to_drink = try inventory.add(g.entities.presets.Potions.get(.healing_potion));
-    var options = try inventory.chooseItemById(potion_to_drink);
-    try options.choose("Drink");
+    var modal_window = try inventory.chooseItemById(potion_to_drink);
+    try (try modal_window.asOptions()).choose("Drink");
 
     // Check the description:
     inventory = try test_session.openInventory();
     const potion_to_describe = try inventory.add(g.entities.presets.Potions.get(.healing_potion));
-    options = try inventory.chooseItemById(potion_to_describe);
-    try options.choose("Describe");
+    modal_window = try inventory.chooseItemById(potion_to_describe);
+    try (try modal_window.asOptions()).choose("Describe");
 
     try test_session.runtime.display.expectLooksLike(
-        \\
-        \\
         \\┌───────────A healing potion───────────┐
         \\│ A brew that glows faintly, as if     │
         \\│ mends alive. It warms your veins     │
         \\│ and your wounds instantly.           │
+        \\│                                      │
+        \\│                                      │
+        \\│                                      │
+        \\│                                      │
+        \\│                                      │
         \\└──────────────────────────────────────┘
-        \\
-        \\
     , .game_area);
 }
 
@@ -96,7 +97,6 @@ test "Describe an unknown enemy" {
     try test_session.pressButton(.a);
 
     try test_session.runtime.display.expectLooksLike(
-        \\######################################30
         \\┌─────────────────Rat──────────────────┐
         \\│ A big, nasty rat with vicious eyes   │
         \\│ that thrives in dark corners and     │
@@ -104,8 +104,9 @@ test "Describe an unknown enemy" {
         \\│                                      │
         \\│ Who knows what to expect from this   │
         \\│ creature?                            │
+        \\│                                      │
+        \\│                                      │
         \\└──────────────────────────────────────┘
-        \\~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     , .game_area);
 }
 

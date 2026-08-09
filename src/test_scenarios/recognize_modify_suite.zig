@@ -34,8 +34,8 @@ test "Recognize an unknown item when enough money" {
     defer test_session.deinit();
     errdefer test_session.printDisplay();
 
-    const options = try recognize_modify.chooseItemById(unknown_item_id);
-    try options.choose("Recognize");
+    const modal_window = try recognize_modify.chooseItemById(unknown_item_id);
+    try (try modal_window.asOptions()).choose("Recognize");
 
     try std.testing.expect(test_session.session.journal.isKnown(unknown_item_id));
     try test_session.runtime.display.expectLooksLike(
@@ -60,8 +60,8 @@ test "Recognize an unknown item when NOT enough money" {
     defer test_session.deinit();
     errdefer test_session.printDisplay();
 
-    const options = try recognize_modify.chooseItemById(unknown_item_id);
-    try options.choose("Recognize");
+    const modal_window = try recognize_modify.chooseItemById(unknown_item_id);
+    try (try modal_window.asOptions()).choose("Recognize");
 
     try test_session.runtime.display.expectLooksLike(
         \\╔═══════════╗══════════════════════════╗
@@ -112,9 +112,9 @@ test "Modify an item somehow when enough money" {
     try std.testing.expect(!test_session.session.registry.has(known_weapon_id, c.Improvements));
     try std.testing.expect(!test_session.session.registry.has(known_weapon_id, c.Breakages));
 
-    const options = try recognize_modify.chooseItemById(known_weapon_id);
-    try options.choose("Modify");
-    try options.choose("Somehow");
+    const modal_window = try recognize_modify.chooseItemById(known_weapon_id);
+    try (try modal_window.asOptions()).choose("Modify");
+    try (try modal_window.asOptions()).choose("Somehow");
 
     try std.testing.expect(!test_session.session.journal.isKnown(known_weapon_id));
     try std.testing.expect(test_session.session.registry.has(known_weapon_id, c.Improvements) or
@@ -143,9 +143,9 @@ test "Modify an item when NOT enough money" {
     errdefer test_session.printDisplay();
 
     try recognize_modify.chooseModifyTab();
-    const options = try recognize_modify.chooseItemById(known_weapon_id);
-    try options.choose("Modify");
-    try options.choose("Somehow");
+    const modal_window = try recognize_modify.chooseItemById(known_weapon_id);
+    try (try modal_window.asOptions()).choose("Modify");
+    try (try modal_window.asOptions()).choose("Somehow");
 
     try test_session.runtime.display.expectLooksLike(
         \\╔═══════════╔════════════╗═════════════╗
@@ -174,10 +174,10 @@ test "Modify an item when it has all possible modifications" {
     improvements.modifications.items.toggleAll();
 
     try recognize_modify.chooseModifyTab();
-    const options = try recognize_modify.chooseItemById(known_weapon_id);
-    try options.choose("Modify");
-    try options.choose("Manually");
-    try options.choose("fire");
+    const modal_window = try recognize_modify.chooseItemById(known_weapon_id);
+    try (try modal_window.asOptions()).choose("Modify");
+    try (try modal_window.asOptions()).choose("Manually");
+    try (try modal_window.asOptions()).choose("fire");
 
     try test_session.runtime.display.expectLooksLike(
         \\╔═══════════╔════════════╗═════════════╗
@@ -221,8 +221,8 @@ test "Repair a broken known item from the inventory" {
         \\╚══════════════════════════════════════╝
     , .game_area);
 
-    const options = try recognize_modify.chooseItemById(weapon_id);
-    try options.choose("Repair");
+    const modal_window = try recognize_modify.chooseItemById(weapon_id);
+    try (try modal_window.asOptions()).choose("Repair");
 
     try test_session.runtime.display.expectLooksLike(
         \\╔═════════════════════════╔════════════╗

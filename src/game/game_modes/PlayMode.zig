@@ -17,7 +17,7 @@ session: *g.GameSession,
 target: ?g.Entity = null,
 quick_actions: QuickActions,
 is_players_turn: bool = true,
-quick_actions_window: ?w.ModalWindow(w.OptionsArea(void)) = null,
+quick_actions_window: ?w.Window = null,
 // If defined, then all input should be ignored.
 notification_to_show: ?NotificationMessage = null,
 
@@ -264,7 +264,7 @@ fn handleInput(self: *Self) !bool {
         if (self.quick_actions_window) |*window| {
             if (try window.handleButton(btn) == .close_window) {
                 try window.hide(self.session.render, .from_buffer);
-                window.deinit(self.session.mode_arena.allocator());
+                window.deinit();
                 self.quick_actions_window = null;
             }
             switch (btn.game_button) {
@@ -320,6 +320,26 @@ fn handleInput(self: *Self) !bool {
             ),
             .get_item => |item| {
                 const entity = try self.session.registry.addNewEntity(g.entities.presets.Items.get(item));
+                try self.session.registry.getUnsafe(self.session.player, c.Inventory).items.add(entity);
+            },
+            .get_ammo => |item| {
+                const entity = try self.session.registry.addNewEntity(g.entities.presets.Ammo.get(item));
+                try self.session.registry.getUnsafe(self.session.player, c.Inventory).items.add(entity);
+            },
+            .get_armor => |item| {
+                const entity = try self.session.registry.addNewEntity(g.entities.presets.Armor.get(item));
+                try self.session.registry.getUnsafe(self.session.player, c.Inventory).items.add(entity);
+            },
+            .get_food => |item| {
+                const entity = try self.session.registry.addNewEntity(g.entities.presets.Food.get(item));
+                try self.session.registry.getUnsafe(self.session.player, c.Inventory).items.add(entity);
+            },
+            .get_potion => |item| {
+                const entity = try self.session.registry.addNewEntity(g.entities.presets.Potions.get(item));
+                try self.session.registry.getUnsafe(self.session.player, c.Inventory).items.add(entity);
+            },
+            .get_weapon => |item| {
+                const entity = try self.session.registry.addNewEntity(g.entities.presets.Weapons.get(item));
                 try self.session.registry.getUnsafe(self.session.player, c.Inventory).items.add(entity);
             },
             .turn_light_on => g.visibility.turn_light_on = true,
@@ -436,8 +456,6 @@ pub fn updateQuickActions(self: *Self) anyerror!void {
                 },
             );
     }
-    self.session.runtime.printStackSize(0, "updateQActions");
-
     const alloc = self.session.mode_arena.allocator();
     // Remember the previously selected action to try to keep it selected
     const prev_selected_action = self.quickAction();
@@ -551,14 +569,17 @@ const TargetsIterator = struct {
 };
 
 /// Builds a window with quick actions list
-fn windowWithQuickActions(self: *Self) !w.ModalWindow(w.OptionsArea(void)) {
-    var area = w.OptionsArea(void).centered(self);
+fn windowWithQuickActions(self: *Self) !w.Window {
+    var window = w.Window.init(self.session.mode_arena.allocator(), w.Window.DEFAULT_MAX_REGION);
+    const area = try window.changeContent(w.OptionsArea(void));
+    area.* = .initEmpty(window.allocator(), self, .center);
     for (self.quick_actions.actions.items, 0..) |qa, idx| {
-        try area.addOption(self.session.mode_arena.allocator(), qa.toString(), {}, chooseQuickAction, null);
+        try area.addOption(qa.toString(), {}, chooseQuickAction, null);
         if (idx == self.quick_actions.selected_idx)
             try area.selectLine(idx);
     }
-    return .defaultModalWindow(area);
+    window.shrinkToContent();
+    return window;
 }
 
 /// Sets the index of the current quick action to the currently selected item in the window

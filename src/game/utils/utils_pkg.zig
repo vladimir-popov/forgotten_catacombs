@@ -46,6 +46,19 @@ pub inline fn enumIntValues(comptime E: type) []const @typeInfo(E).@"enum".tag_t
     }
 }
 
+pub inline fn enumStrValues(comptime E: type) [@typeInfo(E).@"enum".fields.len][]const u8 {
+    comptime {
+        const values = @typeInfo(E).@"enum".fields;
+        var res: [values.len][]const u8 = undefined;
+        var i: usize = 0;
+        for (values) |value| {
+            res[i] = value.name;
+            i += 1;
+        }
+        return res;
+    }
+}
+
 pub fn EnumSetFormatter(comptime E: type) type {
     return struct {
         set: std.enums.EnumSet(E),

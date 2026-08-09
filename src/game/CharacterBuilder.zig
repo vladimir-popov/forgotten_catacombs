@@ -73,9 +73,11 @@ const BuildingStep = union(enum) {
         skills: c.Skills,
         remaining_points: u2,
         options: w.OptionsArea(g.meta.Skill),
-        fn deinit(self: *@This(), alloc: std.mem.Allocator) void {
-            self.options.deinit(alloc);
+
+        fn deinit(self: *@This()) void {
+            self.options.deinit();
         }
+
         fn selectedSkill(self: @This()) g.meta.Skill {
             return self.options.selectedItem();
         }
@@ -118,15 +120,15 @@ const BuildingStep = union(enum) {
 
         fn init(description: w.TextArea, stats: c.Stats, skills: c.Skills, health: c.Health) @This() {
             return .{
-                .description = .init(description, CONFIRM_AREA_REGION),
+                .description = .{ .content = description, .region = CONFIRM_AREA_REGION },
                 .stats = stats,
                 .skills = skills,
                 .health = health,
             };
         }
 
-        fn deinit(self: *@This(), alloc: std.mem.Allocator) void {
-            self.description.deinit(alloc);
+        fn deinit(self: *@This()) void {
+            self.description.content.deinit();
         }
     },
 };
@@ -134,7 +136,7 @@ const BuildingStep = union(enum) {
 arena: *g.GameStateArena,
 step: BuildingStep,
 // a popup window with description of a selected item (archetype, stat or skill)
-description: ?w.ModalWindow(w.TextArea),
+description: ?w.Window,
 
 pub fn init(self: *Self, arena: *g.GameStateArena) !void {
     self.arena = arena;
@@ -144,10 +146,9 @@ pub fn init(self: *Self, arena: *g.GameStateArena) !void {
 
 fn initArchetypeStep(self: *Self) !void {
     const arena_alloc = self.arena.allocator();
-    self.step = .{ .archetype = w.OptionsArea(g.meta.PlayerArchetype).init(self, .center) };
+    self.step = .{ .archetype = w.OptionsArea(g.meta.PlayerArchetype).initEmpty(arena_alloc, self, .center) };
     for (std.enums.values(g.meta.PlayerArchetype)) |archetype| {
         const option = try self.step.archetype.addEmptyOption(
-            arena_alloc,
             archetype,
         );
         option.label_len = (try std.fmt.bufPrint(
@@ -164,13 +165,10 @@ fn initSkillsStep(
     skills: c.Skills,
     remaining_points: u2,
 ) !void {
-    var options = w.OptionsArea(g.meta.Skill).init(self, .left);
+    var options = w.OptionsArea(g.meta.Skill).initEmpty(self.arena.allocator(), self, .left);
     for (std.enums.values(g.meta.Skill)) |skill| {
         // the button handler is omitted, because we have a single point to handle buttons in this mode
-        const option = try options.addEmptyOption(
-            self.arena.allocator(),
-            skill,
-        );
+        const option = try options.addEmptyOption(skill);
         option.label_len = SKILLS_AREA_REGION.cols;
         _ = try std.fmt.bufPrint(
             &option.label_buffer,
@@ -189,15 +187,14 @@ fn initSkillsStep(
 
 fn initConfirmStep(self: *Self, stats: c.Stats, skills: c.Skills) !void {
     const health: c.Health = g.meta.initialHealth(stats.values.getAssertContains(.constitution));
-    const alloc = self.arena.allocator();
-    var text_area: w.TextArea = .empty;
-    try g.Description.describeProgression(alloc, 1, 0, &text_area);
-    _ = try text_area.addEmptyLine(alloc);
-    try g.Description.describeHealth(alloc, &health, &text_area);
-    _ = try text_area.addEmptyLine(alloc);
-    try g.Description.describeSkills(alloc, &skills, &text_area);
-    _ = try text_area.addEmptyLine(alloc);
-    try g.Description.describeStats(alloc, &stats, &text_area);
+    var text_area: w.TextArea = .initEmpty(self.arena.allocator());
+    try g.Description.describeProgression(1, 0, &text_area);
+    _ = try text_area.addEmptyLine();
+    try g.Description.describeHealth(&health, &text_area);
+    _ = try text_area.addEmptyLine();
+    try g.Description.describeSkills(&skills, &text_area);
+    _ = try text_area.addEmptyLine();
+    try g.Description.describeStats(&stats, &text_area);
     self.step = .{ .confirm = .init(text_area, stats, skills, health) };
 }
 
@@ -206,7 +203,7 @@ pub fn handleButton(self: *Self, btn: g.Button, render: g.Render) anyerror!?stru
     if (self.description) |*window| {
         if (try window.handleButton(btn) == .close_window) {
             try window.hide(render, .fill_region);
-            window.deinit(self.arena.allocator());
+            window.deinit();
             self.description = null;
         }
     } else {
@@ -240,14 +237,14 @@ pub fn handleButton(self: *Self, btn: g.Button, render: g.Render) anyerror!?stru
                 },
                 .skills => {
                     // back to archetype selection
-                    self.step.skills.deinit(self.arena.allocator());
+                    self.step.skills.deinit();
                     try self.initArchetypeStep();
                 },
                 .confirm => |confirm_step| {
                     // back to skills selection
                     const stats = confirm_step.stats;
                     const skills = confirm_step.skills;
-                    self.step.confirm.deinit(self.arena.allocator());
+                    self.step.confirm.deinit();
                     try self.initSkillsStep(stats, skills, 0);
                 },
             },
@@ -268,7 +265,7 @@ pub fn handleButton(self: *Self, btn: g.Button, render: g.Render) anyerror!?stru
                         } else {
                             const stats = skills_step.stats;
                             const skills = skills_step.skills;
-                            self.step.skills.deinit(self.arena.allocator());
+                            self.step.skills.deinit();
                             try self.initConfirmStep(stats, skills);
                         }
                     },
@@ -283,14 +280,13 @@ pub fn handleButton(self: *Self, btn: g.Button, render: g.Render) anyerror!?stru
 }
 
 fn showDescription(self: *Self, description: *const g.Description) !void {
-    var area: w.TextArea = .empty;
+    self.description = .init(self.arena.allocator(), w.Window.DEFAULT_MAX_REGION);
+    var area = try self.description.?.changeContent(w.TextArea);
+    area.* = .initEmpty(self.description.?.allocator());
     for (description.description) |descr_line| {
-        const line = try area.addEmptyLine(self.arena.allocator());
-        _ = try std.fmt.bufPrint(line, "{s}", .{descr_line});
+        try area.printLineFmt("{s}", .{descr_line});
     }
-    var window: w.ModalWindow(w.TextArea) = .defaultModalWindow(area);
-    window.title_len = (try std.fmt.bufPrint(&window.title_buffer, "{s}", .{description.name})).len;
-    self.description = window;
+    try self.description.?.formatTitle("{s}", .{description.name});
 }
 
 pub fn draw(self: Self, render: g.Render) !void {

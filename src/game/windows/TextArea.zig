@@ -1,5 +1,5 @@
 //! The simplest implementation of the `Area` interface. Contains a set of lines with a text
-//! to draw in a window. Do not handle any button. Can be drawn in a region with scrolling.
+//! to draw in a window. Handles the right button to close the parent container.
 const std = @import("std");
 const g = @import("../game_pkg.zig");
 const c = g.components;
@@ -18,70 +18,74 @@ pub const Line = [COLS]u8;
 
 const Self = @This();
 
+alloc: std.mem.Allocator,
 /// The scrollable content of the window
 lines: std.ArrayList(Line) = .empty,
 
-pub const empty: Self = .{};
+pub fn initEmpty(alloc: std.mem.Allocator) Self {
+    return .{ .alloc = alloc };
+}
 
-pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
-    self.lines.deinit(alloc);
+pub fn deinit(self: *Self) void {
+    self.lines.deinit(self.alloc);
+}
+
+pub fn area(self: *Self) w.Area {
+    return .{ .underlying = self, .vtable = w.Area.vtableFor(Self) };
 }
 
 pub fn totalLines(self: *const Self) usize {
     return self.lines.items.len;
 }
 
-pub fn selectedLine(_: Self) ?usize {
+pub fn selectedLine(_: *const Self) ?usize {
     return null;
 }
 
-pub fn button(_: Self) ?struct { []const u8, bool } {
-    return null;
+pub fn draw(self: *const Self, render: g.Render, region: p.Region, scrolled: usize) !void {
+    // Clear the region
+    try render.fillRegion(g.Render.default_filler, .normal, region);
+    // Draw the text
+    var cursor = region.top_left.movedTo(.right);
+    for (0..region.rows) |row_idx| {
+        const line_idx = scrolled + row_idx;
+        if (line_idx >= self.lines.items.len) break;
+        try render.drawTextWithAlign(region.cols - 1, &self.lines.items[line_idx], cursor, .normal, .left);
+        cursor.move(.down);
+    }
+    // Draw the button
+    try render.hideLeftButton();
+    try render.drawRightButton("Close", false);
+}
+
+pub fn clearRetainingCapacity(self: *Self) void {
+    self.lines.clearRetainingCapacity();
 }
 
 /// Adds a new line filled by ' '.
-pub fn addEmptyLine(self: *Self, alloc: std.mem.Allocator) !*Line {
-    const line = try self.lines.addOne(alloc);
+pub fn addEmptyLine(self: *Self) !*Line {
+    const line = try self.lines.addOne(self.alloc);
     line.* = @splat(' ');
     return line;
 }
 
-pub fn printLine(self: *Self, alloc: std.mem.Allocator, text: []const u8) !void {
-    const line = try self.lines.addOne(alloc);
+pub fn printLine(self: *Self, text: []const u8) !void {
+    const line = try self.lines.addOne(self.alloc);
     line.* = @splat(' ');
     @memcpy(line[0..text.len], text);
 }
 
-pub fn printLineFmt(self: *Self, alloc: std.mem.Allocator, comptime fmt: []const u8, args: anytype) !void {
-    const line = try self.lines.addOne(alloc);
+pub fn printLineFmt(self: *Self, comptime fmt: []const u8, args: anytype) !void {
+    const line = try self.lines.addOne(self.alloc);
     line.* = @splat(' ');
     _ = try std.fmt.bufPrint(line, fmt, args);
 }
 
-// for compatibility with required interface used by the ModalWindow
-pub fn handleButton(_: *Self, _: g.Button) !w.HandleButtonResult {
-    return .keep_open;
+pub fn handleButton(_: *Self, btn: g.Button) !w.HandleButtonResult {
+    return if (btn.game_button == .a) .close_window else .keep_open;
 }
 
-/// Uses the render to draw the text area directly to the screen.
-///
-/// - `region` - A region of the screen to draw the content of the area.
-///  The first symbol will be drawn at the top left corner of the region.
-///  Scrolled lines and lines out of the region will be skipped. Symbols
-///  of a line outside the region will be cropped.
-///
-/// - `scrolled` - How many scrolled lines should be skipped.
-pub fn draw(self: *const Self, render: g.Render, region: p.Region, scrolled: usize) !void {
-    log.debug("Drawing a text area inside {any}", .{region});
-    var cursor = region.top_left.movedTo(.right);
-    for (0..region.rows) |row_idx| {
-        const line_idx = scrolled + row_idx;
-        try render.drawTextWithAlign(region.cols - 1, &self.lines.items[line_idx], cursor, .normal, .left);
-        cursor.move(.down);
-    }
-}
-
-pub fn write(self: *const Self, writer: *std.Io.Writer) !void {
+pub fn format(self: Self, writer: *std.Io.Writer) std.Io.Writer.Error!void {
     for (self.lines.items) |line| {
         try writer.writeAll(&line);
         try writer.writeByte('\n');

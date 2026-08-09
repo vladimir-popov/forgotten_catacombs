@@ -491,7 +491,10 @@ pub const Experience = struct {
 pub const SourceOfLight = struct {
     radius: f32,
     charge: u16,
-    chargable: bool = false,
+};
+
+pub const Combination = enum {
+    light_with_oil,
 };
 
 pub const Skills = struct {
@@ -584,6 +587,7 @@ pub const Components = struct {
     animation: ?Animation = null,
     armor: ?Armor = null,
     breakages: ?Breakages = null,
+    combination: ?Combination = null,
     consumable: ?Consumable = null,
     description: ?Description, // must be provided for every entity
     door: ?Door = null,

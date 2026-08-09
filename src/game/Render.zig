@@ -269,7 +269,7 @@ pub fn drawDoubledBorder(self: *const Self, region: p.Region, filler: ?u8) !void
     try self.runtime.drawSprite('╝', region.bottomRight(), .normal);
 }
 
-pub fn drawHorizontalLine(self: *const Self, codepoint: u21, left_point: p.Point, length: u8) !void {
+pub fn drawHorizontalLine(self: *const Self, codepoint: u21, left_point: p.Point, length: usize) !void {
     var point = left_point;
     for (0..length) |_| {
         try self.runtime.drawSprite(codepoint, point, .normal);

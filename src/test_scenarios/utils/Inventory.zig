@@ -3,6 +3,7 @@ const g = @import("game");
 const c = g.components;
 const p = g.primitives;
 const Options = @import("Options.zig");
+const ModalWindow = @import("ModalWindow.zig");
 const TestSession = @import("TestSession.zig");
 
 const Self = @This();
@@ -27,46 +28,51 @@ pub fn isDropEmpty(self: Self) bool {
 }
 
 pub fn close(self: Self) !void {
-    std.debug.assert(self.inventoryMode().actions_window == null);
-    std.debug.assert(self.inventoryMode().description_window == null);
+    std.debug.assert(self.inventoryMode().modal_windows.isEmpty());
     try self.test_session.pressButton(.b);
 }
 
 /// Selects the item with passed name in the active tab, or throws an error.
 /// If the item was found, the button is pressed and Options available for the item is returned.
-pub fn chooseItemByName(self: Self, name: []const u8) !Options {
+pub fn chooseItemByName(self: Self, name: []const u8) !ModalWindow {
     const options = Options{
-        .options_area = &self.inventoryMode().main_window.activeTab().scrollable_area.content,
+        .options_area = @ptrCast(@alignCast(
+            self.inventoryMode().main_window.activeTab().scrollable_area.content.underlying,
+        )),
         .test_session = self.test_session,
     };
     try options.choose(name);
     return .{
         .test_session = self.test_session,
-        .options_area = &self.inventoryMode().actions_window.?.scrollable_area.content,
+        .modal_windows = &self.inventoryMode().modal_windows,
     };
 }
 
-pub fn chooseItemById(self: Self, item: g.Entity) !Options {
+pub fn chooseItemById(self: Self, item: g.Entity) !ModalWindow {
     const options = Options{
-        .options_area = &self.inventoryMode().main_window.activeTab().scrollable_area.content,
+        .options_area = @ptrCast(@alignCast(
+            self.inventoryMode().main_window.activeTab().scrollable_area.content.underlying,
+        )),
         .test_session = self.test_session,
     };
     try options.chooseById(item);
     return .{
         .test_session = self.test_session,
-        .options_area = &self.inventoryMode().actions_window.?.scrollable_area.content,
+        .modal_windows = &self.inventoryMode().modal_windows,
     };
 }
 
-pub fn chooseItemByIndex(self: Self, idx: usize) !Options {
+pub fn chooseItemByIndex(self: Self, idx: usize) !ModalWindow {
     const options = Options{
-        .options_area = &self.inventoryMode().main_window.activeTab().scrollable_area.content,
+        .options_area = @ptrCast(@alignCast(
+            self.inventoryMode().main_window.activeTab().scrollable_area.content.underlying,
+        )),
         .test_session = self.test_session,
     };
     try options.chooseByIndex(idx);
     return .{
         .test_session = self.test_session,
-        .options_area = &self.inventoryMode().actions_window.?.scrollable_area.content,
+        .modal_windows = &self.inventoryMode().modal_windows,
     };
 }
 

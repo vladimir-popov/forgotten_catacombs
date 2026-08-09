@@ -17,9 +17,9 @@ entities_on_screen: EntitiesOnScreen,
 entity_in_focus: g.Entity,
 /// Highlighted a focused place in the dungeon
 place_in_focus: p.Point,
-/// The window to show list of entities on the place in focus
-entities_window: ?w.ModalWindow(w.OptionsArea(g.Entity)) = null,
-description_window: ?w.ModalWindow(w.TextArea) = null,
+/// The window to show a list with entities on the place in focus
+entities_window: ?w.Window = null,
+description_window: ?w.Window = null,
 
 pub fn init(self: *ExploreMode, session: *g.GameSession) !void {
     self.* = .{
@@ -38,7 +38,7 @@ pub fn tick(self: *ExploreMode) anyerror!void {
         if (self.description_window) |*description_window| {
             if (try description_window.handleButton(btn) == .close_window) {
                 try description_window.hide(self.session.render, .from_buffer);
-                description_window.deinit(self.session.mode_arena.allocator());
+                description_window.deinit();
                 self.description_window = null;
             } else if (self.isLevelUp()) {
                 if (btn.game_button == .b)
@@ -47,7 +47,7 @@ pub fn tick(self: *ExploreMode) anyerror!void {
         } else if (self.entities_window) |*entities_window| {
             if (try entities_window.handleButton(btn) == .close_window) {
                 try entities_window.hide(self.session.render, .from_buffer);
-                entities_window.deinit(self.session.mode_arena.allocator());
+                entities_window.deinit();
                 self.entities_window = null;
             }
         } else {
@@ -224,13 +224,14 @@ inline fn sub(x: u8, y: u8) u8 {
 fn windowWithEntities(
     self: *ExploreMode,
     variants: [c.Position.ZOrder.count]?g.Entity,
-) !w.ModalWindow(w.OptionsArea(g.Entity)) {
-    var area = w.OptionsArea(g.Entity).centered(self);
+) !w.Window {
+    var window = w.Window.init(self.session.mode_arena.allocator(), w.Window.DEFAULT_MAX_REGION);
+    var area = try window.changeContent(w.OptionsArea(g.Entity));
+    area.* = .initEmpty(window.allocator(), self, .center);
     for (variants) |maybe_entity| {
         if (maybe_entity) |entity| {
             var buf: [32]u8 = undefined;
             try area.addOption(
-                self.session.mode_arena.allocator(),
                 try g.Description.printActualName(&buf, self.session.journal, entity),
                 entity,
                 showEntityDescription,
@@ -241,7 +242,7 @@ fn windowWithEntities(
                 try area.selectLine(area.options.items.len - 1);
         }
     }
-    return .defaultModalWindow(area);
+    return window;
 }
 
 fn showEntityDescription(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!w.HandleButtonResult {
@@ -251,7 +252,7 @@ fn showEntityDescription(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!w
     return .keep_open;
 }
 
-fn windowWithDescription(self: *ExploreMode) !w.ModalWindow(w.TextArea) {
+fn windowWithDescription(self: *ExploreMode) !w.Window {
     return try w.entityDescription(
         self.session.mode_arena.allocator(),
         self.session,

@@ -47,12 +47,9 @@ pub fn init(session: *g.GameSession) !Self {
     const current_level = session.registry.getUnsafe(session.player, c.Experience).level;
     const levels = session.registry.getUnsafe(session.player, c.LevelUp);
     const skills = session.registry.getUnsafe(session.player, c.Skills);
-    var options: w.OptionsArea(g.meta.Skill) = .init(session, .left);
+    var options: w.OptionsArea(g.meta.Skill) = .initEmpty(session.mode_arena.allocator(), session, .left);
     for (std.enums.values(g.meta.Skill)) |skill| {
-        const option = try options.addEmptyOption(
-            session.mode_arena.allocator(),
-            skill,
-        );
+        const option = try options.addEmptyOption(skill);
         option.label_len = SKILLS_AREA_REGION.cols;
         _ = try std.fmt.bufPrint(
             &option.label_buffer,
@@ -74,7 +71,7 @@ pub fn init(session: *g.GameSession) !Self {
 }
 
 pub fn deinit(self: *Self) void {
-    self.options.deinit(self.session.mode_arena.allocator());
+    self.options.deinit();
 }
 
 pub fn tick(self: *Self) !void {
@@ -105,17 +102,6 @@ pub fn tick(self: *Self) !void {
         }
         try self.draw(self.session.render);
     }
-}
-
-fn showDescription(self: *Self, description: *const g.descriptions.Description) !void {
-    var area: w.TextArea = .empty;
-    for (description.description) |descr_line| {
-        const line = try area.addEmptyLine(self.session.mode_arena.allocator());
-        _ = try std.fmt.bufPrint(line, "{s}", .{descr_line});
-    }
-    var window: w.ModalWindow(w.TextArea) = .defaultModalWindow(area);
-    window.title_len = (try std.fmt.bufPrint(&window.title_buffer, "{s}", .{description.name})).len;
-    self.description = window;
 }
 
 fn increaseSkill(self: *@This(), skill: g.meta.Skill) void {

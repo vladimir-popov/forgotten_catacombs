@@ -24,13 +24,13 @@ pub fn OptionsArea(comptime Item: type) type {
         const Self = @This();
 
         pub const OnReleaseButton = *const fn (
-            owner: *anyopaque,
+            context: *anyopaque,
             line_idx: usize,
             item: Item,
         ) anyerror!w.HandleButtonResult;
 
         pub const OnHoldButton = *const fn (
-            owner: *anyopaque,
+            context: *anyopaque,
             line_idx: usize,
             item: Item,
         ) anyerror!w.HandleButtonResult;
@@ -50,6 +50,7 @@ pub fn OptionsArea(comptime Item: type) type {
             }
         };
 
+        alloc: std.mem.Allocator,
         /// The context is always passed to button handlers
         context: *anyopaque,
         options: std.ArrayList(Option),
@@ -57,16 +58,16 @@ pub fn OptionsArea(comptime Item: type) type {
         /// The absolute index of the selected line (includes the lines out of scroll)
         selected_line: usize = 0,
 
-        pub fn centered(owner: *anyopaque) Self {
-            return .init(owner, .center);
+        pub fn initEmpty(alloc: std.mem.Allocator, context: *anyopaque, text_align: g.TextAlign) Self {
+            return .{ .alloc = alloc, .context = context, .text_align = text_align, .options = .empty };
         }
 
-        pub fn init(context: *anyopaque, text_align: g.TextAlign) Self {
-            return .{ .context = context, .text_align = text_align, .options = .empty };
+        pub fn deinit(self: *Self) void {
+            self.options.deinit(self.alloc);
         }
 
-        pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
-            self.options.deinit(alloc);
+        pub fn area(self: *Self) w.Area {
+            return .{ .underlying = self, .vtable = w.Area.vtableFor(Self) };
         }
 
         pub fn clearRetainingCapacity(self: *Self) void {
@@ -82,21 +83,9 @@ pub fn OptionsArea(comptime Item: type) type {
             return self.selected_line;
         }
 
-        /// Returns a button to choose the selected option.
-        /// Returned button is used to draw its label.
-        pub fn button(self: *const Self) ?struct { []const u8, bool } {
-            if (self.options.items.len > 0) {
-                const option = self.options.items[self.selected_line];
-                return .{ "Choose", option.onHoldButtonFn != null };
-            } else {
-                return null;
-            }
-        }
-
         /// Adds a labeled option. The `label` is copied to an inner buffer.
         pub fn addOption(
             self: *Self,
-            alloc: std.mem.Allocator,
             label: []const u8,
             item: Item,
             onReleaseButtonFn: OnReleaseButton,
@@ -104,7 +93,7 @@ pub fn OptionsArea(comptime Item: type) type {
         ) !void {
             std.debug.assert(label.len < LINE_BUFFER_SIZE);
 
-            const line = try self.options.addOne(alloc);
+            const line = try self.options.addOne(self.alloc);
             line.* = .{
                 .item = item,
                 .label_len = label.len,
@@ -117,14 +106,13 @@ pub fn OptionsArea(comptime Item: type) type {
 
         pub fn addOptionFmt(
             self: *Self,
-            alloc: std.mem.Allocator,
             comptime fmt: []const u8,
             args: anytype,
             item: Item,
             onReleaseButtonFn: OnReleaseButton,
             onHoldButtonFn: ?OnHoldButton,
         ) !void {
-            const line = try self.options.addOne(alloc);
+            const line = try self.options.addOne(self.alloc);
             line.* = .{
                 .item = item,
                 .label_len = 0,
@@ -137,10 +125,9 @@ pub fn OptionsArea(comptime Item: type) type {
 
         pub fn addEmptyOption(
             self: *Self,
-            alloc: std.mem.Allocator,
             item: Item,
         ) !*Option {
-            const line = try self.options.addOne(alloc);
+            const line = try self.options.addOne(self.alloc);
             line.* = .{
                 .item = item,
                 .label_len = 0,
@@ -178,7 +165,6 @@ pub fn OptionsArea(comptime Item: type) type {
             return self.options.items[self.selected_line].item;
         }
 
-        /// Returns true to close the parent window.
         pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
             switch (btn.game_button) {
                 .up => self.selectPreviousLine(),
@@ -190,7 +176,10 @@ pub fn OptionsArea(comptime Item: type) type {
                     } else {
                         return try option.onReleaseButtonFn(self.context, self.selected_line, option.item);
                     }
+                } else {
+                    return .close_window;
                 },
+                .b => if (self.options.items.len > 0) return .close_window,
                 else => {},
             }
             return .keep_open;
@@ -209,6 +198,9 @@ pub fn OptionsArea(comptime Item: type) type {
                 "Draw {d} options inside {any}; Scrolled lines {d}; Selected line is {any};",
                 .{ self.options.items.len, region, scrolled, self.selected_line },
             );
+            // Clear the region
+            try render.fillRegion(g.Render.default_filler, .normal, region);
+            // Draw the options
             var point = region.top_left;
             for (0..region.rows) |r| {
                 const line_idx = scrolled + r;
@@ -220,6 +212,15 @@ pub fn OptionsArea(comptime Item: type) type {
                     try render.drawHorizontalLine(' ', point, region.cols);
                 }
                 point.move(.down);
+            }
+            // Draw the buttons
+            if (self.options.items.len > 0) {
+                const option = self.options.items[self.selected_line];
+                try render.drawRightButton("Choose", option.onHoldButtonFn != null);
+                try render.drawLeftButton("Close", false);
+            } else {
+                try render.hideLeftButton();
+                try render.drawRightButton("Close", false);
             }
         }
     };

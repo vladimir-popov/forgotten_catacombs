@@ -13,8 +13,8 @@ test "Rendering initial inventory" {
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
         \\║                                      ║
-        \\║/ Pickaxe                     weapon  ║
-        \\║¡ Torch                        light  ║
+        \\║/ Pickaxe                      weapon ║
+        \\║¡ Torch                         light ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
@@ -29,7 +29,7 @@ test "Unequip torch" {
     defer test_session.deinit();
 
     var inventory = try test_session.openInventory();
-    const options = try inventory.chooseItemByName("Torch");
+    const modal_window = try inventory.chooseItemByName("Torch");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
@@ -43,12 +43,12 @@ test "Unequip torch" {
         \\╚══════════════════════════════════════╝
     , .game_area);
 
-    try options.choose("Unequip");
+    try (try modal_window.asOptions()).choose("Unequip");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
         \\║                                      ║
-        \\║/ Pickaxe                     weapon  ║
+        \\║/ Pickaxe                      weapon ║
         \\║¡ Torch                               ║
         \\║                                      ║
         \\║                                      ║
@@ -69,7 +69,7 @@ test "Trying to unequip a broken weapon" {
     try std.testing.expect(try g.meta.breakItem(&test_session.session.registry, prng.random(), pickaxe_id, null));
 
     var inventory = try test_session.openInventory();
-    const options = try inventory.chooseItemByName("Pickaxe");
+    const modal_window = try inventory.chooseItemByName("Pickaxe");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
@@ -83,7 +83,7 @@ test "Trying to unequip a broken weapon" {
         \\╚══════════════════════════════════════╝
     , .game_area);
 
-    try options.choose("Unequip");
+    try (try modal_window.asOptions()).choose("Unequip");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
@@ -102,8 +102,8 @@ test "Trying to unequip a broken weapon" {
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
         \\║                                      ║
-        \\║\ Pickaxe                     weapon  ║
-        \\║¡ Torch                        light  ║
+        \\║\ Pickaxe                      weapon ║
+        \\║¡ Torch                         light ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
@@ -118,13 +118,13 @@ test "Drop an item" {
     defer test_session.deinit();
 
     var inventory = try test_session.openInventory();
-    const options = try inventory.chooseItemByName("Torch");
-    try options.choose("Drop");
+    const modal_window = try inventory.chooseItemByName("Torch");
+    try (try modal_window.asOptions()).choose("Drop");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════╗═══════════════════╗
         \\║     Inventory    ║       Drop        ║
         \\║                  ╚═══════════════════║
-        \\║/ Pickaxe                     weapon  ║
+        \\║/ Pickaxe                      weapon ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
@@ -154,8 +154,8 @@ test "Drop all items" {
 
     var inventory = try test_session.openInventory();
     while (!inventory.isInvetoryEmpty()) {
-        const options = try inventory.chooseItemByIndex(0);
-        try options.choose("Drop");
+        const modal_window = try inventory.chooseItemByIndex(0);
+        try (try modal_window.asOptions()).choose("Drop");
     }
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════╗═══════════════════╗
@@ -177,18 +177,18 @@ test "Pickup an item" {
     defer test_session.deinit();
     // Drop:
     var inventory = try test_session.openInventory();
-    var options = try inventory.chooseItemByName("Pickaxe");
-    try options.choose("Drop");
+    var modal_window = try inventory.chooseItemByName("Pickaxe");
+    try (try modal_window.asOptions()).choose("Drop");
     try test_session.pressButton(.right);
     // Pickup:
-    options = try inventory.chooseItemByName("Pickaxe");
-    try options.choose("Take");
+    modal_window = try inventory.chooseItemByName("Pickaxe");
+    try (try modal_window.asOptions()).choose("Take");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
         \\║                                      ║
         \\║/ Pickaxe                             ║
-        \\║¡ Torch                        light  ║
+        \\║¡ Torch                         light ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
@@ -204,13 +204,13 @@ test "Pickup a single item from a pile" {
     // Drop everything from the inventory:
     var inventory = try test_session.openInventory();
     while (!inventory.isInvetoryEmpty()) {
-        const options = try inventory.chooseItemByIndex(0);
-        try options.choose("Drop");
+        const modal_window = try inventory.chooseItemByIndex(0);
+        try (try modal_window.asOptions()).choose("Drop");
     }
     try test_session.pressButton(.right);
     // Pickup:
-    const options = try inventory.chooseItemByIndex(0);
-    try options.choose("Take");
+    const modal_window = try inventory.chooseItemByIndex(0);
+    try (try modal_window.asOptions()).choose("Take");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════╔═══════════════════╗
         \\║     Inventory    ║       Drop        ║
@@ -225,14 +225,14 @@ test "Pickup all items from a pile" {
     // Drop everything from the inventory:
     var inventory = try test_session.openInventory();
     while (!inventory.isInvetoryEmpty()) {
-        const options = try inventory.chooseItemByIndex(0);
-        try options.choose("Drop");
+        const modal_window = try inventory.chooseItemByIndex(0);
+        try (try modal_window.asOptions()).choose("Drop");
     }
     try test_session.pressButton(.right);
     // Pickup everything back:
     while (!inventory.isDropEmpty()) {
-        const options = try inventory.chooseItemByIndex(0);
-        try options.choose("Take");
+        const modal_window = try inventory.chooseItemByIndex(0);
+        try (try modal_window.asOptions()).choose("Take");
     }
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
@@ -260,8 +260,8 @@ test "Pickup a gold pile" {
         \\╔══════════════════╗═══════════════════╗
         \\║     Inventory    ║       Drop        ║
         \\║                  ╚═══════════════════║
-        \\║/ Pickaxe                     weapon  ║
-        \\║¡ Torch                        light  ║
+        \\║/ Pickaxe                      weapon ║
+        \\║¡ Torch                         light ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
@@ -281,14 +281,14 @@ test "Pickup a gold pile" {
     , .{ .region = .init(1, 1, 4, 40) });
 
     // Pickup the gold:
-    const options = try inventory.chooseItemByIndex(0);
-    try options.choose("Take");
+    const modal_window = try inventory.chooseItemByIndex(0);
+    try (try modal_window.asOptions()).choose("Take");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
         \\║                                      ║
-        \\║/ Pickaxe                     weapon  ║
-        \\║¡ Torch                        light  ║
+        \\║/ Pickaxe                      weapon ║
+        \\║¡ Torch                         light ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
@@ -320,8 +320,8 @@ test "Pickup gold from a pile of items" {
     // Drop everything from the inventory:
     var inventory = try test_session.openInventory();
     while (!inventory.isInvetoryEmpty()) {
-        const options = try inventory.chooseItemByIndex(0);
-        try options.choose("Drop");
+        const modal_window = try inventory.chooseItemByIndex(0);
+        try (try modal_window.asOptions()).choose("Drop");
     }
 
     // Switch to the Drop Tab:
@@ -342,8 +342,8 @@ test "Pickup gold from a pile of items" {
     , .whole_display);
 
     // Pickup the gold:
-    const options = try inventory.chooseItemByName("Gold");
-    try options.choose("Take");
+    const modal_window = try inventory.chooseItemByName("Gold");
+    try (try modal_window.asOptions()).choose("Take");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════╔═══════════════════╗
         \\║     Inventory    ║       Drop        ║
@@ -383,9 +383,9 @@ test "Use torch as a weapon" {
     defer test_session.deinit();
 
     const inventory = try test_session.openInventory();
-    var options = try inventory.chooseItemByName("Torch");
-    try options.choose("Unequip");
-    options = try inventory.chooseItemByName("Torch");
+    var modal_window = try inventory.chooseItemByName("Torch");
+    try (try modal_window.asOptions()).choose("Unequip");
+    modal_window = try inventory.chooseItemByName("Torch");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
@@ -398,13 +398,13 @@ test "Use torch as a weapon" {
         \\║                                      ║
         \\╚══════════════════════════════════════╝
     , .game_area);
-    try options.choose("Use as a weapon");
+    try (try modal_window.asOptions()).choose("Use as a weapon");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
         \\║                                      ║
         \\║/ Pickaxe                             ║
-        \\║¡ Torch                       weapon  ║
+        \\║¡ Torch                        weapon ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
@@ -424,24 +424,24 @@ test "Put arrows to quiver" {
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
         \\║                                      ║
-        \\║/ Pickaxe                     weapon  ║
+        \\║/ Pickaxe                      weapon ║
         \\║- Arrows 30                           ║
-        \\║¡ Torch                        light  ║
+        \\║¡ Torch                         light ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
         \\╚══════════════════════════════════════╝
     , .game_area);
 
-    var options = try inventory.chooseItemById(arrows);
-    try options.choose("Put to quiver");
+    var modal_window = try inventory.chooseItemById(arrows);
+    try (try modal_window.asOptions()).choose("Put to quiver");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
         \\║                                      ║
-        \\║/ Pickaxe                     weapon  ║
-        \\║- Arrows 30                     ammo  ║
-        \\║¡ Torch                        light  ║
+        \\║/ Pickaxe                      weapon ║
+        \\║- Arrows 30                      ammo ║
+        \\║¡ Torch                         light ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
@@ -460,24 +460,24 @@ test "Wear an armor" {
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
         \\║                                      ║
-        \\║/ Pickaxe                     weapon  ║
+        \\║/ Pickaxe                      weapon ║
         \\║] Jacket                              ║
-        \\║¡ Torch                        light  ║
+        \\║¡ Torch                         light ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
         \\╚══════════════════════════════════════╝
     , .game_area);
 
-    var options = try inventory.chooseItemById(jacket);
-    try options.choose("Wear");
+    var modal_window = try inventory.chooseItemById(jacket);
+    try (try modal_window.asOptions()).choose("Wear");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
         \\║                                      ║
-        \\║/ Pickaxe                     weapon  ║
-        \\║] Jacket                       armor  ║
-        \\║¡ Torch                        light  ║
+        \\║/ Pickaxe                      weapon ║
+        \\║] Jacket                        armor ║
+        \\║¡ Torch                         light ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
@@ -496,23 +496,23 @@ test "Trying to unequip a broken armor" {
     const jacket_id = try inventory.add(g.entities.presets.Armor.get(.jacket));
     try std.testing.expect(try g.meta.breakItem(&test_session.session.registry, prng.random(), jacket_id, null));
 
-    var options = try inventory.chooseItemById(jacket_id);
-    try options.choose("Wear");
+    var modal_window = try inventory.chooseItemById(jacket_id);
+    try (try modal_window.asOptions()).choose("Wear");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
         \\║                                      ║
-        \\║/ Pickaxe                     weapon  ║
-        \\║[ Jacket                       armor  ║
-        \\║¡ Torch                        light  ║
+        \\║/ Pickaxe                      weapon ║
+        \\║[ Jacket                        armor ║
+        \\║¡ Torch                         light ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
         \\╚══════════════════════════════════════╝
     , .game_area);
 
-    options = try inventory.chooseItemById(jacket_id);
-    try options.choose("Unequip");
+    modal_window = try inventory.chooseItemById(jacket_id);
+    try (try modal_window.asOptions()).choose("Unequip");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
@@ -531,9 +531,9 @@ test "Trying to unequip a broken armor" {
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
         \\║                                      ║
-        \\║/ Pickaxe                     weapon  ║
-        \\║[ Jacket                       armor  ║
-        \\║¡ Torch                        light  ║
+        \\║/ Pickaxe                      weapon ║
+        \\║[ Jacket                        armor ║
+        \\║¡ Torch                         light ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
@@ -549,8 +549,8 @@ test "Drink a healing potion" {
     test_session.player.health().current_hp = 5;
     var inventory = try test_session.openInventory();
     const potion = try inventory.add(g.entities.presets.Potions.get(.healing_potion));
-    const options = try inventory.chooseItemById(potion);
-    try options.choose("Drink");
+    const modal_window = try inventory.chooseItemById(potion);
+    try (try modal_window.asOptions()).choose("Drink");
     try std.testing.expect(inventory.isClosed());
 
     try std.testing.expect(!test_session.session.registry.contains(potion));

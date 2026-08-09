@@ -1,4 +1,4 @@
-<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.6 Chrome/144.0.7559.236 Electron/40.8.4 Safari/537.36" version="29.6.6" pages="9">
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.6 Chrome/144.0.7559.236 Electron/40.8.4 Safari/537.36" pages="8">
   <diagram id="HEc6ijCT2G0Q-exSr9Sf" name="Build graph">
     <mxGraphModel dx="1234" dy="2002" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
@@ -147,7 +147,7 @@
     </mxGraphModel>
   </diagram>
   <diagram name="Main components" id="-2OWC2zbBcRplkYAPWdl">
-    <mxGraphModel dx="1175" dy="793" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="1629" dy="1107" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -1223,89 +1223,6 @@
               <mxPoint x="390" y="185" />
             </Array>
           </mxGeometry>
-        </mxCell>
-      </root>
-    </mxGraphModel>
-  </diagram>
-  <diagram id="LHXHFopr-mRD5vGDSLDk" name="Descriptions">
-    <mxGraphModel dx="1234" dy="833" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
-      <root>
-        <mxCell id="0" />
-        <mxCell id="1" parent="0" />
-        <mxCell id="TeerpzXY_BvwL2jRelHO-2" value="&lt;h1 style=&quot;margin-top: 0px;&quot;&gt;Potions&lt;/h1&gt;&lt;p&gt;Potions have arbitrary colors every game sessions. A potion color is bind to an effect of the potion. The description of a potion can describe known and unknown potion. The description of an unknown potion includes only its color (and also weight). The description of a known potion describes the effect of the potion.&lt;/p&gt;&lt;p&gt;A potion becomes known when at least one potion with same effect was drunk.&lt;/p&gt;" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;fontFamily=Helvetica;fontSize=12;fontColor=default;labelBackgroundColor=default;" parent="1" vertex="1">
-          <mxGeometry x="40" y="40" width="680" height="180" as="geometry" />
-        </mxCell>
-        <mxCell id="TeerpzXY_BvwL2jRelHO-3" value="&lt;h1 style=&quot;margin-top: 0px;&quot;&gt;Weapon/Armor&lt;/h1&gt;&lt;p style=&quot;margin: 0px; font-variant-numeric: normal; font-variant-east-asian: normal; font-variant-alternates: normal; font-size-adjust: none; font-kerning: auto; font-optical-sizing: auto; font-feature-settings: normal; font-variation-settings: normal; font-variant-position: normal; font-variant-emoji: normal; font-stretch: normal; line-height: normal; font-family: &amp;quot;Helvetica Neue&amp;quot;;&quot; class=&quot;p1&quot;&gt;&lt;font&gt;Every weapon or armor has base known characteristics, such as weight, effects(!), radius of light and others. But also, a weapon/armor can&amp;nbsp;&lt;/font&gt;&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212)); color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;be broken or improved (&lt;/span&gt;&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212)); color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;have some modification), that can affect its characteristics.&lt;/span&gt;&lt;/p&gt;&lt;p style=&quot;margin: 0px; font-variant-numeric: normal; font-variant-east-asian: normal; font-variant-alternates: normal; font-size-adjust: none; font-kerning: auto; font-optical-sizing: auto; font-feature-settings: normal; font-variation-settings: normal; font-variant-position: normal; font-variant-emoji: normal; font-stretch: normal; line-height: normal; font-family: &amp;quot;Helvetica Neue&amp;quot;; min-height: 17px;&quot; class=&quot;p2&quot;&gt;&lt;font&gt;&lt;br&gt;&lt;/font&gt;&lt;/p&gt;&lt;p style=&quot;margin: 0px; font-variant-numeric: normal; font-variant-east-asian: normal; font-variant-alternates: normal; font-size-adjust: none; font-kerning: auto; font-optical-sizing: auto; font-feature-settings: normal; font-variation-settings: normal; font-variant-position: normal; font-variant-emoji: normal; font-stretch: normal; line-height: normal; font-family: &amp;quot;Helvetica Neue&amp;quot;;&quot; class=&quot;p1&quot;&gt;&lt;font&gt;Only description of the known weapon should show the actual characteristics. For an unknown weapon only base numbers should be shown, plus remark that &quot;weapon(armor) looks unusual&quot; and can be broken or improved.&lt;/font&gt;&lt;/p&gt;&lt;p style=&quot;margin: 0px; font-variant-numeric: normal; font-variant-east-asian: normal; font-variant-alternates: normal; font-size-adjust: none; font-kerning: auto; font-optical-sizing: auto; font-feature-settings: normal; font-variation-settings: normal; font-variant-position: normal; font-variant-emoji: normal; font-stretch: normal; line-height: normal; font-family: &amp;quot;Helvetica Neue&amp;quot;; min-height: 17px;&quot; class=&quot;p2&quot;&gt;&lt;font&gt;&lt;br&gt;&lt;/font&gt;&lt;/p&gt;&lt;p style=&quot;margin: 0px; font-variant-numeric: normal; font-variant-east-asian: normal; font-variant-alternates: normal; font-size-adjust: none; font-kerning: auto; font-optical-sizing: auto; font-feature-settings: normal; font-variation-settings: normal; font-variant-position: normal; font-variant-emoji: normal; font-stretch: normal; line-height: normal; font-family: &amp;quot;Helvetica Neue&amp;quot;;&quot; class=&quot;p1&quot;&gt;&lt;font&gt;A particular weapon entity can be known. To become known, a weapon should be used for some time.&lt;/font&gt;&lt;/p&gt;&lt;p style=&quot;margin: 0px; font-variant-numeric: normal; font-variant-east-asian: normal; font-variant-alternates: normal; font-size-adjust: none; font-kerning: auto; font-optical-sizing: auto; font-feature-settings: normal; font-variation-settings: normal; font-variant-position: normal; font-variant-emoji: normal; font-stretch: normal; line-height: normal; font-family: &amp;quot;Helvetica Neue&amp;quot;; min-height: 17px;&quot; class=&quot;p2&quot;&gt;&lt;font&gt;&lt;br&gt;&lt;/font&gt;&lt;/p&gt;&lt;p style=&quot;margin: 0px; font-variant-numeric: normal; font-variant-east-asian: normal; font-variant-alternates: normal; font-size-adjust: none; font-kerning: auto; font-optical-sizing: auto; font-feature-settings: normal; font-variation-settings: normal; font-variant-position: normal; font-variant-emoji: normal; font-stretch: normal; line-height: normal; font-family: &amp;quot;Helvetica Neue&amp;quot;;&quot; class=&quot;p1&quot;&gt;&lt;font&gt;When some weapon or armor has been equipped first time a counter of turns is added to the Journal. That counter will be reduced every Turn. When the counter becomes 0, the weapon/armor have been marked as known.&lt;/font&gt;&lt;/p&gt;" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;fontFamily=Helvetica;fontSize=12;fontColor=default;labelBackgroundColor=default;" parent="1" vertex="1">
-          <mxGeometry x="40" y="480" width="680" height="270" as="geometry" />
-        </mxCell>
-        <mxCell id="TeerpzXY_BvwL2jRelHO-4" value="&lt;h1 style=&quot;margin-top: 0px;&quot;&gt;Enemies&lt;/h1&gt;&lt;p&gt;Enemies have a different damage, a different speed, a different behaviour, and can be in a different state.&lt;/p&gt;&lt;p&gt;A player starts with no knowledge about enemies. A description of an enemy of an unknown class should not include nor a damage, nor a state of the enemy, nor an inside about its behaviour.&lt;/p&gt;&lt;p&gt;A speed for a known enemy should be shown as a description, not a number:&lt;/p&gt;&lt;pre&gt;&quot;Too slow&quot; &amp;gt;= +10&lt;br&gt;&quot;Slow&quot;&amp;nbsp; == [+5, +10)&lt;br&gt;&quot;Not so fast&quot; == [N, +5)&lt;br&gt;&quot;Fast&quot; == (-5, N)&lt;br&gt;&quot;Very fast&quot; &amp;lt;= -5&lt;/pre&gt;&lt;p&gt;A class of enemies become known&amp;nbsp; after killing at least one enemy of this class.&lt;/p&gt;" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;fontFamily=Helvetica;fontSize=12;fontColor=default;labelBackgroundColor=default;" parent="1" vertex="1">
-          <mxGeometry x="40" y="200" width="670" height="260" as="geometry" />
-        </mxCell>
-        <mxCell id="-x4sdIMdKFhyRg92FcAE-1" value="" style="ellipse;html=1;shape=startState;fillColor=#000000;strokeColor=#ff0000;" parent="1" vertex="1">
-          <mxGeometry x="110" y="710" width="20" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="-x4sdIMdKFhyRg92FcAE-2" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;verticalAlign=bottom;endArrow=open;endSize=8;strokeColor=#ff0000;rounded=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="-x4sdIMdKFhyRg92FcAE-1" target="-x4sdIMdKFhyRg92FcAE-19" edge="1">
-          <mxGeometry relative="1" as="geometry">
-            <mxPoint x="115" y="860" as="targetPoint" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="-x4sdIMdKFhyRg92FcAE-3" value="Has &lt;br&gt;modification" style="rhombus;whiteSpace=wrap;html=1;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;fontSize=10;" parent="1" vertex="1">
-          <mxGeometry x="75" y="830" width="90" height="50" as="geometry" />
-        </mxCell>
-        <mxCell id="-x4sdIMdKFhyRg92FcAE-4" value="no" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;verticalAlign=bottom;endArrow=open;endSize=8;strokeColor=#ff0000;rounded=0;" parent="1" source="-x4sdIMdKFhyRg92FcAE-3" target="-x4sdIMdKFhyRg92FcAE-6" edge="1">
-          <mxGeometry x="-1" relative="1" as="geometry">
-            <mxPoint x="250" y="880" as="targetPoint" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="-x4sdIMdKFhyRg92FcAE-5" value="yes" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;verticalAlign=top;endArrow=open;endSize=8;strokeColor=#ff0000;rounded=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="-x4sdIMdKFhyRg92FcAE-3" target="-x4sdIMdKFhyRg92FcAE-12" edge="1">
-          <mxGeometry x="-1" relative="1" as="geometry">
-            <mxPoint x="120" y="940" as="targetPoint" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="-x4sdIMdKFhyRg92FcAE-15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#ff0000;align=left;verticalAlign=bottom;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=open;endSize=8;" parent="1" source="-x4sdIMdKFhyRg92FcAE-6" target="-x4sdIMdKFhyRg92FcAE-14" edge="1">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="-x4sdIMdKFhyRg92FcAE-6" value="Show effects" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;fontSize=10;" parent="1" vertex="1">
-          <mxGeometry x="340" y="1040" width="120" height="40" as="geometry" />
-        </mxCell>
-        <mxCell id="-x4sdIMdKFhyRg92FcAE-12" value="Is known" style="rhombus;whiteSpace=wrap;html=1;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;fontSize=10;" parent="1" vertex="1">
-          <mxGeometry x="75" y="920" width="90" height="50" as="geometry" />
-        </mxCell>
-        <mxCell id="-x4sdIMdKFhyRg92FcAE-13" value="no" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;verticalAlign=bottom;endArrow=open;endSize=8;strokeColor=#ff0000;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="-x4sdIMdKFhyRg92FcAE-12" target="Qt4_fzngJLPLL5KhsTmB-1" edge="1">
-          <mxGeometry x="-1" relative="1" as="geometry">
-            <mxPoint x="240" y="910" as="targetPoint" />
-            <mxPoint x="175" y="865" as="sourcePoint" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="-x4sdIMdKFhyRg92FcAE-14" value="" style="ellipse;html=1;shape=endState;fillColor=#000000;strokeColor=#ff0000;" parent="1" vertex="1">
-          <mxGeometry x="385" y="1130" width="30" height="30" as="geometry" />
-        </mxCell>
-        <mxCell id="-x4sdIMdKFhyRg92FcAE-16" value="yes" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;verticalAlign=top;endArrow=open;endSize=8;strokeColor=#ff0000;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="-x4sdIMdKFhyRg92FcAE-12" target="-x4sdIMdKFhyRg92FcAE-17" edge="1">
-          <mxGeometry x="-1" relative="1" as="geometry">
-            <mxPoint x="120" y="1010" as="targetPoint" />
-            <mxPoint x="130" y="890" as="sourcePoint" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="-x4sdIMdKFhyRg92FcAE-18" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;strokeColor=#ff0000;align=left;verticalAlign=bottom;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=open;endSize=8;" parent="1" source="-x4sdIMdKFhyRg92FcAE-17" target="-x4sdIMdKFhyRg92FcAE-6" edge="1">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="-x4sdIMdKFhyRg92FcAE-17" value="Apply modification to effects" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;fontSize=10;" parent="1" vertex="1">
-          <mxGeometry x="60" y="1000" width="120" height="40" as="geometry" />
-        </mxCell>
-        <mxCell id="-x4sdIMdKFhyRg92FcAE-19" value="Is&amp;nbsp;&lt;div&gt;weapon/armor&lt;/div&gt;" style="rhombus;whiteSpace=wrap;html=1;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;fontSize=10;" parent="1" vertex="1">
-          <mxGeometry x="75" y="750" width="90" height="50" as="geometry" />
-        </mxCell>
-        <mxCell id="-x4sdIMdKFhyRg92FcAE-20" value="yes" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;verticalAlign=top;endArrow=open;endSize=8;strokeColor=#ff0000;rounded=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" source="-x4sdIMdKFhyRg92FcAE-19" target="-x4sdIMdKFhyRg92FcAE-3" edge="1">
-          <mxGeometry x="-1" relative="1" as="geometry">
-            <mxPoint x="130" y="930" as="targetPoint" />
-            <mxPoint x="130" y="890" as="sourcePoint" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="Qt4_fzngJLPLL5KhsTmB-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;strokeColor=#ff0000;align=left;verticalAlign=bottom;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=open;endSize=8;" parent="1" source="Qt4_fzngJLPLL5KhsTmB-1" target="-x4sdIMdKFhyRg92FcAE-6" edge="1">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="Qt4_fzngJLPLL5KhsTmB-1" value="&quot;weapon(armor) looks unusual&quot;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;fontSize=10;" parent="1" vertex="1">
-          <mxGeometry x="230" y="925" width="120" height="40" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
