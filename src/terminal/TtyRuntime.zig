@@ -144,6 +144,9 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                     }
                 } else if (self.cmd.cursor_idx > 0) {
                     self.cheat = self.cmd.readCheat();
+                    if (self.cheat) |cheat| {
+                        log.debug("Cheat {any} was read", .{cheat});
+                    }
                     try self.cmd.display_buffer.writeBuffer(
                         &stdout.interface,
                         rows_pad + display_rows - 2,

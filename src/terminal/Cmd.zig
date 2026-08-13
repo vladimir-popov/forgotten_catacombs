@@ -24,12 +24,12 @@ const Autocompletion = struct {
         return .{
             .context = cheat,
             .prefix = g.Cheat.toString(cheat),
-            .suggestions = if (g.Cheat.suggestions(cheat)) |ss| ss else &.{},
+            .suggestions = g.Cheat.suggestions(cheat) orelse &.{},
         };
     }
 
     fn nextSuggestion(self: *Autocompletion) void {
-        if (self.suggestion_idx < self.suggestions.len - 1)
+        if (self.suggestion_idx + 1 < self.suggestions.len)
             self.suggestion_idx += 1
         else
             self.suggestion_idx = 0;
@@ -169,9 +169,13 @@ pub fn Cmd(comptime cols: u8) type {
                                     .cheat => |cheat| {
                                         log.debug("Input: '{s}'; parsed as the cheat {any}", .{ input, cheat });
                                         self.cursor_idx = 0;
+                                        self.completion = .all_cheats;
                                         return cheat;
                                     },
-                                    else => return null,
+                                    .tag => |cheat_tag| {
+                                        self.completion = .initForCheat(cheat_tag);
+                                        return null;
+                                    },
                                 }
                             } // or close the cmd
                             else {

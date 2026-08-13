@@ -6,39 +6,6 @@ const ps = g.entities.presets;
 
 const log = std.log.scoped(.cheats);
 
-const total_items_count: usize =
-    ps.Items.count + ps.Weapons.count + ps.Armor.count + ps.Ammo.count + ps.Food.count + ps.Potions.count;
-
-const items_suggestions: [total_items_count][]const u8 = blk: {
-    var suggestions: [total_items_count][]const u8 = undefined;
-    var i: usize = 0;
-    for (std.enums.values(ps.Items.Tag)) |item| {
-        suggestions[i] = @tagName(item);
-        i += 1;
-    }
-    for (std.enums.values(ps.Weapons.Tag)) |item| {
-        suggestions[i] = @tagName(item);
-        i += 1;
-    }
-    for (std.enums.values(ps.Ammo.Tag)) |item| {
-        suggestions[i] = @tagName(item);
-        i += 1;
-    }
-    for (std.enums.values(ps.Armor.Tag)) |item| {
-        suggestions[i] = @tagName(item);
-        i += 1;
-    }
-    for (std.enums.values(ps.Food.Tag)) |item| {
-        suggestions[i] = @tagName(item);
-        i += 1;
-    }
-    for (std.enums.values(ps.Potions.Tag)) |item| {
-        suggestions[i] = @tagName(item);
-        i += 1;
-    }
-    break :blk suggestions;
-};
-
 pub const Cheat = union(enum) {
     /// Tag is a name of the cheat.
     /// For some cheats it's enough, but some cheats have additional arguments.
@@ -55,6 +22,11 @@ pub const Cheat = union(enum) {
 
     /// Creates a new item and put it to player's inventory
     get_item: g.entities.presets.Items.Tag,
+    get_ammo: g.entities.presets.Ammo.Tag,
+    get_armor: g.entities.presets.Armor.Tag,
+    get_food: g.entities.presets.Food.Tag,
+    get_potion: g.entities.presets.Potions.Tag,
+    get_weapon: g.entities.presets.Weapons.Tag,
 
     /// Moves the player to the point on the screen (1-based).
     goto: p.Point,
@@ -95,7 +67,32 @@ pub const Cheat = union(enum) {
             .get_item => if (std.meta.stringToEnum(g.entities.presets.Items.Tag, args)) |item| {
                 return .{ .get_item = item };
             } else {
-                log.warn("Wrong arguments '{s}' for 'get' command.", .{args});
+                log.warn("Wrong arguments '{s}' for '{t}' command.", .{ args, tag });
+            },
+            .get_ammo => if (std.meta.stringToEnum(g.entities.presets.Ammo.Tag, args)) |item| {
+                return .{ .get_ammo = item };
+            } else {
+                log.warn("Wrong arguments '{s}' for '{t}' command.", .{ args, tag });
+            },
+            .get_armor => if (std.meta.stringToEnum(g.entities.presets.Armor.Tag, args)) |item| {
+                return .{ .get_armor = item };
+            } else {
+                log.warn("Wrong arguments '{s}' for '{t}' command.", .{ args, tag });
+            },
+            .get_food => if (std.meta.stringToEnum(g.entities.presets.Food.Tag, args)) |item| {
+                return .{ .get_food = item };
+            } else {
+                log.warn("Wrong arguments '{s}' for '{t}' command.", .{ args, tag });
+            },
+            .get_potion => if (std.meta.stringToEnum(g.entities.presets.Potions.Tag, args)) |item| {
+                return .{ .get_potion = item };
+            } else {
+                log.warn("Wrong arguments '{s}' for '{t}' command.", .{ args, tag });
+            },
+            .get_weapon => if (std.meta.stringToEnum(g.entities.presets.Weapons.Tag, args)) |item| {
+                return .{ .get_weapon = item };
+            } else {
+                log.warn("Wrong arguments '{s}' for '{t}' command.", .{ args, tag });
             },
             .goto => {
                 var itr = std.mem.tokenizeScalar(u8, args, ' ');
@@ -191,7 +188,12 @@ pub const Cheat = union(enum) {
         return switch (self) {
             .dump_entity => "dump entity",
             .dump_vector_field => "dump vectors",
-            .get_item => "get",
+            .get_item => "get item",
+            .get_ammo => "get ammo",
+            .get_armor => "get armor",
+            .get_food => "get food",
+            .get_potion => "get potion",
+            .get_weapon => "get weapon",
             .goto => "goto",
             .level_up => "level up",
             .move_player_to_ladder_down => "down ladder",
@@ -254,9 +256,21 @@ pub const Cheat = union(enum) {
         return false;
     }
 
+    const get_item_suggestions = g.utils.enumStrValues(g.entities.presets.Items.Tag);
+    const get_ammo_suggestions = g.utils.enumStrValues(g.entities.presets.Ammo.Tag);
+    const get_armor_suggestions = g.utils.enumStrValues(g.entities.presets.Armor.Tag);
+    const get_food_suggestions = g.utils.enumStrValues(g.entities.presets.Food.Tag);
+    const get_potion_suggestions = g.utils.enumStrValues(g.entities.presets.Potions.Tag);
+    const get_weapon_suggestions = g.utils.enumStrValues(g.entities.presets.Weapons.Tag);
+
     pub fn suggestions(tag: Tag) ?[]const []const u8 {
         return switch (tag) {
-            .get_item => &items_suggestions,
+            .get_item => &get_item_suggestions,
+            .get_ammo => &get_ammo_suggestions,
+            .get_armor => &get_armor_suggestions,
+            .get_food => &get_food_suggestions,
+            .get_potion => &get_potion_suggestions,
+            .get_weapon => &get_weapon_suggestions,
             else => null,
         };
     }
@@ -282,4 +296,8 @@ test "goto" {
 
 test "set health" {
     try std.testing.expectEqual(Cheat{ .set_health = 42 }, Cheat.parse("set health  42").?.cheat);
+}
+
+test "get weapon" {
+    try std.testing.expectEqual(Cheat{ .get_weapon = .pickaxe }, Cheat.parse("get weapon pickaxe").?.cheat);
 }
