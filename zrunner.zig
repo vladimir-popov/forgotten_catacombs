@@ -55,6 +55,15 @@ pub const std_options: std.Options = .{
     },
 };
 
+var test_in_progress: []const u8 = &.{};
+pub const panic = std.debug.FullPanic(handlePanic);
+
+pub fn handlePanic(msg: []const u8, first_trace_addr: ?usize) noreturn {
+    if (test_in_progress.len > 0)
+        std.debug.print("\nPanic during test '{s}':\n\n", .{test_in_progress});
+    std.debug.defaultPanic(msg, first_trace_addr);
+}
+
 const Logger = struct {
     const log_file = "test.log";
 
@@ -248,7 +257,7 @@ fn runTests(
     var start_time = std.Io.Clock.real.now(io);
     for (tests, 0..) |test_fn, idx| {
         const t = Test.wrap(test_fn);
-
+        test_in_progress = t.name;
         // Run tests:
         report.test_results[idx] = try t.run(arena, io, environ, no_stack_trace, timeout);
 
