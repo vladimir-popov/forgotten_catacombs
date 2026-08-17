@@ -16,7 +16,7 @@ test "Init near the scientist" {
         \\╔═══════════╗══════════════════════════╗
         \\║ Recognize ║   Modify      Repair     ║
         \\║           ╚══════════════════════════║
-        \\║¿ A yellow potion                 22$ ║
+        \\║¿ A teal potion                   22$ ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
@@ -125,7 +125,7 @@ test "Modify an item somehow when enough money" {
         \\║ Recognize ║   Modify      Repair     ║
         \\║           ╚══════════════════════════║
         \\║\ Pickaxe                         11$ ║
-        \\║¿ A yellow potion                 22$ ║
+        \\║¿ A teal potion                   22$ ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║

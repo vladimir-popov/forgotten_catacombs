@@ -491,10 +491,7 @@ pub const Experience = struct {
 pub const SourceOfLight = struct {
     radius: f32,
     charge: u16,
-};
-
-pub const Combination = enum {
-    light_with_oil,
+    max_charge: u16,
 };
 
 pub const Skills = struct {
@@ -566,6 +563,10 @@ pub const Stats = struct {
     }
 };
 
+pub const Poison = struct {
+    value: u8,
+};
+
 pub const Trap = struct {
     /// The likelihood of detecting and disarming the trap depend on how powerful the trap is.
     power: u2,
@@ -587,7 +588,6 @@ pub const Components = struct {
     animation: ?Animation = null,
     armor: ?Armor = null,
     breakages: ?Breakages = null,
-    combination: ?Combination = null,
     consumable: ?Consumable = null,
     description: ?Description, // must be provided for every entity
     door: ?Door = null,
@@ -601,6 +601,7 @@ pub const Components = struct {
     ladder: ?Ladder = null,
     level_up: ?LevelUp = null,
     pile: ?Pile = null,
+    poison: ?Poison = null,
     position: ?Position = null,
     potion: ?Potion = null,
     price: ?Price = null,

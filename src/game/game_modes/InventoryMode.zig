@@ -39,6 +39,8 @@ const c = g.components;
 const p = g.primitives;
 const w = g.windows;
 
+const ResolvedCombination = g.systems.CombinationSystem.ResolvedCombination;
+
 const log = std.log.scoped(.inventory_mode);
 
 const MODAL_WINDOW_REGION: p.Region = p.Region.init(2, 2, g.DISPLAY_ROWS - 4, g.DISPLAY_COLS - 2);
@@ -192,7 +194,7 @@ fn useCombineDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleBu
             try area.addOption("Eat", item, consumeFood, null);
         }
     }
-    if (g.meta.canBeCombined(self.session.journal, item)) {
+    if (self.session.combinations.asIngredient(item)) |_| {
         try area.addOption("Combine", item, combineSelectedItem, null);
     }
     try area.addOption("Drop", item, dropSelectedItem, null);
@@ -356,7 +358,6 @@ fn addDropOption(
 fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Show info about item {d}", .{item.id});
-    // try self.session.render.clearDisplay();
     try self.modal_windows.windows.append(
         self.session.mode_arena.allocator(),
         try w.entityDescription(self.session.mode_arena.allocator(), self.session, item),
@@ -366,36 +367,33 @@ fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButt
 }
 
 /// Shows a window with inventory items that can be combined with the selected item.
-fn combineSelectedItem(ptr: *anyopaque, _: usize, subject: g.Entity) !w.HandleButtonResult {
+fn combineSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const window = try self.modal_windows.windows.addOne(self.session.mode_arena.allocator());
     window.* = .init(self.session.mode_arena.allocator(), w.Window.DEFAULT_MAX_REGION);
-    var area = try window.changeContent(w.OptionsArea(struct { g.Entity, g.Entity, c.Combination }));
+    var area = try window.changeContent(w.OptionsArea(ResolvedCombination));
     area.* = .initEmpty(window.allocator(), self, .center);
-    const combination = self.session.registry.getUnsafe(subject, c.Combination).*;
+    const ingredient = self.session.combinations.asIngredient(item).?;
     var itr = self.inventory.items.iterator();
-    while (itr.next()) |item| {
-        if (self.session.registry.get(item.*, c.Combination)) |item_combination| {
-            if (item_combination.* == combination) {
-                var buffer: w.TextArea.Line = undefined;
-                try area.addOption(
-                    try formatInventoryLine(&buffer, self, item.*),
-                    .{ subject, item.*, combination },
-                    combineItems,
-                    null,
-                );
-            }
+    while (itr.next()) |item2| {
+        if (self.session.combinations.canBeCombined(ingredient, item2.*)) |resolved_combination| {
+            var buffer: w.TextArea.Line = undefined;
+            try area.addOption(
+                try formatInventoryLine(&buffer, self, item2.*),
+                resolved_combination,
+                combineItems,
+                null,
+            );
         }
     }
     window.shrinkToContent();
     return .close_window;
 }
 
-fn combineItems(ptr: *anyopaque, _: usize, item: struct { g.Entity, g.Entity, c.Combination }) !w.HandleButtonResult {
+fn combineItems(ptr: *anyopaque, _: usize, resolved_combination: ResolvedCombination) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    const item1, const item2, const combination = item;
-    try g.meta.combine(&self.session.registry, combination, item1, item2);
-    @panic("Not done");
+    try self.session.combinations.combine(resolved_combination);
+    return .close_window;
 }
 
 /// Moves an item from the inventory to the player's position on the level.

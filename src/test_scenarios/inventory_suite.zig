@@ -548,13 +548,14 @@ test "Drink a healing potion" {
 
     test_session.player.health().current_hp = 5;
     var inventory = try test_session.openInventory();
-    const potion = try inventory.add(g.entities.presets.Potions.get(.healing_potion));
-    const modal_window = try inventory.chooseItemById(potion);
+    const potion = g.entities.presets.Potions.get(.healing_potion);
+    const potion_id = try inventory.add(potion);
+    const modal_window = try inventory.chooseItemById(potion_id);
     try (try modal_window.asOptions()).choose("Drink");
     try std.testing.expect(inventory.isClosed());
 
-    try std.testing.expect(!test_session.session.registry.contains(potion));
-    try std.testing.expect(!test_session.player.inventory().items.contains(potion));
+    try std.testing.expect(!test_session.session.registry.contains(potion_id));
+    try std.testing.expect(!test_session.player.inventory().items.contains(potion_id));
     try std.testing.expect(test_session.player.health().current_hp > 5);
-    try std.testing.expect(test_session.session.journal.known_potions.contains(.healing));
+    try std.testing.expect(test_session.session.journal.known_potions.contains(potion.potion.?));
 }

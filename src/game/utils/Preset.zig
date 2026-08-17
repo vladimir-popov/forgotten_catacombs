@@ -60,7 +60,7 @@ pub fn Preset(comptime T: type, S: type) type {
             }
         };
 
-        /// Returns an iterator over preset values.
+        /// Returns an iterator over preset values T.
         pub fn iterator() Iterator {
             return .{};
         }

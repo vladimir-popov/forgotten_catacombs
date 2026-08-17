@@ -11,34 +11,21 @@ const Self = @This();
 
 const TURNS_TO_KNOW = 100;
 
-const potions_count = std.enums.values(c.Potion).len;
-
 registry: *g.Registry,
-potion_colors: [potions_count]g.Color,
+colors: []const g.Color,
 /// The key is an id of the entity that is unknown.
 /// The value is a count of turns that should be spent to recognize the entity.
 /// When the counter become 0, the entity is moved to the `known_equipment` set.
 unknown_equipment: std.AutoHashMapUnmanaged(g.Entity, u8) = .empty,
 /// A set of already known entities
 known_entities: std.AutoHashMapUnmanaged(g.Entity, void) = .empty,
-/// A set of known effects of potions.
+/// A set of known potions (usually means drunk potions).
 known_potions: std.AutoHashMapUnmanaged(c.Potion, void) = .empty,
 /// A set of known class of enemies.
 known_enemies: std.AutoHashMapUnmanaged(g.meta.EnemyType, void) = .empty,
 
-pub fn init(registry: *g.Registry, seed: u64) !Self {
-    var prng = std.Random.DefaultPrng.init(seed);
-    const colors_count = @typeInfo(g.Color).@"enum".fields.len;
-    std.debug.assert(colors_count >= potions_count);
-
-    var colors: [colors_count]g.Color = undefined;
-    @memcpy(&colors, std.meta.tags(g.Color));
-    prng.random().shuffle(g.Color, &colors);
-
-    var potion_colors: [potions_count]g.Color = undefined;
-    @memcpy(&potion_colors, colors[0..potions_count]);
-
-    return .{ .registry = registry, .potion_colors = potion_colors };
+pub fn init(registry: *g.Registry, colors: []const g.Color) !Self {
+    return .{ .registry = registry, .colors = colors };
 }
 
 /// Try to guess a type of the entity to check its known status correctly.
@@ -64,9 +51,9 @@ pub fn addUnknownEquipment(self: *Self, entity: g.Entity) !void {
 }
 
 /// Returns a color for an unknown potion, or null if the potion is known.
-pub fn unknownPotionColor(self: *const Self, potion_type: c.Potion) ?g.Color {
-    if (!self.known_potions.contains(potion_type))
-        return self.potion_colors[@intFromEnum(potion_type)];
+pub fn unknownPotionColor(self: *const Self, potion: c.Potion) ?g.Color {
+    if (!self.known_potions.contains(potion))
+        return self.colors[@intFromEnum(potion)];
     return null;
 }
 
@@ -75,9 +62,9 @@ pub fn markEnemyAsKnown(self: *Self, enemy_type: g.meta.EnemyType) !void {
     try self.known_enemies.put(self.registry.allocator(), enemy_type, {});
 }
 
-pub fn markPotionAsKnown(self: *Self, potion_type: c.Potion) !void {
-    log.debug("Mark the potion {t} as known", .{potion_type});
-    try self.known_potions.put(self.registry.allocator(), potion_type, {});
+pub fn markPotionAsKnown(self: *Self, potion: c.Potion) !void {
+    log.debug("Mark the potion {t} as known", .{potion});
+    try self.known_potions.put(self.registry.allocator(), potion, {});
 }
 
 pub fn markArmorAsKnown(self: *Self, armor: g.Entity) !void {
@@ -140,7 +127,7 @@ test "Move unknown equipment to known after N turns" {
     defer game_state_arena.deinit();
 
     var registry = try g.Registry.init(&game_state_arena);
-    var journal = try init(&registry, 0);
+    var journal = try init(&registry, std.enums.values(g.Color));
     const equipment = try registry.addNewEntity(g.entities.presets.Weapons.get(.pickaxe));
     try journal.addUnknownEquipment(equipment);
 

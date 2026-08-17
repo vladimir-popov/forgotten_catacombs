@@ -12,6 +12,7 @@ pub const meta = @import("meta.zig");
 pub const notifications = @import("notifications.zig");
 pub const persistance = @import("persistance.zig");
 pub const primitives = @import("primitives.zig");
+pub const systems = @import("systems/systems_pkg.zig");
 pub const utils = @import("utils/utils_pkg.zig");
 pub const visibility = @import("visibility.zig");
 pub const windows = @import("windows/windows_pkg.zig");
@@ -22,7 +23,20 @@ pub const Button = @import("Button.zig");
 pub const CharacterBuilder = @import("CharacterBuilder.zig");
 pub const Cheat = @import("cheats.zig").Cheat;
 pub const Codepoint = u21;
-pub const Color = enum { red, orange, yellow, green, teal, cyan, blue, purple, pink, brown, black, white };
+pub const Color = enum {
+    black,
+    blue,
+    brown,
+    cyan,
+    green,
+    orange,
+    pink,
+    purple,
+    red,
+    teal,
+    white,
+    yellow,
+};
 pub const Description = @import("Description.zig");
 pub const DrawingMode = Runtime.DrawingMode;
 pub const Entity = ecs.Entity;

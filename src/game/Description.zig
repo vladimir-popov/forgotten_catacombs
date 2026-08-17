@@ -484,7 +484,7 @@ test ActualNameFormatter {
     defer arena.deinit();
     var buffer: [64]u8 = undefined;
     var registry = try g.Registry.init(&arena);
-    const journal = try g.Journal.init(&registry, std.testing.random_seed);
+    const journal = try g.Journal.init(&registry, std.enums.values(g.Color));
 
     const entity = try registry.addNewEntity(g.entities.presets.Items.get(.torch));
     const raw_name = try g.Description.rawName(&registry, entity);
@@ -503,7 +503,7 @@ test "Describe a player" {
     const alloc = arena.allocator();
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
     var registry = try g.Registry.init(&arena);
-    const journal = try g.Journal.init(&registry, std.testing.random_seed);
+    const journal = try g.Journal.init(&registry, std.enums.values(g.Color));
     var text_area: g.windows.TextArea = .initEmpty(alloc);
 
     const player = try registry.addNewEntity(try g.entities.player(alloc, prng.random(), .zeros, .zeros, .init(30)));
@@ -545,7 +545,7 @@ test "Describe an unknown rat" {
     defer game_state_arena.deinit();
 
     var registry = try g.Registry.init(&game_state_arena);
-    const journal = try g.Journal.init(&registry, std.testing.random_seed);
+    const journal = try g.Journal.init(&registry, std.enums.values(g.Color));
 
     const id = try registry.addNewEntity(g.entities.presets.Enemies.get(.rat));
     var text_area: g.windows.TextArea = .initEmpty(std.testing.allocator);
@@ -571,7 +571,7 @@ test "Describe a known rat" {
     defer game_state_arena.deinit();
 
     var registry = try g.Registry.init(&game_state_arena);
-    var journal = try g.Journal.init(&registry, std.testing.random_seed);
+    var journal = try g.Journal.init(&registry, std.enums.values(g.Color));
 
     const id = try registry.addNewEntity(g.entities.presets.Enemies.get(.rat));
     try journal.markEnemyAsKnown(g.meta.getEnemyType(&registry, id) orelse unreachable);
@@ -601,7 +601,7 @@ test "Describe a melee weapon" {
     defer game_state_arena.deinit();
 
     var registry = try g.Registry.init(&game_state_arena);
-    const journal = try g.Journal.init(&registry, std.testing.random_seed);
+    const journal = try g.Journal.init(&registry, std.enums.values(g.Color));
 
     const id = try registry.addNewEntity(g.entities.presets.Items.fields.get(.torch).*);
     var text_area: g.windows.TextArea = .initEmpty(std.testing.allocator);
@@ -633,7 +633,7 @@ test "Describe a bow" {
     defer game_state_arena.deinit();
 
     var registry = try g.Registry.init(&game_state_arena);
-    const journal = try g.Journal.init(&registry, std.testing.random_seed);
+    const journal = try g.Journal.init(&registry, std.enums.values(g.Color));
 
     const id = try registry.addNewEntity(g.entities.presets.Weapons.get(.short_bow));
     var text_area: g.windows.TextArea = .initEmpty(std.testing.allocator);
@@ -660,7 +660,7 @@ test "Describe an armor" {
     defer game_state_arena.deinit();
 
     var registry = try g.Registry.init(&game_state_arena);
-    const journal = try g.Journal.init(&registry, std.testing.random_seed);
+    const journal = try g.Journal.init(&registry, std.enums.values(g.Color));
 
     const id = try registry.addNewEntity(g.entities.presets.Armor.get(.jacket));
     var text_area: g.windows.TextArea = .initEmpty(std.testing.allocator);

@@ -7,7 +7,6 @@ const c = g.components;
 const p = g.primitives;
 const ecs = g.ecs;
 
-const ActionSystem = @import("ActionSystem.zig");
 pub const ExploreLevelMode = @import("game_modes/ExploreLevelMode.zig");
 pub const ExploreMode = @import("game_modes/ExploreMode.zig");
 pub const InventoryMode = @import("game_modes/InventoryMode.zig");
@@ -34,9 +33,9 @@ pub const Mode = union(enum) {
     trading: *TradingMode,
 };
 
-/// This is an arena used to create this session.
+/// This arena is used to create this session.
 /// It should be used only inside this session to manage its state (events and notifications)
-root_arena: *g.GameStateArena,
+inner_arena: *g.GameStateArena,
 /// Used to allocate memory for the current mode.
 /// Should be used to allocate anything within mode.
 mode_arena: g.SessionModeArena,
@@ -57,10 +56,16 @@ viewport: g.Viewport,
 registry: g.Registry,
 ///
 journal: g.Journal,
-//
+/// Shuffled array of colors
+colors: [std.enums.values(g.Color).len]g.Color,
+///
 ai: g.AI,
 ///
-actions: ActionSystem,
+actions: g.systems.ActionSystem,
+///
+combinations: g.systems.CombinationSystem,
+///
+damage: g.systems.DamageSystem,
 /// The entity id of the player.
 /// This id should never changes during the game session.
 player: g.Entity,
@@ -99,13 +104,15 @@ pub fn preInit(
     render: g.Render,
 ) !void {
     self.* = .{
-        .root_arena = game_session_arena,
+        .inner_arena = game_session_arena,
         .mode_arena = std.heap.ArenaAllocator.init(game_session_arena.allocator()),
         .runtime = runtime,
         .render = render,
         .viewport = g.Viewport.init(render.scene_buffer.region().rows, render.scene_buffer.region().cols),
         .registry = try g.Registry.init(game_session_arena),
         .actions = .{},
+        .combinations = .{},
+        .damage = .{},
         .events = .empty,
         .seed = 0,
         .max_depth = 0,
@@ -114,6 +121,7 @@ pub fn preInit(
         .prng = std.Random.DefaultPrng.init(runtime.currentMillis()),
         .ai = g.AI{ .session = self, .rand = self.prng.random() },
         .notifications = .empty,
+        .colors = undefined,
         .journal = undefined,
         .player = undefined,
         .level = undefined,
@@ -140,6 +148,8 @@ pub fn initNew(
     self.player = try self.registry.addNewEntity(
         try g.entities.player(self.registry.allocator(), prng.random(), stats, skills, health),
     );
+    @memcpy(&self.colors, std.enums.values(g.Color));
+    prng.random().shuffle(g.Color, &self.colors);
 
     var equipment: *c.Equipment = self.registry.getUnsafe(self.player, c.Equipment);
     var invent: *c.Inventory = self.registry.getUnsafe(self.player, c.Inventory);
@@ -167,7 +177,7 @@ pub fn initNew(
 ///  - puts the viewport around the player;
 ///  - switches the game session to the `play` mode.
 pub fn completeInitialization(self: *Self) !void {
-    self.journal = try g.Journal.init(&self.registry, self.seed);
+    self.journal = try g.Journal.init(&self.registry, &self.colors);
     self.viewport.centeredAround(self.level.playerPosition().place);
     log.debug(
         "The game session is completely initialized. Seed {d}; Max depth {d}; Player id {d}",
@@ -276,7 +286,7 @@ pub fn playerMovedToLevel(self: *Self) !void {
 
 pub fn showPopUpNotification(self: *Self, notification: g.notifications.Notification) !void {
     log.debug("Notification: {any}", .{notification});
-    try self.notifications.pushBack(self.root_arena.allocator(), notification);
+    try self.notifications.pushBack(self.inner_arena.allocator(), notification);
 }
 
 pub fn tick(self: *Self) !void {
@@ -299,7 +309,7 @@ pub fn tick(self: *Self) !void {
 }
 
 pub inline fn sendEvent(self: *Self, event: g.events.Event) !void {
-    try self.events.append(self.root_arena.allocator(), event);
+    try self.events.append(self.inner_arena.allocator(), event);
 }
 
 /// Handles events on the end of the `tick`

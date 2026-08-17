@@ -5,6 +5,8 @@ const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
+const Self = @This();
+
 healing_potion: c.Components = archetype.potion(.{
     .description = .{ .preset = .healing_potion },
     .sprite = .{ .codepoint = cp.potion },

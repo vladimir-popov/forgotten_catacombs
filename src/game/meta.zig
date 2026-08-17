@@ -483,27 +483,6 @@ pub fn calculateDamage(
     ));
 }
 
-pub fn canBeCombined(journal: g.Journal, item: g.Entity) bool {
-    return journal.registry.has(item, c.Combination) and journal.isKnown(item);
-}
-
-pub const Combination = struct { subject: g.Entity, object: g.Entity, combination: c.Combination };
-
-pub fn combine(registry: *g.Registry, combination: c.Combination, item1: g.Entity, item2: g.Entity) !void {
-    switch (combination) {
-        .light_with_oil => {
-            const lamp = registry.get(item1, c.SourceOfLight) orelse registry.get(item2, c.SourceOfLight) orelse
-                std.debug.panic("Combination {t} is not applicable to {d} and {d}", .{ combination, item1.id, item2.id });
-            const oil = registry.get(item1, c.Potion) orelse registry.get(item2, c.Potion) orelse
-                std.debug.panic("Combination {t} is not applicable to {d} and {d}", .{ combination, item1.id, item2.id });
-            if (oil.* != .oil)
-                @panic("Potion must be oil");
-
-            _ = lamp;
-        },
-    }
-}
-
 test "improveItem should apply a new modification every time" {
     // given:
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
