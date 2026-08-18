@@ -70,15 +70,42 @@ pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
 
 /// Draws the window with a scrollbar and buttons if they are required.
 pub fn draw(self: *const Self, render: g.Render) !void {
-    // Draw the content
-    try self.scrollable_area.draw(render);
-    // Draw the border
-    try render.drawBorder(self.region);
-    // Draw the title
+    try self.drawContent(render);
+    try self.drawBorder(render);
+    try self.drawTitle(render);
+    try self.drawButtons(render);
+}
+
+/// Draws the title
+pub fn drawTitle(self: *const Self, render: g.Render) !void {
     const padding: u8 = @intCast(self.region.cols - self.title_len);
     const point = self.region.top_left.movedToNTimes(.right, padding / 2);
     const ttl = self.title();
     try render.drawText(ttl, point, .normal);
+}
+
+/// Draws the content of its inner scrollable panel
+pub fn drawContent(self: *const Self, render: g.Render) !void {
+    try self.scrollable_area.draw(render);
+}
+
+/// Draws the border around its region
+pub fn drawBorder(self: *const Self, render: g.Render) !void {
+    try render.drawBorder(self.region);
+}
+
+/// Draws the border around its region
+pub fn drawButtons(self: *const Self, render: g.Render) !void {
+    if (self.scrollable_area.leftButton()) |btn| {
+        try render.drawLeftButton(btn.text, btn.has_alternatives);
+    } else {
+        try render.hideLeftButton();
+    }
+    if (self.scrollable_area.rightButton()) |btn| {
+        try render.drawRightButton(btn.text, btn.has_alternatives);
+    } else {
+        try render.hideRightButton();
+    }
 }
 
 /// Fills the region of the window either from the buffer, or just fill it with spaces.

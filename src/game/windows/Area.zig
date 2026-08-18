@@ -28,6 +28,10 @@ pub const VTable = struct {
     drawFn: *const fn (ptr: *anyopaque, render: g.Render, region: p.Region, scrolled: usize) anyerror!void,
 
     clearRetainingCapacityFn: *const fn (ptr: *anyopaque) void,
+
+    leftButtonFn: *const fn (ptr: *anyopaque) ?w.Button,
+
+    rightButtonFn: *const fn (ptr: *anyopaque) ?w.Button,
 };
 
 underlying: *anyopaque,
@@ -43,6 +47,14 @@ pub fn selectedLine(self: Self) ?usize {
 
 pub fn clearRetainingCapacity(self: *Self) void {
     self.vtable.clearRetainingCapacityFn(self.underlying);
+}
+
+pub fn leftButton(self: *const Self) ?w.Button {
+    return self.vtable.leftButtonFn(self.underlying);
+}
+
+pub fn rightButton(self: *const Self) ?w.Button {
+    return self.vtable.rightButtonFn(self.underlying);
 }
 
 pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
@@ -75,6 +87,14 @@ pub fn vtableFor(comptime T: type) *const VTable {
             const self: *T = @ptrCast(@alignCast(ptr));
             try self.draw(render, region, scrolled);
         }
+        fn leftButtonFn(ptr: *anyopaque) ?w.Button {
+            const self: *T = @ptrCast(@alignCast(ptr));
+            return self.leftButton();
+        }
+        fn rightButtonFn(ptr: *anyopaque) ?w.Button {
+            const self: *T = @ptrCast(@alignCast(ptr));
+            return self.rightButton();
+        }
 
         const vtable: VTable = .{
             .totalLinesFn = totalLinesFn,
@@ -82,6 +102,8 @@ pub fn vtableFor(comptime T: type) *const VTable {
             .clearRetainingCapacityFn = clearRetainingCapacityFn,
             .handleButtonFn = handleButtonFn,
             .drawFn = drawFn,
+            .leftButtonFn = leftButtonFn,
+            .rightButtonFn = rightButtonFn,
         };
     }.vtable;
 }
@@ -94,6 +116,8 @@ pub const empty: Self = .{
         .clearRetainingCapacityFn = Empty.clearRetainingCapacity,
         .handleButtonFn = Empty.handleButton,
         .drawFn = Empty.draw,
+        .leftButtonFn = Empty.leftButton,
+        .rightButtonFn = Empty.rightButton,
     },
 };
 
@@ -115,4 +139,11 @@ pub const Empty = struct {
     }
 
     fn clearRetainingCapacity(_: *anyopaque) void {}
+
+    fn leftButton(_: *anyopaque) ?w.Button {
+        return null;
+    }
+    fn rightButton(_: *anyopaque) ?w.Button {
+        return null;
+    }
 };

@@ -23,30 +23,52 @@ pub fn OptionsArea(comptime Item: type) type {
     return struct {
         const Self = @This();
 
-        pub const OnReleaseButton = *const fn (
-            context: *anyopaque,
-            line_idx: usize,
-            item: Item,
-        ) anyerror!w.HandleButtonResult;
+        pub const ButtonHandler = struct {
+            handle_release_button: *const fn (
+                context: *anyopaque,
+                selected_line: usize,
+                item: Item,
+            ) anyerror!w.HandleButtonResult,
 
-        pub const OnHoldButton = *const fn (
-            context: *anyopaque,
-            line_idx: usize,
-            item: Item,
-        ) anyerror!w.HandleButtonResult;
+            handle_hold_button: ?*const fn (
+                context: *anyopaque,
+                selected_line: usize,
+                item: Item,
+            ) anyerror!w.HandleButtonResult = null,
+
+            const do_nothing: ButtonHandler = .{ .handle_release_button = doNothing };
+
+            fn doNothing(_: *anyopaque, _: usize, _: Item) anyerror!w.HandleButtonResult {
+                return .keep_open;
+            }
+        };
 
         pub const Option = struct {
-            item: Item,
             /// A buffer for a label content
             label_buffer: [LINE_BUFFER_SIZE]u8,
             /// An actual length of a label content
             label_len: usize,
-            onReleaseButtonFn: OnReleaseButton,
-            onHoldButtonFn: ?OnHoldButton,
+            item: Item,
+            button_handler: ButtonHandler,
 
             /// Returns a slice with a text of the label (no additional spaces).
             pub fn label(self: *const @This()) []const u8 {
                 return self.label_buffer[0..self.label_len];
+            }
+
+            pub fn onRightButtonPressed(
+                self: Option,
+                state: g.Button.State,
+                context: *anyopaque,
+                selected_line: usize,
+            ) !w.HandleButtonResult {
+                switch (state) {
+                    .released => return try self.button_handler.handle_release_button(context, selected_line, self.item),
+                    .hold => return if (self.button_handler.handle_hold_button) |handle|
+                        handle(context, selected_line, self.item)
+                    else
+                        .keep_open,
+                }
             }
         };
 
@@ -79,8 +101,36 @@ pub fn OptionsArea(comptime Item: type) type {
             return self.options.items.len;
         }
 
-        pub fn selectedLine(self: *const Self) ?usize {
-            return self.selected_line;
+        pub fn leftButton(self: *const Self) ?w.Button {
+            return if (self.options.items.len > 0) .close else null;
+        }
+
+        pub fn rightButton(self: *const Self) ?w.Button {
+            return if (self.options.items.len > 0)
+                if (self.options.items[self.selected_line].button_handler.handle_hold_button) |_|
+                    .choose_with_alternatives
+                else
+                    .choose
+            else
+                .close;
+        }
+
+        pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
+            switch (btn.game_button) {
+                .up => self.selectPreviousLine(),
+                .down => self.selectNextLine(),
+                .a => if (self.options.items.len > 0) {
+                    const option = self.options.items[self.selected_line];
+                    if (btn.state == .released) {
+                        return try option.onRightButtonPressed(btn.state, self.context, self.selected_line);
+                    }
+                } else {
+                    return .close_window;
+                },
+                .b => if (self.options.items.len > 0) return .close_window,
+                else => {},
+            }
+            return .keep_open;
         }
 
         /// Adds a labeled option. The `label` is copied to an inner buffer.
@@ -88,8 +138,7 @@ pub fn OptionsArea(comptime Item: type) type {
             self: *Self,
             label: []const u8,
             item: Item,
-            onReleaseButtonFn: OnReleaseButton,
-            onHoldButtonFn: ?OnHoldButton,
+            handler: ButtonHandler,
         ) !void {
             std.debug.assert(label.len < LINE_BUFFER_SIZE);
 
@@ -98,8 +147,7 @@ pub fn OptionsArea(comptime Item: type) type {
                 .item = item,
                 .label_len = label.len,
                 .label_buffer = undefined,
-                .onReleaseButtonFn = onReleaseButtonFn,
-                .onHoldButtonFn = onHoldButtonFn,
+                .button_handler = handler,
             };
             @memmove(line.label_buffer[0..line.label_len], label);
         }
@@ -109,16 +157,14 @@ pub fn OptionsArea(comptime Item: type) type {
             comptime fmt: []const u8,
             args: anytype,
             item: Item,
-            onReleaseButtonFn: OnReleaseButton,
-            onHoldButtonFn: ?OnHoldButton,
+            handler: ButtonHandler,
         ) !void {
             const line = try self.options.addOne(self.alloc);
             line.* = .{
                 .item = item,
                 .label_len = 0,
                 .label_buffer = undefined,
-                .onReleaseButtonFn = onReleaseButtonFn,
-                .onHoldButtonFn = onHoldButtonFn,
+                .button_handler = handler,
             };
             line.label_len = (try std.fmt.bufPrint(&line.label_buffer, fmt, args)).len;
         }
@@ -132,14 +178,9 @@ pub fn OptionsArea(comptime Item: type) type {
                 .item = item,
                 .label_len = 0,
                 .label_buffer = @splat(' '),
-                .onReleaseButtonFn = doNothing,
-                .onHoldButtonFn = null,
+                .button_handler = .do_nothing,
             };
             return line;
-        }
-
-        fn doNothing(_: *anyopaque, _: usize, _: Item) anyerror!w.HandleButtonResult {
-            return .keep_open;
         }
 
         pub fn selectLine(self: *Self, idx: usize) !void {
@@ -157,32 +198,25 @@ pub fn OptionsArea(comptime Item: type) type {
                 self.selected_line += 1;
         }
 
-        pub inline fn selectedOption(self: *const Self) *Option {
-            return &self.options.items[self.selected_line];
+        pub fn selectedLine(self: Self) ?usize {
+            return if (self.options.items.len > 0)
+                self.selected_line
+            else
+                null;
         }
 
-        pub inline fn selectedItem(self: *const Self) Item {
-            return self.options.items[self.selected_line].item;
+        pub fn selectedOption(self: *const Self) ?*Option {
+            return if (self.selectedLine()) |idx|
+                &self.options.items[idx]
+            else
+                null;
         }
 
-        pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
-            switch (btn.game_button) {
-                .up => self.selectPreviousLine(),
-                .down => self.selectNextLine(),
-                .a => if (self.options.items.len > 0) {
-                    const option = self.options.items[self.selected_line];
-                    if (btn.state == .hold and option.onHoldButtonFn != null) {
-                        return try option.onHoldButtonFn.?(self.context, self.selected_line, option.item);
-                    } else {
-                        return try option.onReleaseButtonFn(self.context, self.selected_line, option.item);
-                    }
-                } else {
-                    return .close_window;
-                },
-                .b => if (self.options.items.len > 0) return .close_window,
-                else => {},
-            }
-            return .keep_open;
+        pub fn selectedItem(self: *const Self) ?Item {
+            return if (self.selectedLine()) |idx|
+                self.options.items[idx].item
+            else
+                null;
         }
 
         /// Draws the options line by line inside the passed region. If the region has not enough
@@ -212,15 +246,6 @@ pub fn OptionsArea(comptime Item: type) type {
                     try render.drawHorizontalLine(' ', point, region.cols);
                 }
                 point.move(.down);
-            }
-            // Draw the buttons
-            if (self.options.items.len > 0) {
-                const option = self.options.items[self.selected_line];
-                try render.drawRightButton("Choose", option.onHoldButtonFn != null);
-                try render.drawLeftButton("Close", false);
-            } else {
-                try render.hideLeftButton();
-                try render.drawRightButton("Close", false);
             }
         }
     };

@@ -80,14 +80,14 @@ pub fn tick(self: *Self) !void {
         switch (btn.game_button) {
             .up, .down => _ = try self.options.handleButton(btn),
             .left, .right => {
-                const option = self.options.selectedOption();
-                if (btn.game_button == .right)
-                    self.increaseSkill(option.item)
-                else
-                    self.decriseSkill(option.item);
-
-                const new_value = self.current_skills.values.get(option.item);
-                option.label_buffer[option.label_len - 3] = '0' + @as(u8, @intCast(new_value));
+                if (self.options.selectedOption()) |option| {
+                    if (btn.game_button == .right)
+                        self.increaseSkill(option.item)
+                    else
+                        self.decriseSkill(option.item);
+                    const new_value = self.current_skills.values.get(option.item);
+                    option.label_buffer[option.label_len - 3] = '0' + @as(u8, @intCast(new_value));
+                }
             },
             .b => {
                 // Canceling. Revert any changes.

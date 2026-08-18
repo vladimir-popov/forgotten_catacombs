@@ -42,6 +42,18 @@ pub fn selectedLine(_: *const Self) ?usize {
     return null;
 }
 
+pub fn leftButton(_: *const Self) ?w.Button {
+    return null;
+}
+
+pub fn rightButton(_: *const Self) ?w.Button {
+    return .close;
+}
+
+pub fn handleButton(_: *Self, btn: g.Button) !w.HandleButtonResult {
+    return if (btn.game_button == .a) .close_window else .keep_open;
+}
+
 pub fn draw(self: *const Self, render: g.Render, region: p.Region, scrolled: usize) !void {
     // Clear the region
     try render.fillRegion(g.Render.default_filler, .normal, region);
@@ -53,9 +65,6 @@ pub fn draw(self: *const Self, render: g.Render, region: p.Region, scrolled: usi
         try render.drawTextWithAlign(region.cols - 1, &self.lines.items[line_idx], cursor, .normal, .left);
         cursor.move(.down);
     }
-    // Draw the button
-    try render.hideLeftButton();
-    try render.drawRightButton("Close", false);
 }
 
 pub fn clearRetainingCapacity(self: *Self) void {
@@ -79,10 +88,6 @@ pub fn printLineFmt(self: *Self, comptime fmt: []const u8, args: anytype) !void 
     const line = try self.lines.addOne(self.alloc);
     line.* = @splat(' ');
     _ = try std.fmt.bufPrint(line, fmt, args);
-}
-
-pub fn handleButton(_: *Self, btn: g.Button) !w.HandleButtonResult {
-    return if (btn.game_button == .a) .close_window else .keep_open;
 }
 
 pub fn format(self: Self, writer: *std.Io.Writer) std.Io.Writer.Error!void {

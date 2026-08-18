@@ -79,7 +79,7 @@ const BuildingStep = union(enum) {
         }
 
         fn selectedSkill(self: @This()) g.meta.Skill {
-            return self.options.selectedItem();
+            return self.options.selectedItem().?;
         }
         fn increaseSkill(self: *@This(), skill: g.meta.Skill) void {
             if (self.remaining_points > 0) {
@@ -220,19 +220,20 @@ pub fn handleButton(self: *Self, btn: g.Button, render: g.Render) anyerror!?stru
                 },
             },
             .left, .right => if (self.step == .skills) {
-                const option = self.step.skills.options.selectedOption();
-                if (btn.game_button == .right)
-                    self.step.skills.increaseSkill(option.item)
-                else
-                    self.step.skills.decriseSkill(option.item);
+                if (self.step.skills.options.selectedOption()) |option| {
+                    if (btn.game_button == .right)
+                        self.step.skills.increaseSkill(option.item)
+                    else
+                        self.step.skills.decriseSkill(option.item);
 
-                const new_value = self.step.skills.skills.values.get(option.item);
-                option.label_buffer[option.label_len - 3] = '0' + @as(u8, @intCast(new_value));
+                    const new_value = self.step.skills.skills.values.get(option.item);
+                    option.label_buffer[option.label_len - 3] = '0' + @as(u8, @intCast(new_value));
+                }
             },
             // left button
             .b => switch (self.step) {
-                .archetype => |archetype_step| {
-                    const description = descriptions.castByNameAndGet(archetype_step.selectedItem());
+                .archetype => |archetype_step| if (archetype_step.selectedItem()) |archetype| {
+                    const description = descriptions.castByNameAndGet(archetype);
                     try self.showDescription(description);
                 },
                 .skills => {
@@ -251,9 +252,9 @@ pub fn handleButton(self: *Self, btn: g.Button, render: g.Render) anyerror!?stru
             // right button
             .a => {
                 switch (self.step) {
-                    .archetype => |archetype_step| {
+                    .archetype => |archetype_step| if (archetype_step.selectedItem()) |archetype| {
                         try self.initSkillsStep(
-                            g.meta.statsFromArchetype(archetype_step.selectedItem()),
+                            g.meta.statsFromArchetype(archetype),
                             .zeros,
                             MAX_REMAINING_POINTS,
                         );

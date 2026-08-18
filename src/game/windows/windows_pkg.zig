@@ -34,6 +34,7 @@ pub const HandleButtonResult = enum {
 };
 
 pub const Area = @import("Area.zig");
+pub const Button = @import("Button.zig");
 pub const ModalWindows = @import("ModalWindows.zig");
 pub const OptionsArea = @import("OptionsArea.zig").OptionsArea;
 pub const ScrollableArea = @import("ScrollableArea.zig").ScrollableArea;
@@ -142,8 +143,7 @@ pub fn updateAreaWithItems(
     context: *anyopaque,
     items: g.utils.EntitiesSet,
     formatLine: *const fn (line: *TextArea.Line, context: *anyopaque, item: g.Entity) anyerror![]const u8,
-    onReleaseButton: OptionsArea(g.Entity).OnReleaseButton,
-    onHoldButton: OptionsArea(g.Entity).OnHoldButton,
+    handler: OptionsArea(g.Entity).ButtonHandler,
 ) !void {
     area.clearRetainingCapacity();
     const selected_line = area.selected_line;
@@ -153,8 +153,7 @@ pub fn updateAreaWithItems(
         try area.addOption(
             try formatLine(&line, context, item_ptr.*),
             item_ptr.*,
-            onReleaseButton,
-            onHoldButton,
+            handler,
         );
     }
     if (area.options.items.len > 0) {

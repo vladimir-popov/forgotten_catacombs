@@ -574,7 +574,7 @@ fn windowWithQuickActions(self: *Self) !w.Window {
     const area = try window.changeContent(w.OptionsArea(void));
     area.* = .initEmpty(window.allocator(), self, .center);
     for (self.quick_actions.actions.items, 0..) |qa, idx| {
-        try area.addOption(qa.toString(), {}, chooseQuickAction, null);
+        try area.addOption(qa.toString(), {}, .{ .handle_release_button = chooseQuickAction });
         if (idx == self.quick_actions.selected_idx)
             try area.selectLine(idx);
     }

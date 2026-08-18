@@ -122,10 +122,10 @@ noinline fn welcome(self: *Self) !void {
 
     // The choice will be handled manually in the `tick` method
     if (try self.isSessionFileExists())
-        try self.state.welcome.menu.addOption(" Continue ", {}, continueGame, null);
-    try self.state.welcome.menu.addOption(" New game ", {}, newGame, null);
-    try self.state.welcome.menu.addOption("  Manual  ", {}, showManual, null);
-    try self.state.welcome.menu.addOption("  About   ", {}, showAbout, null);
+        try self.state.welcome.menu.addOption(" Continue ", {}, .{ .handle_release_button = continueGame });
+    try self.state.welcome.menu.addOption(" New game ", {}, .{ .handle_release_button = newGame });
+    try self.state.welcome.menu.addOption("  Manual  ", {}, .{ .handle_release_button = showManual });
+    try self.state.welcome.menu.addOption("  About   ", {}, .{ .handle_release_button = showAbout });
 
     // keep menu item selected
     switch (from_state) {

@@ -35,6 +35,14 @@ pub fn ScrollableArea(comptime Area: type) type {
             self.content.clearRetainingCapacity();
         }
 
+        pub fn leftButton(self: *const Self) ?w.Button {
+            return self.content.leftButton();
+        }
+
+        pub fn rightButton(self: *const Self) ?w.Button {
+            return self.content.rightButton();
+        }
+
         pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
             if (try self.content.handleButton(btn) == .close_window)
                 return .close_window;

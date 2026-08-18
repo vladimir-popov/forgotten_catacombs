@@ -122,15 +122,13 @@ pub fn updateTabs(self: *Self) !void {
                     try self.optionFromTab(TAB_REPAIR).addOption(
                         try self.formatLineWithPrice(&buffer, item, price),
                         item,
-                        repairDescribe,
-                        describeItem,
+                        .{ .handle_release_button = repairDescribe, .handle_hold_button = describeItem },
                     );
                 } else {
                     try self.optionFromTab(TAB_MODIFY).addOption(
                         try self.formatLine(&buffer, item),
                         item,
-                        modifyDescribe,
-                        describeItem,
+                        .{ .handle_release_button = modifyDescribe, .handle_hold_button = describeItem },
                     );
                 }
             }
@@ -139,8 +137,7 @@ pub fn updateTabs(self: *Self) !void {
             try self.optionFromTab(TAB_RECOGNIZE).addOption(
                 try self.formatLineWithPrice(&buffer, item, price),
                 item,
-                recognizeDescribe,
-                describeItem,
+                .{ .handle_release_button = recognizeDescribe, .handle_hold_button = describeItem },
             );
         }
     }
@@ -186,8 +183,8 @@ fn recognizeDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonR
     const window = try self.modal_windows.createOnTop(self.session.mode_arena.allocator(), MODAL_WINDOW_REGION);
     const area = try window.changeContent(w.OptionsArea(g.Entity));
     area.* = .initEmpty(window.allocator(), self, .center);
-    try area.addOption("Recognize", item, recognizeItem, null);
-    try area.addOption("Describe", item, describeItem, null);
+    try area.addOption("Recognize", item, .{ .handle_release_button = recognizeItem });
+    try area.addOption("Describe", item, .{ .handle_release_button = describeItem });
     window.shrinkToContent();
     // keep the main window opened
     return .keep_open;
@@ -225,8 +222,8 @@ fn repairDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResu
     const window = try self.modal_windows.createOnTop(self.session.mode_arena.allocator(), MODAL_WINDOW_REGION);
     const area = try window.changeContent(w.OptionsArea(g.Entity));
     area.* = .initEmpty(window.allocator(), self, .center);
-    try area.addOption("Repair", item, repairItem, null);
-    try area.addOption("Describe", item, describeItem, null);
+    try area.addOption("Repair", item, .{ .handle_release_button = repairItem });
+    try area.addOption("Describe", item, .{ .handle_release_button = describeItem });
     window.shrinkToContent();
     // keep the main window opened
     return .keep_open;
@@ -265,8 +262,8 @@ fn modifyDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResu
     const window = try self.modal_windows.createOnTop(self.session.mode_arena.allocator(), MODAL_WINDOW_REGION);
     const area = try window.changeContent(w.OptionsArea(g.Entity));
     area.* = .initEmpty(window.allocator(), self, .center);
-    try area.addOption("Modify", item, modificationMode, null);
-    try area.addOption("Describe", item, describeItem, null);
+    try area.addOption("Modify", item, .{ .handle_release_button = modificationMode });
+    try area.addOption("Describe", item, .{ .handle_release_button = describeItem });
     window.shrinkToContent();
     // do not close the main window
     return .keep_open;
@@ -281,24 +278,21 @@ fn modificationMode(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonRe
         "Somehow   {d}$",
         .{self.calculateModificationPrice(item, MOD_SOMEHOW_PRICE)},
         item,
-        modifySomehow,
-        null,
+        .{ .handle_release_button = modifySomehow },
     );
     try area.addOptionFmt(
         "Carefully {d}$",
         .{self.calculateModificationPrice(item, MOD_CAREFUL_PRICE)},
         item,
-        modifyCarefully,
-        null,
+        .{ .handle_release_button = modifyCarefully },
     );
     try area.addOptionFmt(
         "Manually  {d}$",
         .{self.calculateModificationPrice(item, MOD_MANUAL_PRICE)},
         item,
-        modifyManually,
-        null,
+        .{ .handle_release_button = modifyManually },
     );
-    try area.addOption("Help", item, showHelp, null);
+    try area.addOption("Help", item, .{ .handle_release_button = showHelp });
     window.shrinkToContent();
     // close the previous modal window
     return .close_window;
@@ -325,8 +319,7 @@ fn modifyManually(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResu
         try area.addOption(
             @tagName(modification),
             item,
-            modifyManuallyEffect,
-            null,
+            .{ .handle_release_button = modifyManuallyEffect },
         );
     }
     window.shrinkToContent();

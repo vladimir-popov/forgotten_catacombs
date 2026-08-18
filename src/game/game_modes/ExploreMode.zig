@@ -234,8 +234,7 @@ fn windowWithEntities(
             try area.addOption(
                 try g.Description.printActualName(&buf, self.session.journal, entity),
                 entity,
-                showEntityDescription,
-                null,
+                .{ .handle_release_button = showEntityDescription },
             );
             if (entity.eql(self.entity_in_focus))
                 // the variants array has to have at least one (focused) entity

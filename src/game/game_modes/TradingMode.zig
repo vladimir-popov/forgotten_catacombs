@@ -114,8 +114,8 @@ pub fn tick(self: *Self) !void {
                 return;
             }
         }
-        try self.draw();
     }
+    try self.draw();
     if (self.session.runtime.popCheat()) |cheat| {
         log.debug("Run cheat {any}", .{cheat});
         switch (cheat) {
@@ -188,8 +188,7 @@ fn updateBuyingTab(self: *Self) !void {
         self,
         self.shop.items,
         formatItemForBuying,
-        buyOrDescribe,
-        describeSelectedItem,
+        .{ .handle_release_button = buyOrDescribe, .handle_hold_button = describeSelectedItem },
     );
 }
 
@@ -200,8 +199,7 @@ fn updateSellingTab(self: *Self) !void {
         self,
         self.inventory.items,
         formatItemForSelling,
-        sellOrDescribe,
-        describeSelectedItem,
+        .{ .handle_release_button = sellOrDescribe, .handle_hold_button = describeSelectedItem },
     );
 }
 
@@ -211,8 +209,8 @@ fn buyOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResul
     window.* = .init(self.session.mode_arena.allocator(), MODAL_WINDOW_REGION);
     const area = try window.changeContent(w.OptionsArea(g.Entity));
     area.* = .initEmpty(window.allocator(), self, .center);
-    try area.addOption("Buy", item, buySelectedItem, null);
-    try area.addOption("Describe", item, describeSelectedItem, null);
+    try area.addOption("Buy", item, .{ .handle_release_button = buySelectedItem });
+    try area.addOption("Describe", item, .{ .handle_release_button = describeSelectedItem });
     window.shrinkToContent();
     // keep the main window opened
     return .keep_open;
@@ -224,8 +222,8 @@ fn sellOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResu
     window.* = .init(self.session.mode_arena.allocator(), MODAL_WINDOW_REGION);
     const area = try window.changeContent(w.OptionsArea(g.Entity));
     area.* = .initEmpty(window.allocator(), self, .center);
-    try area.addOption("Sell", item, sellSelectedItem, null);
-    try area.addOption("Describe", item, describeSelectedItem, null);
+    try area.addOption("Sell", item, .{ .handle_release_button = sellSelectedItem });
+    try area.addOption("Describe", item, .{ .handle_release_button = describeSelectedItem });
     window.shrinkToContent();
     // keep the main window opened
     return .keep_open;

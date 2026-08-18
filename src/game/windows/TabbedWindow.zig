@@ -154,5 +154,7 @@ pub fn draw(self: *const Self, render: g.Render) !void {
     }
 
     // Draw the content and buttons
-    try self.tabs[self.active_tab_idx].scrollable_area.draw(render);
+    const active_tab = &self.tabs[self.active_tab_idx];
+    try active_tab.drawContent(render);
+    try active_tab.drawButtons(render);
 }

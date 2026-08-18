@@ -135,8 +135,7 @@ pub fn updateInventoryTab(self: *Self) !void {
         self,
         self.inventory.items,
         formatInventoryLine,
-        useCombineDropDescribe,
-        describeSelectedItem,
+        .{ .handle_release_button = useCombineDropDescribe, .handle_hold_button = describeSelectedItem },
     );
 }
 
@@ -174,31 +173,31 @@ fn useCombineDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleBu
     const area = try window.changeContent(w.OptionsArea(g.Entity));
     area.* = .initEmpty(window.allocator(), self, .center);
     if (self.isEquipped(item)) {
-        try area.addOption("Unequip", item, unequipItem, null);
+        try area.addOption("Unequip", item, .{ .handle_release_button = unequipItem });
     } else {
         if (self.session.registry.has(item, c.SourceOfLight)) {
-            try area.addOption("Use as a light", item, useAsLight, null);
+            try area.addOption("Use as a light", item, .{ .handle_release_button = useAsLight });
         }
         if (self.session.registry.has(item, c.Weapon)) {
-            try area.addOption("Use as a weapon", item, useAsWeapon, null);
+            try area.addOption("Use as a weapon", item, .{ .handle_release_button = useAsWeapon });
         }
         if (self.session.registry.has(item, c.Ammunition)) {
-            try area.addOption("Put to quiver", item, putToQuiver, null);
+            try area.addOption("Put to quiver", item, .{ .handle_release_button = putToQuiver });
         }
         if (self.session.registry.has(item, c.Armor)) {
-            try area.addOption("Wear", item, useAsArmor, null);
+            try area.addOption("Wear", item, .{ .handle_release_button = useAsArmor });
         }
         if (self.session.registry.has(item, c.Potion)) {
-            try area.addOption("Drink", item, drinkPotion, null);
+            try area.addOption("Drink", item, .{ .handle_release_button = drinkPotion });
         } else if (self.session.registry.has(item, c.Consumable)) {
-            try area.addOption("Eat", item, consumeFood, null);
+            try area.addOption("Eat", item, .{ .handle_release_button = consumeFood });
         }
     }
     if (self.session.combinations.asIngredient(item)) |_| {
-        try area.addOption("Combine", item, combineSelectedItem, null);
+        try area.addOption("Combine", item, .{ .handle_release_button = combineSelectedItem });
     }
-    try area.addOption("Drop", item, dropSelectedItem, null);
-    try area.addOption("Describe", item, describeSelectedItem, null);
+    try area.addOption("Drop", item, .{ .handle_release_button = dropSelectedItem });
+    try area.addOption("Describe", item, .{ .handle_release_button = describeSelectedItem });
     window.shrinkToContent();
     // keep the main window opened
     return .keep_open;
@@ -300,8 +299,8 @@ fn takeFromPileOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleBu
     const window = try self.modal_windows.createOnTop(self.session.mode_arena.allocator(), MODAL_WINDOW_REGION);
     var area = try window.changeContent(w.OptionsArea(g.Entity));
     area.* = .initEmpty(window.allocator(), self, .center);
-    try area.addOption("Take", item, takeSelectedItem, null);
-    try area.addOption("Describe", item, describeSelectedItem, null);
+    try area.addOption("Take", item, .{ .handle_release_button = takeSelectedItem });
+    try area.addOption("Describe", item, .{ .handle_release_button = describeSelectedItem });
     window.shrinkToContent();
     return .keep_open;
 }
@@ -350,8 +349,7 @@ fn addDropOption(
             g.Description.actualNameFormatter(self.session.journal, item),
         },
         item,
-        takeFromPileOrDescribe,
-        describeSelectedItem,
+        .{ .handle_release_button = takeFromPileOrDescribe, .handle_hold_button = describeSelectedItem },
     );
 }
 
@@ -381,8 +379,7 @@ fn combineSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButto
             try area.addOption(
                 try formatInventoryLine(&buffer, self, item2.*),
                 resolved_combination,
-                combineItems,
-                null,
+                .{ .handle_release_button = combineItems },
             );
         }
     }
