@@ -193,7 +193,7 @@ fn useCombineDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleBu
             try area.addOption("Eat", item, .{ .handle_release_button = consumeFood });
         }
     }
-    if (self.session.combinations.asIngredient(item)) |_| {
+    if (self.session.journal.isKnown(item) and self.session.combinations.asIngredient(item) != null) {
         try area.addOption("Combine", item, .{ .handle_release_button = combineSelectedItem });
     }
     try area.addOption("Drop", item, .{ .handle_release_button = dropSelectedItem });
@@ -368,7 +368,7 @@ fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButt
 fn combineSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const window = try self.modal_windows.windows.addOne(self.session.mode_arena.allocator());
-    window.* = .init(self.session.mode_arena.allocator(), w.Window.DEFAULT_MAX_REGION);
+    window.* = .init(self.session.mode_arena.allocator(), MODAL_WINDOW_REGION);
     var area = try window.changeContent(w.OptionsArea(ResolvedCombination));
     area.* = .initEmpty(window.allocator(), self, .center);
     const ingredient = self.session.combinations.asIngredient(item).?;
@@ -379,11 +379,11 @@ fn combineSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButto
             try area.addOption(
                 try formatInventoryLine(&buffer, self, item2.*),
                 resolved_combination,
-                .{ .handle_release_button = combineItems },
+                .{ .handle_release_button = combineItems, .handle_hold_button = describeTargetForCombination },
             );
         }
     }
-    window.shrinkToContent();
+    // window.shrinkToContent();
     return .close_window;
 }
 
@@ -391,6 +391,10 @@ fn combineItems(ptr: *anyopaque, _: usize, resolved_combination: ResolvedCombina
     const self: *Self = @ptrCast(@alignCast(ptr));
     try self.session.combinations.combine(resolved_combination);
     return .close_window;
+}
+
+fn describeTargetForCombination(ptr: *anyopaque, line: usize, combination: ResolvedCombination) !w.HandleButtonResult {
+    return try describeSelectedItem(ptr, line, combination.subject);
 }
 
 /// Moves an item from the inventory to the player's position on the level.

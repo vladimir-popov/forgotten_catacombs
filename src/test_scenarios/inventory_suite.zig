@@ -1,5 +1,6 @@
 const std = @import("std");
 const g = @import("game");
+const c = g.components;
 const TestSession = @import("utils/TestSession.zig");
 
 test "Rendering initial inventory" {
@@ -558,4 +559,81 @@ test "Drink a healing potion" {
     try std.testing.expect(!test_session.player.inventory().items.contains(potion_id));
     try std.testing.expect(test_session.player.health().current_hp > 5);
     try std.testing.expect(test_session.session.journal.known_potions.contains(potion.potion.?));
+}
+
+test "An unrecognized oil can't be used" {
+    var test_session: TestSession = undefined;
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
+    defer test_session.deinit();
+
+    // Prepare inventory:
+    var inventory = try test_session.openInventory();
+    // Add unrecognized oil
+    const oil = g.entities.presets.Potions.get(.oil_potion);
+    const oil_id = try inventory.add(oil);
+    // Check available options in menu:
+    _ = try inventory.chooseItemById(oil_id);
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║┌────────────────────────────────────┐║
+        \\║│               Drink                │║
+        \\║│                Drop                │║
+        \\║│              Describe              │║
+        \\║└────────────────────────────────────┘║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+}
+
+test "Combining oil with lamp should increase lamp's charge" {
+    var test_session: TestSession = undefined;
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
+    defer test_session.deinit();
+
+    // Prepare inventory:
+    var inventory = try test_session.openInventory();
+    // Add recognized oil
+    const oil = g.entities.presets.Potions.get(.oil_potion);
+    const oil_id = try inventory.add(oil);
+    try test_session.session.journal.markPotionAsKnown(oil.potion.?);
+    // Add used lamp
+    var lamp = g.entities.presets.Items.get(.oil_lamp);
+    lamp.source_of_light.?.charge = 0;
+    const lamp_id = try inventory.add(lamp);
+
+    // Scenario:
+    const modal_window = try inventory.chooseItemById(oil_id);
+    try (try modal_window.asOptions()).choose("Combine");
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║┌────────────────────────────────────┐║
+        \\║│¡ Oil lamp                          │║
+        \\║│                                    │║
+        \\║│                                    │║
+        \\║│                                    │║
+        \\║│                                    │║
+        \\║│                                    │║
+        \\║└────────────────────────────────────┘║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+    // Combine oil with lamp
+    try (try modal_window.asOptions()).chooseByIndex(0);
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║                                      ║
+        \\║/ Pickaxe                      weapon ║
+        \\║¿ Oil                                 ║
+        \\║¡ Torch                         light ║
+        \\║¡ Oil lamp                            ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+
+    // Then:
+    const charge = test_session.session.registry.getUnsafe(lamp_id, c.SourceOfLight).charge;
+    try std.testing.expect(charge > 0);
 }
