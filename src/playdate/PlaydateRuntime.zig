@@ -48,8 +48,8 @@ pub fn init(playdate: *api.PlaydateAPI) !Self {
     last_button.* = .reset;
     errdefer alloc.destroy(last_button);
 
-    playdate.system.setSerialMessageCallback(serialMessageCallback);
-    playdate.system.setButtonCallback(LastButton.handleEvent, last_button, 1);
+    // playdate.system.setSerialMessageCallback(serialMessageCallback);
+    playdate.system.setButtonCallback(LastButton.handleEvent, last_button, 5);
 
     return .{
         .playdate = playdate,

@@ -81,7 +81,11 @@ pub fn handleEvent(
         self.pressed_at = when;
         log.debug("Pressed {d} buttons at {d}. Last buttons {any}", .{ buttons, when, self.buttons });
     } else {
+        if (self.buttons != buttons) {
+            self.buttons = 0;
+        }
         self.pressed_at = 0;
+        log.debug("Released {d} buttons at {d}. Last buttons {any}", .{ buttons, when, self.buttons });
     }
     return 0;
 }
