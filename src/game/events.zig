@@ -13,7 +13,6 @@ pub const Event = union(enum) {
     entity_moved: EntityMoved,
     entity_died: g.Entity,
     mode_changed: ModeChanged,
-    player_turn_completed: PlayerTurnCompleted,
 
     pub fn get(self: Event, comptime tag: Tag) ?@FieldType(Event, @tagName(tag)) {
         switch (self) {
@@ -50,8 +49,4 @@ pub const ModeChanged = union(enum) {
     to_trading: g.Entity,
     to_modify_recognize,
     to_play: struct { entity_in_focus: ?g.Entity, action: ?g.actions.Action },
-};
-
-pub const PlayerTurnCompleted = struct {
-    spent_move_points: g.MovePoints,
 };

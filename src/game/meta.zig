@@ -146,6 +146,13 @@ fn getRadiusOfLightFromEntity(registry: *const g.Registry, item: ?g.Entity) stru
     return .{ 0.0, 0 };
 }
 
+pub fn isLamp(registry: *const g.Registry, item: g.Entity) bool {
+    if (registry.get(item, c.Description)) |descr| {
+        return descr.preset == .oil_lamp;
+    }
+    return false;
+}
+
 /// Returns an id of the equipped weapon, or the `actor`, because any enemy must be able to provide
 /// a damage without equipment. The player and humanoid enemies should be able to damage by hands,
 /// animal should bite (but, hands and tooth are not equipped as a weapon).

@@ -571,7 +571,7 @@ pub const Trap = struct {
     /// The likelihood of detecting and disarming the trap depend on how powerful the trap is.
     power: u2,
     /// The turn when its visibility was checked last time
-    last_checked_turn: u32 = 0,
+    last_checked_cycle: u32 = 0,
 
     pub fn damagePercent(self: *const Trap) p.Range(u8) {
         return switch (self.power) {

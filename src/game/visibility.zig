@@ -26,7 +26,7 @@ pub fn isEntityVisibile(
     place: p.Point,
     place_visibility: g.Render.Visibility,
     player: g.Entity,
-    current_turn: u32,
+    current_cycle: u32,
 ) !bool {
     if (turn_light_on) return true;
 
@@ -34,10 +34,10 @@ pub fn isEntityVisibile(
         // If the place is visible, we should check visibility of the trap, but only once per turn
         .visible => if (journal.registry.get(entity, c.Trap)) |trap| {
             if (journal.known_entities.contains(entity)) return true;
-            if (trap.last_checked_turn == current_turn) {
+            if (trap.last_checked_cycle == current_cycle) {
                 return false;
             } else {
-                trap.last_checked_turn = current_turn;
+                trap.last_checked_cycle = current_cycle;
             }
 
             const perception: f32 = u.ff32(journal.registry.getUnsafe(player, c.Stats).get(.perception));

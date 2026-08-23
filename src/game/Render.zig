@@ -71,7 +71,7 @@ pub fn drawScene(self: *const Self, session: *g.GameSession, entity_in_focus: ?g
         session.prng.random(),
         level,
         entity_in_focus,
-        session.spent_turns,
+        session.spent_cycles,
     );
     try self.drawChangedSymbols();
 }
@@ -132,7 +132,7 @@ pub fn drawEntitiesToBuffer(
     rand: std.Random,
     level: *const g.Level,
     entity_in_focus: ?g.Entity,
-    current_turn: u32,
+    current_cycle: u32,
 ) !void {
     var itr = level.registry.query2(cm.Position, cm.Sprite);
     while (itr.next()) |tuple| {
@@ -148,7 +148,7 @@ pub fn drawEntitiesToBuffer(
             position.place,
             place_visibility,
             level.player,
-            current_turn,
+            current_cycle,
         );
         try self.drawSpriteToBuffer(
             viewport,

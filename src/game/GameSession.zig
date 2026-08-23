@@ -73,10 +73,8 @@ player: g.Entity,
 level: g.Level,
 /// The deepest achieved level
 max_depth: u8,
-/// How many turns have been passed from the start of this game session
-spent_turns: u32,
-// How many move points spent within the current turn
-spent_move_points: g.MovePoints,
+/// How many cycles have been passed from the start of this game session
+spent_cycles: u32,
 /// The current mode of the game
 mode: Mode,
 ///
@@ -116,8 +114,7 @@ pub fn preInit(
         .events = .empty,
         .seed = 0,
         .max_depth = 0,
-        .spent_turns = 0,
-        .spent_move_points = 0,
+        .spent_cycles = 0,
         .prng = std.Random.DefaultPrng.init(runtime.currentMillis()),
         .ai = g.AI{ .session = self, .rand = self.prng.random() },
         .notifications = .empty,
@@ -316,16 +313,6 @@ pub inline fn sendEvent(self: *Self, event: g.events.Event) !void {
 noinline fn handleEvent(self: *Self, event_idx: usize) !void {
     var event = self.events.items[event_idx];
     switch (event) {
-        .player_turn_completed => {
-            self.spent_move_points += event.player_turn_completed.spent_move_points;
-            const turns = self.spent_move_points / g.MOVE_POINTS_IN_TURN;
-            self.spent_move_points = self.spent_move_points % g.MOVE_POINTS_IN_TURN;
-            for (0..turns) |_| {
-                self.spent_turns += 1;
-                try self.actions.onTurnCompleted();
-                try self.journal.onTurnCompleted();
-            }
-        },
         .mode_changed => |new_mode| switch (new_mode) {
             .to_play => |args| {
                 try self.switchModeToPlay(args.entity_in_focus);

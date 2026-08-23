@@ -101,7 +101,8 @@ pub fn forgetArmor(self: *Self, armor: g.Entity) !void {
     g.meta.setCodepointOfUnknownArmor(self.registry, armor);
 }
 
-pub fn onTurnCompleted(self: *Self) !void {
+/// Increase a number of cycles when an unknown item is used
+pub fn increaseUsageCounters(self: *Self) !void {
     var not_all_unknown_counters_updated: bool = true;
     while (not_all_unknown_counters_updated) {
         var itr = self.unknown_equipment.iterator();
@@ -133,7 +134,7 @@ test "Move unknown equipment to known after N turns" {
 
     // when:
     for (0..TURNS_TO_KNOW + 1) |_| {
-        try journal.onTurnCompleted();
+        try journal.increaseUsageCounters();
     }
 
     // then:

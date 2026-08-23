@@ -85,51 +85,6 @@ pub fn calculateQuickActionForTarget(
     return null;
 }
 
-pub fn onTurnCompleted(self: *Self) !void {
-    const registry = &self.session().registry;
-    // Regenerate health
-    var regen_itr = registry.query(c.Regeneration);
-    while (regen_itr.next()) |tuple| {
-        const entity, const regeneration = tuple;
-        regeneration.accumulated_turns += 1;
-        if (regeneration.accumulated_turns > regeneration.turns_to_increase) {
-            regeneration.accumulated_turns = 0;
-            const health = registry.get(entity, c.Health) orelse
-                std.debug.panic("Entity {d} has Regeneration, but doesn't have a Health component", .{entity.id});
-            health.add(1);
-        }
-    }
-    //  Handle hunger
-    var hunger_itr = registry.query(c.Hunger);
-    while (hunger_itr.next()) |tuple| {
-        const entity, const hunger = tuple;
-        hunger.turns_after_eating +|= 1;
-        // how often the entity should be damaged by hunger
-        const damage_every_turn: u8 = switch (hunger.level()) {
-            .well_fed => 0,
-            .hunger => 15,
-            .severe_hunger => 10,
-            .critical_starvation => 5,
-        };
-
-        if (damage_every_turn == 0 or hunger.turns_after_eating % damage_every_turn != 0) continue;
-
-        const health = registry.get(entity, c.Health) orelse
-            std.debug.panic("Entity {d} has Hunger, but doesn't have a Health component", .{entity.id});
-        _ = try self.session().damage.applyDamage(entity, entity, health, 1);
-    }
-    // Dim the lights
-    if (registry.get(self.session().player, c.Equipment)) |equipment| {
-        if (equipment.light) |light| {
-            registry.getUnsafe(light, c.SourceOfLight).charge -|= 1;
-        }
-        if (equipment.weapon) |weapon_id| {
-            if (registry.get(weapon_id, c.SourceOfLight)) |sol|
-                sol.charge -|= 1;
-        }
-    }
-}
-
 /// Handles intentions to do some actions.
 /// The action can be modified during this method.
 pub fn doAction(

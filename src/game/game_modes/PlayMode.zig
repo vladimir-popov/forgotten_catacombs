@@ -13,16 +13,19 @@ const SHOW_NOTIFICATION_MS = 800;
 const Self = @This();
 
 session: *g.GameSession,
-// The entity to which quick actions can be applied
+/// The entity to which quick actions can be applied
 target: ?g.Entity = null,
 quick_actions: QuickActions,
 is_players_turn: bool = true,
 quick_actions_window: ?w.Window = null,
-// If defined, then all input should be ignored.
+/// If defined, then all input should be ignored.
 notification_to_show: ?NotificationMessage = null,
+/// How many move points the player spent within the last turn.
+/// We need it to count completed cycles.
+spent_move_points: g.MovePoints = 0,
 
 // This is a buffer for an action. It should help to avoid putting action on stack
-action: g.Action = undefined,
+action_buffer: g.Action = undefined,
 
 pub fn init(
     self: *Self,
@@ -78,13 +81,13 @@ fn playerTurn(self: *Self) !bool {
     if (!try self.handleInput()) {
         return true;
     }
-    const action_result = try self.doTurn(self.session.player, &self.action, std.math.maxInt(g.MovePoints));
+    const action_result = try self.doTurn(self.session.player, &self.action_buffer, std.math.maxInt(g.MovePoints));
     switch (action_result) {
-        .done => {
+        .done => |spent_move_points| {
             // Force change the target
-            switch (self.action.tag) {
+            switch (self.action_buffer.tag) {
                 .hit => {
-                    const enemy = self.action.payload.hit;
+                    const enemy = self.action_buffer.payload.hit;
                     if (self.session.registry.contains(enemy)) {
                         self.setTarget(enemy);
                     } else {
@@ -92,10 +95,25 @@ fn playerTurn(self: *Self) !bool {
                     }
                 },
                 .open => {
-                    const door = self.action.payload.open;
+                    const door = self.action_buffer.payload.open;
                     self.setTarget(door.id);
                 },
                 else => {},
+            }
+            // Handle Initiative
+            if (spent_move_points > 0) {
+                // Add initiative points to enemies
+                var itr = self.session.registry.query(c.Initiative);
+                while (itr.next()) |tuple| {
+                    tuple[1].move_points += spent_move_points;
+                }
+            }
+            //
+            self.spent_move_points += spent_move_points;
+            const cycles = self.spent_move_points / g.MOVE_POINTS_IN_TURN;
+            self.spent_move_points = self.spent_move_points % g.MOVE_POINTS_IN_TURN;
+            for (0..cycles) |_| {
+                try self.onCycleCompleted();
             }
             return false;
         },
@@ -130,6 +148,104 @@ fn enemiesTurn(self: *Self) !void {
     }
 }
 
+/// Trying to do an action. The action can be changed or ignored.
+/// For example, the `move` action can lead to a collision with an enemy or a wall. In the first case,
+/// the action will be changed to `hit`, and completely ignored (changed to `do_nothing`) in the second.
+///
+/// It returns a result of handling the action. In a successful case the actual count of spent move
+/// points is stored in the result.
+pub fn doTurn(
+    self: *Self,
+    actor: g.Entity,
+    action: *g.actions.Action,
+    initiative: g.MovePoints,
+) !g.actions.ActionResult {
+    log.info("The turn of the entity {d}.", .{actor.id});
+    defer log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
+
+    const move_points_for_action = g.meta.movePointsForAction(&self.session.registry, actor, action.tag);
+    if (move_points_for_action > initiative)
+        return .not_enough_points;
+
+    // Do Actions
+    loop: while (true) {
+        const action_result = try self.session.actions.doAction(actor, action, move_points_for_action);
+        switch (action_result) {
+            .repeat_action_handler => continue :loop,
+            .done => |mp| {
+                log.info("Entity {d} spent {d} move points", .{ actor.id, mp });
+            },
+            .actor_is_dead => {
+                log.info("Entity {d} is dead after action {t}", .{ actor.id, action.tag });
+            },
+            .not_enough_points => {
+                log.debug("Entity {d} has not enough move points for action {t}", .{ actor.id, action.tag });
+            },
+            .declined => {
+                log.debug("The action {t} was declined for the entity {d}", .{ action.tag, actor.id });
+            },
+        }
+        return action_result;
+    }
+}
+
+fn onCycleCompleted(self: *Self) !void {
+    const registry = &self.session.registry;
+
+    // Increase the global counter:
+    self.session.spent_cycles += 1;
+
+    // Update journal
+    try self.session.journal.increaseUsageCounters();
+
+    // Regenerate health
+    var regen_itr = registry.query(c.Regeneration);
+    while (regen_itr.next()) |tuple| {
+        const entity, const regeneration = tuple;
+        regeneration.accumulated_turns += 1;
+        if (regeneration.accumulated_turns > regeneration.turns_to_increase) {
+            regeneration.accumulated_turns = 0;
+            const health = registry.get(entity, c.Health) orelse
+                std.debug.panic("Entity {d} has Regeneration, but doesn't have a Health component", .{entity.id});
+            health.add(1);
+        }
+    }
+    //  Handle hunger
+    var hunger_itr = registry.query(c.Hunger);
+    while (hunger_itr.next()) |tuple| {
+        const entity, const hunger = tuple;
+        hunger.turns_after_eating +|= 1;
+        // how often the entity should be damaged by hunger
+        const damage_every_turn: u8 = switch (hunger.level()) {
+            .well_fed => 0,
+            .hunger => 15,
+            .severe_hunger => 10,
+            .critical_starvation => 5,
+        };
+
+        if (damage_every_turn == 0 or hunger.turns_after_eating % damage_every_turn != 0) continue;
+
+        const health = registry.get(entity, c.Health) orelse
+            std.debug.panic("Entity {d} has Hunger, but doesn't have a Health component", .{entity.id});
+        _ = try self.session.damage.applyDamage(entity, entity, health, 1);
+    }
+    // Dim the using lights
+    if (registry.get(self.session.player, c.Equipment)) |equipment| {
+        if (equipment.light) |light_id| {
+            if (g.meta.isLamp(registry, light_id))
+                registry.getUnsafe(light_id, c.SourceOfLight).charge -|= 1;
+        }
+        if (equipment.weapon) |weapon_id| {
+            if (registry.get(weapon_id, c.SourceOfLight)) |sol| {
+                if (g.meta.isLamp(registry, weapon_id))
+                    sol.charge -|= 1;
+            }
+        }
+    }
+    // Apply damage from poison
+
+}
+
 /// Draws the whole screen.
 ///
 /// Returns `true` if the drawing is not completed, and the input should be ignored.
@@ -146,7 +262,7 @@ fn isDrawing(self: *Self) !bool {
         self.session.prng.random(),
         level,
         self.target,
-        self.session.spent_turns,
+        self.session.spent_cycles,
     );
     const now = self.session.runtime.currentMillis();
     const is_blocked_animation = try self.drawAnimationsFramesToBuffer(now);
@@ -269,7 +385,7 @@ fn handleInput(self: *Self) !bool {
             }
             switch (btn.game_button) {
                 .a => {
-                    self.action = self.quickAction();
+                    self.action_buffer = self.quickAction();
                     return true;
                 },
                 .up, .down => try window.draw(self.session.render),
@@ -279,7 +395,7 @@ fn handleInput(self: *Self) !bool {
             switch (btn.game_button) {
                 .a => switch (btn.state) {
                     .released => {
-                        self.action = self.quickAction();
+                        self.action_buffer = self.quickAction();
                         return true;
                     },
                     .hold => {
@@ -301,7 +417,7 @@ fn handleInput(self: *Self) !bool {
                     },
                 },
                 .left, .right, .up, .down => {
-                    self.action = .action(.move, .{ .target = .{ .direction = btn.toDirection().? } });
+                    self.action_buffer = .action(.move, .{ .target = .{ .direction = btn.toDirection().? } });
                     return true;
                 },
             }
@@ -373,65 +489,12 @@ fn handleInput(self: *Self) !bool {
                     try self.session.journal.markArmorAsKnown(entity);
                 }
             },
-            else => if (try cheat.toAction(self.session, &self.action)) {
+            else => if (try cheat.toAction(self.session, &self.action_buffer)) {
                 return true;
             },
         }
     }
     return false;
-}
-
-/// Trying to do an action. The action can be changed or ignored.
-/// For example, the `move` action can lead to a collision with an enemy or a wall. In the first case,
-/// the action will be changed to `hit`, and completely ignored (changed to `do_nothing`) in the second.
-///
-/// It returns result of handling the action. In successful case the actual count of spent move
-/// points is stored in the result.
-/// When an action requires more move points than initiative, `error.NotEnoughMovePoints` will be
-/// returned.
-pub fn doTurn(
-    self: *Self,
-    actor: g.Entity,
-    action: *g.actions.Action,
-    initiative: g.MovePoints,
-) !g.actions.ActionResult {
-    log.info("The turn of the entity {d}.", .{actor.id});
-    defer log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
-
-    const move_points_for_action = g.meta.movePointsForAction(&self.session.registry, actor, action.tag);
-    if (move_points_for_action > initiative)
-        return .not_enough_points;
-
-    // Do Actions
-    loop: while (true) {
-        const action_result = try self.session.actions.doAction(actor, action, move_points_for_action);
-        switch (action_result) {
-            .repeat_action_handler => continue :loop,
-            .done => |mp| {
-                log.info("Entity {d} spent {d} move points", .{ actor.id, mp });
-
-                // Handle Initiative
-                if (self.is_players_turn and mp > 0) {
-                    // Add initiative points to enemies
-                    var itr = self.session.registry.query(c.Initiative);
-                    while (itr.next()) |tuple| {
-                        tuple[1].move_points += mp;
-                    }
-                    try self.session.sendEvent(.{ .player_turn_completed = .{ .spent_move_points = mp } });
-                }
-            },
-            .actor_is_dead => {
-                log.info("Entity {d} is dead after action {t}", .{ actor.id, action.tag });
-            },
-            .not_enough_points => {
-                log.debug("Entity {d} has not enough move points for action {t}", .{ actor.id, action.tag });
-            },
-            .declined => {
-                log.debug("The action {t} was declined for the entity {d}", .{ action.tag, actor.id });
-            },
-        }
-        return action_result;
-    }
 }
 
 fn quickAction(self: *const Self) g.actions.Action {
