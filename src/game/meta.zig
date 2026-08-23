@@ -440,56 +440,6 @@ pub fn hitChance(actor_perception: i4, actor_weapon_mastery: i4, target_dexterit
     return 0.6 + 0.02 * per + 0.02 * skill - 0.03 * dex;
 }
 
-pub fn calculateDamage(
-    base_damage: u8,
-    weapon_class: c.Weapon.Class,
-    weapon_effects: std.enums.EnumSet(c.ElementalEffect),
-    actor_stats: c.Stats,
-    enemy_protection: u8,
-    protection_resistances: std.enums.EnumMap(c.ElementalEffect, c.Resistance),
-) u8 {
-    const str: f32 = @floatFromInt(actor_stats.get(.strength));
-    const stat: f32 = @floatFromInt(switch (weapon_class) {
-        .primitive => actor_stats.get(.strength),
-        .tricky => actor_stats.get(.dexterity),
-        .ancient => actor_stats.get(.intelligence),
-        .native => 0,
-    });
-    const poison_min: f32 = if (weapon_effects.contains(.poison))
-        switch (protection_resistances.get(.poison) orelse .normal) {
-            .weak => 0.3,
-            .normal => 0.2,
-            .resist => 0.0,
-        }
-    else
-        0.0;
-
-    const fire_multiplier: f32 = if (weapon_effects.contains(.fire))
-        switch (protection_resistances.get(.fire) orelse .normal) {
-            .weak => 1.25,
-            .normal => 1.1,
-            .resist => 1.0,
-        }
-    else
-        1.0;
-
-    const acid_factor: f32 = if (weapon_effects.contains(.acid))
-        switch (protection_resistances.get(.acid) orelse .normal) {
-            .weak => 0.6,
-            .normal => 0.85,
-            .resist => 1.0,
-        }
-    else
-        1.0;
-
-    const physical_damage: f32 = base_damage * (1 + 0.1 * stat + 0.05 * str);
-
-    return @intFromFloat(@max(
-        poison_min,
-        physical_damage * fire_multiplier - enemy_protection * acid_factor,
-    ));
-}
-
 test "improveItem should apply a new modification every time" {
     // given:
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);

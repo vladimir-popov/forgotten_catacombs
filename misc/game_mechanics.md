@@ -192,12 +192,16 @@ hit_chance_percent = 60 + 2 x ACTOR PER + 2 x ACTOR skill - 3 x TARGET DEX
 Damage:
 
 ```text
-physical_damage = base_damage x (1 +  + 0.05 × STR + 0.1 x stat)
+physical_damage = base_damage x (1 + 0.05 x STR + 0.1 x stat)
 
 damage = max(
-    poison_multiplier x base_damage,
+    poison_floor,
     physical_damage x fire_multiplier - enemy_armor x acid_factor
 )
+
+poison_floor = K x base_damage x poison_resistance_multiplier
+
+K = 0.2
 ```
 
 Where:
@@ -206,15 +210,15 @@ Where:
 base_damage = random weapon damage
 stat        = matching stat: STR, DEX, or INT
 enemy_armor = target armor
-poison_min  = minimum additional poison damage
+poison_floor = minimum damage dealt by a poisoned attack
 ```
 
 Effect multipliers:
 
-| Target relation | `fire_multiplier` | `acid_factor` | `poison_multiplier` |
+| Target relation | `fire_multiplier` | `acid_factor` | `poison_resistance_multiplier` |
 | --------------- | ----------------- | ------------- | ------------------- |
-| Weak            | `1.25`            | `0.60`        | `0.30`              |
-| Normal          | `1.10`            | `0.85`        | `0.20`              |
+| Weak            | `1.25`            | `0.60`        | `1.5`               |
+| Normal          | `1.10`            | `0.85`        | `1.0`               |
 | Resistant       | `1.00`            | `1.00`        | `0.0`               |
 
 

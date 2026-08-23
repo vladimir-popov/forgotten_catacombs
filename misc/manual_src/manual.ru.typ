@@ -553,7 +553,15 @@ Forgotten catacombs — пошаговая игра. Каждый ход игр�
 Формула для расчёта урона:
 
 #formula(
-    $"damage" = max("poison multiplier" times "base damage", "physical damage" times "fire multiplier" - "enemy's armor" times "acid factor")$,
+    $"damage" = max("poison floor", "physical damage" times "fire multiplier" - "enemy's armor" times "acid factor")$,
+)
+
+#formula(
+    $"poison floor" = K times "base damage" times "poison resistance multiplier"$,
+)
+
+#formula(
+    $K = 0.2$,
 )
 
 здесь:
@@ -567,7 +575,11 @@ Forgotten catacombs — пошаговая игра. Каждый ход игр�
 - $"enemy’s armor"$ — случайное число в диапазоне между минимальным и максимальным значением сопротивления урону у
     атакуемой цели;
 
-- $"poison multiplier"$ — значение ядовитого урона оружия;
+- $"poison floor"$ — минимальный урон, который наносит отравленное оружие;
+
+- $"poison resistance multiplier"$ — множитель сопротивления цели яду;
+
+- $K$ — базовый коэффициент минимального ядовитого урона, равный `0.2`;
 
 - $"fire multiplier"$ — коэффициент урона огнём от оружия;
 
@@ -579,13 +591,12 @@ Forgotten catacombs — пошаговая игра. Каждый ход игр�
     table(
         align: left,
         stroke: none,
-        columns: 3,
+        columns: 4,
         "Сопротивление эффекту у цели", "Множитель огненного эффекта", "Кислотный множитель",
-        "Множитель яда", "Weak", "1.25",
-        "0.60", "0.30", "Normal",
-        "1.10", "0.85", "0.20",
-        "Resistant", "1.00", "1.00",
-        "0.00",
+        "Множитель сопротивления яду",
+        "Weak", "1.25", "0.60", "1.5",
+        "Normal", "1.10", "0.85", "1.0",
+        "Resistant", "1.00", "1.00", "0.0",
     ),
 )
 
