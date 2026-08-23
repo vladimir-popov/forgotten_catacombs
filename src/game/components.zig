@@ -563,7 +563,7 @@ pub const Stats = struct {
 };
 
 pub const Poison = struct {
-    value: u8,
+    damage: u8,
 };
 
 pub const Trap = struct {

@@ -434,6 +434,33 @@ Breakage function:
 | Movement speed penalty | `2`                      | `7`    |
 | Attack speed penalty   | `2`                      | `7`    |
 
+## Poisoning
+
+Drinking a poison potion or oil applies the Poison effect to the actor.
+The effect deals damage once per cycle. Each subsequent damage value is half
+of the previous one, rounded down, and the effect ends when the value reaches
+zero:
+
+```text
+poison_damage(0) = initial_poison_damage
+poison_damage(n) = floor(poison_damage(n - 1) / 2)
+```
+
+Initial poison damage:
+
+| Source | Initial damage |
+| --- | --- |
+| Poison potion | `0.40 x max_HP` |
+| Oil | `0.10 x max_HP` |
+
+The previous one-shot damage values were `0.80 x max_HP` for a poison potion
+and `0.20 x max_HP` for oil. Since the halving sequence has a total close to
+twice its initial value, these starting values preserve the previous total
+damage while distributing it over several cycles.
+
+Applying Poison again sets the current poison damage to the greater of the
+current and new values.
+
 ## 12. Hunger
 
 Hunger levels:

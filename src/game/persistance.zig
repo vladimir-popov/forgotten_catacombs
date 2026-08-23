@@ -441,7 +441,7 @@ test "All components should be serializable" {
         .level_up = .{ .last_handled_level = 3 },
         .pile = pile,
         .price = .{ .value = 100 },
-        .poison = .{ .value = 42 },
+        .poison = .{ .damage = 42 },
         .position = c.Position{ .place = p.Point.point(12, 42), .zorder = .item },
         .potion = .oil,
         .regeneration = .regular,

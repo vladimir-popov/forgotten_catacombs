@@ -324,15 +324,15 @@ fn drinkPotion(self: *Self, actor: g.Entity, potion_id: g.Entity) !void {
         },
         .poison, .oil => {
             const health = self.session().registry.getUnsafe(actor, c.Health);
-            const k: f32 = if (potion == .poison) 0.8 else 0.2;
-            const value: u8 = @intFromFloat(k * g.utils.ff32(health.max));
+            const k: f32 = if (potion == .poison) 0.4 else 0.1;
+            const damage: u8 = @intFromFloat(k * g.utils.ff32(health.max));
             const poison = try self.session().registry.getOrSet(
                 actor,
                 c.Poison,
-                .{ .value = value },
+                .{ .damage = damage },
             );
-            if (poison.value < value)
-                poison.value = value;
+            if (poison.damage < damage)
+                poison.damage = damage;
         },
     }
 

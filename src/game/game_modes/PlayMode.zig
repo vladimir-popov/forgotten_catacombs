@@ -198,7 +198,7 @@ fn onCycleCompleted(self: *Self, actor: g.Entity) !void {
         _ = try self.session.damage.applyDamage(entity, entity, health, 1);
     }
     // Dim the using lights
-    if (registry.get(self.session.player, c.Equipment)) |equipment| {
+    if (registry.get(actor, c.Equipment)) |equipment| {
         if (equipment.light) |light_id| {
             if (g.meta.isLamp(registry, light_id))
                 registry.getUnsafe(light_id, c.SourceOfLight).charge -|= 1;
@@ -211,7 +211,16 @@ fn onCycleCompleted(self: *Self, actor: g.Entity) !void {
         }
     }
     // Apply damage from poison
-
+    if (registry.get(actor, c.Poison)) |poison| {
+        if (registry.get(actor, c.Health)) |health| {
+            if (try self.session.damage.applyDamage(actor, actor, health, poison.damage)) {
+                poison.damage /= 2;
+                if (poison.damage == 0) {
+                    try self.session.registry.remove(actor, c.Poison);
+                }
+            }
+        }
+    }
 }
 
 /// Draws the whole screen.
@@ -327,6 +336,8 @@ fn drawInfoBar(self: *const Self) !void {
     } else if (qa.tag == .pickup) {
         var buf: [32]u8 = undefined;
         try self.session.render.drawInfo(try g.Description.printActualName(&buf, self.session.journal, qa.payload.pickup));
+    } else if (self.session.registry.get(self.session.player, c.Poison)) |_| {
+        try self.session.render.drawInfo("Poisoned");
     } else if (self.session.registry.get(self.session.player, c.Hunger)) |hunger| {
         // Draw the hunger level
         switch (hunger.level()) {
