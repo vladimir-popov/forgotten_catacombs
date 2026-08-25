@@ -144,7 +144,7 @@ fn updateEntitiesOnScreen(self: *ExploreMode) !void {
             if (!gop.found_existing) {
                 gop.value_ptr.* = @splat(null);
             }
-            gop.value_ptr[zorder.index()] = entity;
+            gop.value_ptr[@intFromEnum(zorder)] = entity;
         }
     }
     log.debug("ExploreMode has been refreshed. Entities on screen:\n{any}", .{self.entities_on_screen});

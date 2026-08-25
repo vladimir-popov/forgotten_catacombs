@@ -32,7 +32,7 @@ pub fn heal(
 /// Applies precalculated damage. Adds a blocked animation if needed, and invokes `onEntityDied`
 /// if the target health becomes 0.
 ///
-/// `true` means that the target is dead
+/// `false` means that the target is dead
 pub fn applyDamage(
     self: *Self,
     actor: g.Entity,
@@ -50,7 +50,7 @@ pub fn applyDamage(
         // a special case to give to the player a chance to notice what happened
         const is_blocked_animation = actor.eql(self.session().player) or target.eql(self.session().player);
         try self.session().registry.set(target, c.Animation{ .preset = .hit, .is_blocked = is_blocked_animation });
-        return false;
+        return true;
     } else {
         // handle the death
 
@@ -75,22 +75,19 @@ pub fn applyDamage(
         }
 
         try self.session().removeDeadEntity(target);
-        return true;
+        return false;
     }
 }
 
-pub fn tryToHit(
-    self: *Self,
-    actor: g.Entity,
-    target: g.Entity,
-) !bool {
+/// Returns `false` if the target is dead.
+pub fn tryToHit(self: *Self, actor: g.Entity, target: g.Entity) !bool {
     const registry = &self.session().registry;
     const rand = self.session().prng.random();
 
     // Validate the weapon
     const weapon_id, const weapon = g.meta.getWeapon(registry, actor);
     if (!try self.isValidWeapon(actor, weapon)) {
-        return false;
+        return true;
     }
     const weapon_damage = rand.intRangeAtMost(u8, weapon.damage.min, weapon.damage.max);
 
@@ -135,18 +132,18 @@ pub fn tryToHit(
     // and the pointer becomes invalid:
     const enemy_experience: c.Experience = self.session().registry.getUnsafe(target, c.Experience).*;
 
-    const is_target_dead =
+    const is_target_alive =
         try self.applyDamage(actor, target, target_health, damage);
 
     // Give an experience to player
-    if (is_target_dead and actor.eql(self.session().player)) {
+    if (!is_target_alive and actor.eql(self.session().player)) {
         try self.session().showPopUpNotification(.{ .exp = enemy_experience.asReward() });
         if (try g.meta.addExperience(registry, self.session().player, enemy_experience.asReward())) {
             try self.session().showPopUpNotification(.level_up);
         }
     }
 
-    if (is_target_dead) return true;
+    if (!is_target_alive) return false;
 
     // Show pop-up notifications about hit/damage
     if (actor.eql(self.session().player))
@@ -157,7 +154,7 @@ pub fn tryToHit(
         try self.session().showPopUpNotification(
             .{ .damage = .{ .actor = actor, .damage = target_health_before - target_health.current_hp } },
         );
-    return true;
+    return is_target_alive;
 }
 
 /// Checks where the weapon is melee or has appropriate ammo

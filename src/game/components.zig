@@ -19,10 +19,6 @@ pub const Position = struct {
         item,
         /// player, enemies, npc, closed doors...
         obstacle,
-
-        pub inline fn index(self: ZOrder) u4 {
-            return @intFromEnum(self);
-        }
     };
 
     place: p.Point,
@@ -455,6 +451,9 @@ pub const LevelUp = struct {
 
 pub const Initiative = struct {
     move_points: g.MovePoints,
+    /// How many move points the player or an enemy spent within the last turn.
+    /// We need it to count completed cycles.
+    spent_move_points: g.MovePoints = 0,
 
     pub const empty: Initiative = .{ .move_points = 0 };
 };

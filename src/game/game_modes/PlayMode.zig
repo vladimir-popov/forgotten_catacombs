@@ -5,6 +5,8 @@ const c = g.components;
 const p = g.primitives;
 const w = g.windows;
 
+const ActionResult = g.systems.ActionSystem.ActionResult;
+
 const log = std.log.scoped(.play_mode);
 
 /// How long a notification should be shown by default
@@ -20,11 +22,8 @@ is_players_turn: bool = true,
 quick_actions_window: ?w.Window = null,
 /// If defined, then all input should be ignored.
 notification_to_show: ?NotificationMessage = null,
-/// How many move points the player spent within the last turn.
-/// We need it to count completed cycles.
-spent_move_points: g.MovePoints = 0,
 
-// This is a buffer for an action. It should help to avoid putting action on stack
+// This is a buffer for an action. It should help to avoid putting action on the stack
 action_buffer: g.Action = undefined,
 
 pub fn init(
@@ -62,32 +61,29 @@ pub fn tick(self: *Self) !void {
     }
 
     if (self.is_players_turn) {
-        self.is_players_turn = try self.playerTurn();
-        // update quick action only if the player completed its turn
-        if (!self.is_players_turn)
+        if (try self.handleInput()) {
+            try self.playerTurn();
             try self.updateQuickActions();
+            self.is_players_turn = false;
+        }
     } else {
         try self.enemiesTurn();
-        self.is_players_turn = true;
         // always update quick actions after enemies
         try self.updateQuickActions();
+        self.is_players_turn = true;
     }
 }
 
-/// Returns `false` when the player's turn is over (input led to an action, and that action is
-/// handled).
-fn playerTurn(self: *Self) !bool {
-    // break this function if no input
-    if (!try self.handleInput()) {
-        return true;
-    }
-    const action_result = try self.doTurn(self.session.player, &self.action_buffer, std.math.maxInt(g.MovePoints));
-    switch (action_result) {
+/// Can be invoked from the `tick` or as continue of the playing after switching the game mode.
+pub fn playerTurn(self: *Self) !void {
+    const initiative = self.session.registry.getUnsafe(self.session.player, c.Initiative);
+    const action = &self.action_buffer;
+    switch (try self.doTurn(self.session.player, action, initiative)) {
         .done => |spent_move_points| {
             // Force change the target
-            switch (self.action_buffer.tag) {
+            switch (action.tag) {
                 .hit => {
-                    const enemy = self.action_buffer.payload.hit;
+                    const enemy = action.payload.hit;
                     if (self.session.registry.contains(enemy)) {
                         self.setTarget(enemy);
                     } else {
@@ -102,111 +98,83 @@ fn playerTurn(self: *Self) !bool {
             }
             // Handle Initiative
             if (spent_move_points > 0) {
-                // Add initiative points to enemies
+                // Add initiative points to enemies and return them back to the player
                 var itr = self.session.registry.query(c.Initiative);
                 while (itr.next()) |tuple| {
                     tuple[1].move_points += spent_move_points;
                 }
             }
-            //
-            self.spent_move_points += spent_move_points;
-            const cycles = self.spent_move_points / g.MOVE_POINTS_IN_TURN;
-            self.spent_move_points = self.spent_move_points % g.MOVE_POINTS_IN_TURN;
-            for (0..cycles) |_| {
-                try self.onCycleCompleted();
-            }
-            return false;
         },
-        else => {},
+        // The death of the player will handled on event
+        .actor_is_dead => {},
     }
-    return true;
 }
 
 fn enemiesTurn(self: *Self) !void {
-    var itr = self.session.registry.query(c.Initiative);
+    var itr = self.session.registry.query2(c.Initiative, c.Speed);
     while (itr.next()) |tuple| {
-        const npc, const initiative = tuple;
-        // repeat doing something until move points are over
-        loop: while (true) {
-            // TODO: compare initiative with minimal required mp to prevent calculating an action
-            var action = self.session.ai.action(npc);
-            const action_result = try self.doTurn(npc, &action, initiative.move_points);
-            switch (action_result) {
-                .repeat_action_handler => continue :loop,
-                .done => |mp| {
-                    g.utils.assert(
-                        mp <= initiative.move_points,
-                        "Entity {d} spent more MP {d} than initiative has {any}.",
-                        .{ npc.id, mp, initiative },
-                    );
-                    initiative.move_points -= mp;
-                },
-                .not_enough_points, .actor_is_dead => break :loop,
-                .declined => {},
-            }
-        }
+        const npc, const initiative, const speed = tuple;
+        if (npc.eql(self.session.player))
+            continue;
+
+        // not enough mp for any action yet
+        if (initiative.move_points < speed.moving_speed and initiative.move_points < speed.atack_speed)
+            continue;
+
+        var action = self.session.ai.action(npc);
+        _ = try self.doTurn(npc, &action, initiative);
     }
 }
 
-/// Trying to do an action. The action can be changed or ignored.
-/// For example, the `move` action can lead to a collision with an enemy or a wall. In the first case,
-/// the action will be changed to `hit`, and completely ignored (changed to `do_nothing`) in the second.
-///
-/// It returns a result of handling the action. In a successful case the actual count of spent move
-/// points is stored in the result.
-pub fn doTurn(
+/// Trying to do an action.
+/// Returns spent move points.
+fn doTurn(
     self: *Self,
     actor: g.Entity,
-    action: *g.actions.Action,
-    initiative: g.MovePoints,
-) !g.actions.ActionResult {
+    action: *const g.actions.Action,
+    initiative: *c.Initiative,
+) !ActionResult {
     log.info("The turn of the entity {d}.", .{actor.id});
     defer log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
 
-    const move_points_for_action = g.meta.movePointsForAction(&self.session.registry, actor, action.tag);
-    if (move_points_for_action > initiative)
-        return .not_enough_points;
+    const speed = self.session.registry.getUnsafe(actor, c.Speed).*;
 
-    // Do Actions
-    loop: while (true) {
-        const action_result = try self.session.actions.doAction(actor, action, move_points_for_action);
-        switch (action_result) {
-            .repeat_action_handler => continue :loop,
-            .done => |mp| {
-                log.info("Entity {d} spent {d} move points", .{ actor.id, mp });
-            },
-            .actor_is_dead => {
-                log.info("Entity {d} is dead after action {t}", .{ actor.id, action.tag });
-            },
-            .not_enough_points => {
-                log.debug("Entity {d} has not enough move points for action {t}", .{ actor.id, action.tag });
-            },
-            .declined => {
-                log.debug("The action {t} was declined for the entity {d}", .{ action.tag, actor.id });
-            },
-        }
-        return action_result;
+    switch (try self.session.actions.doAction(actor, action, speed)) {
+        .done => |spent_move_points| {
+            log.info("Entity {d} spent {d} move points", .{ actor.id, spent_move_points });
+            initiative.move_points -= spent_move_points;
+            initiative.spent_move_points += spent_move_points;
+            const cycles = initiative.spent_move_points / g.MOVE_POINTS_IN_TURN;
+            initiative.spent_move_points = initiative.spent_move_points % g.MOVE_POINTS_IN_TURN;
+            for (0..cycles) |_| {
+                try self.onCycleCompleted(actor);
+            }
+            return .{ .done = spent_move_points };
+        },
+        .actor_is_dead => {
+            return .actor_is_dead;
+        },
     }
 }
 
-fn onCycleCompleted(self: *Self) !void {
+fn onCycleCompleted(self: *Self, actor: g.Entity) !void {
     const registry = &self.session.registry;
 
-    // Increase the global counter:
-    self.session.spent_cycles += 1;
+    if (actor.eql(self.session.player)) {
+        // Increase the global counter:
+        self.session.spent_cycles += 1;
 
-    // Update journal
-    try self.session.journal.increaseUsageCounters();
+        // Update journal
+        try self.session.journal.increaseUsageCounters();
+    }
 
     // Regenerate health
-    var regen_itr = registry.query(c.Regeneration);
-    while (regen_itr.next()) |tuple| {
-        const entity, const regeneration = tuple;
+    if (registry.get(actor, c.Regeneration)) |regeneration| {
         regeneration.accumulated_turns += 1;
         if (regeneration.accumulated_turns > regeneration.turns_to_increase) {
             regeneration.accumulated_turns = 0;
-            const health = registry.get(entity, c.Health) orelse
-                std.debug.panic("Entity {d} has Regeneration, but doesn't have a Health component", .{entity.id});
+            const health = registry.get(actor, c.Health) orelse
+                std.debug.panic("Entity {d} has Regeneration, but doesn't have a Health component", .{actor.id});
             health.add(1);
         }
     }
@@ -373,7 +341,7 @@ fn drawInfoBar(self: *const Self) !void {
     }
 }
 
-/// Returns `true` when an input leads to an action
+/// Returns `true` if the input leads to an action
 fn handleInput(self: *Self) !bool {
     // NOTE: the quick_actions_window can be drawn during this method
     if (try self.session.runtime.readPushedButtons()) |btn| {
@@ -417,8 +385,15 @@ fn handleInput(self: *Self) !bool {
                     },
                 },
                 .left, .right, .up, .down => {
-                    self.action_buffer = .action(.move, .{ .target = .{ .direction = btn.toDirection().? } });
-                    return true;
+                    if (self.session.actions.actualActionOnMoving(
+                        self.session.registry.getUnsafe(self.session.player, c.Position).place,
+                        .{ .direction = btn.toDirection().? },
+                    )) |action| {
+                        self.action_buffer = action;
+                        return true;
+                    } else {
+                        return false;
+                    }
                 },
             }
         }

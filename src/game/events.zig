@@ -48,5 +48,13 @@ pub const ModeChanged = union(enum) {
     to_inventory,
     to_trading: g.Entity,
     to_modify_recognize,
-    to_play: struct { entity_in_focus: ?g.Entity, action: ?g.actions.Action },
+    to_play: struct {
+        /// An entity that should be targeted in focus; This is either the previous
+        /// target or a new target from the `Explore` mode.
+        entity_in_focus: ?g.Entity,
+
+        /// An action to perform; Usually an action initiated during managing the inventory
+        /// (eating or drinking as an example).
+        action: ?g.actions.Action,
+    },
 };

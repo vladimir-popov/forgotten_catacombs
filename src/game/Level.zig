@@ -451,7 +451,7 @@ pub fn isObstacle(self: *const Self, place: p.Point) bool {
             .floor, .doorway => {},
             else => return true,
         },
-        .entities => |entities| if (entities[c.Position.ZOrder.obstacle.index()]) |entity|
+        .entities => |entities| if (entities[@intFromEnum(c.Position.ZOrder.obstacle)]) |entity|
             // an entity with health points is overcoming obstacle
             return self.registry.get(entity, c.Health) == null
         else
@@ -500,9 +500,9 @@ pub fn cellAt(self: *const Self, place: p.Point) Cell {
 pub fn tryToPutItem(self: *Self, item: g.Entity, place: p.Point) !bool {
     switch (self.cellAt(place)) {
         .landscape => |landscape| if (landscape == .doorway) return false,
-        .entities => |entities| if (entities[c.Position.ZOrder.item.index()]) |_|
+        .entities => |entities| if (entities[@intFromEnum(c.Position.ZOrder.item)] != null)
             return false
-        else if (entities[c.Position.ZOrder.obstacle.index()]) |_|
+        else if (entities[@intFromEnum(c.Position.ZOrder.obstacle)] != null)
             return false,
     }
     try self.registry.set(item, c.Position{ .place = place, .zorder = .item });

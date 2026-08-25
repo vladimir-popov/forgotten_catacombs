@@ -61,11 +61,11 @@ colors: [std.enums.values(g.Color).len]g.Color,
 ///
 ai: g.AI,
 ///
-actions: g.systems.ActionSystem,
+actions: g.systems.ActionSystem = .{},
 ///
-combinations: g.systems.CombinationSystem,
+combinations: g.systems.CombinationSystem = .{},
 ///
-damage: g.systems.DamageSystem,
+damage: g.systems.DamageSystem = .{},
 /// The entity id of the player.
 /// This id should never changes during the game session.
 player: g.Entity,
@@ -108,9 +108,6 @@ pub fn preInit(
         .render = render,
         .viewport = g.Viewport.init(render.scene_buffer.region().rows, render.scene_buffer.region().cols),
         .registry = try g.Registry.init(game_session_arena),
-        .actions = .{},
-        .combinations = .{},
-        .damage = .{},
         .events = .empty,
         .seed = 0,
         .max_depth = 0,
@@ -311,14 +308,16 @@ pub inline fn sendEvent(self: *Self, event: g.events.Event) !void {
 
 /// Handles events on the end of the `tick`
 noinline fn handleEvent(self: *Self, event_idx: usize) !void {
-    var event = self.events.items[event_idx];
-    switch (event) {
+    switch (self.events.items[event_idx]) {
         .mode_changed => |new_mode| switch (new_mode) {
             .to_play => |args| {
-                try self.switchModeToPlay(args.entity_in_focus);
-                if (args.action != null) {
-                    const action = &(event.mode_changed.to_play.action.?);
-                    _ = try self.mode.play.doTurn(self.player, action, std.math.maxInt(g.MovePoints));
+                try self.render.redrawFromSceneBuffer();
+                _ = self.mode_arena.reset(.retain_capacity);
+                self.mode = .{ .play = try self.mode_arena.allocator().create(PlayMode) };
+                try self.mode.play.init(self, args.entity_in_focus);
+                if (args.action) |action| {
+                    self.mode.play.action_buffer = action;
+                    try self.mode.play.playerTurn();
                 }
             },
             .to_explore => {

@@ -8,20 +8,6 @@ const log = std.log.scoped(.actions);
 
 pub const MovePoints = u8;
 
-pub const ActionResult = union(enum) {
-    /// If the original action leads to another (moving to hit as example),
-    /// the new updated action should be handled again
-    repeat_action_handler,
-    /// Action successfully happened and move points were spent
-    done: g.MovePoints,
-    /// As example, because of moving to the wall
-    declined,
-    /// Means that action requires more move points than limit
-    not_enough_points,
-    /// An action lead to the death of the actor
-    actor_is_dead,
-};
-
 /// The intension to perform an action.
 /// Describes what some entity is going to do.
 pub const Action = struct {
@@ -35,19 +21,27 @@ pub const Action = struct {
                 /// A place in the dungeon (1-based)
                 new_place: p.Point,
                 direction: p.Direction,
+
+                pub fn asPlace(self: Target, from_position: p.Point) p.Point {
+                    return switch (self) {
+                        .direction => |direction| from_position.movedTo(direction),
+                        .new_place => |place| place,
+                    };
+                }
             };
             target: Target,
         };
-        /// Do nothing, as example, when trying to move to the wall
-        do_nothing: void,
+
+        pub const Door = struct { id: g.Entity, place: p.Point };
+
         /// Skip the round
         wait: void,
         /// An entity is going to move in the direction
         move: Move,
         /// An entity is going to open a door
-        open: struct { id: g.Entity, place: p.Point },
+        open: Door,
         /// An entity is going to close a door
-        close: struct { id: g.Entity, place: p.Point },
+        close: Door,
         /// An entity to hit
         hit: g.Entity,
         /// The id of an item that someone is going to take from the floor
@@ -111,7 +105,6 @@ pub const Action = struct {
 
     pub fn priority(self: Action) u8 {
         return switch (self.tag) {
-            .do_nothing => 0,
             .hit => 10,
             .move_to_level => 9,
             .disarm_trap => 8,
@@ -138,7 +131,7 @@ pub const Action = struct {
             .wait => "Wait",
             .modify_recognize => "Mod/Rec",
             .disarm_trap => "Disarm",
-            .get_angry, .chill, .go_sleep, .do_nothing, .move, .step_in_trap => "???",
+            .get_angry, .chill, .go_sleep, .move, .step_in_trap => "???",
         };
     }
 };
