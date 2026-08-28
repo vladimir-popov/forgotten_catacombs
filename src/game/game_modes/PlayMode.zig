@@ -170,9 +170,9 @@ fn onCycleCompleted(self: *Self, actor: g.Entity) !void {
 
     // Regenerate health
     if (registry.get(actor, c.Regeneration)) |regeneration| {
-        regeneration.accumulated_turns += 1;
-        if (regeneration.accumulated_turns > regeneration.turns_to_increase) {
-            regeneration.accumulated_turns = 0;
+        regeneration.accumulated_cycles += 1;
+        if (regeneration.accumulated_cycles >= regeneration.turns_to_increase) {
+            regeneration.accumulated_cycles = 0;
             const health = registry.get(actor, c.Health) orelse
                 std.debug.panic("Entity {d} has Regeneration, but doesn't have a Health component", .{actor.id});
             health.add(1);
@@ -212,12 +212,12 @@ fn onCycleCompleted(self: *Self, actor: g.Entity) !void {
     }
     // Apply damage from poison
     if (registry.get(actor, c.Poison)) |poison| {
-        if (registry.get(actor, c.Health)) |health| {
-            if (try self.session.damage.applyDamage(actor, actor, health, poison.damage)) {
-                poison.damage /= 2;
-                if (poison.damage == 0) {
-                    try self.session.registry.remove(actor, c.Poison);
-                }
+        const health = registry.get(actor, c.Health) orelse
+            std.debug.panic("Entity {d} has Poison, but doesn't have a Health component", .{actor.id});
+        if (try self.session.damage.applyDamage(actor, actor, health, poison.damage)) {
+            poison.damage /= 2;
+            if (poison.damage == 0) {
+                try self.session.registry.remove(actor, c.Poison);
             }
         }
     }

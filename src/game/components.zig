@@ -119,7 +119,7 @@ pub const Regeneration = struct {
     pub const regular: Regeneration = .{ .turns_to_increase = 20 };
 
     turns_to_increase: u8,
-    accumulated_turns: u8 = 0,
+    accumulated_cycles: u8 = 0,
 };
 
 pub const Speed = struct {
