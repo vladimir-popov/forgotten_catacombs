@@ -128,7 +128,9 @@ pub fn calculateQuickActionForTarget(
     // An action for an entity under the foot
     if (player_place.eql(target_position.place)) {
         if (g.meta.isItem(registry, target_entity)) {
-            return .action(.pickup, target_entity);
+            const inventory = self.session().registry.getUnsafe(self.session().player, c.Inventory);
+            if (!inventory.isFull())
+                return .action(.pickup, target_entity);
         }
         if (registry.get(target_entity, c.Ladder)) |ladder| {
             // It's impossible to go upper the first level
@@ -375,7 +377,6 @@ fn closeDoor(self: *Self, door: g.Action.Payload.Door) !void {
 }
 
 fn pickup(self: *Self, actor: g.Entity, item: g.Entity) !void {
-    const inventory = self.session().registry.getUnsafe(actor, c.Inventory);
     if (self.session().registry.get(item, c.Pile)) |_| {
         try self.session().manageInventory();
     } else if (self.session().registry.get(item, c.Wallet)) |gold_pile| {
@@ -384,6 +385,7 @@ fn pickup(self: *Self, actor: g.Entity, item: g.Entity) !void {
         try self.session().registry.removeEntity(item);
         try self.session().level.removeEntity(item);
     } else {
+        const inventory = self.session().registry.getUnsafe(actor, c.Inventory);
         try inventory.items.add(item);
         try self.session().registry.remove(item, c.Position);
         try self.session().level.removeEntity(item);

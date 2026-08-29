@@ -219,7 +219,7 @@ test "Pickup a single item from a pile" {
     , .{ .region = .init(1, 1, 3, 40) });
 }
 
-test "Pickup all items from a pile" {
+test "Pickuping all items from a pile should lead to removing the 'Drop' tab" {
     var test_session: TestSession = undefined;
     try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
@@ -240,6 +240,48 @@ test "Pickup all items from a pile" {
         \\║              Inventory               ║
         \\║                                      ║
     , .{ .region = .init(1, 1, 3, 40) });
+}
+
+test "Pickuping extra items should be imposible" {
+    var test_session: TestSession = undefined;
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
+    defer test_session.deinit();
+
+    // Drop something from the inventory:
+    var inventory = try test_session.openInventory();
+    var modal_window = try inventory.chooseItemByIndex(0);
+    try (try modal_window.asOptions()).choose("Drop");
+
+    // Fill the inventory
+    const inventory_component = test_session.session.registry.getUnsafe(test_session.player.id, c.Inventory);
+    while (!inventory_component.isFull()) {
+        const item_id = try test_session.session.registry.addNewEntity(g.entities.presets.Items.get(.torch));
+        try inventory_component.items.add(item_id);
+    }
+    const inventory_size_before = inventory_component.items.size();
+
+    // Switch to the 'Drop' tab
+    try test_session.pressButton(.right);
+
+    // Try to pickup something
+    try std.testing.expect(!inventory.isDropEmpty());
+    modal_window = try inventory.chooseItemByIndex(0);
+    try (try modal_window.asOptions()).choose("Take");
+
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════╔═══════════════════╗
+        \\║     Inventory    ║       Drop        ║
+        \\║══════════════════╝                   ║
+        \\║┌────────────────────────────────────┐║
+        \\║│        Your inventory is full!     │║
+        \\║└────────────────────────────────────┘║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+    try std.testing.expect(!inventory.isDropEmpty());
+    try std.testing.expectEqual(inventory_size_before, inventory_component.items.size());
 }
 
 test "Pickup a gold pile" {

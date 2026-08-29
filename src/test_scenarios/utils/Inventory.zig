@@ -23,6 +23,10 @@ pub fn isInvetoryEmpty(self: Self) bool {
     return self.test_session.session.mode.inventory.inventory.items.size() == 0;
 }
 
+pub fn isInvetoryFull(self: Self) bool {
+    return self.test_session.session.mode.inventory.inventory.isFull();
+}
+
 pub fn isDropEmpty(self: Self) bool {
     return self.test_session.session.mode.inventory.drop == null;
 }

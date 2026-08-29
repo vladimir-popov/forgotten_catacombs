@@ -18,6 +18,7 @@ pub fn topWindow(self: Self) ?*w.Window {
     return &self.windows.items[self.windows.items.len - 1];
 }
 
+/// Creates an new window on heap, initialize it and adds to the `windows`.
 pub fn createOnTop(self: *Self, alloc: std.mem.Allocator, max_region: p.Region) !*w.Window {
     const window = try self.windows.addOne(alloc);
     window.* = .init(alloc, max_region);

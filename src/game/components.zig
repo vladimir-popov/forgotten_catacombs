@@ -144,10 +144,16 @@ pub const Pile = struct {
 };
 
 pub const Inventory = struct {
+    pub const MAX_SIZE = 30;
+
     items: u.EntitiesSet,
 
     pub fn empty(alloc: std.mem.Allocator) !Inventory {
         return .{ .items = try u.EntitiesSet.init(alloc) };
+    }
+
+    pub fn isFull(self: Inventory) bool {
+        return self.items.size() >= MAX_SIZE;
     }
 
     pub fn deinit(self: *Inventory) void {

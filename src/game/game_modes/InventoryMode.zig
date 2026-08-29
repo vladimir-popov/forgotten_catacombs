@@ -430,6 +430,12 @@ fn takeSelectedItem(ptr: *anyopaque, _: usize, selected_item: g.Entity) !w.Handl
         wallet.money += gold_pile.money;
         try self.session.registry.removeEntity(selected_item);
     } else {
+        if (self.inventory.isFull()) {
+            const alloc = self.session.mode_arena.allocator();
+            const window = try self.modal_windows.windows.addOne(alloc);
+            window.* = try w.notification(alloc, "Your inventory is full!", .{ .max_region = MODAL_WINDOW_REGION });
+            return .keep_open;
+        }
         try self.inventory.items.add(selected_item);
     }
     if (self.session.registry.get(dropped_entity, c.Pile)) |pile| {
