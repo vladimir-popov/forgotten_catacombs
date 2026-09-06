@@ -8,7 +8,7 @@ const log = std.log.scoped(.description);
 /// A short name of the entity.
 name: []const u8,
 
-// A line should have no more 36 symbols
+// A line should have no more than 35 symbols
 
 /// A short description of the entity.
 description: []const []const u8 = &.{},

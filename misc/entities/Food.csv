@@ -1,4 +1,4 @@
-RND Weight;Название;Food;Calories;Price;Описание;Description
+RND Weight;Название;Name;Calories;Price;Описание;Description
 100;Яблоко;Apple;80;18;Спелое аппетитное яблоко ненадолго перебьет аппетит.;A ripe, delicious apple will curb your appetite for a short time.
 90;Сушёные фрукты;Dried Fruits;90;20;Липкие сушёные фрукты с насыщенным вкусом.;Sticky dried fruits packed with flavor.
 80;Сыр;Cheese;120;24;Плотный кусок выдержанного сыра.;A dense piece of aged cheese.

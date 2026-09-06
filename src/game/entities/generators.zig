@@ -211,7 +211,21 @@ fn generateWeapon(registry: *g.Registry, rand: std.Random, depth: u8) !g.Entity 
 const food_proportions: [g.entities.presets.Food.count]u8 = blk: {
     const weights: std.enums.EnumMap(g.entities.presets.Food.Tag, u8) = .init(.{
         .apple = 100,
+        .dried_fruits = 90,
+        .cheese = 80,
+        .stale_bread = 80,
+        .rat_skewer = 70,
+        .jerky = 60,
+        .sandwich = 55,
+        .stew = 50,
+        .cooked_meat = 45,
+        .tins = 25,
         .traveler_ration = 24,
+        .salted_meat_pack = 20,
+        .miners_rations = 18,
+        .ancient_preserved_supplies = 10,
+        .insect_paste = 8,
+        .armadillo_roast = 6,
     });
     var proportions: [g.entities.presets.Food.count]u8 = undefined;
     for (std.enums.values(g.entities.presets.Food.Tag), 0..) |food, i| {

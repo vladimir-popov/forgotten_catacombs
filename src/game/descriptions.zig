@@ -253,18 +253,123 @@ pub const Food = struct {
     apple: g.Description = .{
         .name = "Apple",
         .description = &.{
-            "A  simple  apple.  Briefly  eases",
-            "hunger,   but    offers    little",
-            "sustenance.",
+            "A  ripe,  delicious apple will curb",
+            "your appetite for a short time.",
         },
     },
-    traveler_ration: g.Description = .{
-        .name = "Traveler ration",
+
+    dried_fruits: g.Description = .{
+        .name = "Dried Fruits",
         .description = &.{
-            "A compact bundle of preserved food.",
-            "Bland and meager, yet  designed to",
-            "provide  steady nourishment over a",
-            "long period.",
+            "Sticky  dried  fruits  packed  with",
+            "flavor.",
+        },
+    },
+
+    cheese: g.Description = .{
+        .name = "Cheese",
+        .description = &.{
+            "A dense piece of aged cheese.",
+        },
+    },
+
+    stale_bread: g.Description = .{
+        .name = "Stale Bread",
+        .description = &.{
+            "Hard bread that is still edible.",
+        },
+    },
+
+    rat_skewer: g.Description = .{
+        .name = "Rat Skewer",
+        .description = &.{
+            "Roasted   rat   meat  on  a  wooden",
+            "skewer.",
+        },
+    },
+
+    jerky: g.Description = .{
+        .name = "Jerky",
+        .description = &.{
+            "Tough strips of salted meat.",
+        },
+    },
+
+    sandwich: g.Description = .{
+        .name = "Sandwich",
+        .description = &.{
+            "Bread  stuffed  with  a  simple but",
+            "filling meal.",
+        },
+    },
+
+    stew: g.Description = .{
+        .name = "Stew",
+        .description = &.{
+            "A warm stew of meat and vegetables.",
+        },
+    },
+
+    cooked_meat: g.Description = .{
+        .name = "Cooked Meat",
+        .description = &.{
+            "A hearty portion of roasted meat.",
+        },
+    },
+
+    tins: g.Description = .{
+        .name = "Tins",
+        .description = &.{
+            "Sealed  cans  filled  with prepared",
+            "food.",
+        },
+    },
+
+    traveler_ration: g.Description = .{
+        .name = "Traveler Ration",
+        .description = &.{
+            "Reliable  food  prepared  for  long",
+            "journeys.",
+        },
+    },
+
+    salted_meat_pack: g.Description = .{
+        .name = "Salted Meat Pack",
+        .description = &.{
+            "Salted  meat  with  a strong flavor",
+            "and dense texture.",
+        },
+    },
+
+    miners_rations: g.Description = .{
+        .name = "Miner’s Rations",
+        .description = &.{
+            "Filling rations made for exhausting",
+            "labor.",
+        },
+    },
+
+    ancient_preserved_supplies: g.Description = .{
+        .name = "Ancient Preserved Supplies",
+        .description = &.{
+            "Ancient        supplies        from",
+            "long-forgotten times.",
+        },
+    },
+
+    insect_paste: g.Description = .{
+        .name = "Insect Paste",
+        .description = &.{
+            "A  thick  paste  made  from crushed",
+            "insects.",
+        },
+    },
+
+    armadillo_roast: g.Description = .{
+        .name = "Armadillo Roast",
+        .description = &.{
+            "Fatty  roasted meat beneath a thick",
+            "shell.",
         },
     },
 };

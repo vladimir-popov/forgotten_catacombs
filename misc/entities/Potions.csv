@@ -1,4 +1,4 @@
-RND Weight;Имя;Potion;Price (known);Price (unknown);Действие;Описание;Description
+RND Weight;Имя;Name;Price (known);Price (unknown);Действие;Описание;Description
 50;Здоровье;Health;68;58;Поправляет здоровье на 30-60%;После нескольких глотков боль постепенно начинает отступать.;Pain slowly begins to fade after a few swallows.
 30;Масло;Oil;14;58;Заправляет масляную лампу или накладывает отравление с начальным уроном 10% от max HP;Густая скользкая жидкость, которой обычно заправляют масляные лампы.;A thick slippery liquid commonly used to refill oil lamps.
 10;Яд;Poison;32;58;Накладывает отравление с начальным уроном 40% от max HP;Достаточно одного глотка, чтобы тело начало стремительно слабеть.;A single swallow is enough to make the body rapidly give in to weakness.

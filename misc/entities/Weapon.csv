@@ -1,4 +1,4 @@
-Weapon;Перевод;Stat;Damage;Eff;Price;Описание;Description
+Name;Перевод;Stat;Damage;Eff;Price;Описание;Description
 Pickaxe;Кирка;STR;3–5;—;18;Тяжёлая кирка со сколотым остриём. Металл покрыт следами ударов, рукоять сглажена временем.;"""Heavy pickaxe with chipped tip "",""steel marked by repeated strikes"",""handle worn smooth over time "","
 Torch;Факел;STR;2–3;Fire;14;Факел с пропитанной тканью и коптящим пламенем. Уголь осыпается, оставляя запах гари.;"""Cloth wrapped torch burning low "",""embers fall and ash drifts "",""flame clings and licks all "","
 Rusty Sword;Ржавый меч;STR;4–6;—;32;Ржавый клинок с зазубринами. Лезвие цепляет и рвёт, оставляя неровные раны.;"""Rust eaten blade with jagged edge"",""steel catches and tears deep"",""wounds left rough and uneven "","
