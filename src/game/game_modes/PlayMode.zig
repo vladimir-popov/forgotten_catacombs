@@ -43,6 +43,8 @@ pub fn init(
         .{ .row = self.session.viewport.region.rows + 1, .col = 1 },
         self.session.viewport.region.cols,
     );
+    try session.render.redrawFromSceneBuffer();
+    std.debug.assert(!try self.draw());
 }
 
 fn setTarget(self: *Self, target: ?g.Entity) void {
@@ -53,7 +55,7 @@ fn setTarget(self: *Self, target: ?g.Entity) void {
 
 pub fn tick(self: *Self) !void {
     // TODO draw only after changes and return 1, else 0.
-    if (try self.isDrawing()) {
+    if (try self.draw()) {
         try self.session.runtime.cleanInputBuffer();
         // skip getting an input from the player, or AI actions to show blocking animations
         // and pop-up notifications
@@ -226,7 +228,7 @@ fn onCycleCompleted(self: *Self, actor: g.Entity) !void {
 /// Draws the whole screen.
 ///
 /// Returns `true` if the drawing is not completed, and the input should be ignored.
-fn isDrawing(self: *Self) !bool {
+fn draw(self: *Self) !bool {
     // the quick_actions_window is drawn during handleInput
     if (self.quick_actions_window != null) return false;
 
@@ -247,41 +249,46 @@ fn isDrawing(self: *Self) !bool {
     // Flash all scene changes to display
     try self.session.render.drawChangedSymbols();
 
-    // Draw pop-up notifications
-    const notification_shown = try self.showNotifications(now);
-
     // Draw player's hp
     try self.session.render.drawPlayerHp(self.session.registry.getUnsafe(self.session.player, c.Health));
+
+    if (is_blocked_animation)
+        return true;
+
+    // Draw pop-up notifications
+    const notification_shown = try self.showNotifications(now);
 
     return is_blocked_animation or notification_shown;
 }
 
 /// Draws a single frame from every animation.
 /// Removes the animation if the last frame was drawn.
-/// Returns true if any animation is blocked.
+/// Returns `true` if any animation is blocked.
 pub fn drawAnimationsFramesToBuffer(self: *const Self, now: u64) !bool {
     var was_blocked_animation: bool = false;
     var itr = self.session.level.registry.query2(c.Position, c.Animation);
     while (itr.next()) |components| {
         const entity, const position, const animation = components;
-        was_blocked_animation |= animation.is_blocked;
+        was_blocked_animation |= animation.isBlocked();
         if (animation.frame(now)) |frame| {
-            if (frame > 0 and self.session.viewport.region.containsPoint(position.place)) {
-                const mode: g.DrawingMode = if (entity.eql(self.target))
+            const codepoint, const maybe_place = frame;
+            const place = maybe_place orelse position.place;
+            if (codepoint > 0 and self.session.viewport.region.containsPoint(place)) {
+                const mode: g.DrawingMode = if (maybe_place == null and entity.eql(self.target))
                     .inverted
                 else
                     .normal;
                 try self.session.render.drawSpriteToBuffer(
                     self.session.viewport,
-                    frame,
-                    position.place,
+                    codepoint,
+                    place,
                     3, // animations have max z order
                     mode,
-                    self.session.level.checkPlaceVisibility(position.place),
+                    self.session.level.checkPlaceVisibility(place),
                 );
             }
         } else {
-            try self.session.level.registry.remove(entity, c.Animation);
+            try self.session.registry.remove(entity, c.Animation);
         }
     }
     return was_blocked_animation;

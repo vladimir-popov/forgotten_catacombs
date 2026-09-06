@@ -17,6 +17,7 @@ pub const ComparingArea = union(enum) {
     /// The same as `.game_area`, but without the first line.
     /// It can be more robust in cases when it's impossible to predict a hp count.
     game_area_without_first_line,
+    /// A region in screen's coordinates
     region: p.Region,
     line: u8,
     info_bar,

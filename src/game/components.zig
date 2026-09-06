@@ -3,35 +3,161 @@ const g = @import("game_pkg.zig");
 const p = g.primitives;
 const u = g.utils;
 
-/// A place in the dungeon where an entity is, and its z-order.
-/// A place with zero row and zero column is undefined.
-/// **NOTE:** do not replace the whole position. Only the place should be changed during the game,
-/// because z-order is a constant property of the entity.
-pub const Position = struct {
-    pub const ZOrder = enum {
-        pub const count = @typeInfo(ZOrder).@"enum".fields.len;
+pub const Ammunition = struct {
+    pub const Type = enum { arrows, bolts, bullets };
+    amount: u8,
+    ammunition_type: Type,
 
-        pub const indexes: [count]u8 = .{ 0, 1, 2 };
+    pub fn arrows(amount: u8) Ammunition {
+        return .{ .amount = amount, .ammunition_type = .arrows };
+    }
 
-        /// opened doors, ladders, teleports...
-        floor,
-        /// any dropped items, traps, piles...
-        item,
-        /// player, enemies, npc, closed doors...
-        obstacle,
-    };
+    pub fn bolts(amount: u8) Ammunition {
+        return .{ .amount = amount, .ammunition_type = .bolts };
+    }
 
-    place: p.Point,
-    /// The vertical order of the entities on the same place.
-    /// The sprite with bigger order should be rendered over the sprite with lower.
-    zorder: ZOrder,
+    pub fn bullets(amount: u8) Ammunition {
+        return .{ .amount = amount, .ammunition_type = .bullets };
+    }
 };
 
-pub const Door = struct { state: enum { opened, closed } };
+pub const Animation = struct {
+    /// An animation played at the entity's place
+    pub const Static = struct {
+        /// A delay between frames of animation
+        const DELAY_MS = 300;
 
-/// Describes how and where something should look.
-pub const Sprite = struct {
-    codepoint: g.Codepoint,
+        // Keep in mind, that the last frame can be shown till the player's input.
+        // Prefer to use 0 as the last frame.
+        pub const FramesPresets = u.Preset([]const g.Codepoint, struct {
+            empty: []const g.Codepoint = &[_]g.Codepoint{},
+            get_angry: []const g.Codepoint = &[_]g.Codepoint{ '!', 0, '!', 0, '!', 0 },
+            go_sleep: []const g.Codepoint = &[_]g.Codepoint{ 'z', 0, 'z', 0, 'z', 0 },
+            // healing: []const g.Codepoint = &[_]g.Codepoint{ 0, '♥', 0, '♥' },
+            healing: []const g.Codepoint = &[_]g.Codepoint{ '+', 0, '+', 0 },
+            hit: []const g.Codepoint = &[_]g.Codepoint{ '×', 0 },
+            relax: []const g.Codepoint = &[_]g.Codepoint{ '?', 0, '?', 0, '?', 0 },
+            // teleport: []const g.Codepoint = &[_]g.Codepoint{ '-', '=', '≡' },
+            wait: []const g.Codepoint = &[_]g.Codepoint{ 'z', 'Z', 'z', 'Z', 0 },
+        });
+
+        preset: FramesPresets.Tag,
+        current_frame: u8 = 0,
+        previous_render_time: u64 = 0,
+        is_blocked: bool,
+
+        fn frame(self: *Static, now: u64) ?g.Codepoint {
+            const frames = FramesPresets.fields.get(self.preset);
+            if (now - self.previous_render_time > DELAY_MS) {
+                self.previous_render_time = now;
+                self.current_frame += 1;
+            }
+            // the first invocation is always increments the current_frame.
+            // this is way -1 is safe here
+            return if (self.current_frame <= frames.len) frames.*[self.current_frame - 1] else null;
+        }
+    };
+
+    /// Animated projectile flight
+    pub const Shot = struct {
+        const DELAY_MS = 100;
+
+        trajectory: g.utils.Bresenham,
+        previous_render_time: u64 = 0,
+
+        fn move(self: *Shot, now: u64) ?p.Point {
+            if (now - self.previous_render_time < DELAY_MS)
+                return self.trajectory.current();
+
+            self.previous_render_time = now;
+            return self.trajectory.next();
+        }
+    };
+
+    shot: ?Shot = null,
+    static: ?Static = null,
+
+    pub fn initShot(from: p.Point, to: p.Point) Animation {
+        return .{
+            .shot = .{ .trajectory = .init(from, to) },
+        };
+    }
+
+    pub fn initStatic(preset: Static.FramesPresets.Tag, is_blocked: bool) Animation {
+        return .{
+            .static = .{ .preset = preset, .is_blocked = is_blocked },
+        };
+    }
+
+    pub fn addHitAnimation(self: *Animation, is_blocked: bool) void {
+        self.static = .{ .preset = .hit, .is_blocked = is_blocked };
+    }
+
+    pub fn frame(self: *Animation, now: u64) ?struct { g.Codepoint, ?p.Point } {
+        if (self.shot) |*shot| {
+            if (shot.move(now)) |place| {
+                return .{ g.codepoints.projectile, place };
+            } else {
+                self.shot = null;
+            }
+        }
+        if (self.static) |*static| {
+            if (static.frame(now)) |cp| {
+                return .{ cp, null };
+            } else {
+                self.static = null;
+            }
+        }
+        return null;
+    }
+
+    pub fn isBlocked(self: Animation) bool {
+        if (self.shot != null) return true;
+        if (self.static) |st| return st.is_blocked;
+        return false;
+    }
+};
+
+pub const Armor = struct {
+    pub const zeros = Armor{ .protection = p.Range(u8).range(0, 0) };
+
+    protection: p.Range(u8),
+};
+
+pub const Breakages = struct {
+    modifications: Modifications,
+
+    pub const empty: Breakages = .{ .modifications = .initEmpty() };
+
+    const all_proportions: [std.enums.values(Modification).len]u8 = blk: {
+        var proportions: [std.enums.values(Modification).len]u8 = @splat(5);
+        proportions[@intFromEnum(Modification.fire)] = 10;
+        proportions[@intFromEnum(Modification.poison)] = 10;
+        proportions[@intFromEnum(Modification.acid)] = 10;
+        proportions[@intFromEnum(Modification.speed)] = 7;
+        proportions[@intFromEnum(Modification.attack)] = 7;
+        break :blk proportions;
+    };
+
+    /// Returns a random modification absent in the current set, or null.
+    pub fn chooseRandomNew(self: Breakages, rand: std.Random, is_for_weapon: bool) ?Modification {
+        var proportions: [std.enums.values(Modification).len]u8 = all_proportions;
+        _ = self.modifications.actualizeProportions(&proportions);
+        if (is_for_weapon) {
+            proportions[@intFromEnum(Modification.fire)] = 0;
+            proportions[@intFromEnum(Modification.poison)] = 0;
+            proportions[@intFromEnum(Modification.acid)] = 0;
+        }
+        if (std.mem.max(u8, &proportions) == 0)
+            return null
+        else
+            return @enumFromInt(rand.weightedIndex(u8, &proportions));
+    }
+};
+
+/// The property of a food with calories.
+pub const Consumable = struct {
+    calories: u16,
 };
 
 pub const Description = struct {
@@ -40,36 +166,164 @@ pub const Description = struct {
     preset: Preset.Tag,
 };
 
-pub const Animation = struct {
-    // Keep in mind, that the last frame can be shown till the player's input.
-    // Prefer to use 0 as the last frame.
-    pub const FramesPresets = u.Preset([]const g.Codepoint, struct {
-        empty: []const g.Codepoint = &[_]g.Codepoint{},
-        get_angry: []const g.Codepoint = &[_]g.Codepoint{ '!', 0, '!', 0, '!', 0 },
-        go_sleep: []const g.Codepoint = &[_]g.Codepoint{ 'z', 0, 'z', 0, 'z', 0 },
-        // healing: []const g.Codepoint = &[_]g.Codepoint{ 0, '♥', 0, '♥' },
-        healing: []const g.Codepoint = &[_]g.Codepoint{ '+', 0, '+', 0 },
-        hit: []const g.Codepoint = &[_]g.Codepoint{ '×', 0 },
-        relax: []const g.Codepoint = &[_]g.Codepoint{ '?', 0, '?', 0, '?', 0 },
-        // teleport: []const g.Codepoint = &[_]g.Codepoint{ '-', '=', '≡' },
-        wait: []const g.Codepoint = &[_]g.Codepoint{ 'z', 'Z', 'z', 'Z', 0 },
-    });
+pub const Door = struct { state: enum { opened, closed } };
 
-    preset: FramesPresets.Tag,
-    current_frame: u8 = 0,
-    previous_render_time: u64 = 0,
-    /// true means that input should not be handled until all frames of this animation will be played.
-    is_blocked: bool = false,
+pub const EnemyState = enum {
+    sleeping,
+    walking,
+    aggressive,
+};
 
-    pub fn frame(self: *Animation, now: u64) ?g.Codepoint {
-        const frames = FramesPresets.fields.get(self.preset);
-        if (now - self.previous_render_time > g.RENDER_DELAY_MS) {
-            self.previous_render_time = now;
-            self.current_frame += 1;
+pub const Equipment = struct {
+    weapon: ?g.Entity,
+    light: ?g.Entity,
+    ammunition: ?g.Entity,
+    armor: ?g.Entity,
+
+    pub const nothing: Equipment = .{ .weapon = null, .light = null, .ammunition = null, .armor = null };
+};
+
+/// The information about the current amount of experience points, the current level,
+/// and the reward for a victor.
+pub const Experience = struct {
+    const reward_denominator = 10;
+
+    pub const zero: Experience = .{ .experience = 0, .level = 1 };
+
+    level: u4,
+    experience: u16,
+
+    pub fn init(experience: u16) Experience {
+        return .{ .level = g.meta.actualLevel(1, experience), .experience = experience };
+    }
+
+    pub inline fn reward(reward_exp: u16) Experience {
+        return .init(reward_exp * reward_denominator);
+    }
+
+    pub fn asReward(self: Experience) u16 {
+        return self.experience / reward_denominator;
+    }
+};
+
+pub const Health = struct {
+    // The count of maximum hit points
+    max: u8,
+    // The count of the current hit points
+    current_hp: u8,
+
+    pub fn init(max: u8) Health {
+        return .{ .current_hp = max, .max = max };
+    }
+
+    pub fn add(self: *Health, value: u8) void {
+        self.current_hp += value;
+        self.current_hp = @min(self.current_hp, self.max);
+    }
+};
+
+pub const Hunger = struct {
+    pub const Level = enum {
+        well_fed,
+        hunger,
+        severe_hunger,
+        critical_starvation,
+
+        pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
+            _ = switch (self) {
+                .well_fed => try writer.write(""),
+                .hunger => try writer.write("Hungry"),
+                .severe_hunger => try writer.write("Severely hungry"),
+                .critical_starvation => try writer.write("Critically starved"),
+            };
         }
-        // the first invocation is always increments the current_frame.
-        // this is way -1 is safe here
-        return if (self.current_frame <= frames.len) frames.*[self.current_frame - 1] else null;
+    };
+
+    pub const well_fed: Hunger = .{ .turns_after_eating = 0 };
+
+    turns_after_eating: u16,
+
+    pub fn level(self: Hunger) Level {
+        return switch (self.turns_after_eating) {
+            0...1000 => .well_fed,
+            1001...1850 => .hunger,
+            1851...2500 => .severe_hunger,
+            else => .critical_starvation,
+        };
+    }
+
+    pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
+        try writer.print(
+            ".{{ .turns_after_eating = {d}, .level() = {t} }}",
+            .{ self.turns_after_eating, self.level() },
+        );
+    }
+};
+
+/// Bonuses for a weapon, or weaknesses/resistances for am armor.
+pub const ElementalEffect = enum { fire, acid, poison };
+
+/// The enum with all possible modification types.
+pub const Modification = g.utils.MergeEnums(.{
+    ElementalEffect,
+    Stats.Stat,
+    enum { speed, attack },
+});
+
+pub const Improvements = struct {
+    modifications: Modifications,
+
+    pub const empty: Improvements = .{ .modifications = .initEmpty() };
+
+    const all_proportions: [std.enums.values(Modification).len]u8 = blk: {
+        var ps: [std.enums.values(Modification).len]u8 = @splat(5);
+        ps[@intFromEnum(Modification.fire)] = 10;
+        ps[@intFromEnum(Modification.poison)] = 10;
+        ps[@intFromEnum(Modification.acid)] = 10;
+        ps[@intFromEnum(Modification.speed)] = 3;
+        ps[@intFromEnum(Modification.attack)] = 3;
+        break :blk ps;
+    };
+
+    /// Returns a random modification absent in the current set, or null.
+    pub fn chooseRandomNew(self: Improvements, rand: std.Random) ?Modification {
+        var proportions: [std.enums.values(Modification).len]u8 = all_proportions;
+        _ = self.modifications.actualizeProportions(&proportions);
+        if (std.mem.max(u8, &proportions) == 0)
+            return null
+        else
+            return @enumFromInt(rand.weightedIndex(u8, &proportions));
+    }
+};
+
+pub const Initiative = struct {
+    move_points: g.MovePoints,
+    /// How many move points the player or an enemy spent within the last turn.
+    /// We need it to count completed cycles.
+    spent_move_points: g.MovePoints = 0,
+
+    pub const empty: Initiative = .{ .move_points = 0 };
+};
+
+pub const Inventory = struct {
+    pub const MAX_SIZE = 30;
+
+    items: u.EntitiesSet,
+
+    pub fn empty(alloc: std.mem.Allocator) !Inventory {
+        return .{ .items = try u.EntitiesSet.init(alloc) };
+    }
+
+    pub fn isFull(self: Inventory) bool {
+        return self.items.size() >= MAX_SIZE;
+    }
+
+    pub fn deinit(self: *Inventory) void {
+        self.items.deinit();
+    }
+
+    pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
+        try writer.print(".{{ .items = {f} }}", .{self.items});
     }
 };
 
@@ -99,139 +353,13 @@ pub const Ladder = struct {
     }
 };
 
-pub const Health = struct {
-    // The count of maximum hit points
-    max: u8,
-    // The count of the current hit points
-    current_hp: u8,
-
-    pub fn init(max: u8) Health {
-        return .{ .current_hp = max, .max = max };
-    }
-
-    pub fn add(self: *Health, value: u8) void {
-        self.current_hp += value;
-        self.current_hp = @min(self.current_hp, self.max);
-    }
+pub const LevelUp = struct {
+    /// The last level handled level.
+    /// For example, it's possible to get level 2, 3 and 4 before handle any of them.
+    /// The player will have the level 4, but the `last_handled_level` will be 1.
+    /// When level up will be handled once, the `last_handled_level` become 2 and so on.
+    last_handled_level: u4,
 };
-
-pub const Regeneration = struct {
-    pub const regular: Regeneration = .{ .turns_to_increase = 20 };
-
-    turns_to_increase: u8,
-    accumulated_cycles: u8 = 0,
-};
-
-pub const Speed = struct {
-    /// How many move points are needed for moving on the neighbor position
-    moving_speed: g.MovePoints,
-    /// How many move points are needed to hit an enemy
-    atack_speed: g.MovePoints,
-
-    pub const default: Speed = .{ .moving_speed = g.MOVE_POINTS_IN_TURN, .atack_speed = g.MOVE_POINTS_IN_TURN };
-};
-
-pub const Pile = struct {
-    items: u.EntitiesSet,
-
-    pub fn empty(alloc: std.mem.Allocator) !Pile {
-        return .{ .items = try u.EntitiesSet.init(alloc) };
-    }
-
-    pub fn deinit(self: *Pile) void {
-        self.items.deinit();
-    }
-};
-
-pub const Inventory = struct {
-    pub const MAX_SIZE = 30;
-
-    items: u.EntitiesSet,
-
-    pub fn empty(alloc: std.mem.Allocator) !Inventory {
-        return .{ .items = try u.EntitiesSet.init(alloc) };
-    }
-
-    pub fn isFull(self: Inventory) bool {
-        return self.items.size() >= MAX_SIZE;
-    }
-
-    pub fn deinit(self: *Inventory) void {
-        self.items.deinit();
-    }
-
-    pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
-        try writer.print(".{{ .items = {f} }}", .{self.items});
-    }
-};
-
-pub const Price = struct {
-    value: u16,
-
-    pub inline fn multiply(self: *const Price, k: f32) u16 {
-        const valuef: f32 = @floatFromInt(self.value);
-        const result: u16 = @intFromFloat(valuef * k);
-        return @max(result, 0);
-    }
-};
-
-pub const Shop = struct {
-    items: u.EntitiesSet,
-
-    pub fn empty(alloc: std.mem.Allocator) !Shop {
-        return .{ .items = try u.EntitiesSet.init(alloc) };
-    }
-
-    pub fn deinit(self: *Shop) void {
-        self.items.deinit();
-    }
-};
-
-pub const Wallet = struct {
-    money: u16,
-
-    pub const empty: Wallet = .{ .money = 0 };
-};
-
-pub const Equipment = struct {
-    weapon: ?g.Entity,
-    light: ?g.Entity,
-    ammunition: ?g.Entity,
-    armor: ?g.Entity,
-
-    pub const nothing: Equipment = .{ .weapon = null, .light = null, .ammunition = null, .armor = null };
-};
-
-pub const Ammunition = struct {
-    pub const Type = enum { arrows, bolts, bullets };
-    amount: u8,
-    ammunition_type: Type,
-
-    pub fn arrows(amount: u8) Ammunition {
-        return .{ .amount = amount, .ammunition_type = .arrows };
-    }
-
-    pub fn bolts(amount: u8) Ammunition {
-        return .{ .amount = amount, .ammunition_type = .bolts };
-    }
-
-    pub fn bullets(amount: u8) Ammunition {
-        return .{ .amount = amount, .ammunition_type = .bullets };
-    }
-};
-
-// THESE ARE NOT COMPONENTS
-pub const Resistance = enum { weak, normal, resist };
-
-/// Bonuses for a weapon, or weaknesses/resistances for am armor.
-pub const ElementalEffect = enum { fire, acid, poison };
-
-/// The enum with all possible modification types.
-pub const Modification = g.utils.MergeEnums(.{
-    ElementalEffect,
-    Stats.Stat,
-    enum { speed, attack },
-});
 
 /// A wrapper with additional methods around the std.enums.EnumSet(Modification)
 pub const Modifications = struct {
@@ -295,112 +423,45 @@ pub const Modifications = struct {
         return proportions;
     }
 };
-//
 
-pub const Improvements = struct {
-    modifications: Modifications,
+pub const Pile = struct {
+    items: u.EntitiesSet,
 
-    pub const empty: Improvements = .{ .modifications = .initEmpty() };
+    pub fn empty(alloc: std.mem.Allocator) !Pile {
+        return .{ .items = try u.EntitiesSet.init(alloc) };
+    }
 
-    const all_proportions: [std.enums.values(Modification).len]u8 = blk: {
-        var ps: [std.enums.values(Modification).len]u8 = @splat(5);
-        ps[@intFromEnum(Modification.fire)] = 10;
-        ps[@intFromEnum(Modification.poison)] = 10;
-        ps[@intFromEnum(Modification.acid)] = 10;
-        ps[@intFromEnum(Modification.speed)] = 3;
-        ps[@intFromEnum(Modification.attack)] = 3;
-        break :blk ps;
+    pub fn deinit(self: *Pile) void {
+        self.items.deinit();
+    }
+};
+
+pub const Poison = struct {
+    damage: u8,
+};
+
+/// A place in the dungeon where an entity is, and its z-order.
+/// A place with zero row and zero column is undefined.
+/// **NOTE:** do not replace the whole position. Only the place should be changed during the game,
+/// because z-order is a constant property of the entity.
+pub const Position = struct {
+    pub const ZOrder = enum {
+        pub const count = @typeInfo(ZOrder).@"enum".fields.len;
+
+        pub const indexes: [count]u8 = .{ 0, 1, 2 };
+
+        /// opened doors, ladders, teleports...
+        floor,
+        /// any dropped items, traps, piles...
+        item,
+        /// player, enemies, npc, closed doors...
+        obstacle,
     };
 
-    /// Returns a random modification absent in the current set, or null.
-    pub fn chooseRandomNew(self: Improvements, rand: std.Random) ?Modification {
-        var proportions: [std.enums.values(Modification).len]u8 = all_proportions;
-        _ = self.modifications.actualizeProportions(&proportions);
-        if (std.mem.max(u8, &proportions) == 0)
-            return null
-        else
-            return @enumFromInt(rand.weightedIndex(u8, &proportions));
-    }
-};
-
-pub const Breakages = struct {
-    modifications: Modifications,
-
-    pub const empty: Breakages = .{ .modifications = .initEmpty() };
-
-    const all_proportions: [std.enums.values(Modification).len]u8 = blk: {
-        var proportions: [std.enums.values(Modification).len]u8 = @splat(5);
-        proportions[@intFromEnum(Modification.fire)] = 10;
-        proportions[@intFromEnum(Modification.poison)] = 10;
-        proportions[@intFromEnum(Modification.acid)] = 10;
-        proportions[@intFromEnum(Modification.speed)] = 7;
-        proportions[@intFromEnum(Modification.attack)] = 7;
-        break :blk proportions;
-    };
-
-    /// Returns a random modification absent in the current set, or null.
-    pub fn chooseRandomNew(self: Breakages, rand: std.Random, is_for_weapon: bool) ?Modification {
-        var proportions: [std.enums.values(Modification).len]u8 = all_proportions;
-        _ = self.modifications.actualizeProportions(&proportions);
-        if (is_for_weapon) {
-            proportions[@intFromEnum(Modification.fire)] = 0;
-            proportions[@intFromEnum(Modification.poison)] = 0;
-            proportions[@intFromEnum(Modification.acid)] = 0;
-        }
-        if (std.mem.max(u8, &proportions) == 0)
-            return null
-        else
-            return @enumFromInt(rand.weightedIndex(u8, &proportions));
-    }
-};
-
-pub const Weapon = struct {
-    /// The damage depends on the weapon class
-    pub const Class = enum {
-        /// No bonuses
-        native,
-        /// The strength is used
-        primitive,
-        /// The dexterity is used
-        tricky,
-        /// The intelligence is used
-        ancient,
-    };
-
-    class: Class,
-    /// A type of required ammunition.
-    /// The null means that the weapon is melee.
-    ammunition_type: ?Ammunition.Type,
-    max_distance: u8,
-    damage: p.Range(u8),
-    // Always known effects like the `fire` on a torch
-    effects: std.EnumSet(ElementalEffect) = .{},
-
-    pub fn melee(class: Class, damage: p.Range(u8)) Weapon {
-        return .{ .max_distance = 1, .ammunition_type = null, .class = class, .damage = damage };
-    }
-
-    pub fn meleeWithEffect(class: Class, damage: p.Range(u8), effect: ElementalEffect) Weapon {
-        var effs: std.EnumSet(ElementalEffect) = .{};
-        effs.insert(effect);
-        return .{ .max_distance = 1, .ammunition_type = null, .class = class, .damage = damage, .effects = effs };
-    }
-
-    pub fn ranged(max_distance: u8, ammunition_type: Ammunition.Type, class: Class, damage: p.Range(u8)) Weapon {
-        std.debug.assert(max_distance > 1);
-        return .{ .max_distance = max_distance, .ammunition_type = ammunition_type, .class = class, .damage = damage };
-    }
-};
-
-pub const Armor = struct {
-    pub const zeros = Armor{ .protection = p.Range(u8).range(0, 0) };
-
-    protection: p.Range(u8),
-};
-
-/// The property of a food with calories.
-pub const Consumable = struct {
-    calories: u16,
+    place: p.Point,
+    /// The vertical order of the entities on the same place.
+    /// The sprite with bigger order should be rendered over the sprite with lower.
+    zorder: ZOrder,
 };
 
 pub const Potion = enum {
@@ -409,94 +470,33 @@ pub const Potion = enum {
     oil,
 };
 
-pub const Hunger = struct {
-    pub const Level = enum {
-        well_fed,
-        hunger,
-        severe_hunger,
-        critical_starvation,
+pub const Price = struct {
+    value: u16,
 
-        pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
-            _ = switch (self) {
-                .well_fed => try writer.write(""),
-                .hunger => try writer.write("Hungry"),
-                .severe_hunger => try writer.write("Severely hungry"),
-                .critical_starvation => try writer.write("Critically starved"),
-            };
-        }
-    };
-
-    pub const well_fed: Hunger = .{ .turns_after_eating = 0 };
-
-    turns_after_eating: u16,
-
-    pub fn level(self: Hunger) Level {
-        return switch (self.turns_after_eating) {
-            0...1000 => .well_fed,
-            1001...1850 => .hunger,
-            1851...2500 => .severe_hunger,
-            else => .critical_starvation,
-        };
-    }
-
-    pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
-        try writer.print(
-            ".{{ .turns_after_eating = {d}, .level() = {t} }}",
-            .{ self.turns_after_eating, self.level() },
-        );
+    pub inline fn multiply(self: *const Price, k: f32) u16 {
+        const valuef: f32 = @floatFromInt(self.value);
+        const result: u16 = @intFromFloat(valuef * k);
+        return @max(result, 0);
     }
 };
 
-pub const LevelUp = struct {
-    /// The last level handled level.
-    /// For example, it's possible to get level 2, 3 and 4 before handle any of them.
-    /// The player will have the level 4, but the `last_handled_level` will be 1.
-    /// When level up will be handled once, the `last_handled_level` become 2 and so on.
-    last_handled_level: u4,
+pub const Regeneration = struct {
+    pub const regular: Regeneration = .{ .turns_to_increase = 20 };
+
+    turns_to_increase: u8,
+    accumulated_cycles: u8 = 0,
 };
 
-pub const Initiative = struct {
-    move_points: g.MovePoints,
-    /// How many move points the player or an enemy spent within the last turn.
-    /// We need it to count completed cycles.
-    spent_move_points: g.MovePoints = 0,
+pub const Shop = struct {
+    items: u.EntitiesSet,
 
-    pub const empty: Initiative = .{ .move_points = 0 };
-};
-
-pub const EnemyState = enum {
-    sleeping,
-    walking,
-    aggressive,
-};
-
-/// The information about the current amount of experience points, the current level,
-/// and the reward for a victor.
-pub const Experience = struct {
-    const reward_denominator = 10;
-
-    pub const zero: Experience = .{ .experience = 0, .level = 1 };
-
-    level: u4,
-    experience: u16,
-
-    pub fn init(experience: u16) Experience {
-        return .{ .level = g.meta.actualLevel(1, experience), .experience = experience };
+    pub fn empty(alloc: std.mem.Allocator) !Shop {
+        return .{ .items = try u.EntitiesSet.init(alloc) };
     }
 
-    pub inline fn reward(reward_exp: u16) Experience {
-        return .init(reward_exp * reward_denominator);
+    pub fn deinit(self: *Shop) void {
+        self.items.deinit();
     }
-
-    pub fn asReward(self: Experience) u16 {
-        return self.experience / reward_denominator;
-    }
-};
-
-pub const SourceOfLight = struct {
-    radius: f32,
-    charge: u16,
-    max_charge: u16,
 };
 
 pub const Skills = struct {
@@ -519,6 +519,26 @@ pub const Skills = struct {
             }),
         };
     }
+};
+
+pub const SourceOfLight = struct {
+    radius: f32,
+    charge: u16,
+    max_charge: u16,
+};
+
+pub const Speed = struct {
+    /// How many move points are needed for moving on the neighbor position
+    moving_speed: g.MovePoints,
+    /// How many move points are needed to hit an enemy
+    atack_speed: g.MovePoints,
+
+    pub const default: Speed = .{ .moving_speed = g.MOVE_POINTS_IN_TURN, .atack_speed = g.MOVE_POINTS_IN_TURN };
+};
+
+/// Describes how and where something should look.
+pub const Sprite = struct {
+    codepoint: g.Codepoint,
 };
 
 pub const Stats = struct {
@@ -568,10 +588,6 @@ pub const Stats = struct {
     }
 };
 
-pub const Poison = struct {
-    damage: u8,
-};
-
 pub const Trap = struct {
     /// The likelihood of detecting and disarming the trap depend on how powerful the trap is.
     power: u2,
@@ -587,6 +603,53 @@ pub const Trap = struct {
         };
     }
 };
+
+pub const Wallet = struct {
+    money: u16,
+
+    pub const empty: Wallet = .{ .money = 0 };
+};
+
+pub const Weapon = struct {
+    /// The damage depends on the weapon class
+    pub const Class = enum {
+        /// No bonuses
+        native,
+        /// The strength is used
+        primitive,
+        /// The dexterity is used
+        tricky,
+        /// The intelligence is used
+        ancient,
+    };
+
+    class: Class,
+    /// A type of required ammunition.
+    /// The null means that the weapon is melee.
+    ammunition_type: ?Ammunition.Type,
+    max_distance: u8,
+    damage: p.Range(u8),
+    // Always known effects like the `fire` on a torch
+    effects: std.EnumSet(ElementalEffect) = .{},
+
+    pub fn melee(class: Class, damage: p.Range(u8)) Weapon {
+        return .{ .max_distance = 1, .ammunition_type = null, .class = class, .damage = damage };
+    }
+
+    pub fn meleeWithEffect(class: Class, damage: p.Range(u8), effect: ElementalEffect) Weapon {
+        var effs: std.EnumSet(ElementalEffect) = .{};
+        effs.insert(effect);
+        return .{ .max_distance = 1, .ammunition_type = null, .class = class, .damage = damage, .effects = effs };
+    }
+
+    pub fn ranged(max_distance: u8, ammunition_type: Ammunition.Type, class: Class, damage: p.Range(u8)) Weapon {
+        std.debug.assert(max_distance > 1);
+        return .{ .max_distance = max_distance, .ammunition_type = ammunition_type, .class = class, .damage = damage };
+    }
+};
+
+// THESE ARE NOT COMPONENTS
+pub const Resistance = enum { weak, normal, resist };
 
 pub const Components = struct {
     ammunition: ?Ammunition = null,

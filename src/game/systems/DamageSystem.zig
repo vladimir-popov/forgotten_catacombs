@@ -23,7 +23,7 @@ pub fn heal(
     const is_blocked_animation = target.eql(self.session().player);
     try self.session().registry.set(
         target,
-        c.Animation{ .preset = .healing, .is_blocked = is_blocked_animation },
+        c.Animation.initStatic(.healing, is_blocked_animation),
     );
 
     log.debug("Entity {d} recovered up to {d} hp", .{ target.id, value });
@@ -49,7 +49,11 @@ pub fn applyDamage(
     if (target_health.current_hp > 0) {
         // a special case to give to the player a chance to notice what happened
         const is_blocked_animation = actor.eql(self.session().player) or target.eql(self.session().player);
-        try self.session().registry.set(target, c.Animation{ .preset = .hit, .is_blocked = is_blocked_animation });
+        if (self.session().registry.get(target, c.Animation)) |animation| {
+            animation.addHitAnimation(is_blocked_animation);
+        } else {
+            try self.session().registry.set(target, c.Animation.initStatic(.hit, is_blocked_animation));
+        }
         return true;
     } else {
         // handle the death
@@ -84,13 +88,38 @@ pub fn tryToHit(self: *Self, actor: g.Entity, target: g.Entity) !bool {
     const registry = &self.session().registry;
     const rand = self.session().prng.random();
 
-    // Validate the weapon
     const weapon_id, const weapon = g.meta.getWeapon(registry, actor);
-    if (!try self.isValidWeapon(actor, weapon)) {
-        return true;
-    }
-    const weapon_damage = rand.intRangeAtMost(u8, weapon.damage.min, weapon.damage.max);
 
+    // Validate the weapon and handle a shot
+    if (weapon.ammunition_type) |expected_ammo| {
+        const ammo_id, const ammo = g.meta.getAmmunition(registry, actor) orelse {
+            if (actor.eql(self.session().player))
+                try self.session().showPopUpNotification(.no_ammo);
+            return true;
+        };
+        if (ammo.ammunition_type != expected_ammo) {
+            if (actor.eql(self.session().player))
+                try self.session().showPopUpNotification(.wrong_ammo);
+            return true;
+        }
+        const actor_position = registry.getUnsafe(actor, c.Position);
+        const target_position = registry.getUnsafe(target, c.Position);
+        try registry.set(target, c.Animation.initShot(actor_position.place, target_position.place));
+        ammo.amount -= 1;
+        if (ammo.amount == 0) {
+            try registry.removeEntity(ammo_id);
+            if (registry.get(actor, c.Equipment)) |equipment| {
+                if (ammo_id.eql(equipment.ammunition)) {
+                    equipment.ammunition = null;
+                }
+            }
+            if (registry.get(actor, c.Inventory)) |inventory| {
+                _ = inventory.items.remove(ammo_id);
+            }
+        }
+    }
+
+    // Calculate and handle evasion
     const actor_stats = g.meta.getActualStats(registry, actor);
     const actor_weapon_skill: i4 = if (self.session().registry.get(actor, c.Skills)) |skills|
         skills.values.get(.weapon_mastery)
@@ -98,7 +127,6 @@ pub fn tryToHit(self: *Self, actor: g.Entity, target: g.Entity) !bool {
         0;
     const target_stats = g.meta.getActualStats(registry, target);
 
-    // Calculate and handle evasion
     const hit_chance = g.meta.hitChance(actor_stats.get(.perception), actor_weapon_skill, target_stats.get(.dexterity));
     if (hit_chance < rand.float(f32)) {
         // -- Miss --
@@ -109,6 +137,8 @@ pub fn tryToHit(self: *Self, actor: g.Entity, target: g.Entity) !bool {
         return true;
     }
 
+    // Calculate the damage
+    const weapon_damage = rand.intRangeAtMost(u8, weapon.damage.min, weapon.damage.max);
     const armor_id, const armor = g.meta.getArmor(registry, target);
     const target_protection = if (armor) |arm|
         rand.intRangeAtMost(u8, arm.protection.min, arm.protection.max)
@@ -155,36 +185,6 @@ pub fn tryToHit(self: *Self, actor: g.Entity, target: g.Entity) !bool {
             .{ .damage = .{ .actor = actor, .damage = target_health_before - target_health.current_hp } },
         );
     return is_target_alive;
-}
-
-/// Checks where the weapon is melee or has appropriate ammo
-fn isValidWeapon(self: *Self, actor: g.Entity, weapon: *const c.Weapon) !bool {
-    if (weapon.ammunition_type) |expected_ammo| {
-        const registry = &self.session().registry;
-        const ammo_id, const ammo = g.meta.getAmmunition(registry, actor) orelse {
-            if (actor.eql(self.session().player))
-                try self.session().showPopUpNotification(.no_ammo);
-            return false;
-        };
-        if (ammo.ammunition_type != expected_ammo) {
-            if (actor.eql(self.session().player))
-                try self.session().showPopUpNotification(.wrong_ammo);
-            return false;
-        }
-        ammo.amount -= 1;
-        if (ammo.amount == 0) {
-            try registry.removeEntity(ammo_id);
-            if (registry.get(actor, c.Equipment)) |equipment| {
-                if (ammo_id.eql(equipment.ammunition)) {
-                    equipment.ammunition = null;
-                }
-            }
-            if (registry.get(actor, c.Inventory)) |inventory| {
-                _ = inventory.items.remove(ammo_id);
-            }
-        }
-    }
-    return true;
 }
 
 fn calculateDamage(

@@ -105,6 +105,8 @@ pub fn Registry(comptime ComponentsStruct: type) type {
                 std.debug.panic("Entity {d} doesn't have component {s}", .{ entity.id, @typeName(C) });
         }
 
+        /// Returns a pointer to an already existed component, or sets the passed default value and
+        /// returns a pointer to it.
         pub fn getOrSet(self: *Self, entity: Entity, comptime C: type, default: C) !*C {
             return try @field(self.components_map, @typeName(C)).getOrSetForEntity(self.allocator(), entity, default);
         }

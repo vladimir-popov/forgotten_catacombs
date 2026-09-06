@@ -20,6 +20,7 @@ pub const nothing = ' ';
 pub const noise = '♪';
 pub const pile = '=';
 pub const potion = '¿';
+pub const projectile = '*';
 pub const rock = '#';
 pub const source_of_light = '¡';
 pub const teleport = '_';

@@ -16,12 +16,36 @@ test "Shoot at the target" {
     // Take aim at a rat
     try test_session.exploreMode();
     try test_session.pressButton(.up);
-    try test_session.pressButton(.a);
+    try test_session.pressButton(.b);
     try std.testing.expectEqual(rat_id, test_session.player.target());
+    try test_session.runtime.display.expectLooksLike(
+        \\######################################30
+        \\#•••••••••••••#     #••••••••••••••••••#
+        \\#•••┌───┐•••••###+###•••••••••••┌───┐••#
+        \\#•••│   +•••••••••••••••••••••••+   │••#
+        \\#•••└───┘•••••••••••r•••••••••••└───┘••#
+        \\#•••┌───┐••••••••••••••••••••••••••••••#
+        \\#•••│   +••••••••••••••••••••••••••••••#
+        \\#•••└───┘••••••••••••••••••••••••••••••#
+        \\~~~~~~~~~~~~~~~~~~~│@│~~~~~~~~~~~~~~~~~~
+        \\~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        \\════════════════════════════════════════
+        \\ r:|||||||||||||||||⇧Explore �� Attack ⇧
+    , .whole_display);
 
     // Hit the target
     const rat_health = test_session.session.registry.getUnsafe(rat_id, c.Health);
     const initial_health = rat_health.current_hp;
+
+    // Check the projectile
+    try test_session.pressButton(.a);
+    try test_session.tick(.{});
+    try test_session.runtime.display.expectLooksLike(
+        \\•
+        \\•
+        \\*
+        \\@
+    , .{ .region = .init(6, 21, 4, 1) });
     for (0..50) |_| {
         if (rat_health.current_hp != initial_health) break;
         try test_session.pressButton(.a);

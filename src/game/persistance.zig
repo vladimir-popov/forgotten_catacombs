@@ -420,7 +420,7 @@ test "All components should be serializable" {
     const expected = c.Components{
         .armor = .{ .protection = .range(1, 3) },
         .ammunition = .{ .amount = 42, .ammunition_type = .arrows },
-        .animation = c.Animation{ .preset = .hit },
+        .animation = c.Animation.initStatic(.hit, false),
         .breakages = .{ .modifications = .init(&.{ .fire, .strength }) },
         .consumable = .{ .calories = 12 },
         .description = c.Description{ .preset = .player },

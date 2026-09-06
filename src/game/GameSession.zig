@@ -311,7 +311,6 @@ noinline fn handleEvent(self: *Self, event_idx: usize) !void {
     switch (self.events.items[event_idx]) {
         .mode_changed => |new_mode| switch (new_mode) {
             .to_play => |args| {
-                try self.render.redrawFromSceneBuffer();
                 _ = self.mode_arena.reset(.retain_capacity);
                 self.mode = .{ .play = try self.mode_arena.allocator().create(PlayMode) };
                 try self.mode.play.init(self, args.entity_in_focus);

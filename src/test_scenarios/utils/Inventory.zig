@@ -34,6 +34,7 @@ pub fn isDropEmpty(self: Self) bool {
 pub fn close(self: Self) !void {
     std.debug.assert(self.inventoryMode().modal_windows.isEmpty());
     try self.test_session.pressButton(.b);
+    std.debug.assert(self.test_session.session.mode == .play);
 }
 
 /// Selects the item with passed name in the active tab, or throws an error.

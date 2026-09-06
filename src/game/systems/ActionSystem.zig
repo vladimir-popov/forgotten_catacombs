@@ -104,7 +104,7 @@ pub fn doAction(
         .wait => {
             try self.session().registry.set(
                 actor,
-                c.Animation{ .preset = .wait, .is_blocked = self.session().player.eql(actor) },
+                c.Animation.initStatic(.wait, self.session().player.eql(actor)),
             );
             return .{ .done = speed.moving_speed };
         },
@@ -396,16 +396,16 @@ fn goSleep(self: *Self, actor: g.Entity) !void {
     self.session().registry.getUnsafe(actor, c.EnemyState).* = .sleeping;
     try self.session().registry.set(
         actor,
-        c.Animation{ .preset = .go_sleep },
+        c.Animation.initStatic(.go_sleep, false),
     );
 }
 
 fn chill(self: *Self, actor: g.Entity) !void {
     self.session().registry.getUnsafe(actor, c.EnemyState).* = .walking;
-    try self.session().registry.set(actor, c.Animation{ .preset = .relax });
+    try self.session().registry.set(actor, c.Animation.initStatic(.relax, false));
 }
 
 fn getAngry(self: *Self, actor: g.Entity) !void {
     self.session().registry.getUnsafe(actor, c.EnemyState).* = .aggressive;
-    try self.session().registry.set(actor, c.Animation{ .preset = .get_angry });
+    try self.session().registry.set(actor, c.Animation.initStatic(.get_angry, false));
 }

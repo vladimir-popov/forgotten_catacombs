@@ -70,6 +70,10 @@ pub fn next(self: *Self) ?Point {
         self.err += self.dx;
         self.y0 += self.sy;
     }
+    return self.current();
+}
+
+pub fn current(self: Self) ?Point {
     // exclude the end
     if (self.x0 == self.x1 and self.y0 == self.y1) return null;
     return .point(@intCast(self.y0), @intCast(self.x0));

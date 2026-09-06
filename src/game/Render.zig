@@ -61,7 +61,7 @@ pub fn deinit(self: *Self) void {
     self.scene_buffer.destroy();
 }
 
-/// Draws the dungeon and visible sprites on the screen.
+/// Draws the dungeon and visible sprites to the buffer and flash the buffer to the screen.
 pub fn drawScene(self: *const Self, session: *g.GameSession, entity_in_focus: ?g.Entity) !void {
     const level = &session.level;
     try self.drawDungeonToBuffer(session.viewport, level);

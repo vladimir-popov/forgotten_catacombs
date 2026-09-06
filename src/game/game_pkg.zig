@@ -58,9 +58,6 @@ pub const LevelArena = std.heap.ArenaAllocator;
 /// How many move points should spent player to increase a turns counter
 pub const MOVE_POINTS_IN_TURN = 10;
 
-/// A delay between frames of animation
-pub const RENDER_DELAY_MS = 300;
-
 // Playdate display resolution px:
 pub const DISPLAY_HEIGHT = 240;
 pub const DISPLAY_WIDHT = 400;

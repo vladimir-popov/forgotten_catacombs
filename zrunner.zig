@@ -52,6 +52,7 @@ pub const std_options: std.Options = .{
         // .{ .scope = .test_session, .level = .debug },
         .{ .scope = .inventory_mode, .level = .debug },
         .{ .scope = .level, .level = .debug },
+        .{ .scope = .play_mode, .level = .debug },
     },
 };
 

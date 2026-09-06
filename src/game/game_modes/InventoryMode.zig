@@ -85,6 +85,10 @@ pub fn tick(self: *Self) !void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (self.modal_windows.nonEmpty()) {
             try self.modal_windows.handleButton(btn);
+            if (self.action) |act| {
+                try self.session.continuePlay(null, act);
+                return;
+            }
         } else {
             if (try self.main_window.handleButton(btn) == .close_window) {
                 try self.session.continuePlay(null, self.action);
@@ -92,10 +96,6 @@ pub fn tick(self: *Self) !void {
             }
         }
         try self.draw();
-        if (self.action) |act| {
-            try self.session.continuePlay(null, act);
-            return;
-        }
     }
 }
 
