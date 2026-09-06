@@ -52,7 +52,7 @@ pub fn tick(self: *ExploreMode) anyerror!void {
             }
         } else {
             switch (btn.game_button) {
-                .a => {
+                .b => {
                     if (btn.state == .hold and self.countOfEntitiesInFocus() > 1) {
                         if (self.entitiesInFocus()) |entities| {
                             self.entities_window = try self.windowWithEntities(entities);
@@ -61,7 +61,7 @@ pub fn tick(self: *ExploreMode) anyerror!void {
                         self.description_window = try self.windowWithDescription();
                     }
                 },
-                .b => {
+                .a => {
                     try self.session.continuePlay(self.entity_in_focus, null);
                     return;
                 },
@@ -90,11 +90,11 @@ fn draw(self: *const ExploreMode) !void {
         try window.draw(self.session.render);
     } else {
         try self.session.render.drawScene(self.session, self.entity_in_focus);
-        try self.session.render.drawRightButton("Describe", self.countOfEntitiesInFocus() > 1);
+        try self.session.render.drawLeftButton("Describe", self.countOfEntitiesInFocus() > 1);
         if (self.canBeATarget()) {
-            try self.session.render.drawLeftButton("Target", false);
+            try self.session.render.drawRightButton("Target", false);
         } else {
-            try self.session.render.drawLeftButton("Cancel", false);
+            try self.session.render.drawRightButton("Cancel", false);
         }
         // Draw the name or health of the entity in focus
         var buf: [g.DISPLAY_COLS]u8 = undefined;

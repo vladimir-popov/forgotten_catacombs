@@ -16,7 +16,7 @@ test "Shoot at the target" {
     // Take aim at a rat
     try test_session.exploreMode();
     try test_session.pressButton(.up);
-    try test_session.pressButton(.b);
+    try test_session.pressButton(.a);
     try std.testing.expectEqual(rat_id, test_session.player.target());
     try test_session.runtime.display.expectLooksLike(
         \\######################################30
@@ -65,7 +65,7 @@ test "The arrows entity should be removed when the last arrow was issued" {
     // Take aim at a rat
     try test_session.exploreMode();
     try test_session.pressButton(.up);
-    try test_session.pressButton(.b);
+    try test_session.pressButton(.a);
     try std.testing.expectEqual(rat_id, test_session.player.target());
 
     // Hit the target
