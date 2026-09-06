@@ -16,7 +16,7 @@ test "Init near the scientist" {
         \\╔═══════════╗══════════════════════════╗
         \\║ Recognize ║   Modify      Repair     ║
         \\║           ╚══════════════════════════║
-        \\║¿ A teal potion                   22$ ║
+        \\║¿ A teal potion                   30$ ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
@@ -50,7 +50,7 @@ test "Recognize an unknown item when enough money" {
         \\║                                      ║
         \\╚══════════════════════════════════════╝
         \\════════════════════════════════════════
-        \\ Your money:  978$              Close   
+        \\ Your money:  970$              Close   
     , .whole_display);
 }
 
@@ -125,7 +125,7 @@ test "Modify an item somehow when enough money" {
         \\║ Recognize ║   Modify      Repair     ║
         \\║           ╚══════════════════════════║
         \\║\ Pickaxe                         11$ ║
-        \\║¿ A teal potion                   22$ ║
+        \\║¿ A teal potion                   30$ ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
@@ -271,7 +271,7 @@ fn initNearScientistWithMoney(test_session: *TestSession, money: u16) !struct { 
     std.testing.random_seed = 100500;
     try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
     const known_weapon_id = test_session.player.equipment().weapon.?;
-    const unknown_item = g.entities.presets.Potions.get(.healing_potion);
+    const unknown_item = g.entities.presets.Potions.get(.healing);
     const unknown_item_id = try test_session.session.registry.addNewEntity(unknown_item);
     try test_session.player.inventory().items.add(unknown_item_id);
     test_session.player.position().place = g.dungeon.FirstLocation.scientist_place.movedTo(.right);

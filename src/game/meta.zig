@@ -410,7 +410,7 @@ pub fn sellingPrice(journal: g.Journal, entity: g.Entity, price: *const c.Price)
     const description = journal.registry.getUnsafe(entity, c.Description);
     if (description.preset == .torch)
         return price.multiply(0.15);
-    if (description.preset == .oil_potion)
+    if (description.preset == .oil)
         return price.multiply(0.2);
 
     return price.multiply(0.2);

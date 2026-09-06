@@ -22,6 +22,7 @@ For example, `Traveler Ration` becomes `traveler_ration`.
 
 The description presets referenced by the generated code must be declared in
 `src/game/descriptions.zig` separately.
+Generated food entities are sorted alphabetically by `Name`.
 
 ## Generate Description Presets
 
@@ -39,6 +40,7 @@ corresponding description group, such as `pub const Food = struct`.
 
 Description text is split into lines no longer than 35 characters. Additional
 spaces are distributed between words to justify every line except the last.
+Generated description presets are sorted alphabetically by `Name`.
 
 ## Generate Random Weights
 
@@ -57,7 +59,7 @@ The output can be inserted into the initializer passed to
 ## Generate Potion Entities
 
 The `generate_potions.zig` script generates potion entity definitions from the
-`Name` and `Price (known)` columns of a CSV file.
+`Name`, `Price (known)`, and `Действие` columns of a CSV file.
 
 Run it from the project root:
 
@@ -66,9 +68,12 @@ zig run misc/tools/generate_potions.zig -- misc/entities/Potions.csv \
   > src/game/entities/potions.zig
 ```
 
-The entity and description preset names use the `snake_case` name with a
-`_potion` suffix. The `Potion` component uses the same name without the
-suffix. For example, `Bouillon` generates `bouillon_potion` and `.bouillon`.
+The entity, description preset, and `Potion` component names use the same
+`snake_case` value. For example, `Bouillon` generates `bouillon` and
+`.bouillon`.
+An action in the form `Утоляет голод (N)` also generates a `Consumable`
+component with `N` calories.
+Generated potion entities are sorted alphabetically by `Name`.
 
 ## Generate Enum Values
 

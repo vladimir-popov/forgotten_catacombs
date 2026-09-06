@@ -12,6 +12,7 @@ test {
     _ = @import("recognize_modify_suite.zig");
     _ = @import("save_load_suite.zig");
     _ = @import("periodic_effects_suite.zig");
+    _ = @import("potions_suite.zig");
     _ = @import("trading_suite.zig");
     _ = @import("traps_suite.zig");
     _ = @import("update_target_suite.zig");

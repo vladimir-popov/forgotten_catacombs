@@ -3,6 +3,12 @@ const std = @import("std");
 const max_csv_size = 1024 * 1024;
 const max_columns = 32;
 
+const FoodRow = struct {
+    name: []const u8,
+    calories: []const u8,
+    price: []const u8,
+};
+
 pub fn main(init: std.process.Init) !void {
     var args = init.minimal.args.iterate();
     _ = args.next();
@@ -20,11 +26,11 @@ pub fn main(init: std.process.Init) !void {
     var stdout = std.Io.File.stdout().writer(init.io, &buffer);
     defer stdout.interface.flush() catch {};
 
-    try generate(csv, &stdout.interface);
+    try generate(csv, &stdout.interface, init.gpa);
     try stdout.interface.flush();
 }
 
-fn generate(csv: []const u8, writer: *std.Io.Writer) !void {
+fn generate(csv: []const u8, writer: *std.Io.Writer, allocator: std.mem.Allocator) !void {
     var lines = std.mem.splitScalar(u8, csv, '\n');
     const header = lines.next() orelse return error.EmptyCsv;
 
@@ -41,14 +47,9 @@ fn generate(csv: []const u8, writer: *std.Io.Writer) !void {
     _ = findColumn(header_fields[0..header_count], "Description") orelse
         return error.MissingDescriptionColumn;
 
-    try writer.writeAll(
-        "const archetype = @import(\"archetypes.zig\");\n" ++
-            "const cp = @import(\"../codepoints.zig\");\n" ++
-            "const g = @import(\"../game_pkg.zig\");\n" ++
-            "const c = g.components;\n\n",
-    );
+    var rows: std.ArrayList(FoodRow) = .empty;
+    defer rows.deinit(allocator);
 
-    var first = true;
     while (lines.next()) |raw_line| {
         const line = std.mem.trimEnd(u8, raw_line, "\r");
         if (line.len == 0)
@@ -59,26 +60,46 @@ fn generate(csv: []const u8, writer: *std.Io.Writer) !void {
         if (field_count <= @max(name_column, @max(calories_column, price_column)))
             return error.MissingField;
 
-        const name = fields[name_column];
         const calories = fields[calories_column];
         const price = fields[price_column];
         _ = std.fmt.parseInt(u16, calories, 10) catch return error.InvalidCalories;
         _ = std.fmt.parseInt(u16, price, 10) catch return error.InvalidPrice;
+        try rows.append(allocator, .{
+            .name = fields[name_column],
+            .calories = calories,
+            .price = price,
+        });
+    }
 
+    std.mem.sort(FoodRow, rows.items, {}, lessThanByName);
+
+    try writer.writeAll(
+        "const archetype = @import(\"archetypes.zig\");\n" ++
+            "const cp = @import(\"../codepoints.zig\");\n" ++
+            "const g = @import(\"../game_pkg.zig\");\n" ++
+            "const c = g.components;\n\n",
+    );
+
+    var first = true;
+    for (rows.items) |row| {
         if (!first)
             try writer.writeAll("\n");
         first = false;
 
-        try writeSnakeCase(writer, name);
+        try writeSnakeCase(writer, row.name);
         try writer.writeAll(": c.Components = archetype.food(.{\n");
         try writer.writeAll("    .description = .{ .preset = .");
-        try writeSnakeCase(writer, name);
+        try writeSnakeCase(writer, row.name);
         try writer.writeAll(" },\n    .sprite = .{ .codepoint = cp.food },\n    .price = .{ .value = ");
-        try writer.writeAll(price);
+        try writer.writeAll(row.price);
         try writer.writeAll(" },\n    .consumable = .{ .calories = ");
-        try writer.writeAll(calories);
+        try writer.writeAll(row.calories);
         try writer.writeAll(" },\n}),\n");
     }
+}
+
+fn lessThanByName(_: void, lhs: FoodRow, rhs: FoodRow) bool {
+    return std.mem.lessThan(u8, lhs.name, rhs.name);
 }
 
 fn findColumn(columns: []const []const u8, name: []const u8) ?usize {

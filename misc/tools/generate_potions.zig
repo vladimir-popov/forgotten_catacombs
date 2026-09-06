@@ -3,6 +3,12 @@ const std = @import("std");
 const max_csv_size = 1024 * 1024;
 const max_columns = 32;
 
+const PotionRow = struct {
+    name: []const u8,
+    price: []const u8,
+    calories: ?[]const u8,
+};
+
 pub fn main(init: std.process.Init) !void {
     var args = init.minimal.args.iterate();
     _ = args.next();
@@ -20,11 +26,11 @@ pub fn main(init: std.process.Init) !void {
     var stdout = std.Io.File.stdout().writer(init.io, &buffer);
     defer stdout.interface.flush() catch {};
 
-    try generate(csv, &stdout.interface);
+    try generate(csv, &stdout.interface, init.gpa);
     try stdout.interface.flush();
 }
 
-fn generate(csv: []const u8, writer: *std.Io.Writer) !void {
+fn generate(csv: []const u8, writer: *std.Io.Writer, allocator: std.mem.Allocator) !void {
     var lines = std.mem.splitScalar(u8, csv, '\n');
     const header = lines.next() orelse return error.EmptyCsv;
 
@@ -34,15 +40,12 @@ fn generate(csv: []const u8, writer: *std.Io.Writer) !void {
         return error.MissingNameColumn;
     const price_column = findColumn(header_fields[0..header_count], "Price (known)") orelse
         return error.MissingKnownPriceColumn;
+    const action_column = findColumn(header_fields[0..header_count], "Действие") orelse
+        return error.MissingActionColumn;
 
-    try writer.writeAll(
-        "const archetype = @import(\"archetypes.zig\");\n" ++
-            "const cp = @import(\"../codepoints.zig\");\n" ++
-            "const g = @import(\"../game_pkg.zig\");\n" ++
-            "const c = g.components;\n\n",
-    );
+    var rows: std.ArrayList(PotionRow) = .empty;
+    defer rows.deinit(allocator);
 
-    var first = true;
     while (lines.next()) |raw_line| {
         const line = std.mem.trimEnd(u8, raw_line, "\r");
         if (line.len == 0)
@@ -53,24 +56,61 @@ fn generate(csv: []const u8, writer: *std.Io.Writer) !void {
         if (field_count <= @max(name_column, price_column))
             return error.MissingField;
 
-        const name = fields[name_column];
         const price = fields[price_column];
         _ = std.fmt.parseInt(u16, price, 10) catch return error.InvalidPrice;
+        try rows.append(allocator, .{
+            .name = fields[name_column],
+            .price = price,
+            .calories = try extractCalories(fields[action_column]),
+        });
+    }
 
+    std.mem.sort(PotionRow, rows.items, {}, lessThanByName);
+
+    try writer.writeAll(
+        "const archetype = @import(\"archetypes.zig\");\n" ++
+            "const cp = @import(\"../codepoints.zig\");\n" ++
+            "const g = @import(\"../game_pkg.zig\");\n" ++
+            "const c = g.components;\n\n",
+    );
+
+    var first = true;
+    for (rows.items) |row| {
         if (!first)
             try writer.writeAll("\n");
         first = false;
 
-        try writeSnakeCase(writer, name);
-        try writer.writeAll("_potion: c.Components = archetype.potion(.{\n");
+        try writeSnakeCase(writer, row.name);
+        try writer.writeAll(": c.Components = archetype.potion(.{\n");
         try writer.writeAll("    .description = .{ .preset = .");
-        try writeSnakeCase(writer, name);
-        try writer.writeAll("_potion },\n    .sprite = .{ .codepoint = cp.potion },\n    .price = .{ .value = ");
-        try writer.writeAll(price);
-        try writer.writeAll(" },\n    .potion = .");
-        try writeSnakeCase(writer, name);
+        try writeSnakeCase(writer, row.name);
+        try writer.writeAll(" },\n    .sprite = .{ .codepoint = cp.potion },\n    .price = .{ .value = ");
+        try writer.writeAll(row.price);
+        try writer.writeAll(" },\n");
+        if (row.calories) |calories| {
+            try writer.writeAll("    .consumable = .{ .calories = ");
+            try writer.writeAll(calories);
+            try writer.writeAll(" },\n");
+        }
+        try writer.writeAll("    .potion = .");
+        try writeSnakeCase(writer, row.name);
         try writer.writeAll(",\n}),\n");
     }
+}
+
+fn lessThanByName(_: void, lhs: PotionRow, rhs: PotionRow) bool {
+    return std.mem.lessThan(u8, lhs.name, rhs.name);
+}
+
+fn extractCalories(action: []const u8) !?[]const u8 {
+    const prefix = "Утоляет голод (";
+    const prefix_start = std.mem.indexOf(u8, action, prefix) orelse return null;
+    const value_start = prefix_start + prefix.len;
+    const value_end = std.mem.indexOfScalarPos(u8, action, value_start, ')') orelse
+        return error.InvalidCalories;
+    const value = action[value_start..value_end];
+    _ = std.fmt.parseInt(u16, value, 10) catch return error.InvalidCalories;
+    return value;
 }
 
 fn findColumn(columns: []const []const u8, name: []const u8) ?usize {

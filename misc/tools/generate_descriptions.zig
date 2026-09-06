@@ -5,6 +5,11 @@ const max_columns = 32;
 const max_line_length = 35;
 const max_words = 64;
 
+const DescriptionRow = struct {
+    name: []const u8,
+    description: []const u8,
+};
+
 pub fn main(init: std.process.Init) !void {
     var args = init.minimal.args.iterate();
     _ = args.next();
@@ -22,11 +27,11 @@ pub fn main(init: std.process.Init) !void {
     var stdout = std.Io.File.stdout().writer(init.io, &buffer);
     defer stdout.interface.flush() catch {};
 
-    try generate(csv, &stdout.interface);
+    try generate(csv, &stdout.interface, init.gpa);
     try stdout.interface.flush();
 }
 
-fn generate(csv: []const u8, writer: *std.Io.Writer) !void {
+fn generate(csv: []const u8, writer: *std.Io.Writer, allocator: std.mem.Allocator) !void {
     var lines = std.mem.splitScalar(u8, csv, '\n');
     const header = lines.next() orelse return error.EmptyCsv;
 
@@ -36,6 +41,9 @@ fn generate(csv: []const u8, writer: *std.Io.Writer) !void {
         return error.MissingNameColumn;
     const description_column = findColumn(header_fields[0..header_count], "Description") orelse
         return error.MissingDescriptionColumn;
+
+    var rows: std.ArrayList(DescriptionRow) = .empty;
+    defer rows.deinit(allocator);
 
     while (lines.next()) |raw_line| {
         const line = std.mem.trimEnd(u8, raw_line, "\r");
@@ -47,8 +55,17 @@ fn generate(csv: []const u8, writer: *std.Io.Writer) !void {
         if (field_count <= @max(name_column, description_column))
             return error.MissingField;
 
-        const name = fields[name_column];
-        const description = fields[description_column];
+        try rows.append(allocator, .{
+            .name = fields[name_column],
+            .description = fields[description_column],
+        });
+    }
+
+    std.mem.sort(DescriptionRow, rows.items, {}, lessThanByName);
+
+    for (rows.items) |row| {
+        const name = row.name;
+        const description = row.description;
 
         try writeSnakeCase(writer, name);
         try writer.writeAll(": g.Description = .{\n    .name = \"");
@@ -57,6 +74,10 @@ fn generate(csv: []const u8, writer: *std.Io.Writer) !void {
         try writeWrappedDescription(writer, description);
         try writer.writeAll("    },\n},\n\n");
     }
+}
+
+fn lessThanByName(_: void, lhs: DescriptionRow, rhs: DescriptionRow) bool {
+    return std.mem.lessThan(u8, lhs.name, rhs.name);
 }
 
 fn findColumn(columns: []const []const u8, name: []const u8) ?usize {

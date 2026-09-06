@@ -107,7 +107,7 @@ fn generateRandomItem(registry: *g.Registry, rand: std.Random, depth: u8, propor
         .potions => return try generatePotion(registry, rand),
         .ammo => return try generateAmmo(registry, rand),
         .torch => return try registry.addNewEntity(g.entities.presets.Items.get(.torch)),
-        .oil => return try registry.addNewEntity(g.entities.presets.Potions.get(.oil_potion)),
+        .oil => return try registry.addNewEntity(g.entities.presets.Potions.get(.oil)),
     }
 }
 
@@ -208,8 +208,8 @@ fn generateWeapon(registry: *g.Registry, rand: std.Random, depth: u8) !g.Entity 
     return try registry.addNewEntity(g.entities.presets.Weapons.fields.values[idx].*);
 }
 
-const food_proportions: [g.entities.presets.Food.count]u8 = blk: {
-    const weights: std.enums.EnumMap(g.entities.presets.Food.Tag, u8) = .init(.{
+const food_proportions: [g.entities.presets.Food.count]u16 = blk: {
+    const weights: std.enums.EnumMap(g.entities.presets.Food.Tag, u16) = .init(.{
         .apple = 100,
         .dried_fruits = 90,
         .cheese = 80,
@@ -227,7 +227,7 @@ const food_proportions: [g.entities.presets.Food.count]u8 = blk: {
         .insect_paste = 8,
         .armadillo_roast = 6,
     });
-    var proportions: [g.entities.presets.Food.count]u8 = undefined;
+    var proportions: [g.entities.presets.Food.count]u16 = undefined;
     for (std.enums.values(g.entities.presets.Food.Tag), 0..) |food, i| {
         proportions[i] = weights.getAssertContains(food);
     }
@@ -235,17 +235,24 @@ const food_proportions: [g.entities.presets.Food.count]u8 = blk: {
 };
 
 fn generateFood(registry: *g.Registry, rand: std.Random) !g.Entity {
-    const idx = rand.weightedIndex(u8, &food_proportions);
+    const idx = rand.weightedIndex(u16, &food_proportions);
     return try registry.addNewEntity(g.entities.presets.Food.get(@enumFromInt(idx)));
 }
 
-const potions_proportions: [g.entities.presets.Potions.count]u8 = blk: {
-    const weights: std.enums.EnumMap(g.entities.presets.Potions.Tag, u8) = .init(.{
-        .healing_potion = 50,
-        .poisoning_potion = 10,
-        .oil_potion = 30,
+const potions_proportions: [g.entities.presets.Potions.count]u16 = blk: {
+    const weights: std.enums.EnumMap(g.entities.presets.Potions.Tag, u16) = .init(.{
+        .healing = 50,
+        .oil = 30,
+        .poison = 10,
+        .bouillon = 70,
+        .spoiled_bouillon = 70,
+        .acid = 10,
+        .water = 40,
+        .antidote = 30,
+        .liquid_fire = 10,
+        .machine_oil = 20,
     });
-    var proportions: [g.entities.presets.Potions.count]u8 = undefined;
+    var proportions: [g.entities.presets.Potions.count]u16 = undefined;
     for (std.enums.values(g.entities.presets.Potions.Tag), 0..) |potion, i| {
         proportions[i] = weights.getAssertContains(potion);
     }
@@ -253,7 +260,7 @@ const potions_proportions: [g.entities.presets.Potions.count]u8 = blk: {
 };
 
 fn generatePotion(registry: *g.Registry, rand: std.Random) !g.Entity {
-    const idx = rand.weightedIndex(u8, &potions_proportions);
+    const idx = rand.weightedIndex(u16, &potions_proportions);
     return try registry.addNewEntity(g.entities.presets.Potions.get(@enumFromInt(idx)));
 }
 

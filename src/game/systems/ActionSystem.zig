@@ -336,6 +336,8 @@ fn drinkPotion(self: *Self, actor: g.Entity, potion_id: g.Entity) !void {
             if (poison.damage < damage)
                 poison.damage = damage;
         },
+        .bouillon => try self.eat(actor, potion_id),
+        else => {},
     }
 
     try self.session().journal.markPotionAsKnown(potion);

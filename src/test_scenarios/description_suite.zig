@@ -31,7 +31,7 @@ test "Describe an unknown potion" {
     defer test_session.deinit();
 
     const inventory = try test_session.openInventory();
-    const potion = try inventory.add(g.entities.presets.Potions.get(.healing_potion));
+    const potion = try inventory.add(g.entities.presets.Potions.get(.healing));
     const modal_window = try inventory.chooseItemById(potion);
     try (try modal_window.asOptions()).choose("Describe");
 
@@ -56,23 +56,23 @@ test "Describe a known potion (after drinking a similar)" {
 
     // Drink a potion:
     var inventory = try test_session.openInventory();
-    const potion_to_drink = try inventory.add(g.entities.presets.Potions.get(.healing_potion));
+    const potion_to_drink = try inventory.add(g.entities.presets.Potions.get(.healing));
     var modal_window = try inventory.chooseItemById(potion_to_drink);
     try (try modal_window.asOptions()).choose("Drink");
 
     // Check the description:
     inventory = try test_session.openInventory();
-    const potion_to_describe = try inventory.add(g.entities.presets.Potions.get(.healing_potion));
+    const potion_to_describe = try inventory.add(g.entities.presets.Potions.get(.healing));
     modal_window = try inventory.chooseItemById(potion_to_describe);
     try (try modal_window.asOptions()).choose("Describe");
 
     try test_session.runtime.display.expectLooksLike(
-        \\┌───────────A healing potion───────────┐
-        \\│ A brew that glows faintly, as if     │
-        \\│ mends alive. It warms your veins     │
-        \\│ and your wounds instantly.           │
-        \\│                                      │
-        \\│                                      │
+        \\┌───────────────Healing────────────────┐
+        \\│ The  warm  medicinal brew smells of  │
+        \\│ herbs  and  honey.  A  few  careful  │
+        \\│ swallows restore strength, dull the  │
+        \\│ pain,  and help the body endure its  │
+        \\│ deepest wounds.                      │
         \\│                                      │
         \\│                                      │
         \\│                                      │

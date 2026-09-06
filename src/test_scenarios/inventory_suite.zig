@@ -591,7 +591,7 @@ test "Drink a healing potion" {
 
     test_session.player.health().current_hp = 5;
     var inventory = try test_session.openInventory();
-    const potion = g.entities.presets.Potions.get(.healing_potion);
+    const potion = g.entities.presets.Potions.get(.healing);
     const potion_id = try inventory.add(potion);
     const modal_window = try inventory.chooseItemById(potion_id);
     try (try modal_window.asOptions()).choose("Drink");
@@ -611,7 +611,7 @@ test "An unrecognized oil can't be used" {
     // Prepare inventory:
     var inventory = try test_session.openInventory();
     // Add unrecognized oil
-    const oil = g.entities.presets.Potions.get(.oil_potion);
+    const oil = g.entities.presets.Potions.get(.oil);
     const oil_id = try inventory.add(oil);
     // Check available options in menu:
     _ = try inventory.chooseItemById(oil_id);
@@ -637,7 +637,7 @@ test "Combining oil with lamp should increase lamp's charge" {
     // Prepare inventory:
     var inventory = try test_session.openInventory();
     // Add recognized oil
-    const oil = g.entities.presets.Potions.get(.oil_potion);
+    const oil = g.entities.presets.Potions.get(.oil);
     const oil_id = try inventory.add(oil);
     try test_session.session.journal.markPotionAsKnown(oil.potion.?);
     // Add used lamp
