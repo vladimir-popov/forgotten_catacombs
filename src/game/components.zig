@@ -466,8 +466,15 @@ pub const Position = struct {
 
 pub const Potion = enum {
     healing,
-    poison,
     oil,
+    poison,
+    bouillon,
+    spoiled_bouillon,
+    acid,
+    water,
+    antidote,
+    liquid_fire,
+    machine_oil,
 };
 
 pub const Price = struct {

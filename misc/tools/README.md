@@ -1,5 +1,7 @@
 # Tools
 
+_All scripts have been generated in Codex_
+
 ## Generate Food Entities
 
 The `generate_food.zig` script generates Zig entity definitions from
@@ -51,3 +53,38 @@ zig run misc/tools/generate_weights.zig -- misc/entities/Food.csv
 
 The output can be inserted into the initializer passed to
 `std.enums.EnumMap.init`.
+
+## Generate Potion Entities
+
+The `generate_potions.zig` script generates potion entity definitions from the
+`Name` and `Price (known)` columns of a CSV file.
+
+Run it from the project root:
+
+```sh
+zig run misc/tools/generate_potions.zig -- misc/entities/Potions.csv \
+  > src/game/entities/potions.zig
+```
+
+The entity and description preset names use the `snake_case` name with a
+`_potion` suffix. The `Potion` component uses the same name without the
+suffix. For example, `Bouillon` generates `bouillon_potion` and `.bouillon`.
+
+## Generate Enum Values
+
+The `generate_enum.zig` script generates enum values from the `Name` column of
+a CSV file.
+
+Run it from the project root:
+
+```sh
+zig run misc/tools/generate_enum.zig -- misc/entities/Potions.csv
+```
+
+The output uses lowercase `snake_case` values:
+
+```zig
+    healing,
+    poison,
+    oil,
+```
