@@ -250,7 +250,6 @@ const potions_proportions: [g.entities.presets.Potions.count]u16 = blk: {
         .water = 40,
         .antidote = 30,
         .liquid_fire = 10,
-        .machine_oil = 20,
     });
     var proportions: [g.entities.presets.Potions.count]u16 = undefined;
     for (std.enums.values(g.entities.presets.Potions.Tag), 0..) |potion, i| {

@@ -461,17 +461,6 @@ pub const Food = struct {
         },
     },
 
-    machine_oil: g.Description = .{
-        .name = "Machine Oil",
-        .description = &.{
-            "Heavy  machine oil fills cracks and",
-            "frees  jammed  mechanisms.  It  was",
-            "never  meant  for  a  living  body,",
-            "where  it burns through the stomach",
-            "and leaves a metallic ache.",
-        },
-    },
-
     oil: g.Description = .{
         .name = "Oil",
         .description = &.{

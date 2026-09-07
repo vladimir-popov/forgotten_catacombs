@@ -474,7 +474,6 @@ pub const Potion = enum {
     water,
     antidote,
     liquid_fire,
-    machine_oil,
 };
 
 pub const Price = struct {

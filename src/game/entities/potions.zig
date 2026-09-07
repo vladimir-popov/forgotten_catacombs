@@ -39,13 +39,6 @@ liquid_fire: c.Components = archetype.potion(.{
     .potion = .liquid_fire,
 }),
 
-machine_oil: c.Components = archetype.potion(.{
-    .description = .{ .preset = .machine_oil },
-    .sprite = .{ .codepoint = cp.potion },
-    .price = .{ .value = 96 },
-    .potion = .machine_oil,
-}),
-
 oil: c.Components = archetype.potion(.{
     .description = .{ .preset = .oil },
     .sprite = .{ .codepoint = cp.potion },

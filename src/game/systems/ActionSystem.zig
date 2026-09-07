@@ -28,8 +28,10 @@ pub fn doAction(
 ) !ActionResult {
     switch (action.tag) {
         .drink => {
-            try self.drinkPotion(actor, action.payload.drink);
-            return .{ .done = speed.moving_speed };
+            if (try self.drinkPotion(actor, action.payload.drink))
+                return .{ .done = speed.moving_speed }
+            else
+                return .actor_is_dead;
         },
         .eat => {
             try self.eat(actor, action.payload.eat);
@@ -310,9 +312,18 @@ fn handleTrap(self: *Self, actor: g.Entity, trap_id: g.Entity, trap: *const c.Tr
     return is_actor_alive;
 }
 
-fn drinkPotion(self: *Self, actor: g.Entity, potion_id: g.Entity) !void {
+/// `false` means that the target is dead
+fn drinkPotion(self: *Self, actor: g.Entity, potion_id: g.Entity) !bool {
     const registry = &self.session().registry;
     const potion = registry.getUnsafe(potion_id, c.Potion).*;
+
+    try self.session().journal.markPotionAsKnown(potion);
+    // try to remove from the inventory
+    if (self.session().registry.get(actor, c.Inventory)) |inventory| {
+        _ = inventory.items.remove(potion_id);
+    }
+    // remove the item
+    defer self.session().registry.removeEntity(potion_id) catch @panic("Error on removing a potion entity");
 
     // handle consequences
     switch (potion) {
@@ -324,10 +335,16 @@ fn drinkPotion(self: *Self, actor: g.Entity, potion_id: g.Entity) !void {
                 health,
             );
         },
+        .acid, .liquid_fire => {
+            const health = self.session().registry.getUnsafe(actor, c.Health);
+            const k: f32 = 0.7;
+            const damage: u8 = @intFromFloat(k * g.utils.ff32(health.max));
+            return try self.session().damage.applyDamage(potion_id, actor, health, damage);
+        },
         .poison, .oil => {
             const health = self.session().registry.getUnsafe(actor, c.Health);
-            const k: f32 = if (potion == .poison) 0.4 else 0.1;
-            const damage: u8 = @intFromFloat(k * g.utils.ff32(health.max));
+            const k: f32 = if (potion == .poison) 0.5 else 0.2;
+            const damage: u8 = @intFromFloat(k * g.utils.ff32(health.current_hp));
             const poison = try self.session().registry.getOrSet(
                 actor,
                 c.Poison,
@@ -336,17 +353,20 @@ fn drinkPotion(self: *Self, actor: g.Entity, potion_id: g.Entity) !void {
             if (poison.damage < damage)
                 poison.damage = damage;
         },
+        .antidote => {
+            try self.session().registry.remove(actor, c.Poison);
+        },
         .bouillon => try self.eat(actor, potion_id),
-        else => {},
+        .spoiled_bouillon => {
+            if (self.session().registry.get(actor, c.Hunger)) |hunger| {
+                hunger.turns_after_eating +|= 300;
+            }
+        },
+        .water => {
+            // do nothing
+        },
     }
-
-    try self.session().journal.markPotionAsKnown(potion);
-    // try to remove from the inventory
-    if (self.session().registry.get(actor, c.Inventory)) |inventory| {
-        _ = inventory.items.remove(potion_id);
-    }
-    // remove the item
-    try self.session().registry.removeEntity(potion_id);
+    return true;
 }
 
 fn eat(self: *Self, actor: g.Entity, food: g.Entity) !void {

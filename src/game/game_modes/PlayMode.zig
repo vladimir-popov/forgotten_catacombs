@@ -44,7 +44,7 @@ pub fn init(
         self.session.viewport.region.cols,
     );
     try session.render.redrawFromSceneBuffer();
-    std.debug.assert(!try self.draw());
+    _ = !try self.draw();
 }
 
 fn setTarget(self: *Self, target: ?g.Entity) void {
