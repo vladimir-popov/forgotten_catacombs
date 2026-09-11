@@ -648,9 +648,28 @@ pub const Weapon = struct {
         return .{ .max_distance = 1, .ammunition_type = null, .class = class, .damage = damage, .effects = effs };
     }
 
-    pub fn ranged(max_distance: u8, ammunition_type: Ammunition.Type, class: Class, damage: p.Range(u8)) Weapon {
+    pub fn ranged(class: Class, damage: p.Range(u8), max_distance: u8, ammunition_type: Ammunition.Type) Weapon {
         std.debug.assert(max_distance > 1);
         return .{ .max_distance = max_distance, .ammunition_type = ammunition_type, .class = class, .damage = damage };
+    }
+
+    pub fn rangedWithEffect(
+        class: Class,
+        damage: p.Range(u8),
+        max_distance: u8,
+        ammunition_type: Ammunition.Type,
+        effect: ElementalEffect,
+    ) Weapon {
+        std.debug.assert(max_distance > 1);
+        var effs: std.EnumSet(ElementalEffect) = .{};
+        effs.insert(effect);
+        return .{
+            .max_distance = max_distance,
+            .ammunition_type = ammunition_type,
+            .class = class,
+            .damage = damage,
+            .effects = effs,
+        };
     }
 };
 
