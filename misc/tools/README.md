@@ -75,15 +75,35 @@ An action in the form `Утоляет голод (N)` also generates a `Consumab
 component with `N` calories.
 Generated potion entities are sorted alphabetically by `Name`.
 
-## Generate Enum Values
+## Generate Weapon Entities
 
-The `generate_enum.zig` script generates enum values from the `Name` column of
+The `generate_weapons.zig` script generates weapon entity definitions from
+the `Name`, `Stat`, `Damage`, `Ammo`, `Range`, `Effect`, and `Price` columns of
 a CSV file.
 
 Run it from the project root:
 
 ```sh
-zig run misc/tools/generate_enum.zig -- misc/entities/Potions.csv
+zig run misc/tools/generate_weapons.zig -- misc/entities/Weapon.csv \
+  > src/game/entities/weapons.zig
+```
+
+The `Damage` column must contain a range such as `3-5`. The `Stat` values
+`STR`, `DEX`, and `INT` are mapped to the corresponding weapon classes.
+An empty `Ammo` field generates a melee weapon. Otherwise, `Ammo` selects the
+ranged weapon ammunition type. A non-empty `Effect` field adds the matching
+elemental effect.
+Generated weapon entities are sorted alphabetically by `Name`.
+
+## Generate Names as Enum Values
+
+The `generate_names_enum.zig` script generates enum values from the `Name` column of
+a CSV file.
+
+Run it from the project root:
+
+```sh
+zig run misc/tools/generate_names_enum.zig -- misc/entities/Potions.csv
 ```
 
 The output uses lowercase `snake_case` values:
