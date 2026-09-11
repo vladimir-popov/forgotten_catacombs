@@ -8,8 +8,9 @@ const log = std.log.scoped(.test_utils);
 
 const Self = @This();
 
-const zero_symbol = '�';
+const zero_symbol = '◌';
 const space_symbol = '¶';
+const any_symbol = '�';
 
 pub const ComparingArea = union(enum) {
     whole_display,
@@ -175,6 +176,9 @@ fn isEqual(codepoint: u21, expected_symbol: u21) bool {
     if (codepoint == 0) {
         return isBlank(expected_symbol);
     }
+    if (expected_symbol == any_symbol)
+        return true;
+
     return codepoint == expected_symbol;
 }
 

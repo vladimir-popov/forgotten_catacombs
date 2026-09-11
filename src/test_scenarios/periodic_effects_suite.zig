@@ -59,7 +59,7 @@ test "Hunger should decrease health every cycle" {
         \\~~~~~~~~~~~~~~~~~~~│@│~~~~~~~~~~~~~~~~~~
         \\~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         \\════════════════════════════════════════
-        \\       Hungry       ⇧Explore ��  Wait  ⇧
+        \\       Hungry       ⇧Explore     Wait  ⇧
     , .whole_display);
     try std.testing.expect(health.current_hp < health_before);
 }
@@ -87,7 +87,7 @@ test "Poison should damaging every tick" {
         \\~~~~~~~~~~~~~~~~~~~│@│~~~~~~~~~~~~~~~~~~
         \\~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         \\════════════════════════════════════════
-        \\      Poisoned      ⇧Explore ��  Wait  ⇧
+        \\      Poisoned      ⇧Explore     Wait  ⇧
     , .whole_display);
     try std.testing.expect(test_session.player.health().current_hp < health_before);
 }

@@ -108,7 +108,7 @@ test "Trying to sell when the trader doesn't have enough money" {
         \\║                                      ║
         \\╚══════════════════════════════════════╝
         \\════════════════════════════════════════
-        \\ Traider's:     0$           �� Close   
+        \\ Traider's:     0$              Close   
     , .whole_display);
 }
 

@@ -16,7 +16,7 @@ test "Init near the scientist" {
         \\╔═══════════╗══════════════════════════╗
         \\║ Recognize ║   Modify      Repair     ║
         \\║           ╚══════════════════════════║
-        \\║¿ A teal potion                   30$ ║
+        \\║¿ A teal potion                  ���$ ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
@@ -124,15 +124,15 @@ test "Modify an item somehow when enough money" {
         \\╔═══════════╗══════════════════════════╗
         \\║ Recognize ║   Modify      Repair     ║
         \\║           ╚══════════════════════════║
-        \\║\ Pickaxe                         11$ ║
-        \\║¿ A teal potion                   30$ ║
+        \\║\ Pickaxe                       ����$ ║
+        \\║¿ A teal potion                 ����$ ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
         \\╚══════════════════════════════════════╝
         \\════════════════════════════════════════
-        \\ Your money:  900$    Close  �� Choose ⇧
+        \\ Your money:  900$    Close     Choose ⇧
     , .whole_display);
 }
 
@@ -191,7 +191,7 @@ test "Modify an item when it has all possible modifications" {
         \\║                                      ║
         \\╚══════════════════════════════════════╝
         \\════════════════════════════════════════
-        \\ Your money: 9000$           �� Close   
+        \\ Your money: 9000$              Close   
     , .whole_display);
 }
 
@@ -212,7 +212,7 @@ test "Repair a broken known item from the inventory" {
         \\╔═════════════════════════╔════════════╗
         \\║ Recognize     Modify    ║ Repair     ║
         \\║═════════════════════════╝            ║
-        \\║/ Pickaxe                         12$ ║
+        \\║/ Pickaxe                       ����$ ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║

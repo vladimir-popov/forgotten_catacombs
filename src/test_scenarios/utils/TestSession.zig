@@ -54,7 +54,7 @@ pub fn initOnFirstLevel(self: *Self, gpa: std.mem.Allocator, io: std.Io) !void {
 ///••••••••••••••••••••••••••••••••••••••••
 ///••••••••••••••••••••••••••••••••••••••••
 ///════════════════════════════════════════
-///                    ⇧Explore ��  Wait  ⇧
+///                    ⇧Explore     Wait  ⇧
 /// ```
 pub fn initWithTestArea(self: *Self, gpa: std.mem.Allocator, io: std.Io) !void {
     // TODO: Refactor to not create a first level here

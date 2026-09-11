@@ -45,7 +45,7 @@ test "Level up should become available after killing an enemy and receiving enou
     // Check that the Level up is not available
     try test_session.exploreMode();
     try test_session.runtime.display.expectLooksLike(
-        \\        You         ⇧Describe�� Cancel  
+        \\        You         ⇧Describe   Cancel  
     , .info_bar);
     try test_session.pressButton(.b);
     try test_session.runtime.display.expectLooksLike(
@@ -58,7 +58,7 @@ test "Level up should become available after killing an enemy and receiving enou
     try test_session.pressButton(.a);
     try test_session.tick(.{ .count = 5 });
     try test_session.runtime.display.expectLooksLike(
-        \\ r:|                ⇧Explore �� Attack ⇧
+        \\ r:|                ⇧Explore    Attack ⇧
     , .info_bar);
 
     // Hit the target
@@ -73,7 +73,7 @@ test "Level up should become available after killing an enemy and receiving enou
     // Now the level up should be available
     try test_session.exploreMode();
     try test_session.runtime.display.expectLooksLike(
-        \\        You         ⇧Describe�� Cancel  
+        \\        You         ⇧Describe   Cancel  
     , .info_bar);
     try test_session.pressButton(.b);
     try test_session.runtime.display.expectLooksLike(

@@ -612,10 +612,11 @@ test "Describe a melee weapon" {
 
     // then:
     try expectContent(text_area,
-        \\Wooden handle, cloth wrap, burning
-        \\flame. Lasts until the  fire dies.
-        \\It can be  used as a weapon out of
-        \\despair.
+        \\A  cloth-wrapped torch burns with a
+        \\smoky,  uneven  flame.  Ash  drifts
+        \\from  its  ember while the stubborn
+        \\light  clings  to  the darkness and
+        \\refuses to die.
         \\
         \\This is a primitive weapon.
         \\Damage: 1-1
@@ -644,13 +645,15 @@ test "Describe a bow" {
 
     // then:
     try expectContent(text_area,
-        \\A compact bow. Quick to draw,
-        \\quiet, and effective at short
-        \\range.
+        \\A  light  bow  creaks  beneath  its
+        \\drawn   string.   The   wood  looks
+        \\fragile,  yet  every  curve  stores
+        \\enough  spring to send an arrow far
+        \\into the waiting dark.
         \\
         \\This is a tricky weapon.
-        \\Damage: 2-3
-        \\Max range: 5
+        \\Damage: 4-6
+        \\Max range: 3
     );
 }
 

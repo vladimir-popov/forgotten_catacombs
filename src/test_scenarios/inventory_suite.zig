@@ -311,7 +311,7 @@ test "Pickup a gold pile" {
         \\║                                      ║
         \\╚══════════════════════════════════════╝
         \\════════════════════════════════════════
-        \\        107$          Close  �� Choose ⇧
+        \\        107$          Close     Choose ⇧
     , .whole_display);
 
     // Switch to the Drop Tab:
@@ -338,7 +338,7 @@ test "Pickup a gold pile" {
         \\║                                      ║
         \\╚══════════════════════════════════════╝
         \\════════════════════════════════════════
-        \\        149$          Close  �� Choose ⇧
+        \\        149$          Close     Choose ⇧
     , .whole_display);
 
     // The gold pile should not exists anywhere:
@@ -381,7 +381,7 @@ test "Pickup gold from a pile of items" {
         \\║                                      ║
         \\╚══════════════════════════════════════╝
         \\════════════════════════════════════════
-        \\        107$          Close  �� Choose ⇧
+        \\        107$          Close     Choose ⇧
     , .whole_display);
 
     // Pickup the gold:
@@ -399,7 +399,7 @@ test "Pickup gold from a pile of items" {
         \\║                                      ║
         \\╚══════════════════════════════════════╝
         \\════════════════════════════════════════
-        \\        149$          Close  �� Choose ⇧
+        \\        149$          Close     Choose ⇧
     , .whole_display);
 
     // Switch back to the Inventory Tab:
@@ -416,7 +416,7 @@ test "Pickup gold from a pile of items" {
         \\║                                      ║
         \\╚══════════════════════════════════════╝
         \\════════════════════════════════════════
-        \\        149$                 �� Close   
+        \\        149$                    Close   
     , .whole_display);
 }
 

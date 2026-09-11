@@ -23,14 +23,14 @@ test "Shoot at the target" {
         \\#•••••••••••••#     #••••••••••••••••••#
         \\#•••┌───┐•••••###+###•••••••••••┌───┐••#
         \\#•••│   +•••••••••••••••••••••••+   │••#
-        \\#•••└───┘•••••••••••r•••••••••••└───┘••#
-        \\#•••┌───┐••••••••••••••••••••••••••••••#
+        \\#•••└───┘•••••••••••••••••••••••└───┘••#
+        \\#•••┌───┐•••••••••••r••••••••••••••••••#
         \\#•••│   +••••••••••••••••••••••••••••••#
         \\#•••└───┘••••••••••••••••••••••••••••••#
         \\~~~~~~~~~~~~~~~~~~~│@│~~~~~~~~~~~~~~~~~~
         \\~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         \\════════════════════════════════════════
-        \\ r:|||||||||||||||||⇧Explore �� Attack ⇧
+        \\ r:|||||||||||||||||⇧Explore    Attack ⇧
     , .whole_display);
 
     // Hit the target
@@ -41,7 +41,7 @@ test "Shoot at the target" {
     try test_session.pressButton(.a);
     try test_session.tick(.{});
     try test_session.runtime.display.expectLooksLike(
-        \\•
+        \\r
         \\•
         \\*
         \\@
@@ -81,7 +81,7 @@ test "The arrows entity should be removed when the last arrow was issued" {
 
 fn initFirstLevelWithRat(test_session: *TestSession) !g.Entity {
     // Prepare a game session:
-    const pp = test_session.player.position().place.movedToNTimes(.up, 4);
+    const pp = test_session.player.position().place.movedToNTimes(.up, 3);
     const rat = try test_session.session.level.addEnemy(.sleeping, g.entities.enemyAtPlace(.rat, pp));
 
     // The initial game state:
@@ -91,8 +91,8 @@ fn initFirstLevelWithRat(test_session: *TestSession) !g.Entity {
         \\#•••••••••••••#     #••••••••••••••••••#
         \\#•••┌───┐•••••###+###•••••••••••┌───┐••#
         \\#•••│   +•••••••••••••••••••••••+   │••#
-        \\#•••└───┘•••••••••••r•••••••••••└───┘••#
-        \\#•••┌───┐••••••••••••••••••••••••••••••#
+        \\#•••└───┘•••••••••••••••••••••••└───┘••#
+        \\#•••┌───┐•••••••••••r••••••••••••••••••#
         \\#•••│   +••••••••••••••••••••••••••••••#
         \\#•••└───┘••••••••••••••••••••••••••••••#
         \\~~~~~~~~~~~~~~~~~~~│@│~~~~~~~~~~~~~~~~~~

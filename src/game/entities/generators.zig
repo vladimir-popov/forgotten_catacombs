@@ -170,6 +170,26 @@ const GenerateArmorAndWeaponOptions = struct {
     };
 };
 
+/// Calculates the relative spawn weight of an armor or weapon at the given
+/// dungeon depth.
+///
+/// The average value of `range` is converted to the item's peak depth using
+/// the same progression formula for both weapon damage and armor protection:
+///
+/// ```text
+/// power = (range.min + range.max) / 2
+/// peak = 1 + floor(power / 7)
+/// ```
+///
+/// The weight is `0` when the current depth is outside `ops.radius` from the
+/// peak. Inside the radius, every depth step applies `ops.step_weight` as a
+/// penalty to `ops.base_weight`, but the result never falls below
+/// `ops.tail_weight`. This keeps an item available near its intended depth
+/// while making items from other progression stages less likely.
+///
+/// The returned value is a relative weight, not a probability. It is passed
+/// to `std.Random.weightedIndex` together with the weights of the other
+/// armor or weapon presets.
 fn armorOrWeaponWeight(range: p.Range(u8), depth: u8, ops: GenerateArmorAndWeaponOptions) u8 {
     const power: u16 = (@as(u16, range.min) + @as(u16, range.max)) / 2;
     const peak: u8 = @intCast(1 + power / 7);

@@ -13,14 +13,14 @@ test "Describe an item" {
 
     try test_session.runtime.display.expectLooksLike(
         \\┌────────────────Torch─────────────────┐
-        \\│ Wooden handle, cloth wrap, burning  ▒│
-        \\│ flame. Lasts until the  fire dies.  ░│
-        \\│ It can be  used as a weapon out of  ░│
-        \\│ despair.                            ░│
+        \\│ A  cloth-wrapped torch burns with a ▒│
+        \\│ smoky,  uneven  flame.  Ash  drifts ░│
+        \\│ from  its  ember while the stubborn ░│
+        \\│ light  clings  to  the darkness and ░│
+        \\│ refuses to die.                     ░│
         \\│                                     ░│
         \\│ This is a primitive weapon.         ░│
         \\│ Damage: 1-1                         ░│
-        \\│                                     ░│
         \\└──────────────────────────────────────┘
     , .game_area);
 }

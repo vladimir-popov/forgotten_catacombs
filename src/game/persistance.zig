@@ -454,7 +454,7 @@ test "All components should be serializable" {
         .stats = .init(1, 2, 3, 4, 5),
         .trap = .{ .power = 3 },
         .wallet = .{ .money = 321 },
-        .weapon = .ranged(5, .arrows, .tricky, .range(1, 2)),
+        .weapon = .ranged(.tricky, .range(1, 2), 5, .arrows),
     };
 
     inline for (@typeInfo(c.Components).@"struct".fields) |field| {
