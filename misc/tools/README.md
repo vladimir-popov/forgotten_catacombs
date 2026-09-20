@@ -79,7 +79,8 @@ Generated potion entities are sorted alphabetically by `Name`.
 
 The `generate_weapons.zig` script generates weapon entity definitions from
 the `Name`, `Stat`, `Damage`, `Ammo`, `Range`, `Effect`, and `Price` columns of
-a CSV file.
+a CSV file. The optional `Trait` column stores balance metadata such as `VAR`
+and is not emitted into the runtime weapon definition.
 
 Run it from the project root:
 

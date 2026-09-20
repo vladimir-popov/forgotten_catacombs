@@ -57,8 +57,8 @@ sections 3 and 5 of `misc/game_balance.md`.
 ## 5. Enemy Scaling Formulas
 
 Enemy XP and expected HP scale with enemy tier. Their formulas, coefficients,
-floor distribution, power budget, and TTK targets are stored in section 5 of
-`misc/game_balance.md`.
+floor distribution, combat profiles, and TTK targets are stored in section 5
+of `misc/game_balance.md`.
 
 ## 6. Combat Model
 
