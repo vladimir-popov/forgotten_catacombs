@@ -96,6 +96,23 @@ ranged weapon ammunition type. A non-empty `Effect` field adds the matching
 elemental effect.
 Generated weapon entities are sorted alphabetically by `Name`.
 
+## Generate Armor Entities
+
+The `generate_armor.zig` script generates armor entity definitions from the
+`Name`, `Armor`, and `Price` columns of a CSV file.
+
+Run it from the project root:
+
+```sh
+zig run misc/tools/generate_armor.zig -- misc/entities/Armor.csv \
+  > src/game/entities/armor.zig
+```
+
+The `Armor` column must contain an integer range such as `1-3` or `1–3`.
+The `Name` value is converted to `snake_case` and used both as the entity name
+and as its description preset. Generated armor entities are sorted
+alphabetically by `Name`.
+
 ## Generate Names as Enum Values
 
 The `generate_names_enum.zig` script generates enum values from the `Name` column of

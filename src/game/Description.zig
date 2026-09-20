@@ -665,7 +665,7 @@ test "Describe an armor" {
     var registry = try g.Registry.init(&game_state_arena);
     const journal = try g.Journal.init(&registry, std.enums.values(g.Color));
 
-    const id = try registry.addNewEntity(g.entities.presets.Armor.get(.jacket));
+    const id = try registry.addNewEntity(g.entities.presets.Armor.get(.riveted_leather_jacket));
     var text_area: g.windows.TextArea = .initEmpty(std.testing.allocator);
     defer text_area.deinit();
 
@@ -674,13 +674,14 @@ test "Describe an armor" {
 
     // then:
     try expectContent(text_area,
-        \\A sturdy, time-worn leather jacket.
-        \\Despite its worn  look, the  jacket
-        \\offers     surprising    resilience
-        \\against  scrapes   and  gives minor
-        \\resistance to fire and heat.
+        \\A  heavy  jacket  of boiled leather
+        \\set with rows of dull steel rivets.
+        \\Metal  shows  through  the surface,
+        \\lending a hidden strength. There is
+        \\something   more   here  than  mere
+        \\leather.
         \\
-        \\Protection: 0-5
+        \\Protection: 1-3
     );
 }
 

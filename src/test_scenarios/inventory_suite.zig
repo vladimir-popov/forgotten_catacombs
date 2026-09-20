@@ -498,13 +498,13 @@ test "Wear an armor" {
     defer test_session.deinit();
 
     const inventory = try test_session.openInventory();
-    const jacket = try inventory.add(g.entities.presets.Armor.get(.jacket));
+    const jacket = try inventory.add(g.entities.presets.Armor.get(.riveted_leather_jacket));
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
         \\║                                      ║
         \\║/ Pickaxe                      weapon ║
-        \\║] Jacket                              ║
+        \\║] Riveted leather jacket              ║
         \\║¡ Torch                         light ║
         \\║                                      ║
         \\║                                      ║
@@ -519,7 +519,7 @@ test "Wear an armor" {
         \\║              Inventory               ║
         \\║                                      ║
         \\║/ Pickaxe                      weapon ║
-        \\║] Jacket                        armor ║
+        \\║] Riveted leather jacket        armor ║
         \\║¡ Torch                         light ║
         \\║                                      ║
         \\║                                      ║
@@ -536,7 +536,7 @@ test "Trying to unequip a broken armor" {
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
 
     var inventory = try test_session.openInventory();
-    const jacket_id = try inventory.add(g.entities.presets.Armor.get(.jacket));
+    const jacket_id = try inventory.add(g.entities.presets.Armor.get(.riveted_leather_jacket));
     try std.testing.expect(try g.meta.breakItem(&test_session.session.registry, prng.random(), jacket_id, null));
 
     var modal_window = try inventory.chooseItemById(jacket_id);
@@ -546,7 +546,7 @@ test "Trying to unequip a broken armor" {
         \\║              Inventory               ║
         \\║                                      ║
         \\║/ Pickaxe                      weapon ║
-        \\║[ Jacket                        armor ║
+        \\║[ Riveted leather jacket        armor ║
         \\║¡ Torch                         light ║
         \\║                                      ║
         \\║                                      ║
@@ -575,7 +575,7 @@ test "Trying to unequip a broken armor" {
         \\║              Inventory               ║
         \\║                                      ║
         \\║/ Pickaxe                      weapon ║
-        \\║[ Jacket                        armor ║
+        \\║[ Riveted leather jacket        armor ║
         \\║¡ Torch                         light ║
         \\║                                      ║
         \\║                                      ║

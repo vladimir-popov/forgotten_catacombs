@@ -207,12 +207,12 @@ fn armorOrWeaponWeight(range: p.Range(u8), depth: u8, ops: GenerateArmorAndWeapo
 }
 
 fn generateArmor(registry: *g.Registry, rand: std.Random, depth: u8) !g.Entity {
-    var proportions: [g.entities.presets.Armor.count]u8 = undefined;
+    var proportions: [g.entities.presets.Armor.count]u16 = undefined;
     for (g.entities.presets.Armor.fields.values, 0..) |components, i| {
         const protection = components.armor.?.protection;
         proportions[i] = armorOrWeaponWeight(protection, depth, .armor_options);
     }
-    const idx = rand.weightedIndex(u8, &proportions);
+    const idx = rand.weightedIndex(u16, &proportions);
 
     return try registry.addNewEntity(g.entities.presets.Armor.fields.values[idx].*);
 }
