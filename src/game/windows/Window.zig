@@ -69,7 +69,7 @@ pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
 }
 
 /// Draws the window with a scrollbar and buttons if they are required.
-pub fn draw(self: *const Self, render: g.Render) !void {
+pub fn draw(self: *Self, render: g.Render) !void {
     try self.drawContent(render);
     try self.drawBorder(render);
     try self.drawTitle(render);

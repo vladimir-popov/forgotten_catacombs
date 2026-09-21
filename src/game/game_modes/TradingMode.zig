@@ -41,7 +41,7 @@ const w = g.windows;
 
 const log = std.log.scoped(.trading_mode);
 
-/// The biggest region that can be occupied by a modal window with description
+/// The biggest region that can be occupied by a modal window
 const MODAL_WINDOW_REGION: p.Region = p.Region.init(3, 2, g.DISPLAY_ROWS - 5, g.DISPLAY_COLS - 2);
 
 const Self = @This();
@@ -52,7 +52,7 @@ inventory: *c.Inventory,
 shop: *c.Shop,
 shop_wallet: *c.Wallet,
 main_window: w.TabbedWindow,
-modal_windows: w.ModalWindows = .empty,
+modal_windows: w.ModalWindows = .empty(MODAL_WINDOW_REGION),
 
 pub fn init(
     self: *Self,
@@ -286,7 +286,12 @@ fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButt
     log.debug("Show info about item {d}", .{item.id});
     try self.modal_windows.windows.append(
         self.session.mode_arena.allocator(),
-        try w.entityDescription(self.session.mode_arena.allocator(), self.session, item),
+        try w.entityDescription(
+            self.session.mode_arena.allocator(),
+            self.session,
+            item,
+            MODAL_WINDOW_REGION,
+        ),
     );
     // keep the main window opened
     return .keep_open;

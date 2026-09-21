@@ -290,8 +290,8 @@ fn showDescription(self: *Self, description: *const g.Description) !void {
     try self.description.?.formatTitle("{s}", .{description.name});
 }
 
-pub fn draw(self: Self, render: g.Render) !void {
-    if (self.description) |description| {
+pub fn draw(self: *Self, render: g.Render) !void {
+    if (self.description) |*description| {
         try description.draw(render);
     } else {
         try render.clearDisplay();

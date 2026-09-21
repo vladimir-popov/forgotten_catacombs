@@ -79,7 +79,7 @@ inline fn isLevelUp(self: ExploreMode) bool {
         g.meta.isLevelUp(&self.session.registry, self.session.player);
 }
 
-fn draw(self: *const ExploreMode) !void {
+fn draw(self: *ExploreMode) !void {
     if (self.description_window) |*window| {
         try window.draw(self.session.render);
         if (self.isLevelUp()) {
@@ -256,5 +256,6 @@ fn windowWithDescription(self: *ExploreMode) !w.Window {
         self.session.mode_arena.allocator(),
         self.session,
         self.entity_in_focus,
+        g.windows.Window.DEFAULT_MAX_REGION,
     );
 }

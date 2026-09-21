@@ -44,6 +44,7 @@ const Self = @This();
 tabs: [MAX_TABS]w.Window = undefined,
 tabs_len: usize = 0,
 active_tab_idx: usize = 0,
+is_redrawing_required: bool = true,
 
 pub fn deinit(self: *Self) void {
     self.tabs_len = 0;
@@ -75,6 +76,7 @@ pub fn activeTab(self: *Self) *w.Window {
 
 /// true means the window should be closed
 pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
+    self.is_redrawing_required = true;
     const tab = self.activeTab();
     if (try tab.handleButton(btn) == .close_window)
         return .close_window;
@@ -91,7 +93,10 @@ pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
     return .keep_open;
 }
 
-pub fn draw(self: *const Self, render: g.Render) !void {
+pub fn draw(self: *Self, render: g.Render) !void {
+    if (!self.is_redrawing_required) return;
+    defer self.is_redrawing_required = false;
+
     // Draw the tab titles
     const tab_title_width: usize = (WHOLE_WINDOW_REGION.cols - 2) / self.tabs_len;
     try render.drawDoubledBorder(WHOLE_WINDOW_REGION, g.Render.default_filler);

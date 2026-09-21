@@ -56,7 +56,7 @@ drop: ?g.Entity,
 /// The action initiated during manage the inventory.
 action: ?g.actions.Action = null,
 /// The stack of modal windows
-modal_windows: w.ModalWindows = .empty,
+modal_windows: w.ModalWindows = .empty(MODAL_WINDOW_REGION),
 
 pub fn init(
     self: *Self,
@@ -100,12 +100,13 @@ pub fn tick(self: *Self) !void {
 }
 
 fn draw(self: *Self) !void {
-    try self.main_window.draw(self.session.render);
     var buf: [10]u8 = undefined;
     const money = self.session.registry.getUnsafe(self.session.player, c.Wallet).money;
     try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "{d}$", .{money}));
     if (self.modal_windows.nonEmpty()) {
         try self.modal_windows.draw(self.session.render);
+    } else {
+        try self.main_window.draw(self.session.render);
     }
 }
 
@@ -169,7 +170,7 @@ const inventory_line_fmt = std.fmt.comptimePrint(
 fn useCombineDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Buttons is helt. Show modal window for {any}", .{item});
-    const window = try self.modal_windows.createOnTop(self.session.mode_arena.allocator(), MODAL_WINDOW_REGION);
+    const window = try self.modal_windows.createOnTop(self.session.mode_arena.allocator());
     const area = try window.changeContent(w.OptionsArea(g.Entity));
     area.* = .initEmpty(window.allocator(), self, .center);
     if (self.isEquipped(item)) {
@@ -296,7 +297,7 @@ fn drinkPotion(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult 
 
 fn takeFromPileOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    const window = try self.modal_windows.createOnTop(self.session.mode_arena.allocator(), MODAL_WINDOW_REGION);
+    const window = try self.modal_windows.createOnTop(self.session.mode_arena.allocator());
     var area = try window.changeContent(w.OptionsArea(g.Entity));
     area.* = .initEmpty(window.allocator(), self, .center);
     try area.addOption("Take", item, .{ .handle_release_button = takeSelectedItem });
@@ -358,7 +359,12 @@ fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButt
     log.debug("Show info about item {d}", .{item.id});
     try self.modal_windows.windows.append(
         self.session.mode_arena.allocator(),
-        try w.entityDescription(self.session.mode_arena.allocator(), self.session, item),
+        try w.entityDescription(
+            self.session.mode_arena.allocator(),
+            self.session,
+            item,
+            g.windows.Window.DEFAULT_MAX_REGION,
+        ),
     );
     // keep the main window opened
     return .keep_open;

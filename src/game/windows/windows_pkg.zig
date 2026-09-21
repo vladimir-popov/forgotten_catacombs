@@ -101,8 +101,9 @@ pub fn entityDescription(
     alloc: std.mem.Allocator,
     session: *const g.GameSession,
     entity: g.Entity,
+    window_region: p.Region,
 ) !Window {
-    var window = Window.init(alloc, Window.DEFAULT_MAX_REGION);
+    var window = Window.init(alloc, window_region);
     try window.formatTitle("{f}", .{g.Description.actualNameFormatter(session.journal, entity)});
 
     const area: *TextArea = try window.changeContent(TextArea);
