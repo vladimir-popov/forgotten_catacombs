@@ -216,22 +216,18 @@ fn initSideMenu(self: *Self) void {
     _ = self.runtime.addMenuItem("Main menu", self, goToMainMenu);
 }
 
-fn goToMainMenu(null_ptr: ?*anyopaque) callconv(.c) void {
-    if (null_ptr) |ptr| {
-        const self: *Self = @ptrCast(@alignCast(ptr));
-        std.debug.assert(self.state == .game_session);
-        self.state.game_session.switchModeToSavingSession() catch |err|
-            std.debug.panic("Error on switching to SaveSession: {any}", .{err});
-    }
+fn goToMainMenu(ptr: ?*anyopaque) callconv(.c) void {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    std.debug.assert(self.state == .game_session);
+    self.state.game_session.switchModeToSavingSession() catch |err|
+        std.debug.panic("Error on switching to SaveSession: {any}", .{err});
 }
 
-fn openInventory(null_ptr: ?*anyopaque) callconv(.c) void {
-    if (null_ptr) |ptr| {
-        const self: *Self = @ptrCast(@alignCast(ptr));
-        std.debug.assert(self.state == .game_session);
-        self.state.game_session.manageInventory() catch |err|
-            std.debug.panic("Error on opening inventory: {any}", .{err});
-    }
+fn openInventory(ptr: ?*anyopaque) callconv(.c) void {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    std.debug.assert(self.state == .game_session);
+    self.state.game_session.manageInventory() catch |err|
+        std.debug.panic("Error on opening inventory: {any}", .{err});
 }
 
 /// Checks that save file for a session exists.

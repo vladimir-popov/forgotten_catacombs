@@ -1,7 +1,38 @@
+//!## Run game
+//!
+//! 1. eventHandler(pd, .EventInit, 0);
+//! 2. updateAndRender().
+//!
+//!## Frame Run Loop
+//!```
+//! [Frame start]
+//! 1. Button callbacks (`LastButton.handleEvent`)
+//!    Once for each press/release event in the queue;
+//! 2. Game logic and rendering
+//!    `updateAndRender()`;
+//! 3. Playdate OS refreshes the display using the framebuffer
+//!    if updateAndRender returned 1;
+//! [Wait for the next frame / update opportunity]
+//!```
+//!## System Menu
+//!
+//!### Open
+//!
+//! 1. eventHandler(pd, .EventPause, 0);
+//! 2. Stop calling the updateAndRender.
+//!
+//!### Handle menu / Close
+//!
+//! 1. Handle an item callback;
+//! 2. eventHandler(pd, .EventResume, 0);
+//! 3. Button callbacks with all pressed buttons during navigate the menu;
+//! 4. updateAndRender().
+//!
 const std = @import("std");
 const api = @import("api.zig");
 const g = @import("game");
 
+const LastButton = @import("LastButton.zig");
 const PlaydateRuntime = @import("PlaydateRuntime.zig");
 
 const log = std.log.scoped(.playdate);
@@ -13,6 +44,7 @@ pub const std_options = std.Options{
         // .{ .scope = .default, .level = .debug },
         // .{ .scope = .stack, .level = .debug },
         // .{ .scope = .game, .level = .info },
+        // .{ .scope = .playdate, .level = .debug },
         // .{ .scope = .last_button, .level = .debug },
     },
 };
@@ -77,6 +109,7 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
             global_state = @ptrCast(@alignCast(playdate.system.realloc(null, @sizeOf(GlobalState))));
             global_state.playdate_runtime = PlaydateRuntime.init(playdate) catch
                 @panic("Error on creating Runtime");
+            playdate.system.setButtonCallback(LastButton.handleEvent, &global_state.playdate_runtime.last_button, 5);
             global_state.game = g.Game.init(
                 global_state.playdate_runtime.alloc,
                 global_state.playdate_runtime.runtime(),
@@ -88,7 +121,8 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
             playdate.system.setUpdateCallback(updateAndRender, global_state);
         },
         .EventPause => {
-            global_state.playdate_runtime.last_button.is_menu_shown = true;
+            log.debug("EventPause", .{});
+            global_state.playdate_runtime.is_menu_shown = true;
         },
         else => {},
     }
@@ -97,6 +131,11 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
 
 fn updateAndRender(userdata: ?*anyopaque) callconv(.c) c_int {
     const state: *GlobalState = @ptrCast(@alignCast(userdata.?));
+
+    // If this callback is invoked then the menu is closed.
+    // We have skip one button handler to ignore buttons pressed when the menu was opened.
+    state.playdate_runtime.is_menu_shown = false;
+
     // we get the first address on the stack here, this is why take the point on the pointer here
     state.playdate_runtime.stack_start = @intFromPtr(&state);
     state.game.tick() catch |err|

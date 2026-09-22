@@ -20,9 +20,13 @@ playdate: *api.PlaydateAPI,
 alloc: std.mem.Allocator,
 bitmap_table: *api.LCDBitmapTable,
 manual_qrcode: *api.LCDBitmap,
-last_button: *LastButton,
+last_button: LastButton,
 is_dev_mode: bool = false,
 stack_start: usize = 0,
+
+// dirty hack: playdate sends button events happened when the menu was opened
+// right after closing menu. But we have to ignore that events.
+is_menu_shown: bool = false,
 
 pub fn init(playdate: *api.PlaydateAPI) !Self {
     const err: ?*[*c]const u8 = null;
@@ -43,26 +47,19 @@ pub fn init(playdate: *api.PlaydateAPI) !Self {
         std.debug.panic("Error on loading image to the bitmap table: {s}", .{err_msg});
     }
 
-    const alloc = Allocator.allocator(playdate);
-    const last_button = try alloc.create(LastButton);
-    last_button.* = .reset;
-    errdefer alloc.destroy(last_button);
-
     // playdate.system.setSerialMessageCallback(serialMessageCallback);
-    playdate.system.setButtonCallback(LastButton.handleEvent, last_button, 5);
 
     return .{
         .playdate = playdate,
-        .alloc = alloc,
+        .alloc = Allocator.allocator(playdate),
         .bitmap_table = bitmap_table,
         .manual_qrcode = manual_qrcode,
-        .last_button = last_button,
+        .last_button = .reset,
     };
 }
 
 pub fn deinit(self: *Self) void {
     self.playdate.realloc(0, self.bitmap_table);
-    self.playdate.realloc(0, self.last_button);
 }
 
 pub fn runtime(self: *Self) g.Runtime {
@@ -136,7 +133,7 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?g.Button {
 
 fn cleanInputBuffer(ptr: *anyopaque) anyerror!void {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    self.last_button.* = .reset;
+    self.last_button = .reset;
 }
 
 fn clearDisplay(ptr: *anyopaque) anyerror!void {
