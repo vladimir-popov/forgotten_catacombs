@@ -1,16 +1,26 @@
 # Tools
 
-_All scripts have been generated in Codex_
+All generators are available through one CLI application:
+
+```sh
+zig run misc/tools/main.zig -- <command> <csv-path>
+```
+
+Use `--help` to list the available commands:
+
+```sh
+zig run misc/tools/main.zig -- --help
+```
 
 ## Generate Food Entities
 
-The `generate_food.zig` script generates Zig entity definitions from
+The `food` command generates Zig entity definitions from
 `misc/entities/Food.csv`.
 
 Run it from the project root:
 
 ```sh
-zig run misc/tools/generate_food.zig -- misc/entities/Food.csv \
+zig run misc/tools/main.zig -- food misc/entities/Food.csv \
   > src/game/entities/food.zig
 ```
 
@@ -26,13 +36,13 @@ Generated food entities are sorted alphabetically by `Name`.
 
 ## Generate Description Presets
 
-The `generate_descriptions.zig` script generates description declarations from
+The `descriptions` command generates description declarations from
 the `Name` and `Description` columns of a CSV file.
 
 Run it from the project root:
 
 ```sh
-zig run misc/tools/generate_descriptions.zig -- misc/entities/Food.csv
+zig run misc/tools/main.zig -- descriptions misc/entities/Food.csv
 ```
 
 The output is a fragment for `src/game/descriptions.zig`. Insert it inside the
@@ -44,13 +54,13 @@ Generated description presets are sorted alphabetically by `Name`.
 
 ## Generate Random Weights
 
-The `generate_weights.zig` script generates `EnumMap` fields from the `Name`
+The `weights` command generates `EnumMap` fields from the `Name`
 and `RND Weight` columns of a CSV file.
 
 Run it from the project root:
 
 ```sh
-zig run misc/tools/generate_weights.zig -- misc/entities/Food.csv
+zig run misc/tools/main.zig -- weights misc/entities/Food.csv
 ```
 
 The output can be inserted into the initializer passed to
@@ -58,13 +68,13 @@ The output can be inserted into the initializer passed to
 
 ## Generate Potion Entities
 
-The `generate_potions.zig` script generates potion entity definitions from the
+The `potions` command generates potion entity definitions from the
 `Name`, `Price (known)`, and `Действие` columns of a CSV file.
 
 Run it from the project root:
 
 ```sh
-zig run misc/tools/generate_potions.zig -- misc/entities/Potions.csv \
+zig run misc/tools/main.zig -- potions misc/entities/Potions.csv \
   > src/game/entities/potions.zig
 ```
 
@@ -77,7 +87,7 @@ Generated potion entities are sorted alphabetically by `Name`.
 
 ## Generate Weapon Entities
 
-The `generate_weapons.zig` script generates weapon entity definitions from
+The `weapons` command generates weapon entity definitions from
 the `Name`, `Stat`, `Damage`, `Ammo`, `Range`, `Effect`, and `Price` columns of
 a CSV file. The optional `Trait` column stores balance metadata such as `VAR`
 and is not emitted into the runtime weapon definition.
@@ -85,7 +95,7 @@ and is not emitted into the runtime weapon definition.
 Run it from the project root:
 
 ```sh
-zig run misc/tools/generate_weapons.zig -- misc/entities/Weapon.csv \
+zig run misc/tools/main.zig -- weapons misc/entities/Weapon.csv \
   > src/game/entities/weapons.zig
 ```
 
@@ -98,13 +108,13 @@ Generated weapon entities are sorted alphabetically by `Name`.
 
 ## Generate Armor Entities
 
-The `generate_armor.zig` script generates armor entity definitions from the
+The `armor` command generates armor entity definitions from the
 `Name`, `Armor`, and `Price` columns of a CSV file.
 
 Run it from the project root:
 
 ```sh
-zig run misc/tools/generate_armor.zig -- misc/entities/Armor.csv \
+zig run misc/tools/main.zig -- armor misc/entities/Armor.csv \
   > src/game/entities/armor.zig
 ```
 
@@ -115,13 +125,13 @@ alphabetically by `Name`.
 
 ## Generate Names as Enum Values
 
-The `generate_names_enum.zig` script generates enum values from the `Name` column of
+The `names-enum` command generates enum values from the `Name` column of
 a CSV file.
 
 Run it from the project root:
 
 ```sh
-zig run misc/tools/generate_names_enum.zig -- misc/entities/Potions.csv
+zig run misc/tools/main.zig -- names-enum misc/entities/Potions.csv
 ```
 
 The output uses lowercase `snake_case` values:

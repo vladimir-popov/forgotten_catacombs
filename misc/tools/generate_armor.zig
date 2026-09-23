@@ -1,6 +1,5 @@
 const std = @import("std");
 
-const max_csv_size = 1024 * 1024;
 const max_columns = 32;
 
 const Protection = struct {
@@ -14,28 +13,7 @@ const ArmorRow = struct {
     price: u16,
 };
 
-pub fn main(init: std.process.Init) !void {
-    var args = init.minimal.args.iterate();
-    _ = args.next();
-    const csv_path = args.next() orelse return error.MissingCsvPath;
-
-    const csv = try std.Io.Dir.cwd().readFileAlloc(
-        init.io,
-        csv_path,
-        init.gpa,
-        .limited(max_csv_size),
-    );
-    defer init.gpa.free(csv);
-
-    var buffer: [4096]u8 = undefined;
-    var stdout = std.Io.File.stdout().writer(init.io, &buffer);
-    defer stdout.interface.flush() catch {};
-
-    try generate(csv, &stdout.interface, init.gpa);
-    try stdout.interface.flush();
-}
-
-fn generate(csv: []const u8, writer: *std.Io.Writer, allocator: std.mem.Allocator) !void {
+pub fn generate(csv: []const u8, writer: *std.Io.Writer, allocator: std.mem.Allocator) !void {
     var lines = std.mem.splitScalar(u8, csv, '\n');
     const header = lines.next() orelse return error.EmptyCsv;
 
