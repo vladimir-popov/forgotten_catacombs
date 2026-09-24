@@ -80,6 +80,15 @@ pub const Archetypes = struct {
     },
 };
 
+pub const Stats = struct {
+    pub const Enum = std.meta.FieldEnum(Stats);
+    strength: g.Description = .{ .name = "Strength" },
+    dexterity: g.Description = .{ .name = "Dexterity" },
+    perception: g.Description = .{ .name = "Perception" },
+    intelligence: g.Description = .{ .name = "Intelligence" },
+    constitution: g.Description = .{ .name = "Constitution" },
+};
+
 pub const Skills = struct {
     pub const Enum = std.meta.FieldEnum(Skills);
     weapon_mastery: g.Description = .{

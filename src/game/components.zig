@@ -506,9 +506,11 @@ pub const Shop = struct {
 };
 
 pub const Skills = struct {
+    pub const Skill = g.descriptions.Skills.Enum;
+
     pub const zeros: Skills = .init(0, 0, 0, 0);
 
-    values: std.enums.EnumArray(g.descriptions.Skills.Enum, i4),
+    values: std.enums.EnumArray(Skill, i4),
 
     pub fn init(
         weapon_mastery: i4,
@@ -548,16 +550,11 @@ pub const Sprite = struct {
 };
 
 pub const Stats = struct {
-    pub const Stat = enum {
-        strength,
-        dexterity,
-        perception,
-        intelligence,
-        constitution,
-    };
+    pub const Stat = g.descriptions.Stats.Enum;
+
     pub const zeros: Stats = .init(0, 0, 0, 0, 0);
 
-    values: std.EnumMap(Stat, i4),
+    values: std.enums.EnumArray(Stat, i4),
 
     pub inline fn init(
         strength: i4,
@@ -578,12 +575,12 @@ pub const Stats = struct {
     }
 
     pub inline fn get(self: Stats, key: Stat) i4 {
-        return self.values.get(key) orelse 0;
+        return self.values.get(key);
     }
 
     pub fn add(self: *Stats, stat: Stat, value: i4) void {
         const old = self.get(stat);
-        self.values.put(stat, old + value);
+        self.values.set(stat, old + value);
     }
 
     pub fn merge(self: *Stats, other: Stats) void {

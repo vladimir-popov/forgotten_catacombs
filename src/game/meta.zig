@@ -8,7 +8,6 @@ const log = std.log.scoped(.meta);
 
 pub const EnemyType = g.descriptions.Enemies.Enum;
 pub const PlayerArchetype = g.descriptions.Archetypes.Enum;
-pub const Skill = g.descriptions.Skills.Enum;
 
 /// A numbers of required exp point for level up.
 /// The 0 element is a required amount of exp point to get the

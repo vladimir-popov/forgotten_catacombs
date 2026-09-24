@@ -72,23 +72,23 @@ const BuildingStep = union(enum) {
         stats: c.Stats,
         skills: c.Skills,
         remaining_points: u2,
-        options: w.OptionsArea(g.meta.Skill),
+        options: w.OptionsArea(c.Skills.Skill),
 
         fn deinit(self: *@This()) void {
             self.options.deinit();
         }
 
-        fn selectedSkill(self: @This()) g.meta.Skill {
+        fn selectedSkill(self: @This()) c.Skills.Skill {
             return self.options.selectedItem().?;
         }
-        fn increaseSkill(self: *@This(), skill: g.meta.Skill) void {
+        fn increaseSkill(self: *@This(), skill: c.Skills.Skill) void {
             if (self.remaining_points > 0) {
                 const new_value = self.skills.values.get(skill) + 1;
                 self.skills.values.set(skill, new_value);
                 self.remaining_points -= 1;
             }
         }
-        fn decriseSkill(self: *@This(), skill: g.meta.Skill) void {
+        fn decriseSkill(self: *@This(), skill: c.Skills.Skill) void {
             if (self.remaining_points < 2) {
                 const new_value = self.skills.values.get(skill) - 1;
                 self.skills.values.set(skill, new_value);
@@ -165,8 +165,8 @@ fn initSkillsStep(
     skills: c.Skills,
     remaining_points: u2,
 ) !void {
-    var options = w.OptionsArea(g.meta.Skill).initEmpty(self.arena.allocator(), self, .left);
-    for (std.enums.values(g.meta.Skill)) |skill| {
+    var options = w.OptionsArea(c.Skills.Skill).initEmpty(self.arena.allocator(), self, .left);
+    for (std.enums.values(c.Skills.Skill)) |skill| {
         // the button handler is omitted, because we have a single point to handle buttons in this mode
         const option = try options.addEmptyOption(skill);
         option.label_len = SKILLS_AREA_REGION.cols;
@@ -186,7 +186,7 @@ fn initSkillsStep(
 }
 
 fn initConfirmStep(self: *Self, stats: c.Stats, skills: c.Skills) !void {
-    const health: c.Health = g.meta.initialHealth(stats.values.getAssertContains(.constitution));
+    const health: c.Health = g.meta.initialHealth(stats.get(.constitution));
     var text_area: w.TextArea = .initEmpty(self.arena.allocator());
     try g.Description.describeProgression(1, 0, &text_area);
     _ = try text_area.addEmptyLine();

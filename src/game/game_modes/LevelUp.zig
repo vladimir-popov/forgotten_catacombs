@@ -39,7 +39,7 @@ original_skills: c.Skills,
 current_level: u4,
 levels: *c.LevelUp,
 current_skills: *c.Skills,
-options: w.OptionsArea(g.meta.Skill),
+options: w.OptionsArea(c.Skills.Skill),
 remaining_points: u4,
 
 pub fn init(session: *g.GameSession) !Self {
@@ -47,8 +47,8 @@ pub fn init(session: *g.GameSession) !Self {
     const current_level = session.registry.getUnsafe(session.player, c.Experience).level;
     const levels = session.registry.getUnsafe(session.player, c.LevelUp);
     const skills = session.registry.getUnsafe(session.player, c.Skills);
-    var options: w.OptionsArea(g.meta.Skill) = .initEmpty(session.mode_arena.allocator(), session, .left);
-    for (std.enums.values(g.meta.Skill)) |skill| {
+    var options: w.OptionsArea(c.Skills.Skill) = .initEmpty(session.mode_arena.allocator(), session, .left);
+    for (std.enums.values(c.Skills.Skill)) |skill| {
         const option = try options.addEmptyOption(skill);
         option.label_len = SKILLS_AREA_REGION.cols;
         _ = try std.fmt.bufPrint(
@@ -104,7 +104,7 @@ pub fn tick(self: *Self) !void {
     }
 }
 
-fn increaseSkill(self: *@This(), skill: g.meta.Skill) void {
+fn increaseSkill(self: *@This(), skill: c.Skills.Skill) void {
     if (self.remaining_points > 0) {
         const new_value = self.current_skills.values.get(skill) + 1;
         self.current_skills.values.set(skill, new_value);
@@ -112,7 +112,7 @@ fn increaseSkill(self: *@This(), skill: g.meta.Skill) void {
         self.levels.last_handled_level += 1;
     }
 }
-fn decriseSkill(self: *@This(), skill: g.meta.Skill) void {
+fn decriseSkill(self: *@This(), skill: c.Skills.Skill) void {
     const original_value = self.original_skills.values.get(skill);
     const current_value = self.current_skills.values.get(skill);
     if (current_value > original_value) {
