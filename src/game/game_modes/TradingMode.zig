@@ -153,8 +153,8 @@ fn drawBalance(self: Self) !void {
 }
 
 const product_fmt = std.fmt.comptimePrint(
-    "{{u}} {{s:<{d}}}{{d:4}}$",
-    .{w.TabbedWindow.TAB_REGION.cols - 9}, // "{u} ".len == 2 + "0000$".len == 5 + 2 for pads
+    "{{u}} {{s:<{d}}}{{d:4}}$ ",
+    .{w.TabbedWindow.TAB_REGION.cols - 10}, // "{u} ".len == 2 + "0000$".len == 5 + 2 for pads
 );
 
 fn formatProduct(self: *Self, line: *w.TextArea.Line, item: g.Entity, for_buying: bool) ![]const u8 {
