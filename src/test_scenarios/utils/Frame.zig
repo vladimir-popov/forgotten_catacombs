@@ -121,6 +121,10 @@ pub fn ttyFormat(self: @This(), writer: *std.Io.Writer) WriterError!void {
 
 /// Compares the content of the display in the area for comparing with a passed expectation.
 /// The highlighting is ignored.
+/// The follow special symbols can be used:
+///   - zero_symbol = '◌';
+///   - space_symbol = '¶';
+///   - any_symbol = '�';
 pub fn expectLooksLike(self: Self, expectation: []const u8, area: ComparingArea) !void {
     if (try self.diffInArea(try parse(expectation, area.toRegion()), area)) |diff| {
         var buffer: [g.DISPLAY_ROWS * g.DISPLAY_COLS * 4]u8 = @splat(0);

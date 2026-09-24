@@ -37,7 +37,7 @@ pub fn actualLevel(current_level: u4, total_experience: u16) u4 {
 
 /// Adds exp to the player's Experience. If it leads to level up,
 /// increases the player level, updates the LevelUp component for the player,
-/// and return `true`. Otherwise returns `false`.
+/// recovers its hp and return `true`. Otherwise returns `false`.
 pub fn addExperience(registry: *g.Registry, player: g.Entity, exp: u16) !bool {
     const experience = registry.getUnsafe(player, c.Experience);
     const level_before = experience.level;
@@ -46,6 +46,8 @@ pub fn addExperience(registry: *g.Registry, player: g.Entity, exp: u16) !bool {
     if (experience.level > level_before) {
         const level_up = try registry.getOrSet(player, c.LevelUp, .{ .last_handled_level = level_before });
         level_up.last_handled_level = @min(level_up.last_handled_level, level_before);
+        const health = registry.getUnsafe(player, c.Health);
+        health.current_hp = health.max;
         return true;
     } else {
         return false;

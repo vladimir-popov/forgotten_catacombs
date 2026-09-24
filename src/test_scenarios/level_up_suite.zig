@@ -81,6 +81,29 @@ test "Level up should become available after killing an enemy and receiving enou
     , .info_bar);
 }
 
+test "Level up should lead to hp recovery" {
+    var test_session: TestSession = undefined;
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
+    defer test_session.deinit();
+    errdefer test_session.printDisplay();
+
+    const player_health = test_session.player.health();
+    player_health.current_hp -= 5;
+
+    const rat_id = try addRatAndExp(&test_session);
+
+    // Hit the target
+    const rat_health = test_session.session.registry.getUnsafe(rat_id, c.Health);
+    const initial_health = rat_health.current_hp;
+    while (rat_health.current_hp == initial_health) {
+        try test_session.pressButton(.a);
+    }
+    // Skip notifications
+    try test_session.tick(.{ .duration_ms = 2000 });
+
+    try std.testing.expectEqual(player_health.max, player_health.current_hp);
+}
+
 /// Adds a rat with 1 hp to the level, and increase the player's exp to the value of one point less to get the
 /// new level.
 fn addRatAndExp(test_session: *TestSession) !g.Entity {
@@ -98,7 +121,7 @@ fn addRatAndExp(test_session: *TestSession) !g.Entity {
     // Redraw the info bar
     try test_session.tick(.{});
     try test_session.runtime.display.expectLooksLike(
-        \\######################################30
+        \\######################################��
         \\#•••••••••••••#     #••••••••••••••••••#
         \\#•••┌───┐•••••###+###•••••••••••┌───┐••#
         \\#•••│   +•••••••••••••••••••••••+   │••#
