@@ -12,15 +12,23 @@ const log = std.log.scoped(.windows);
 // with a small reserve for utf8 symbols
 const COLS = g.DISPLAY_COLS + 5;
 
+const Self = @This();
+
 /// An array of bytes to store a label for an option.
 /// It has slightly bigger length than `MAX_WIDTH` to be able to store a utf8 symbol.
 pub const Line = [COLS]u8;
 
-const Self = @This();
+pub const ButtonWithHandler = struct {
+    button: w.Button,
+    context: *anyopaque,
+    handler: *const fn (context: *anyopaque) anyerror!w.HandleButtonResult,
+};
 
 alloc: std.mem.Allocator,
 /// The scrollable content of the window
 lines: std.ArrayList(Line) = .empty,
+b_button: ?ButtonWithHandler = null,
+a_button: ?ButtonWithHandler = .{ .button = .close, .context = &.{}, .handler = closeHandler },
 
 pub fn initEmpty(alloc: std.mem.Allocator) Self {
     return .{ .alloc = alloc };
@@ -42,16 +50,35 @@ pub fn selectedLine(_: *const Self) ?usize {
     return null;
 }
 
-pub fn leftButton(_: *const Self) ?w.Button {
+pub fn leftButton(self: *const Self) ?w.Button {
+    if (self.b_button) |btn| {
+        return btn.button;
+    }
     return null;
 }
 
-pub fn rightButton(_: *const Self) ?w.Button {
-    return .close;
+pub fn rightButton(self: *const Self) ?w.Button {
+    if (self.a_button) |btn| {
+        return btn.button;
+    }
+    return null;
 }
 
-pub fn handleButton(_: *Self, btn: g.Button) !w.HandleButtonResult {
-    return if (btn.game_button == .a) .close_window else .keep_open;
+pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
+    switch (btn.game_button) {
+        .a => if (self.a_button) |button| {
+            return try button.handler(button.context);
+        },
+        .b => if (self.b_button) |button| {
+            return try button.handler(button.context);
+        },
+        else => {},
+    }
+    return .keep_open;
+}
+
+fn closeHandler(_: *anyopaque) !w.HandleButtonResult {
+    return .close_window;
 }
 
 pub fn draw(self: *const Self, render: g.Render, region: p.Region, scrolled: usize) !void {

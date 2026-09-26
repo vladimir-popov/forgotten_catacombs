@@ -36,7 +36,7 @@ session: *g.GameSession,
 original_levels: c.LevelUp,
 original_skills: c.Skills,
 /// The current level of the player
-current_level: u4,
+experience: *c.Experience,
 levels: *c.LevelUp,
 current_skills: *c.Skills,
 options: w.OptionsArea(c.Skills.Skill),
@@ -44,7 +44,7 @@ remaining_points: u4,
 
 pub fn init(session: *g.GameSession) !Self {
     log.debug("Init LevelUp mode", .{});
-    const current_level = session.registry.getUnsafe(session.player, c.Experience).level;
+    const exp = session.registry.getUnsafe(session.player, c.Experience);
     const levels = session.registry.getUnsafe(session.player, c.LevelUp);
     const skills = session.registry.getUnsafe(session.player, c.Skills);
     var options: w.OptionsArea(c.Skills.Skill) = .initEmpty(session.mode_arena.allocator(), session, .left);
@@ -62,11 +62,11 @@ pub fn init(session: *g.GameSession) !Self {
         .session = session,
         .levels = levels,
         .original_levels = levels.*,
-        .current_level = current_level,
+        .experience = exp,
         .original_skills = skills.*,
         .current_skills = skills,
         .options = options,
-        .remaining_points = current_level - levels.last_handled_level,
+        .remaining_points = exp.actualLevel() - levels.last_handled_level,
     };
 }
 
@@ -97,6 +97,7 @@ pub fn tick(self: *Self) !void {
             },
             .a => {
                 // All done. Continue playing.
+                self.experience.level = self.experience.actualLevel();
                 try self.session.continuePlay(null, null);
             },
         }
@@ -129,21 +130,18 @@ pub fn draw(self: Self, render: g.Render) !void {
     try render.drawHorizontalLine('═', title_point.movedTo(.down), g.DISPLAY_COLS);
     try render.drawHorizontalLine('═', .point(g.DISPLAY_ROWS - 1, 1), g.DISPLAY_COLS);
     var buf: [g.DISPLAY_COLS]u8 = undefined;
-    const title: []const u8 = if (self.levels.last_handled_level < self.current_level)
-        try std.fmt.bufPrint(&buf, "New level: {d}", .{self.levels.last_handled_level + 1})
-    else
-        "All done!";
     try render.drawTextWithAlign(
         g.DISPLAY_COLS,
-        title,
+        try std.fmt.bufPrint(&buf, "{d} points remain", .{self.remaining_points}),
         title_point,
         .normal,
         .center,
     );
     try self.options.draw(render, SKILLS_AREA_REGION, 0);
-    try render.drawInfo(
-        try std.fmt.bufPrint(&buf, "{d} points remain", .{self.remaining_points}),
-    );
+    try render.drawInfo(if (self.levels.last_handled_level < self.experience.actualLevel())
+        try std.fmt.bufPrint(&buf, "New level: {d}", .{self.levels.last_handled_level + 1})
+    else
+        "All done!");
     try render.drawLeftButton("Cancel", false);
     try render.drawRightButton("Apply", false);
 }

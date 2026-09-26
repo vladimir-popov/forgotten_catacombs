@@ -53,8 +53,8 @@ test "Trying to buy when NOT enough money" {
     try std.testing.expectEqual(items_before, test_session.player.inventory().items.size());
     try test_session.runtime.display.expectLooksLike(
         \\║┌────────────────────────────────────┐║
-        \\║│          You have not enough       │║
-        \\║│                 money.             │║
+        \\║│        You have not enough         │║
+        \\║│               money.               │║
         \\║└────────────────────────────────────┘║
     , .{ .region = .init(4, 1, 4, 40) });
 }
@@ -101,14 +101,14 @@ test "Trying to sell when the trader doesn't have enough money" {
         \\║        Buy       ║       Sell        ║
         \\║══════════════════╝                   ║
         \\║┌────────────────────────────────────┐║
-        \\║│          Traider doesn't have      │║
-        \\║│              enough money          │║
+        \\║│        Traider doesn't have        │║
+        \\║│            enough money            │║
         \\║└────────────────────────────────────┘║
         \\║                                      ║
         \\║                                      ║
         \\╚══════════════════════════════════════╝
         \\════════════════════════════════════════
-        \\ Traider's:     0$              Close   
+        \\ Traider's:     0$              Close¶¶¶
     , .whole_display);
 }
 

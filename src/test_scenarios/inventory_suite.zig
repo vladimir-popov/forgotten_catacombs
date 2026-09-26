@@ -30,21 +30,21 @@ test "Unequip torch" {
     defer test_session.deinit();
 
     var inventory = try test_session.openInventory();
-    const modal_window = try inventory.chooseItemByName("Torch");
+    const modal_windows = try inventory.chooseItemByName("Torch");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
+        \\║                                      ║
         \\║┌────────────────────────────────────┐║
         \\║│              Unequip               │║
         \\║│                Drop                │║
         \\║│              Describe              │║
         \\║└────────────────────────────────────┘║
         \\║                                      ║
-        \\║                                      ║
         \\╚══════════════════════════════════════╝
     , .game_area);
 
-    try (try modal_window.asOptions()).choose("Unequip");
+    try modal_windows.options(g.Entity).choose("Unequip");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
@@ -70,29 +70,29 @@ test "Trying to unequip a broken weapon" {
     try std.testing.expect(try g.meta.breakItem(&test_session.session.registry, prng.random(), pickaxe_id, null));
 
     var inventory = try test_session.openInventory();
-    const modal_window = try inventory.chooseItemByName("Pickaxe");
+    const modal_windows = try inventory.chooseItemByName("Pickaxe");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
+        \\║                                      ║
         \\║┌────────────────────────────────────┐║
         \\║│              Unequip               │║
         \\║│                Drop                │║
         \\║│              Describe              │║
         \\║└────────────────────────────────────┘║
         \\║                                      ║
-        \\║                                      ║
         \\╚══════════════════════════════════════╝
     , .game_area);
 
-    try (try modal_window.asOptions()).choose("Unequip");
+    try modal_windows.options(g.Entity).choose("Unequip");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
         \\║                                      ║
-        \\┌────────────────Oops!─────────────────┐
-        \\│ Looks like it is broken and stuck.   │
-        \\│ You will need to repair  it first.   │
-        \\└──────────────────────────────────────┘
+        \\║┌───────────────Oops!────────────────┐║
+        \\║│ Looks like it is broken and stuck. │║
+        \\║│ You will need to repair  it first. │║
+        \\║└────────────────────────────────────┘║
         \\║                                      ║
         \\║                                      ║
         \\╚══════════════════════════════════════╝
@@ -119,8 +119,8 @@ test "Drop an item" {
     defer test_session.deinit();
 
     var inventory = try test_session.openInventory();
-    const modal_window = try inventory.chooseItemByName("Torch");
-    try (try modal_window.asOptions()).choose("Drop");
+    const modal_windows = try inventory.chooseItemByName("Torch");
+    try modal_windows.options(g.Entity).choose("Drop");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════╗═══════════════════╗
         \\║     Inventory    ║       Drop        ║
@@ -155,8 +155,8 @@ test "Drop all items" {
 
     var inventory = try test_session.openInventory();
     while (!inventory.isInvetoryEmpty()) {
-        const modal_window = try inventory.chooseItemByIndex(0);
-        try (try modal_window.asOptions()).choose("Drop");
+        const modal_windows = try inventory.chooseItemByIndex(0);
+        try modal_windows.options(g.Entity).choose("Drop");
     }
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════╗═══════════════════╗
@@ -178,12 +178,12 @@ test "Pickup an item" {
     defer test_session.deinit();
     // Drop:
     var inventory = try test_session.openInventory();
-    var modal_window = try inventory.chooseItemByName("Pickaxe");
-    try (try modal_window.asOptions()).choose("Drop");
+    var modal_windows = try inventory.chooseItemByName("Pickaxe");
+    try modal_windows.options(g.Entity).choose("Drop");
     try test_session.pressButton(.right);
     // Pickup:
-    modal_window = try inventory.chooseItemByName("Pickaxe");
-    try (try modal_window.asOptions()).choose("Take");
+    modal_windows = try inventory.chooseItemByName("Pickaxe");
+    try modal_windows.options(g.Entity).choose("Take");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
@@ -205,13 +205,13 @@ test "Pickup a single item from a pile" {
     // Drop everything from the inventory:
     var inventory = try test_session.openInventory();
     while (!inventory.isInvetoryEmpty()) {
-        const modal_window = try inventory.chooseItemByIndex(0);
-        try (try modal_window.asOptions()).choose("Drop");
+        const modal_windows = try inventory.chooseItemByIndex(0);
+        try modal_windows.options(g.Entity).choose("Drop");
     }
     try test_session.pressButton(.right);
     // Pickup:
-    const modal_window = try inventory.chooseItemByIndex(0);
-    try (try modal_window.asOptions()).choose("Take");
+    const modal_windows = try inventory.chooseItemByIndex(0);
+    try modal_windows.options(g.Entity).choose("Take");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════╔═══════════════════╗
         \\║     Inventory    ║       Drop        ║
@@ -226,14 +226,14 @@ test "Pickuping all items from a pile should lead to removing the 'Drop' tab" {
     // Drop everything from the inventory:
     var inventory = try test_session.openInventory();
     while (!inventory.isInvetoryEmpty()) {
-        const modal_window = try inventory.chooseItemByIndex(0);
-        try (try modal_window.asOptions()).choose("Drop");
+        const modal_windows = try inventory.chooseItemByIndex(0);
+        try modal_windows.options(g.Entity).choose("Drop");
     }
     try test_session.pressButton(.right);
     // Pickup everything back:
     while (!inventory.isDropEmpty()) {
-        const modal_window = try inventory.chooseItemByIndex(0);
-        try (try modal_window.asOptions()).choose("Take");
+        const modal_windows = try inventory.chooseItemByIndex(0);
+        try modal_windows.options(g.Entity).choose("Take");
     }
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
@@ -249,8 +249,8 @@ test "Pickuping extra items should be imposible" {
 
     // Drop something from the inventory:
     var inventory = try test_session.openInventory();
-    var modal_window = try inventory.chooseItemByIndex(0);
-    try (try modal_window.asOptions()).choose("Drop");
+    var modal_windows = try inventory.chooseItemByIndex(0);
+    try modal_windows.options(g.Entity).choose("Drop");
 
     // Fill the inventory
     const inventory_component = test_session.session.registry.getUnsafe(test_session.player.id, c.Inventory);
@@ -265,17 +265,17 @@ test "Pickuping extra items should be imposible" {
 
     // Try to pickup something
     try std.testing.expect(!inventory.isDropEmpty());
-    modal_window = try inventory.chooseItemByIndex(0);
-    try (try modal_window.asOptions()).choose("Take");
+    modal_windows = try inventory.chooseItemByIndex(0);
+    try modal_windows.options(g.Entity).choose("Take");
 
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════╔═══════════════════╗
         \\║     Inventory    ║       Drop        ║
         \\║══════════════════╝                   ║
         \\║┌────────────────────────────────────┐║
-        \\║│        Your inventory is full!     │║
+        \\║┌────────────────────────────────────┐║
+        \\║│      Your inventory is full!       │║
         \\║└────────────────────────────────────┘║
-        \\║                                      ║
         \\║                                      ║
         \\║                                      ║
         \\╚══════════════════════════════════════╝
@@ -324,8 +324,8 @@ test "Pickup a gold pile" {
     , .{ .region = .init(1, 1, 4, 40) });
 
     // Pickup the gold:
-    const modal_window = try inventory.chooseItemByIndex(0);
-    try (try modal_window.asOptions()).choose("Take");
+    const modal_windows = try inventory.chooseItemByIndex(0);
+    try modal_windows.options(g.Entity).choose("Take");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
@@ -363,8 +363,8 @@ test "Pickup gold from a pile of items" {
     // Drop everything from the inventory:
     var inventory = try test_session.openInventory();
     while (!inventory.isInvetoryEmpty()) {
-        const modal_window = try inventory.chooseItemByIndex(0);
-        try (try modal_window.asOptions()).choose("Drop");
+        const modal_windows = try inventory.chooseItemByIndex(0);
+        try modal_windows.options(g.Entity).choose("Drop");
     }
 
     // Switch to the Drop Tab:
@@ -385,8 +385,8 @@ test "Pickup gold from a pile of items" {
     , .whole_display);
 
     // Pickup the gold:
-    const modal_window = try inventory.chooseItemByName("Gold");
-    try (try modal_window.asOptions()).choose("Take");
+    const modal_windows = try inventory.chooseItemByName("Gold");
+    try modal_windows.options(g.Entity).choose("Take");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════╔═══════════════════╗
         \\║     Inventory    ║       Drop        ║
@@ -426,9 +426,9 @@ test "Use torch as a weapon" {
     defer test_session.deinit();
 
     const inventory = try test_session.openInventory();
-    var modal_window = try inventory.chooseItemByName("Torch");
-    try (try modal_window.asOptions()).choose("Unequip");
-    modal_window = try inventory.chooseItemByName("Torch");
+    var modal_windows = try inventory.chooseItemByName("Torch");
+    try modal_windows.options(g.Entity).choose("Unequip");
+    modal_windows = try inventory.chooseItemByName("Torch");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
@@ -441,7 +441,7 @@ test "Use torch as a weapon" {
         \\║                                      ║
         \\╚══════════════════════════════════════╝
     , .game_area);
-    try (try modal_window.asOptions()).choose("Use as a weapon");
+    try modal_windows.options(g.Entity).choose("Use as a weapon");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
@@ -476,8 +476,8 @@ test "Put arrows to quiver" {
         \\╚══════════════════════════════════════╝
     , .game_area);
 
-    var modal_window = try inventory.chooseItemById(arrows);
-    try (try modal_window.asOptions()).choose("Put to quiver");
+    const modal_windows = try inventory.chooseItemById(arrows);
+    try modal_windows.options(g.Entity).choose("Put to quiver");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
@@ -512,8 +512,8 @@ test "Wear an armor" {
         \\╚══════════════════════════════════════╝
     , .game_area);
 
-    var modal_window = try inventory.chooseItemById(jacket);
-    try (try modal_window.asOptions()).choose("Wear");
+    const modal_windows = try inventory.chooseItemById(jacket);
+    try modal_windows.options(g.Entity).choose("Wear");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
@@ -539,8 +539,8 @@ test "Trying to unequip a broken armor" {
     const jacket_id = try inventory.add(g.entities.presets.Armor.get(.riveted_leather_jacket));
     try std.testing.expect(try g.meta.breakItem(&test_session.session.registry, prng.random(), jacket_id, null));
 
-    var modal_window = try inventory.chooseItemById(jacket_id);
-    try (try modal_window.asOptions()).choose("Wear");
+    var modal_windows = try inventory.chooseItemById(jacket_id);
+    try modal_windows.options(g.Entity).choose("Wear");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
@@ -554,16 +554,16 @@ test "Trying to unequip a broken armor" {
         \\╚══════════════════════════════════════╝
     , .game_area);
 
-    modal_window = try inventory.chooseItemById(jacket_id);
-    try (try modal_window.asOptions()).choose("Unequip");
+    modal_windows = try inventory.chooseItemById(jacket_id);
+    try modal_windows.options(g.Entity).choose("Unequip");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
         \\║                                      ║
-        \\┌────────────────Oops!─────────────────┐
-        \\│ Looks like it is broken and stuck.   │
-        \\│ You will need to repair  it first.   │
-        \\└──────────────────────────────────────┘
+        \\║┌───────────────Oops!────────────────┐║
+        \\║│ Looks like it is broken and stuck. │║
+        \\║│ You will need to repair  it first. │║
+        \\║└────────────────────────────────────┘║
         \\║                                      ║
         \\║                                      ║
         \\╚══════════════════════════════════════╝
@@ -593,8 +593,8 @@ test "Drink a healing potion" {
     var inventory = try test_session.openInventory();
     const potion = g.entities.presets.Potions.get(.healing);
     const potion_id = try inventory.add(potion);
-    const modal_window = try inventory.chooseItemById(potion_id);
-    try (try modal_window.asOptions()).choose("Drink");
+    const modal_windows = try inventory.chooseItemById(potion_id);
+    try modal_windows.options(g.Entity).choose("Drink");
     try std.testing.expect(inventory.isClosed());
 
     try std.testing.expect(!test_session.session.registry.contains(potion_id));
@@ -618,12 +618,12 @@ test "An unrecognized oil can't be used" {
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║
+        \\║                                      ║
         \\║┌────────────────────────────────────┐║
         \\║│               Drink                │║
         \\║│                Drop                │║
         \\║│              Describe              │║
         \\║└────────────────────────────────────┘║
-        \\║                                      ║
         \\║                                      ║
         \\╚══════════════════════════════════════╝
     , .game_area);
@@ -646,13 +646,13 @@ test "Combining oil with lamp should increase lamp's charge" {
     const lamp_id = try inventory.add(lamp);
 
     // Scenario:
-    const modal_window = try inventory.chooseItemById(oil_id);
-    try (try modal_window.asOptions()).choose("Combine");
+    const modal_windows = try inventory.chooseItemById(oil_id);
+    try modal_windows.options(g.Entity).choose("Combine");
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
         \\║┌────────────────────────────────────┐║
         \\║│¡ Oil lamp                          │║
-        \\║│                                    │║
         \\║│                                    │║
         \\║│                                    │║
         \\║│                                    │║
@@ -661,7 +661,7 @@ test "Combining oil with lamp should increase lamp's charge" {
         \\╚══════════════════════════════════════╝
     , .game_area);
     // Combine oil with lamp
-    try (try modal_window.asOptions()).chooseByIndex(0);
+    try modal_windows.options(g.Entity).chooseByIndex(0);
     try test_session.runtime.display.expectLooksLike(
         \\╔══════════════════════════════════════╗
         \\║              Inventory               ║

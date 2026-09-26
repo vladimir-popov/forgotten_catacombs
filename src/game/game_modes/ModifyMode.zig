@@ -22,9 +22,6 @@ const w = g.windows;
 
 const log = std.log.scoped(.modify_mode);
 
-/// The biggest region that can be occupied by a modal window
-const MODAL_WINDOW_REGION: p.Region = p.Region.init(3, 2, g.DISPLAY_ROWS - 5, g.DISPLAY_COLS - 2);
-
 const IDENTIFY_COST = 0.45;
 const REPAIR_BREAK_COST = 0.50;
 const MOD_SOMEHOW_PRICE = 100;
@@ -38,13 +35,18 @@ const TAB_RECOGNIZE = 0;
 const TAB_MODIFY = 1;
 const TAB_REPAIR = 2;
 
+/// The biggest region that can be occupied by a modal window with options
+const MODAL_WINDOW_REGION: p.Region = p.Region.init(3, 2, g.DISPLAY_ROWS - 5, g.DISPLAY_COLS - 2);
+
 const Self = @This();
+
+const MainWindow = w.TabbedWindow(.{ w.OptionsArea(g.Entity), w.OptionsArea(g.Entity), w.OptionsArea(g.Entity) });
 
 session: *g.GameSession,
 inventory: *c.Inventory,
 wallet: *c.Wallet,
-main_window: w.TabbedWindow,
-modal_windows: w.ModalWindows = .empty(MODAL_WINDOW_REGION),
+main_window: MainWindow,
+compositor: w.WindowCompositor,
 
 pub fn init(
     self: *Self,
@@ -54,79 +56,77 @@ pub fn init(
 ) !void {
     self.* = .{
         .session = session,
-        .main_window = .{},
+        .main_window = .empty,
+        .compositor = try .init(session.mode_arena.allocator(), &self.main_window, MODAL_WINDOW_REGION),
         .inventory = inventory,
         .wallet = wallet,
     };
-    var tab = try self.main_window.addEmptyTab(self.allocator(), "Recognize");
-    var area = try tab.changeContent(w.OptionsArea(g.Entity));
-    area.* = .initEmpty(tab.allocator(), self, .left);
+    _ = try self.main_window.addTab(
+        "Recognize",
+        w.OptionsArea(g.Entity).initEmpty(self.allocator(), self, .left),
+    );
 
-    tab = try self.main_window.addEmptyTab(self.allocator(), "Modify");
-    area = try tab.changeContent(w.OptionsArea(g.Entity));
-    area.* = .initEmpty(tab.allocator(), self, .left);
+    _ = try self.main_window.addTab(
+        "Modify",
+        w.OptionsArea(g.Entity).initEmpty(self.allocator(), self, .left),
+    );
 
-    tab = try self.main_window.addEmptyTab(self.allocator(), "Repair");
-    area = try tab.changeContent(w.OptionsArea(g.Entity));
-    area.* = .initEmpty(tab.allocator(), self, .left);
+    _ = try self.main_window.addTab(
+        "Repair",
+        w.OptionsArea(g.Entity).initEmpty(self.allocator(), self, .left),
+    );
 
     try self.updateTabs();
     try self.draw();
 }
 
 pub fn deinit(self: *Self) void {
-    self.main_window.deinit(self.allocator());
-    self.modal_windows.deinit(self.allocator());
+    self.compositor.deinit();
 }
 
-pub fn allocator(self: *Self) std.mem.Allocator {
+fn allocator(self: *Self) std.mem.Allocator {
     return self.session.mode_arena.allocator();
 }
 
 pub fn tick(self: *Self) !void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
-        if (self.modal_windows.nonEmpty()) {
-            try self.modal_windows.handleButton(btn);
-        } else {
-            if (try self.main_window.handleButton(btn) == .close_window) {
-                // the  deinit method will be invoked here:
-                try self.session.continuePlay(null, null);
-                return;
-            }
+        if (try self.compositor.handleButton(btn) == .closed_main_window) {
+            // the  deinit method will be invoked here:
+            try self.session.continuePlay(null, null);
+            return;
         }
         try self.draw();
     }
 }
 
-fn optionFromTab(self: Self, tab_idx: usize) *w.OptionsArea(g.Entity) {
-    return @ptrCast(@alignCast(self.main_window.tabs[tab_idx].scrollable_area.content.underlying));
+fn optionFromTab(self: *Self, tab_idx: usize) *w.OptionsArea(g.Entity) {
+    return self.main_window.getArea(w.OptionsArea(g.Entity), tab_idx).?;
 }
 
 /// Recalculates the content of all tabs.
 /// It should be done after every action.
 pub fn updateTabs(self: *Self) !void {
-    self.main_window.tabs[TAB_RECOGNIZE].scrollable_area.clearRetainingCapacity();
-    self.main_window.tabs[TAB_MODIFY].scrollable_area.clearRetainingCapacity();
-    self.main_window.tabs[TAB_REPAIR].scrollable_area.clearRetainingCapacity();
+    self.optionFromTab(TAB_RECOGNIZE).clearRetainingCapacity();
+    self.optionFromTab(TAB_MODIFY).clearRetainingCapacity();
+    self.optionFromTab(TAB_REPAIR).clearRetainingCapacity();
 
-    const active_tab = self.main_window.activeTab();
-    const active_content: *w.OptionsArea(g.Entity) = @ptrCast(@alignCast(active_tab.scrollable_area.content.underlying));
+    const active_content = self.optionFromTab(self.main_window.active_tab_idx);
 
     var itr = self.inventory.items.iterator();
     while (itr.next()) |item_ptr| {
         const item = item_ptr.*;
-        var buffer: [w.TabbedWindow.TAB_REGION.cols + 4]u8 = undefined;
+        var buffer: [g.DISPLAY_COLS + 4]u8 = undefined;
         if (self.session.journal.isKnown(item)) {
             if (self.isWeaponOrArmor(item)) {
                 if (g.meta.isBroken(&self.session.registry, item)) {
                     const price = self.calculateRepairingPrice(item);
-                    try self.optionFromTab(TAB_REPAIR).addOption(
+                    _ = try self.optionFromTab(TAB_REPAIR).addOption(
                         try self.formatLineWithPrice(&buffer, item, price),
                         item,
                         .{ .handle_release_button = repairDescribe, .handle_hold_button = describeItem },
                     );
                 } else {
-                    try self.optionFromTab(TAB_MODIFY).addOption(
+                    _ = try self.optionFromTab(TAB_MODIFY).addOption(
                         try self.formatLine(&buffer, item),
                         item,
                         .{ .handle_release_button = modifyDescribe, .handle_hold_button = describeItem },
@@ -135,17 +135,17 @@ pub fn updateTabs(self: *Self) !void {
             }
         } else {
             const price = self.calculateIdentificationPrice(item);
-            try self.optionFromTab(TAB_RECOGNIZE).addOption(
+            _ = try self.optionFromTab(TAB_RECOGNIZE).addOption(
                 try self.formatLineWithPrice(&buffer, item, price),
                 item,
                 .{ .handle_release_button = recognizeDescribe, .handle_hold_button = describeItem },
             );
         }
     }
-    if (active_tab.scrollable_area.content.totalLines() > 0) {
+    if (active_content.totalLines() > 0) {
         const selected_line = active_content.selectedLine() orelse 0;
         try active_content.selectLine(
-            if (selected_line < active_tab.scrollable_area.content.totalLines())
+            if (selected_line < active_content.totalLines())
                 selected_line
             else
                 active_content.options.items.len - 1,
@@ -156,7 +156,7 @@ pub fn updateTabs(self: *Self) !void {
 //[¿ A yellow potion                  22$ ]
 const line_with_price_fmt = std.fmt.comptimePrint(
     "{{u}} {{s:<{d}}}{{d:4}}$ ",
-    .{w.TabbedWindow.TAB_REGION.cols - 10}, // ("{u} ".len == 2) + ("0000$ ".len == 6) + 2 for borders
+    .{g.DISPLAY_COLS - 10}, // ("{u} ".len == 2) + ("0000$ ".len == 6) + 2 for borders
 );
 
 fn formatLineWithPrice(self: *Self, buffer: []u8, item: g.Entity, price: u16) ![]const u8 {
@@ -181,11 +181,10 @@ inline fn isWeaponOrArmor(self: *Self, item: g.Entity) bool {
 
 fn recognizeDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    const window = try self.modal_windows.createOnTop(self.session.mode_arena.allocator());
-    const area = try window.changeContent(w.OptionsArea(g.Entity));
-    area.* = .initEmpty(window.allocator(), self, .center);
-    try area.addOption("Recognize", item, .{ .handle_release_button = recognizeItem });
-    try area.addOption("Describe", item, .{ .handle_release_button = describeItem });
+    const window = try self.compositor.showModalWindowWithOptions(self.allocator(), &.{}, g.Entity, self, .center);
+    const area = &window.panel.area;
+    _ = try area.addOption("Recognize", item, .{ .handle_release_button = recognizeItem });
+    _ = try area.addOption("Describe", item, .{ .handle_release_button = describeItem });
     window.shrinkToContent();
     // keep the main window opened
     return .keep_open;
@@ -206,13 +205,10 @@ fn recognizeItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResul
         wallet.money -= price;
         try self.updateTabs();
     } else {
-        try self.modal_windows.windows.append(
-            self.session.mode_arena.allocator(),
-            try w.notification(
-                self.session.mode_arena.allocator(),
-                "You have not enough\nmoney.",
-                .{ .max_region = MODAL_WINDOW_REGION },
-            ),
+        try self.compositor.showNotification(
+            self.allocator(),
+            &.{},
+            "You have not enough\nmoney.",
         );
     }
     return .close_window;
@@ -220,11 +216,10 @@ fn recognizeItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResul
 
 fn repairDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    const window = try self.modal_windows.createOnTop(self.session.mode_arena.allocator());
-    const area = try window.changeContent(w.OptionsArea(g.Entity));
-    area.* = .initEmpty(window.allocator(), self, .center);
-    try area.addOption("Repair", item, .{ .handle_release_button = repairItem });
-    try area.addOption("Describe", item, .{ .handle_release_button = describeItem });
+    const window = try self.compositor.showModalWindowWithOptions(self.allocator(), &.{}, g.Entity, self, .center);
+    const area = &window.panel.area;
+    _ = try area.addOption("Repair", item, .{ .handle_release_button = repairItem });
+    _ = try area.addOption("Describe", item, .{ .handle_release_button = describeItem });
     window.shrinkToContent();
     // keep the main window opened
     return .keep_open;
@@ -246,13 +241,10 @@ fn repairItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
         wallet.money -= price;
         try self.updateTabs();
     } else {
-        try self.modal_windows.windows.append(
-            self.session.mode_arena.allocator(),
-            try w.notification(
-                self.session.mode_arena.allocator(),
-                "You have not enough\nmoney.",
-                .{ .max_region = MODAL_WINDOW_REGION },
-            ),
+        try self.compositor.showNotification(
+            self.allocator(),
+            &.{},
+            "You have not enough\nmoney.",
         );
     }
     return .close_window;
@@ -260,11 +252,10 @@ fn repairItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
 
 fn modifyDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    const window = try self.modal_windows.createOnTop(self.session.mode_arena.allocator());
-    const area = try window.changeContent(w.OptionsArea(g.Entity));
-    area.* = .initEmpty(window.allocator(), self, .center);
-    try area.addOption("Modify", item, .{ .handle_release_button = modificationMode });
-    try area.addOption("Describe", item, .{ .handle_release_button = describeItem });
+    const window = try self.compositor.showModalWindowWithOptions(self.allocator(), &.{}, g.Entity, self, .center);
+    const area = &window.panel.area;
+    _ = try area.addOption("Modify", item, .{ .handle_release_button = modificationMode });
+    _ = try area.addOption("Describe", item, .{ .handle_release_button = describeItem });
     window.shrinkToContent();
     // do not close the main window
     return .keep_open;
@@ -272,28 +263,27 @@ fn modifyDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResu
 
 fn modificationMode(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    const window = try self.modal_windows.createOnTop(self.session.mode_arena.allocator());
-    const area = try window.changeContent(w.OptionsArea(g.Entity));
-    area.* = .initEmpty(window.allocator(), self, .center);
-    try area.addOptionFmt(
+    const window = try self.compositor.showModalWindowWithOptions(self.allocator(), &.{}, g.Entity, self, .center);
+    const area = &window.panel.area;
+    _ = try area.addOptionFmt(
         "Somehow   {d}$",
         .{self.calculateModificationPrice(item, MOD_SOMEHOW_PRICE)},
         item,
         .{ .handle_release_button = modifySomehow },
     );
-    try area.addOptionFmt(
+    _ = try area.addOptionFmt(
         "Carefully {d}$",
         .{self.calculateModificationPrice(item, MOD_CAREFUL_PRICE)},
         item,
         .{ .handle_release_button = modifyCarefully },
     );
-    try area.addOptionFmt(
+    _ = try area.addOptionFmt(
         "Manually  {d}$",
         .{self.calculateModificationPrice(item, MOD_MANUAL_PRICE)},
         item,
         .{ .handle_release_button = modifyManually },
     );
-    try area.addOption("Help", item, .{ .handle_release_button = showHelp });
+    _ = try area.addOption("Help", item, .{ .handle_release_button = showHelp });
     window.shrinkToContent();
     // close the previous modal window
     return .close_window;
@@ -313,11 +303,10 @@ fn modifyCarefully(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonRes
 
 fn modifyManually(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    const window = try self.modal_windows.createOnTop(self.session.mode_arena.allocator());
-    const area = try window.changeContent(w.OptionsArea(g.Entity));
-    area.* = .initEmpty(window.allocator(), self, .center);
+    const window = try self.compositor.showModalWindowWithOptions(self.allocator(), &.{}, g.Entity, self, .center);
+    const area = &window.panel.area;
     for (std.enums.values(c.Modification)) |modification| {
-        try area.addOption(
+        _ = try area.addOption(
             @tagName(modification),
             item,
             .{ .handle_release_button = modifyManuallyEffect },
@@ -338,13 +327,10 @@ fn modifyManuallyEffect(ptr: *anyopaque, idx: usize, item: g.Entity) !w.HandleBu
 fn modify(self: *Self, item: g.Entity, breakage_chance: u8, manual_modification: ?c.Modification, price: u16) !void {
     const wallet = self.session.registry.getUnsafe(self.session.player, c.Wallet);
     if (wallet.money < price) {
-        try self.modal_windows.windows.append(
-            self.session.mode_arena.allocator(),
-            try w.notification(
-                self.session.mode_arena.allocator(),
-                "You have not enough\nmoney.",
-                .{ .max_region = MODAL_WINDOW_REGION },
-            ),
+        try self.compositor.showNotification(
+            self.allocator(),
+            &.{},
+            "You have not enough\nmoney.",
         );
         return;
     }
@@ -359,13 +345,10 @@ fn modify(self: *Self, item: g.Entity, breakage_chance: u8, manual_modification:
 
     if (!was_modified) {
         if (!should_become_broken)
-            try self.modal_windows.windows.append(
-                self.session.mode_arena.allocator(),
-                try w.notification(
-                    self.session.mode_arena.allocator(),
-                    "All possible modifications\nalready applied",
-                    .{ .max_region = MODAL_WINDOW_REGION },
-                ),
+            try self.compositor.showNotification(
+                self.allocator(),
+                &.{},
+                "All possible modifications\nalready applied",
             );
         return;
     }
@@ -381,22 +364,16 @@ fn modify(self: *Self, item: g.Entity, breakage_chance: u8, manual_modification:
 
 fn showHelp(ptr: *anyopaque, _: usize, _: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    try self.modal_windows.windows.append(
-        self.session.mode_arena.allocator(),
-        try w.notification(
-            self.session.mode_arena.allocator(),
-            \\An arbitrary  modification  has a 
-            \\30% chance of breaking the item.
-            \\
-            \\A  careful  modification  reduces 
-            \\this risk to 10%.
-            \\
-            \\A manual modification allows  you  
-            \\to  choose  the  specific  effect 
-            \\to add to the item.
-        ,
-            .{ .title = "Help", .text_align = .left },
-        ),
+    try self.compositor.showNotification(self.allocator(), "Help",
+        \\An arbitrary  modification  has a 
+        \\30% chance of breaking the item.
+        \\
+        \\A  careful  modification  reduces 
+        \\this risk to 10%.
+        \\
+        \\A manual modification allows  you  
+        \\to  choose  the  specific  effect 
+        \\to add to the item.
     );
     // Do not close the previous window
     return .keep_open;
@@ -404,28 +381,16 @@ fn showHelp(ptr: *anyopaque, _: usize, _: g.Entity) !w.HandleButtonResult {
 
 fn describeItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    try self.modal_windows.windows.append(
-        self.session.mode_arena.allocator(),
-        try w.entityDescription(
-            self.session.mode_arena.allocator(),
-            self.session,
-            item,
-            MODAL_WINDOW_REGION,
-        ),
-    );
+    try self.compositor.showEntityDescription(self.allocator(), self.session, item);
     // Do not close the previous window
     return .keep_open;
 }
 
 fn draw(self: *Self) !void {
-    if (self.modal_windows.nonEmpty()) {
-        try self.modal_windows.draw(self.session.render);
-    } else {
-        var buf: [20]u8 = undefined;
-        const money = self.session.registry.getUnsafe(self.session.player, c.Wallet).money;
-        try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "Your money: {d:4}$", .{money}));
-        try self.main_window.draw(self.session.render);
-    }
+    var buf: [20]u8 = undefined;
+    const money = self.session.registry.getUnsafe(self.session.player, c.Wallet).money;
+    try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "Your money: {d:4}$", .{money}));
+    try self.compositor.draw(self.session.render);
 }
 
 fn calculateIdentificationPrice(self: Self, item: g.Entity) u16 {

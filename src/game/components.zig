@@ -188,21 +188,31 @@ pub const Equipment = struct {
 pub const Experience = struct {
     const reward_denominator = 10;
 
-    pub const zero: Experience = .{ .experience = 0, .level = 1 };
+    pub const first_level: Experience = .{ .experience = 0, .level = 1 };
 
     level: u4,
     experience: u16,
 
     pub fn init(experience: u16) Experience {
-        return .{ .level = g.meta.actualLevel(1, experience), .experience = experience };
+        return .{ .level = 1, .experience = experience };
     }
 
     pub inline fn reward(reward_exp: u16) Experience {
-        return .init(reward_exp * reward_denominator);
+        var exp = init(reward_exp * reward_denominator);
+        exp.level = exp.actualLevel();
+        return exp;
     }
 
     pub fn asReward(self: Experience) u16 {
         return self.experience / reward_denominator;
+    }
+
+    pub fn actualLevel(self: Experience) u4 {
+        var level = self.level;
+        while (g.meta.Levels[level - 1] < self.experience) {
+            level += 1;
+        }
+        return level;
     }
 };
 

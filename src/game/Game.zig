@@ -83,11 +83,14 @@ pub fn tick(self: *Self) !void {
             }
         },
         .create_character => if (try self.runtime.readPushedButtons()) |btn| {
-            if (try self.state.create_character.handleButton(btn, self.render)) |tuple| {
-                const stats, const skills, const health = tuple;
-                try self.startGameSession(stats, skills, health);
+            if (try self.state.create_character.wizard.handleButton(btn) == .close_window) {
+                try self.startGameSession(
+                    self.state.create_character.stats,
+                    self.state.create_character.skills,
+                    self.state.create_character.health,
+                );
             } else {
-                try self.state.create_character.draw(self.render);
+                try self.state.create_character.wizard.draw(self.render);
             }
         },
         .game_session => |session| {
@@ -122,10 +125,11 @@ noinline fn welcome(self: *Self) !void {
 
     // The choice will be handled manually in the `tick` method
     if (try self.isSessionFileExists())
-        try self.state.welcome.menu.addOption(" Continue ", {}, .{ .handle_release_button = continueGame });
-    try self.state.welcome.menu.addOption(" New game ", {}, .{ .handle_release_button = newGame });
-    try self.state.welcome.menu.addOption("  Manual  ", {}, .{ .handle_release_button = showManual });
-    try self.state.welcome.menu.addOption("  About   ", {}, .{ .handle_release_button = showAbout });
+        _ = try self.state.welcome.menu.addOption(" Continue ", {}, .{ .handle_release_button = continueGame });
+
+    _ = try self.state.welcome.menu.addOption(" New game ", {}, .{ .handle_release_button = newGame });
+    _ = try self.state.welcome.menu.addOption("  Manual  ", {}, .{ .handle_release_button = showManual });
+    _ = try self.state.welcome.menu.addOption("  About   ", {}, .{ .handle_release_button = showAbout });
 
     // keep menu item selected
     switch (from_state) {
@@ -143,8 +147,8 @@ fn newGame(ptr: *anyopaque, _: usize, _: void) !w.HandleButtonResult {
     try self.render.clearDisplay();
     _ = self.state_arena.reset(.retain_capacity);
     self.state = .{ .create_character = try self.state_arena.allocator().create(g.CharacterBuilder) };
-    try self.state.create_character.init(&self.state_arena);
-    try self.state.create_character.draw(self.render);
+    try self.state.create_character.init(self.state_arena.allocator());
+    try self.state.create_character.wizard.draw(self.render);
     return .keep_open;
 }
 

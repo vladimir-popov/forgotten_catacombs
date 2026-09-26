@@ -4,3 +4,4 @@ has_alternatives: bool,
 pub const close: @This() = .{ .text = "Close", .has_alternatives = false };
 pub const choose: @This() = .{ .text = "Choose", .has_alternatives = false };
 pub const choose_with_alternatives: @This() = .{ .text = "Choose", .has_alternatives = true };
+pub const up_level: @This() = .{ .text = "Lvl Up!", .has_alternatives = false };

@@ -12,25 +12,27 @@ test_session: *TestSession,
 /// If the options was found, a button is pressed to choose that option.
 /// To find an option this function checks the label of every item for containing the passed name.
 pub fn choose(self: Self, option_name: []const u8) !void {
-    for (self.options_area.options.items, 0..) |option, idx| {
+    for (self.options_area.options.items, 0..) |*option, idx| {
         if (std.mem.containsAtLeast(u8, option.label(), 1, option_name)) {
             try self.options_area.selectLine(idx);
             try self.test_session.pressButton(.a);
             return;
         }
     }
-    return error.OptionWasNotFound;
+    std.debug.print("Not found option with name {s}\n", .{option_name});
+    return error.NotFoundOptionByName;
 }
 
 pub fn chooseById(self: Self, item_id: g.Entity) !void {
-    for (self.options_area.options.items, 0..) |option, idx| {
+    for (self.options_area.options.items, 0..) |*option, idx| {
         if (option.item.eql(item_id)) {
             try self.options_area.selectLine(idx);
             try self.test_session.pressButton(.a);
             return;
         }
     }
-    return error.OptionWasNotFound;
+    std.debug.print("Not found option with id {d}\n", .{item_id.id});
+    return error.NotFoundOptionById;
 }
 
 pub fn chooseByIndex(self: Self, idx: usize) !void {
@@ -39,7 +41,7 @@ pub fn chooseByIndex(self: Self, idx: usize) !void {
 }
 
 pub fn contains(self: Self, item_id: g.Entity) bool {
-    for (self.options_area.options.items) |option| {
+    for (self.options_area.options.items) |*option| {
         if (option.item.eql(item_id)) {
             return true;
         }

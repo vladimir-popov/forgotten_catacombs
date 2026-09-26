@@ -19,8 +19,8 @@ session: *g.GameSession,
 target: ?g.Entity = null,
 quick_actions: QuickActions,
 is_players_turn: bool = true,
-quick_actions_window: ?w.Window = null,
-/// If defined, then all input should be ignored.
+quick_actions_window: ?w.ModalWindow(w.OptionsArea(void)) = null,
+/// If defined then all input should be ignored.
 notification_to_show: ?NotificationMessage = null,
 
 // This is a buffer for an action. It should help to avoid putting action on the stack
@@ -345,15 +345,13 @@ fn drawInfoBar(self: *const Self) !void {
         try self.session.render.drawInfo(try g.Description.printActualName(&buf, self.session.journal, qa.payload.pickup));
     } else if (self.session.registry.get(self.session.player, c.Poison)) |_| {
         try self.session.render.drawInfo("Poisoned");
-    } else if (self.session.registry.get(self.session.player, c.Hunger)) |hunger| {
+    } else if (self.session.registry.getUnsafe(self.session.player, c.Hunger).level() != .well_fed) {
         // Draw the hunger level
-        switch (hunger.level()) {
-            .well_fed => try self.session.render.cleanInfo(),
-            else => |lvl| {
-                var buf: [g.Render.INFO_ZONE_LENGTH]u8 = undefined;
-                try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "{f}", .{lvl}));
-            },
-        }
+        const lvl = self.session.registry.getUnsafe(self.session.player, c.Hunger).level();
+        var buf: [g.Render.INFO_ZONE_LENGTH]u8 = undefined;
+        try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "{f}", .{lvl}));
+    } else if (g.meta.isLevelUp(&self.session.registry, self.session.player)) {
+        try self.session.render.drawInfo("Level up!");
     } else {
         try self.session.render.cleanInfo();
     }
@@ -365,7 +363,7 @@ fn handleInput(self: *Self) !bool {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (self.quick_actions_window) |*window| {
             if (try window.handleButton(btn) == .close_window) {
-                try window.hide(self.session.render, .from_buffer);
+                try self.session.render.redrawRegionFromSceneBuffer(window.region);
                 window.deinit();
                 self.quick_actions_window = null;
             }
@@ -385,7 +383,7 @@ fn handleInput(self: *Self) !bool {
                         return true;
                     },
                     .hold => {
-                        self.quick_actions_window = try self.windowWithQuickActions();
+                        try self.initWindowWithQuickActions();
                         try self.quick_actions_window.?.draw(self.session.render);
                         return false;
                     },
@@ -625,17 +623,27 @@ const TargetsIterator = struct {
 };
 
 /// Builds a window with quick actions list
-fn windowWithQuickActions(self: *Self) !w.Window {
-    var window = w.Window.init(self.session.mode_arena.allocator(), w.Window.DEFAULT_MAX_REGION);
-    const area = try window.changeContent(w.OptionsArea(void));
-    area.* = .initEmpty(window.allocator(), self, .center);
+fn initWindowWithQuickActions(self: *Self) !void {
+    std.debug.assert(self.quick_actions_window == null);
+
+    self.quick_actions_window = try w.modal_window.withOptions(
+        self.session.mode_arena.allocator(),
+        void,
+        self,
+        .center,
+        .{ .max_region = w.FULL_SCREEN_REGION },
+    );
+    const area = &self.quick_actions_window.?.panel.area;
     for (self.quick_actions.actions.items, 0..) |qa, idx| {
-        try area.addOption(qa.toString(), {}, .{ .handle_release_button = chooseQuickAction });
+        _ = try area.addOption(
+            qa.toString(),
+            {},
+            .{ .handle_release_button = chooseQuickAction },
+        );
         if (idx == self.quick_actions.selected_idx)
             try area.selectLine(idx);
     }
-    window.shrinkToContent();
-    return window;
+    self.quick_actions_window.?.shrinkToContent();
 }
 
 /// Sets the index of the current quick action to the currently selected item in the window

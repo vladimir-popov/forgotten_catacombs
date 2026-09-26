@@ -2,8 +2,10 @@ const std = @import("std");
 const g = @import("game");
 const c = g.components;
 const p = g.primitives;
+const w = g.windows;
+
+const ModalWindows = @import("ModalWindows.zig");
 const Options = @import("Options.zig");
-const ModalWindow = @import("ModalWindow.zig");
 const TestSession = @import("TestSession.zig");
 
 const Self = @This();
@@ -39,44 +41,31 @@ pub fn chooseRepairTab(self: Self) !void {
     try self.test_session.pressButton(.up);
 }
 
-/// Selects the item with passed name in the active tab, or throws an error.
-/// If the item was found, the button is pressed and Options available for the item is returned.
-pub fn chooseItemByName(self: Self, name: []const u8) !ModalWindow {
+/// Selects an item with the passed name in an active tab, or throws an error.
+/// If the item was found, the button is pressed and ModalWindows returns.
+pub fn chooseItemByName(self: Self, name: []const u8) !ModalWindows {
     const options = Options{
-        .options_area = &self.modifyMode().main_window.activeTab().scrollable_area.content,
+        .options_area = self.modifyMode().main_window.activeTab(w.OptionsArea(g.Entity)).?,
         .test_session = self.test_session,
     };
     try options.choose(name);
-    return .{
-        .test_session = self.test_session,
-        .modal_windows = &self.modifyMode().modal_windows,
-    };
+    return .{ .test_session = self.test_session, .compositor = &self.modifyMode().compositor };
 }
 
-pub fn chooseItemById(self: Self, item: g.Entity) !ModalWindow {
+pub fn chooseItemById(self: Self, item: g.Entity) !ModalWindows {
     const options = Options{
-        .options_area = @ptrCast(@alignCast(
-            self.modifyMode().main_window.activeTab().scrollable_area.content.underlying,
-        )),
+        .options_area = self.modifyMode().main_window.activeTab(w.OptionsArea(g.Entity)).?,
         .test_session = self.test_session,
     };
     try options.chooseById(item);
-    return .{
-        .test_session = self.test_session,
-        .modal_windows = &self.modifyMode().modal_windows,
-    };
+    return .{ .test_session = self.test_session, .compositor = &self.modifyMode().compositor };
 }
 
-pub fn chooseItemByIndex(self: Self, idx: usize) !ModalWindow {
+pub fn chooseItemByIndex(self: Self, idx: usize) !ModalWindows {
     const options = Options{
-        .options_area = @ptrCast(@alignCast(
-            self.modifyMode().main_window.activeTab().scrollable_area.content.underlying,
-        )),
+        .options_area = self.modifyMode().main_window.activeTab(w.OptionsArea(g.Entity)).?,
         .test_session = self.test_session,
     };
     try options.chooseByIndex(idx);
-    return .{
-        .test_session = self.test_session,
-        .modal_windows = &self.modifyMode().modal_windows,
-    };
+    return .{ .test_session = self.test_session, .compositor = &self.modifyMode().compositor };
 }

@@ -1,4 +1,4 @@
-<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.6 Chrome/144.0.7559.236 Electron/40.8.4 Safari/537.36" pages="8">
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.7.17 Chrome/128.0.6613.36 Electron/32.0.1 Safari/537.36" version="24.7.17" pages="10">
   <diagram id="HEc6ijCT2G0Q-exSr9Sf" name="Build graph">
     <mxGraphModel dx="1234" dy="2002" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
@@ -1222,6 +1222,109 @@
               <mxPoint x="390" y="185" />
               <mxPoint x="390" y="185" />
             </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="lx1fJM2BUThhmJDA9-GM" name="Windows system">
+    <mxGraphModel dx="1114" dy="830" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="oEpedYLgEpOnY2YKz73s-3" value="TextArea" style="html=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="120" y="40" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-4" value="OptionsArea" style="html=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="280" y="40" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-10" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=diamond;startFill=1;entryX=0.25;entryY=1;entryDx=0;entryDy=0;startSize=9;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="oEpedYLgEpOnY2YKz73s-9" target="oEpedYLgEpOnY2YKz73s-3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="148" y="160" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-9" value="ScrollablePanel" style="html=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="200" y="140" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=diamond;startFill=1;startSize=9;" edge="1" parent="1" source="oEpedYLgEpOnY2YKz73s-12" target="oEpedYLgEpOnY2YKz73s-9">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="95" y="340" />
+              <mxPoint x="255" y="340" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-12" value="ModalWindow" style="html=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="360" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-13" value="TabbedWindow" style="html=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="200" y="360" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=diamond;startFill=1;startSize=9;" edge="1" parent="1" source="oEpedYLgEpOnY2YKz73s-14" target="oEpedYLgEpOnY2YKz73s-9">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="414" y="340" />
+              <mxPoint x="255" y="340" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-14" value="WizardWindow" style="html=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="359" y="360" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=diamond;startFill=1;startSize=9;" edge="1" parent="1" source="oEpedYLgEpOnY2YKz73s-13" target="oEpedYLgEpOnY2YKz73s-9">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="255" y="360" as="sourcePoint" />
+            <mxPoint x="265" y="420" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-23" value="Areas are about how to draw their content in the passed region" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;size=14;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;spacingLeft=5;align=left;" vertex="1" parent="1">
+          <mxGeometry x="455" y="12.5" width="120" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-27" value="Provides a scrolling functionality for an area and keeps a region to draw the area in." style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;size=14;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;spacingLeft=5;align=left;" vertex="1" parent="1">
+          <mxGeometry x="410" y="170" width="140" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-28" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=2;rounded=0;exitX=1;exitY=0.75;exitDx=0;exitDy=0;" edge="1" parent="1" source="oEpedYLgEpOnY2YKz73s-9" target="oEpedYLgEpOnY2YKz73s-27">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="320" y="194" as="sourcePoint" />
+            <mxPoint x="390" y="193" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-30" value="" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.annotation_2;align=left;labelPosition=right;pointerEvents=1;" vertex="1" parent="1">
+          <mxGeometry x="414" y="2.5" width="50" height="125" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-31" value="" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.annotation_2;align=left;labelPosition=right;pointerEvents=1;" vertex="1" parent="1">
+          <mxGeometry x="510" y="322.5" width="50" height="125" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-32" value="Manages an occupied region, provides more complicated UI behaviour" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;size=14;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;spacingLeft=5;align=left;" vertex="1" parent="1">
+          <mxGeometry x="550" y="342.5" width="140" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-34" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;" edge="1" parent="1" source="oEpedYLgEpOnY2YKz73s-33" target="oEpedYLgEpOnY2YKz73s-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-35" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;" edge="1" parent="1" source="oEpedYLgEpOnY2YKz73s-33" target="oEpedYLgEpOnY2YKz73s-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-36" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=diamond;startFill=1;startSize=9;" edge="1" parent="1" source="oEpedYLgEpOnY2YKz73s-33" target="oEpedYLgEpOnY2YKz73s-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-33" value="WindowCompositor" style="html=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="200" y="480" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-37" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=diamond;startFill=1;entryX=0.75;entryY=1;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;edgeStyle=orthogonalEdgeStyle;startSize=9;" edge="1" parent="1" source="oEpedYLgEpOnY2YKz73s-9" target="oEpedYLgEpOnY2YKz73s-4">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="210" y="295" as="sourcePoint" />
+            <mxPoint x="158" y="100" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-39" value="Owns modal windows and compose them with a MainWindow to handle input and draw them as a stack of windows" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;size=14;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;spacingLeft=5;align=left;" vertex="1" parent="1">
+          <mxGeometry x="440" y="510" width="140" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-40" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=2;rounded=0;" edge="1" parent="1" source="oEpedYLgEpOnY2YKz73s-33" target="oEpedYLgEpOnY2YKz73s-39">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="320" y="308" as="sourcePoint" />
+            <mxPoint x="390" y="300" as="targetPoint" />
           </mxGeometry>
         </mxCell>
       </root>

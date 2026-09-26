@@ -34,8 +34,8 @@ test "Recognize an unknown item when enough money" {
     defer test_session.deinit();
     errdefer test_session.printDisplay();
 
-    const modal_window = try recognize_modify.chooseItemById(unknown_item_id);
-    try (try modal_window.asOptions()).choose("Recognize");
+    const modal_windows = try recognize_modify.chooseItemById(unknown_item_id);
+    try modal_windows.options(g.Entity).choose("Recognize");
 
     try std.testing.expect(test_session.session.journal.isKnown(unknown_item_id));
     try test_session.runtime.display.expectLooksLike(
@@ -60,22 +60,22 @@ test "Recognize an unknown item when NOT enough money" {
     defer test_session.deinit();
     errdefer test_session.printDisplay();
 
-    const modal_window = try recognize_modify.chooseItemById(unknown_item_id);
-    try (try modal_window.asOptions()).choose("Recognize");
+    const modal_windows = try recognize_modify.chooseItemById(unknown_item_id);
+    try modal_windows.options(g.Entity).choose("Recognize");
 
     try test_session.runtime.display.expectLooksLike(
         \\╔═══════════╗══════════════════════════╗
         \\║ Recognize ║   Modify      Repair     ║
         \\║           ╚══════════════════════════║
         \\║┌────────────────────────────────────┐║
-        \\║│          You have not enough       │║
-        \\║│                 money.             │║
+        \\║│        You have not enough         │║
+        \\║│               money.               │║
         \\║└────────────────────────────────────┘║
         \\║                                      ║
         \\║                                      ║
         \\╚══════════════════════════════════════╝
         \\════════════════════════════════════════
-        \\ Your money:    0$              Close   
+        \\ Your money:    0$           ◌◌ Close   
     , .whole_display);
 }
 
@@ -112,9 +112,9 @@ test "Modify an item somehow when enough money" {
     try std.testing.expect(!test_session.session.registry.has(known_weapon_id, c.Improvements));
     try std.testing.expect(!test_session.session.registry.has(known_weapon_id, c.Breakages));
 
-    const modal_window = try recognize_modify.chooseItemById(known_weapon_id);
-    try (try modal_window.asOptions()).choose("Modify");
-    try (try modal_window.asOptions()).choose("Somehow");
+    const modal_windows = try recognize_modify.chooseItemById(known_weapon_id);
+    try modal_windows.options(g.Entity).choose("Modify");
+    try modal_windows.options(g.Entity).choose("Somehow");
 
     try std.testing.expect(!test_session.session.journal.isKnown(known_weapon_id));
     try std.testing.expect(test_session.session.registry.has(known_weapon_id, c.Improvements) or
@@ -143,23 +143,23 @@ test "Modify an item when NOT enough money" {
     errdefer test_session.printDisplay();
 
     try recognize_modify.chooseModifyTab();
-    const modal_window = try recognize_modify.chooseItemById(known_weapon_id);
-    try (try modal_window.asOptions()).choose("Modify");
-    try (try modal_window.asOptions()).choose("Somehow");
+    const modal_windows = try recognize_modify.chooseItemById(known_weapon_id);
+    try modal_windows.options(g.Entity).choose("Modify");
+    try modal_windows.options(g.Entity).choose("Somehow");
 
     try test_session.runtime.display.expectLooksLike(
         \\╔═══════════╔════════════╗═════════════╗
         \\║ Recognize ║   Modify   ║  Repair     ║
         \\║═══════════╝            ╚═════════════║
         \\║┌────────────────────────────────────┐║
-        \\║│          You have not enough       │║
-        \\║│                 money.             │║
+        \\║│        You have not enough         │║
+        \\║│               money.               │║
         \\║└────────────────────────────────────┘║
         \\║                                      ║
         \\║                                      ║
         \\╚══════════════════════════════════════╝
         \\════════════════════════════════════════
-        \\ Your money:    0$              Close   
+        \\ Your money:    0$           ◌◌ Close   
     , .whole_display);
 }
 
@@ -174,24 +174,24 @@ test "Modify an item when it has all possible modifications" {
     improvements.modifications.items.toggleAll();
 
     try recognize_modify.chooseModifyTab();
-    const modal_window = try recognize_modify.chooseItemById(known_weapon_id);
-    try (try modal_window.asOptions()).choose("Modify");
-    try (try modal_window.asOptions()).choose("Manually");
-    try (try modal_window.asOptions()).choose("fire");
+    const modal_windows = try recognize_modify.chooseItemById(known_weapon_id);
+    try modal_windows.options(g.Entity).choose("Modify");
+    try modal_windows.options(g.Entity).choose("Manually");
+    try modal_windows.options(g.Entity).choose("fire");
 
     try test_session.runtime.display.expectLooksLike(
         \\╔═══════════╔════════════╗═════════════╗
         \\║ Recognize ║   Modify   ║  Repair     ║
         \\║═══════════╝            ╚═════════════║
         \\║┌────────────────────────────────────┐║
-        \\║│       All possible modifications   │║
-        \\║│            already applied         │║
+        \\║│     All possible modifications     │║
+        \\║│          already applied           │║
         \\║└────────────────────────────────────┘║
         \\║                                      ║
         \\║                                      ║
         \\╚══════════════════════════════════════╝
         \\════════════════════════════════════════
-        \\ Your money: 9000$              Close   
+        \\ Your money: 9000$           ◌◌ Close   
     , .whole_display);
 }
 
@@ -221,8 +221,8 @@ test "Repair a broken known item from the inventory" {
         \\╚══════════════════════════════════════╝
     , .game_area);
 
-    const modal_window = try recognize_modify.chooseItemById(weapon_id);
-    try (try modal_window.asOptions()).choose("Repair");
+    const modal_windows = try recognize_modify.chooseItemById(weapon_id);
+    try modal_windows.options(g.Entity).choose("Repair");
 
     try test_session.runtime.display.expectLooksLike(
         \\╔═════════════════════════╔════════════╗

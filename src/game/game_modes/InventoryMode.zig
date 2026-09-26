@@ -43,20 +43,21 @@ const ResolvedCombination = g.systems.CombinationSystem.ResolvedCombination;
 
 const log = std.log.scoped(.inventory_mode);
 
-const MODAL_WINDOW_REGION: p.Region = p.Region.init(2, 2, g.DISPLAY_ROWS - 4, g.DISPLAY_COLS - 2);
-
 const Self = @This();
 
+/// The biggest region that can be occupied by a modal window with options
+const MODAL_WINDOW_REGION: p.Region = p.Region.init(3, 2, g.DISPLAY_ROWS - 5, g.DISPLAY_COLS - 2);
+
 session: *g.GameSession,
-main_window: w.TabbedWindow,
 inventory: *c.Inventory,
 equipment: *c.Equipment,
 /// The entity under the player's feet. Can be a pile or a single item
 drop: ?g.Entity,
+should_close_inventory: bool = false,
 /// The action initiated during manage the inventory.
 action: ?g.actions.Action = null,
-/// The stack of modal windows
-modal_windows: w.ModalWindows = .empty(MODAL_WINDOW_REGION),
+main_window: w.TabbedWindow(.{ w.OptionsArea(g.Entity), w.OptionsArea(g.Entity) }),
+compositor: w.WindowCompositor,
 
 pub fn init(
     self: *Self,
@@ -68,7 +69,8 @@ pub fn init(
     log.debug("Init inventory with drop {any}", .{drop});
     self.* = .{
         .session = session,
-        .main_window = .{},
+        .main_window = .empty,
+        .compositor = try .init(session.mode_arena.allocator(), &self.main_window, MODAL_WINDOW_REGION),
         .equipment = equipment,
         .inventory = inventory,
         .drop = drop,
@@ -81,19 +83,22 @@ pub fn init(
     try self.draw();
 }
 
+fn allocator(self: *Self) std.mem.Allocator {
+    return self.session.mode_arena.allocator();
+}
+
 pub fn tick(self: *Self) !void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
-        if (self.modal_windows.nonEmpty()) {
-            try self.modal_windows.handleButton(btn);
-            if (self.action) |act| {
-                try self.session.continuePlay(null, act);
-                return;
-            }
-        } else {
-            if (try self.main_window.handleButton(btn) == .close_window) {
+        switch (try self.compositor.handleButton(btn)) {
+            .closed_main_window => {
                 try self.session.continuePlay(null, self.action);
                 return;
-            }
+            },
+            .closed_modal_window => if (self.should_close_inventory) {
+                try self.session.continuePlay(null, self.action);
+                return;
+            },
+            .keep_window => {},
         }
         try self.draw();
     }
@@ -103,36 +108,33 @@ fn draw(self: *Self) !void {
     var buf: [10]u8 = undefined;
     const money = self.session.registry.getUnsafe(self.session.player, c.Wallet).money;
     try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "{d}$", .{money}));
-    if (self.modal_windows.nonEmpty()) {
-        try self.modal_windows.draw(self.session.render);
-    } else {
-        try self.main_window.draw(self.session.render);
-    }
+    try self.compositor.draw(self.session.render);
 }
 
-fn tabWithInventory(self: *Self) *w.Window {
-    return &self.main_window.tabs[0];
+fn inventoryArea(self: *Self) *w.OptionsArea(g.Entity) {
+    return self.main_window.getArea(w.OptionsArea(g.Entity), 0).?;
 }
 
-fn tabWithDrop(self: *Self) ?*w.Window {
-    return if (self.main_window.tabs_count > 1)
-        &self.main_window.tabs[1]
-    else
-        null;
+fn dropArea(self: *Self) ?*w.OptionsArea(g.Entity) {
+    return self.main_window.getArea(w.OptionsArea(g.Entity), 1);
 }
 
 fn addInventoryTab(self: *Self) !void {
-    const tab = try self.main_window.addEmptyTab(self.session.mode_arena.allocator(), "Inventory");
-    const area = try tab.changeContent(w.OptionsArea(g.Entity));
-    area.* = .initEmpty(tab.allocator(), self, .left);
+    _ = try self.main_window.addTab(
+        "Inventory",
+        w.OptionsArea(g.Entity).initEmpty(
+            self.allocator(),
+            self,
+            .left,
+        ),
+    );
     try self.updateInventoryTab();
 }
 
 /// Rebuilds a list of items
 pub fn updateInventoryTab(self: *Self) !void {
-    const tab = self.tabWithInventory();
     try w.updateAreaWithItems(
-        @ptrCast(@alignCast(tab.scrollable_area.content.underlying)),
+        self.inventoryArea(),
         self,
         self.inventory.items,
         formatInventoryLine,
@@ -164,41 +166,40 @@ fn formatInventoryLine(
 
 const inventory_line_fmt = std.fmt.comptimePrint(
     "{{u}} {{s:<{d}}}{{s}} ",
-    .{w.TabbedWindow.TAB_REGION.cols - 11}, // 12 == ("{u} ".len == 2) + ("weapon ".len == 7) + (2 for borers)
+    .{g.DISPLAY_COLS - 11}, // 12 == ("{u} ".len == 2) + ("weapon ".len == 7) + (2 for borders)
 );
 
 fn useCombineDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Buttons is helt. Show modal window for {any}", .{item});
-    const window = try self.modal_windows.createOnTop(self.session.mode_arena.allocator());
-    const area = try window.changeContent(w.OptionsArea(g.Entity));
-    area.* = .initEmpty(window.allocator(), self, .center);
+    const window = try self.compositor.showModalWindowWithOptions(self.allocator(), &.{}, g.Entity, self, .center);
+    const area = &window.panel.area;
     if (self.isEquipped(item)) {
-        try area.addOption("Unequip", item, .{ .handle_release_button = unequipItem });
+        _ = try area.addOption("Unequip", item, .{ .handle_release_button = unequipItem });
     } else {
         if (self.session.registry.has(item, c.SourceOfLight)) {
-            try area.addOption("Use as a light", item, .{ .handle_release_button = useAsLight });
+            _ = try area.addOption("Use as a light", item, .{ .handle_release_button = useAsLight });
         }
         if (self.session.registry.has(item, c.Weapon)) {
-            try area.addOption("Use as a weapon", item, .{ .handle_release_button = useAsWeapon });
+            _ = try area.addOption("Use as a weapon", item, .{ .handle_release_button = useAsWeapon });
         }
         if (self.session.registry.has(item, c.Ammunition)) {
-            try area.addOption("Put to quiver", item, .{ .handle_release_button = putToQuiver });
+            _ = try area.addOption("Put to quiver", item, .{ .handle_release_button = putToQuiver });
         }
         if (self.session.registry.has(item, c.Armor)) {
-            try area.addOption("Wear", item, .{ .handle_release_button = useAsArmor });
+            _ = try area.addOption("Wear", item, .{ .handle_release_button = useAsArmor });
         }
         if (self.session.registry.has(item, c.Potion)) {
-            try area.addOption("Drink", item, .{ .handle_release_button = drinkPotion });
+            _ = try area.addOption("Drink", item, .{ .handle_release_button = drinkPotion });
         } else if (self.session.registry.has(item, c.Consumable)) {
-            try area.addOption("Eat", item, .{ .handle_release_button = consumeFood });
+            _ = try area.addOption("Eat", item, .{ .handle_release_button = consumeFood });
         }
     }
     if (self.session.journal.isKnown(item) and self.session.combinations.asIngredient(item) != null) {
-        try area.addOption("Combine", item, .{ .handle_release_button = combineSelectedItem });
+        _ = try area.addOption("Combine", item, .{ .handle_release_button = combineSelectedItem });
     }
-    try area.addOption("Drop", item, .{ .handle_release_button = dropSelectedItem });
-    try area.addOption("Describe", item, .{ .handle_release_button = describeSelectedItem });
+    _ = try area.addOption("Drop", item, .{ .handle_release_button = dropSelectedItem });
+    _ = try area.addOption("Describe", item, .{ .handle_release_button = describeSelectedItem });
     window.shrinkToContent();
     // keep the main window opened
     return .keep_open;
@@ -219,15 +220,12 @@ fn unequipItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult 
     if (item.eql(self.equipment.ammunition))
         self.equipment.ammunition = null;
     if (g.meta.isBroken(&self.session.registry, item)) {
-        try self.modal_windows.windows.append(
-            self.session.mode_arena.allocator(),
-            try w.notification(
-                self.session.mode_arena.allocator(),
-                \\Looks like it is broken and stuck.
-                \\You will need to repair  it first.
+        try self.compositor.showNotification(
+            self.allocator(),
+            "Oops!",
+            \\Looks like it is broken and stuck.
+            \\You will need to repair  it first.
             ,
-                .{ .title = "Oops!", .text_align = .left },
-            ),
         );
     } else {
         if (item.eql(self.equipment.weapon))
@@ -280,7 +278,7 @@ fn consumeFood(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult 
         self.action = .action(.eat, item);
         _ = self.inventory.items.remove(item);
     }
-    try self.updateInventoryTab();
+    self.should_close_inventory = true;
     return .close_window;
 }
 
@@ -291,35 +289,44 @@ fn drinkPotion(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult 
         self.action = .action(.drink, item);
         _ = self.inventory.items.remove(item);
     }
-    try self.updateInventoryTab();
+    self.should_close_inventory = true;
     return .close_window;
 }
 
 fn takeFromPileOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    const window = try self.modal_windows.createOnTop(self.session.mode_arena.allocator());
-    var area = try window.changeContent(w.OptionsArea(g.Entity));
-    area.* = .initEmpty(window.allocator(), self, .center);
-    try area.addOption("Take", item, .{ .handle_release_button = takeSelectedItem });
-    try area.addOption("Describe", item, .{ .handle_release_button = describeSelectedItem });
+    const window = try self.compositor.showModalWindowWithOptions(
+        self.allocator(),
+        &.{},
+        g.Entity,
+        self,
+        .center,
+    );
+    const area = &window.panel.area;
+    _ = try area.addOption("Take", item, .{ .handle_release_button = takeSelectedItem });
+    _ = try area.addOption("Describe", item, .{ .handle_release_button = describeSelectedItem });
     window.shrinkToContent();
     return .keep_open;
 }
 
 fn addDropTab(self: *Self, drop: g.Entity) !void {
-    if (self.main_window.tabs_len < 2) {
+    if (self.main_window.tabs.len < 2) {
         log.debug("Add drop tab for {any}", .{drop});
-        const tab = try self.main_window.addEmptyTab(self.session.mode_arena.allocator(), "Drop");
-        const area = try tab.changeContent(w.OptionsArea(g.Entity));
-        area.* = .initEmpty(tab.allocator(), self, .left);
+        _ = try self.main_window.addTab(
+            "Drop",
+            w.OptionsArea(g.Entity).initEmpty(self.allocator(), self, .left),
+        );
     }
+    self.main_window.active_tab_idx = 0;
     try self.updateDropTab(drop);
 }
 
 fn updateDropTab(self: *Self, drop: g.Entity) !void {
     self.drop = drop;
-    const tab = &self.main_window.tabs[1];
-    const options_area: *w.OptionsArea(g.Entity) = @ptrCast(@alignCast(tab.scrollable_area.content.underlying));
+    const options_area: *w.OptionsArea(g.Entity) = self.main_window.getArea(
+        w.OptionsArea(g.Entity),
+        1,
+    ).?;
     const selected_line = options_area.selected_line;
     options_area.clearRetainingCapacity();
     if (self.session.registry.get(drop, c.Pile)) |pile| {
@@ -343,7 +350,7 @@ fn addDropOption(
     options_area: *w.OptionsArea(g.Entity),
     item: g.Entity,
 ) !void {
-    try options_area.addOptionFmt(
+    _ = try options_area.addOptionFmt(
         "{u} {f}",
         .{
             self.session.registry.getUnsafe(item, c.Sprite).codepoint,
@@ -357,15 +364,7 @@ fn addDropOption(
 fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Show info about item {d}", .{item.id});
-    try self.modal_windows.windows.append(
-        self.session.mode_arena.allocator(),
-        try w.entityDescription(
-            self.session.mode_arena.allocator(),
-            self.session,
-            item,
-            g.windows.Window.DEFAULT_MAX_REGION,
-        ),
-    );
+    try self.compositor.showEntityDescription(self.allocator(), self.session, item);
     // keep the main window opened
     return .keep_open;
 }
@@ -373,16 +372,20 @@ fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButt
 /// Shows a window with inventory items that can be combined with the selected item.
 fn combineSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    const window = try self.modal_windows.windows.addOne(self.session.mode_arena.allocator());
-    window.* = .init(self.session.mode_arena.allocator(), MODAL_WINDOW_REGION);
-    var area = try window.changeContent(w.OptionsArea(ResolvedCombination));
-    area.* = .initEmpty(window.allocator(), self, .center);
+    const window = try self.compositor.showModalWindowWithOptions(
+        self.allocator(),
+        &.{},
+        ResolvedCombination,
+        self,
+        .center,
+    );
+    const area = &window.panel.area;
     const ingredient = self.session.combinations.asIngredient(item).?;
     var itr = self.inventory.items.iterator();
     while (itr.next()) |item2| {
         if (self.session.combinations.canBeCombined(ingredient, item2.*)) |resolved_combination| {
             var buffer: w.TextArea.Line = undefined;
-            try area.addOption(
+            _ = try area.addOption(
                 try formatInventoryLine(&buffer, self, item2.*),
                 resolved_combination,
                 .{ .handle_release_button = combineItems, .handle_hold_button = describeTargetForCombination },
@@ -437,9 +440,11 @@ fn takeSelectedItem(ptr: *anyopaque, _: usize, selected_item: g.Entity) !w.Handl
         try self.session.registry.removeEntity(selected_item);
     } else {
         if (self.inventory.isFull()) {
-            const alloc = self.session.mode_arena.allocator();
-            const window = try self.modal_windows.windows.addOne(alloc);
-            window.* = try w.notification(alloc, "Your inventory is full!", .{ .max_region = MODAL_WINDOW_REGION });
+            try self.compositor.showNotification(
+                self.allocator(),
+                &.{},
+                "Your inventory is full!",
+            );
             return .keep_open;
         }
         try self.inventory.items.add(selected_item);

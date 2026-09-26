@@ -20,18 +20,11 @@ pub inline fn experienceToNextLevel(current_level: u4) u16 {
 
 pub inline fn isLevelUp(registry: *g.Registry, player: g.Entity) bool {
     if (registry.get(player, c.LevelUp)) |level_up| {
-        return level_up.last_handled_level < registry.getUnsafe(player, c.Experience).level;
+        const exp = registry.getUnsafe(player, c.Experience);
+        return level_up.last_handled_level < exp.actualLevel();
     } else {
         return false;
     }
-}
-
-pub fn actualLevel(current_level: u4, total_experience: u16) u4 {
-    var level = current_level;
-    while (g.meta.Levels[level - 1] < total_experience) {
-        level += 1;
-    }
-    return level;
 }
 
 /// Adds exp to the player's Experience. If it leads to level up,
@@ -39,12 +32,9 @@ pub fn actualLevel(current_level: u4, total_experience: u16) u4 {
 /// recovers its hp and return `true`. Otherwise returns `false`.
 pub fn addExperience(registry: *g.Registry, player: g.Entity, exp: u16) !bool {
     const experience = registry.getUnsafe(player, c.Experience);
-    const level_before = experience.level;
     experience.experience +|= exp;
-    experience.level = actualLevel(experience.level, experience.experience);
-    if (experience.level > level_before) {
-        const level_up = try registry.getOrSet(player, c.LevelUp, .{ .last_handled_level = level_before });
-        level_up.last_handled_level = @min(level_up.last_handled_level, level_before);
+    if (experience.actualLevel() > experience.level) {
+        _ = try registry.getOrSet(player, c.LevelUp, .{ .last_handled_level = experience.level });
         const health = registry.getUnsafe(player, c.Health);
         health.current_hp = health.max;
         return true;

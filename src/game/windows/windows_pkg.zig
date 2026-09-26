@@ -14,130 +14,32 @@ const p = g.primitives;
 
 const log = std.log.scoped(.windows);
 
-/// To hide a window something should be drawn inside its region.
-/// The easiest way is drawing underlying layer again (for example the whole scene, or a window
-/// under the current),but it's on optimal way. Usually we have to particular options:
-///  - `from_buffer` - redraw inside the region a content from the inner buffer of the render;
-///  - `fill_region` - draw inside the region an empty space.
-/// The first one is actual when a window is above the scene, the second - when the window is above
-/// another window.
-pub const HideMode = enum { from_buffer, fill_region };
-
 /// The result of handling a button. Some window can have default `Close` button (a Description
 /// window as example), or have another logic to request closing itself (a window with options).
 pub const HandleButtonResult = enum {
-    /// If the 'close' button was pressed, or the content requires closing after
-    /// handling the button.
+    /// Means that the window should be closed after handling a button
     close_window,
-    /// A button was handled, but the window should still be open.
+    /// Means that the window should still be open.
     keep_open,
 };
 
-pub const Area = @import("Area.zig");
+pub const modal_window = @import("modal_window.zig");
+pub const options_area = @import("options_area.zig");
+pub const scrollable_panel = @import("scrollable_panel.zig");
+pub const tabbed_window = @import("tabbed_window.zig");
+pub const wizard = @import("wizard/wizard_pkg.zig");
+
 pub const Button = @import("Button.zig");
-pub const ModalWindows = @import("ModalWindows.zig");
-pub const OptionsArea = @import("OptionsArea.zig").OptionsArea;
-pub const ScrollableArea = @import("ScrollableArea.zig").ScrollableArea;
-pub const TabbedWindow = @import("TabbedWindow.zig");
+pub const OptionsArea = options_area.OptionsArea;
+pub const ModalWindow = modal_window.ModalWindow;
+pub const ScrollablePanel = scrollable_panel.ScrollablePanel;
+pub const TabbedWindow = tabbed_window.TabbedWindow;
 pub const TextArea = @import("TextArea.zig");
-pub const Window = @import("Window.zig");
+pub const WindowCompositor = @import("WindowCompositor.zig");
 
-pub const NotificationOptions = struct {
-    title: []const u8 = &.{},
-    max_region: p.Region = .init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS),
-    text_align: g.TextAlign = .center,
-};
-
-/// Shows a multiline message in the modal window.
-/// Example:
-/// ```
-/// ┌───────────────Title───────────────┐
-/// │               Multi               │
-/// │               line                │
-/// │              message              │
-/// └───────────────────────────────────┘
-///═══════════════════════════════════════
-///                                Close
-/// ```
-pub fn notification(
-    alloc: std.mem.Allocator,
-    message: []const u8,
-    opts: NotificationOptions,
-) !Window {
-    var window = Window.init(alloc, opts.max_region);
-    try window.formatTitle("{s}", .{opts.title});
-
-    var text_area = try window.changeContent(TextArea);
-    text_area.* = .initEmpty(window.allocator());
-    var itr = std.mem.splitScalar(u8, message, '\n');
-    while (itr.next()) |msg_line| {
-        const line = try text_area.addEmptyLine();
-        const width = g.DISPLAY_COLS - 2;
-        const pad = switch (opts.text_align) {
-            .left => 0,
-            .center => p.diff(msg_line.len, width) / 2,
-            .right => p.diff(msg_line.len, width),
-        };
-        _ = try std.fmt.bufPrint(line[pad..], "{s}", .{msg_line});
-    }
-    window.shrinkToContent();
-    return window;
-}
-
-/// Approximate example:
-/// ```
-/// ┌───────────────Club────────────────┐
-/// │A gnarled piece of wood, scarred   │
-/// │from use. Deals blunt damage.      │
-/// │Cheap and easy to use.             │
-/// │                                   │
-/// │Damage: cutting 2-3                │
-/// │Weight: 3                          │
-/// └───────────────────────────────────┘
-///═══════════════════════════════════════
-///                                Close
-/// ```
-pub fn entityDescription(
-    alloc: std.mem.Allocator,
-    session: *const g.GameSession,
-    entity: g.Entity,
-    window_region: p.Region,
-) !Window {
-    var window = Window.init(alloc, window_region);
-    try window.formatTitle("{f}", .{g.Description.actualNameFormatter(session.journal, entity)});
-
-    const area: *TextArea = try window.changeContent(TextArea);
-    area.* = .initEmpty(window.allocator());
-    if (session.player.id == entity.id) {
-        try g.Description.describePlayer(session.journal, entity, area);
-    } else if (session.registry.has(entity, c.EnemyState)) {
-        try g.Description.describeEnemy(session.journal, entity, area);
-    } else {
-        const is_equipped = g.meta.isEquipped(&session.registry, session.player, entity);
-        try g.Description.describeItem(session.journal, entity, is_equipped, area);
-    }
-    return window;
-}
-
-/// Example:
-/// ```
-/// ┌──────────────Title───────────────┐
-/// │              Option              │
-/// │░░░░░░░░░░░░░ Option ░░░░░░░░░░░░░│
-/// │              Option              │
-/// └──────────────────────────────────┘
-///═══════════════════════════════════════
-///                          Close Choose
-/// ```
-pub fn options(
-    alloc: std.mem.Allocator,
-    comptime Item: type,
-    owner: *anyopaque,
-) !Window {
-    var window = try Window.initFullScreen(alloc);
-    _ = try window.createArea(OptionsArea(Item), .init(owner, .center));
-    return window;
-}
+/// A maximal region which can be occupied by a window.
+/// This region includes a space for borders.
+pub const FULL_SCREEN_REGION: p.Region = p.Region.init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS);
 
 pub fn updateAreaWithItems(
     area: *OptionsArea(g.Entity),
@@ -151,7 +53,7 @@ pub fn updateAreaWithItems(
     var itr = items.iterator();
     while (itr.next()) |item_ptr| {
         var line: TextArea.Line = undefined;
-        try area.addOption(
+        _ = try area.addOption(
             try formatLine(&line, context, item_ptr.*),
             item_ptr.*,
             handler,

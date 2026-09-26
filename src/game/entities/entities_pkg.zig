@@ -40,7 +40,7 @@ pub fn player(
     return .{
         .description = .{ .preset = .player },
         .equipment = .nothing,
-        .experience = .zero,
+        .experience = .first_level,
         .health = health,
         .hunger = .well_fed,
         .initiative = .{ .move_points = std.math.maxInt(g.MovePoints) },

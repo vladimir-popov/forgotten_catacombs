@@ -49,7 +49,7 @@ test "Level up should become available after killing an enemy and receiving enou
     , .info_bar);
     try test_session.pressButton(.b);
     try test_session.runtime.display.expectLooksLike(
-        \\        You                     Close   
+        \\                                Close   
     , .info_bar);
 
     // Close description
@@ -73,11 +73,11 @@ test "Level up should become available after killing an enemy and receiving enou
     // Now the level up should be available
     try test_session.exploreMode();
     try test_session.runtime.display.expectLooksLike(
-        \\        You         ⇧Describe   Cancel  
+        \\        You         ⇧Describe   Cancel¶¶
     , .info_bar);
     try test_session.pressButton(.b);
     try test_session.runtime.display.expectLooksLike(
-        \\     Level up!       Up level   Close   
+        \\                     Lvl Up!    Close¶¶¶
     , .info_bar);
 }
 

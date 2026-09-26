@@ -2,6 +2,7 @@ const std = @import("std");
 const g = @import("game");
 const c = g.components;
 const p = g.primitives;
+const w = g.windows;
 const Options = @import("Options.zig");
 const TestSession = @import("TestSession.zig");
 
@@ -35,46 +36,36 @@ pub fn shopWallet(self: Self) *c.Wallet {
 /// If the item was found, the button is pressed and Options available for the item is returned.
 pub fn chooseItemByName(self: Self, name: []const u8) !Options {
     const options = Options{
-        .options_area = @ptrCast(@alignCast(
-            self.tradingMode().main_window.activeTab().area.content.underlying,
-        )),
+        .options_area = self.tradingMode().main_window.activeTab(w.OptionsArea(g.Entity)).?,
         .test_session = self.test_session,
     };
     try options.choose(name);
-    return .{
+    return Options{
+        .options_area = self.tradingMode().compositor.topModalWindowArea(w.OptionsArea(g.Entity)).?,
         .test_session = self.test_session,
-        .options_area = &self.tradingMode().modal_windows.topWindow().?.content.content,
     };
 }
 
 pub fn chooseItemById(self: Self, item: g.Entity) !Options {
     const options = Options{
-        .options_area = @ptrCast(@alignCast(
-            self.tradingMode().main_window.activeTab().area.content.underlying,
-        )),
+        .options_area = self.tradingMode().main_window.activeTab(w.OptionsArea(g.Entity)).?,
         .test_session = self.test_session,
     };
     try options.chooseById(item);
-    return .{
+    return Options{
+        .options_area = self.tradingMode().compositor.topModalWindowArea(w.OptionsArea(g.Entity)).?,
         .test_session = self.test_session,
-        .options_area = @ptrCast(@alignCast(
-            self.tradingMode().modal_windows.topWindow().?.content.content.underlying,
-        )),
     };
 }
 
 pub fn chooseItemByIndex(self: Self, idx: usize) !Options {
     const options = Options{
-        .options_area = @ptrCast(@alignCast(
-            self.tradingMode().main_window.activeTab().scrollable_area.content.underlying,
-        )),
+        .options_area = self.tradingMode().main_window.activeTab(w.OptionsArea(g.Entity)).?,
         .test_session = self.test_session,
     };
     try options.chooseByIndex(idx);
-    return .{
+    return Options{
+        .options_area = self.tradingMode().compositor.topModalWindowArea(w.OptionsArea(g.Entity)).?,
         .test_session = self.test_session,
-        .options_area = @ptrCast(@alignCast(
-            self.tradingMode().modal_windows.topWindow().?.scrollable_area.content.underlying,
-        )),
     };
 }

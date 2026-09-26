@@ -6,52 +6,30 @@ const w = g.windows;
 
 const log = std.log.scoped(.windows);
 
-/// The aria provides scrolling functionality to another inner aria.
-pub fn ScrollableArea(comptime Area: type) type {
+/// Wraps an area with scrolling, a scrollbar, and contextual action buttons.
+pub fn ScrollablePanel(comptime Area: type) type {
     return struct {
         const Self = @This();
 
-        content: Area,
+        area: Area,
         region: p.Region,
         scrolled_lines: usize = 0,
 
-        pub fn area(self: *Self) w.Area {
-            return .{ .underlying = self, .vtable = w.Area.vtableFor(Self) };
-        }
-
         pub fn isScrollRequired(self: *const Self) bool {
-            return self.content.totalLines() > self.region.rows;
+            return self.area.totalLines() > self.region.rows;
         }
 
         fn maxScrollingCount(self: *const Self) usize {
-            return self.content.totalLines() -| (self.region.rows);
+            return self.area.totalLines() -| self.region.rows;
         }
 
         pub fn totalLines(self: Self) usize {
-            return self.content.totalLines();
-        }
-
-        pub fn clearRetainingCapacity(self: *Self) void {
-            self.content.clearRetainingCapacity();
-        }
-
-        pub fn leftButton(self: *const Self) ?w.Button {
-            return self.content.leftButton();
-        }
-
-        pub fn rightButton(self: *const Self) ?w.Button {
-            return self.content.rightButton();
+            return self.area.totalLines();
         }
 
         pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
-            if (try self.content.handleButton(btn) == .close_window)
+            if (try self.area.handleButton(btn) == .close_window)
                 return .close_window;
-
-            if (!self.isScrollRequired()) return .keep_open;
-            if (self.content.selectedLine()) |selected_line| {
-                if (self.region.rows + self.scrolled_lines > selected_line and selected_line >= self.scrolled_lines)
-                    return .keep_open;
-            }
 
             switch (btn.game_button) {
                 .up => {
@@ -68,11 +46,15 @@ pub fn ScrollableArea(comptime Area: type) type {
         }
 
         pub fn draw(self: *const Self, render: g.Render) !void {
+            const region = self.region;
+            const max_scroll_count = self.maxScrollingCount();
+            const scroll = @min(self.scrolled_lines, max_scroll_count);
+
             // Draw the scrollbar
             if (self.isScrollRequired()) {
-                const progress = scrollingProgress(self.scrolled_lines, self.region.rows, self.maxScrollingCount());
-                var point = self.region.topRight();
-                for (0..self.region.rows) |i| {
+                const progress = scrollingProgress(scroll, region.rows, max_scroll_count);
+                var point = region.topRight();
+                for (0..region.rows) |i| {
                     if (i == progress)
                         try render.runtime.drawSprite('▒', point, .normal)
                     else
@@ -82,16 +64,25 @@ pub fn ScrollableArea(comptime Area: type) type {
             }
             // Draw the content inside the region excluding a space for the scrollbar
             const right_pad: u8 = if (self.isScrollRequired()) 1 else 0;
-            try self.content.draw(render, self.region.innerRegion(0, right_pad, 0, 0), self.scrolled_lines);
+            try self.area.draw(render, region.innerRegion(0, right_pad, 0, 0), scroll);
+            if (self.area.leftButton()) |btn| {
+                try render.drawLeftButton(btn.text, btn.has_alternatives);
+            } else {
+                try render.hideLeftButton();
+            }
+            if (self.area.rightButton()) |btn| {
+                try render.drawRightButton(btn.text, btn.has_alternatives);
+            } else {
+                try render.hideRightButton();
+            }
         }
 
         fn scrollingProgress(scrolled_lines: usize, area_height: usize, max_scroll_count: usize) usize {
-            var progress = scrolled_lines * area_height / max_scroll_count;
-            // Two corner cases for better UX:
-            // 1. Move the scroll after the first scrolling
+            if (area_height == 0 or max_scroll_count == 0) return 0;
+
+            const safe_scrolled_lines = @min(scrolled_lines, max_scroll_count);
+            var progress = safe_scrolled_lines * area_height / max_scroll_count;
             if (progress == 0 and scrolled_lines > 0) progress += 1;
-            // 2. Do not move the scroll to the end until the last possible line is scrolled
-            // (progress become == content_height)
             if (progress == area_height - 1 or progress == area_height)
                 progress -= 1;
             return progress;

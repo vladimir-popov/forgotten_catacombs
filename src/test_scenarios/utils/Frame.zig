@@ -177,11 +177,14 @@ fn parse(str: []const u8, region: p.Region) !Self {
 
 fn isEqual(codepoint: u21, expected_symbol: u21) bool {
     // special cases for blank symbol
-    if (codepoint == 0) {
+    if (codepoint == 0)
         return isBlank(expected_symbol);
-    }
+
     if (expected_symbol == any_symbol)
         return true;
+
+    if (expected_symbol == space_symbol)
+        return isBlank(codepoint);
 
     return codepoint == expected_symbol;
 }
