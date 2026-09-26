@@ -41,7 +41,7 @@ pub const TAB_REGION: p.Region = .{
 
 const Self = @This();
 
-tabs: [MAX_TABS]w.Window = undefined,
+tabs: [MAX_TABS]w.ModalWindow = undefined,
 tabs_len: usize = 0,
 active_tab_idx: usize = 0,
 is_redrawing_required: bool = true,
@@ -52,7 +52,7 @@ pub fn deinit(self: *Self) void {
 }
 
 /// Adds one more tab with empty content to this window.
-pub fn addEmptyTab(self: *Self, alloc: std.mem.Allocator, title: []const u8) !*w.Window {
+pub fn addEmptyTab(self: *Self, alloc: std.mem.Allocator, title: []const u8) !*w.ModalWindow {
     std.debug.assert(self.tabs_len < MAX_TABS);
     self.tabs_len += 1;
     const tab = &self.tabs[self.tabs_len - 1];
@@ -70,7 +70,7 @@ pub fn removeLastTab(self: *Self) void {
         self.active_tab_idx -|= 1;
 }
 
-pub fn activeTab(self: *Self) *w.Window {
+pub fn activeTab(self: *Self) *w.ModalWindow {
     return &self.tabs[self.active_tab_idx];
 }
 

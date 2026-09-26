@@ -18,8 +18,8 @@ entity_in_focus: g.Entity,
 /// Highlighted a focused place in the dungeon
 place_in_focus: p.Point,
 /// The window to show a list with entities on the place in focus
-entities_window: ?w.Window = null,
-description_window: ?w.Window = null,
+entities_window: ?w.ModalWindow = null,
+description_window: ?w.ModalWindow = null,
 
 pub fn init(self: *ExploreMode, session: *g.GameSession) !void {
     self.* = .{
@@ -224,8 +224,8 @@ inline fn sub(x: u8, y: u8) u8 {
 fn windowWithEntities(
     self: *ExploreMode,
     variants: [c.Position.ZOrder.count]?g.Entity,
-) !w.Window {
-    var window = w.Window.init(self.session.mode_arena.allocator(), w.Window.DEFAULT_MAX_REGION);
+) !w.ModalWindow {
+    var window = w.ModalWindow.init(self.session.mode_arena.allocator(), w.ModalWindow.DEFAULT_MAX_REGION);
     var area = try window.changeContent(w.OptionsArea(g.Entity));
     area.* = .initEmpty(window.allocator(), self, .center);
     for (variants) |maybe_entity| {
@@ -251,11 +251,11 @@ fn showEntityDescription(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!w
     return .keep_open;
 }
 
-fn windowWithDescription(self: *ExploreMode) !w.Window {
+fn windowWithDescription(self: *ExploreMode) !w.ModalWindow {
     return try w.entityDescription(
         self.session.mode_arena.allocator(),
         self.session,
         self.entity_in_focus,
-        g.windows.Window.DEFAULT_MAX_REGION,
+        g.windows.ModalWindow.DEFAULT_MAX_REGION,
     );
 }

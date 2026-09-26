@@ -3,7 +3,7 @@ const g = @import("../game_pkg.zig");
 const p = g.primitives;
 const w = g.windows;
 
-/// A maximal region which can be occupied by the modal window.
+/// A maximal region which can be occupied by the modal window above this window.
 /// This region includes a space for borders.
 pub const DEFAULT_MAX_REGION: p.Region = p.Region.init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS);
 
@@ -16,8 +16,8 @@ scrollable_area: w.ScrollableArea(w.Area),
 // The region on the screen occupied by this window. Includes space for the title and border.
 region: p.Region,
 
-pub fn init(alloc: std.mem.Allocator, max_region: p.Region) Self {
-    return .{
+pub fn init(self: *Self, alloc: std.mem.Allocator, max_region: p.Region) void {
+    self.* = .{
         .content_arena = .init(alloc),
         .region = max_region,
         .scrollable_area = .{ .content = .empty, .region = max_region.innerRegion(1, 1, 1, 1) },
@@ -32,6 +32,13 @@ pub fn allocator(self: *Self) std.mem.Allocator {
     return self.content_arena.allocator();
 }
 
+/// Shrinks the window vertically to fit its content.
+///
+/// The resulting height includes the top and bottom borders and is limited by
+/// the current window region. If the content is shorter than the available
+/// height, the window is vertically centered within that region.
+///
+/// Updates the scrollable area's region to match the resized window.
 pub fn shrinkToContent(self: *Self) void {
     // Count of rows that should be drawn (including border)
     const rows: usize = self.scrollable_area.totalLines() + 2; // 2 for border
@@ -56,7 +63,8 @@ pub fn formatTitle(self: *Self, comptime fmt: []const u8, args: anytype) !void {
     self.title_len = (try std.fmt.bufPrint(&self.title_buffer, fmt, args)).len;
 }
 
-/// Returns a pointer to a not initialized Area.
+/// Allocates on the inner arena a new `Area`.
+/// Returns a pointer to the new uninitialized Area.
 pub fn changeContent(self: *Self, comptime Area: type) !*Area {
     _ = self.content_arena.reset(.retain_capacity);
     const area = try self.content_arena.allocator().create(Area);
@@ -77,7 +85,7 @@ pub fn draw(self: *Self, render: g.Render) !void {
 }
 
 /// Draws the title
-pub fn drawTitle(self: *const Self, render: g.Render) !void {
+fn drawTitle(self: *const Self, render: g.Render) !void {
     const padding: u8 = @intCast(self.region.cols - self.title_len);
     const point = self.region.top_left.movedToNTimes(.right, padding / 2);
     const ttl = self.title();
@@ -90,7 +98,7 @@ pub fn drawContent(self: *const Self, render: g.Render) !void {
 }
 
 /// Draws the border around its region
-pub fn drawBorder(self: *const Self, render: g.Render) !void {
+fn drawBorder(self: *const Self, render: g.Render) !void {
     try render.drawBorder(self.region);
 }
 

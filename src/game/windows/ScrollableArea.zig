@@ -11,7 +11,9 @@ pub fn ScrollableArea(comptime Area: type) type {
     return struct {
         const Self = @This();
 
+
         content: Area,
+        /// Predefined region is used to calculate scrolling.
         region: p.Region,
         scrolled_lines: usize = 0,
 

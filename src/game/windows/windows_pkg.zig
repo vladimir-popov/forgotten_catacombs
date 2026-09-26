@@ -35,12 +35,13 @@ pub const HandleButtonResult = enum {
 
 pub const Area = @import("Area.zig");
 pub const Button = @import("Button.zig");
-pub const ModalWindows = @import("ModalWindows.zig");
+pub const ModalWindow = @import("ModalWindow.zig");
 pub const OptionsArea = @import("OptionsArea.zig").OptionsArea;
 pub const ScrollableArea = @import("ScrollableArea.zig").ScrollableArea;
 pub const TabbedWindow = @import("TabbedWindow.zig");
 pub const TextArea = @import("TextArea.zig");
-pub const Window = @import("Window.zig");
+pub const WindowComposer = @import("WindowComposer.zig").WindowComposer;
+
 
 pub const NotificationOptions = struct {
     title: []const u8 = &.{},
@@ -63,8 +64,8 @@ pub fn notification(
     alloc: std.mem.Allocator,
     message: []const u8,
     opts: NotificationOptions,
-) !Window {
-    var window = Window.init(alloc, opts.max_region);
+) !ModalWindow {
+    var window = ModalWindow.init(alloc, opts.max_region);
     try window.formatTitle("{s}", .{opts.title});
 
     var text_area = try window.changeContent(TextArea);
@@ -102,8 +103,8 @@ pub fn entityDescription(
     session: *const g.GameSession,
     entity: g.Entity,
     window_region: p.Region,
-) !Window {
-    var window = Window.init(alloc, window_region);
+) !ModalWindow {
+    var window = ModalWindow.init(alloc, window_region);
     try window.formatTitle("{f}", .{g.Description.actualNameFormatter(session.journal, entity)});
 
     const area: *TextArea = try window.changeContent(TextArea);
@@ -133,8 +134,8 @@ pub fn options(
     alloc: std.mem.Allocator,
     comptime Item: type,
     owner: *anyopaque,
-) !Window {
-    var window = try Window.initFullScreen(alloc);
+) !ModalWindow {
+    var window = try ModalWindow.initFullScreen(alloc);
     _ = try window.createArea(OptionsArea(Item), .init(owner, .center));
     return window;
 }

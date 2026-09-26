@@ -19,7 +19,7 @@ session: *g.GameSession,
 target: ?g.Entity = null,
 quick_actions: QuickActions,
 is_players_turn: bool = true,
-quick_actions_window: ?w.Window = null,
+quick_actions_window: ?w.ModalWindow = null,
 /// If defined, then all input should be ignored.
 notification_to_show: ?NotificationMessage = null,
 
@@ -625,8 +625,8 @@ const TargetsIterator = struct {
 };
 
 /// Builds a window with quick actions list
-fn windowWithQuickActions(self: *Self) !w.Window {
-    var window = w.Window.init(self.session.mode_arena.allocator(), w.Window.DEFAULT_MAX_REGION);
+fn windowWithQuickActions(self: *Self) !w.ModalWindow {
+    var window = w.ModalWindow.init(self.session.mode_arena.allocator(), w.ModalWindow.DEFAULT_MAX_REGION);
     const area = try window.changeContent(w.OptionsArea(void));
     area.* = .initEmpty(window.allocator(), self, .center);
     for (self.quick_actions.actions.items, 0..) |qa, idx| {

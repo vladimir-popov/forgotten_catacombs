@@ -136,7 +136,7 @@ const BuildingStep = union(enum) {
 arena: *g.GameStateArena,
 step: BuildingStep,
 // a popup window with description of a selected item (archetype, stat or skill)
-description: ?w.Window,
+description: ?w.ModalWindow,
 
 pub fn init(self: *Self, arena: *g.GameStateArena) !void {
     self.arena = arena;
@@ -281,7 +281,7 @@ pub fn handleButton(self: *Self, btn: g.Button, render: g.Render) anyerror!?stru
 }
 
 fn showDescription(self: *Self, description: *const g.Description) !void {
-    self.description = .init(self.arena.allocator(), w.Window.DEFAULT_MAX_REGION);
+    self.description = .init(self.arena.allocator(), w.ModalWindow.DEFAULT_MAX_REGION);
     var area = try self.description.?.changeContent(w.TextArea);
     area.* = .initEmpty(self.description.?.allocator());
     for (description.description) |descr_line| {
