@@ -1,4 +1,4 @@
-<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.6 Chrome/144.0.7559.236 Electron/40.8.4 Safari/537.36" pages="8">
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.7.17 Chrome/128.0.6613.36 Electron/32.0.1 Safari/537.36" version="24.7.17" pages="10">
   <diagram id="HEc6ijCT2G0Q-exSr9Sf" name="Build graph">
     <mxGraphModel dx="1234" dy="2002" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
@@ -1223,6 +1223,104 @@
               <mxPoint x="390" y="185" />
             </Array>
           </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="lx1fJM2BUThhmJDA9-GM" name="Windows system">
+    <mxGraphModel dx="1114" dy="830" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="oEpedYLgEpOnY2YKz73s-21" value="Panel Arena" style="shape=umlFrame;whiteSpace=wrap;html=1;pointerEvents=0;width=100;height=20;swimlaneFillColor=default;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="20" width="460" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-2" value="«interface»&lt;br&gt;&lt;b&gt;Area&lt;/b&gt;" style="html=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="200" y="160" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=0;startSize=6;endSize=12;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="oEpedYLgEpOnY2YKz73s-3" target="oEpedYLgEpOnY2YKz73s-2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="175" y="120" />
+              <mxPoint x="255" y="120" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-3" value="TextArea" style="html=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="120" y="40" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=0;startSize=6;endSize=12;" edge="1" parent="1" source="oEpedYLgEpOnY2YKz73s-4" target="oEpedYLgEpOnY2YKz73s-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-4" value="OptionsArea" style="html=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="280" y="40" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=diamond;startFill=1;" edge="1" parent="1" source="oEpedYLgEpOnY2YKz73s-9" target="oEpedYLgEpOnY2YKz73s-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-9" value="Panel" style="html=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="200" y="260" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=diamond;startFill=1;" edge="1" parent="1" source="oEpedYLgEpOnY2YKz73s-12" target="oEpedYLgEpOnY2YKz73s-9">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="95" y="340" />
+              <mxPoint x="255" y="340" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-12" value="ModalWindow" style="html=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="360" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-13" value="TabbedWindow" style="html=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="200" y="360" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=diamond;startFill=1;" edge="1" parent="1" source="oEpedYLgEpOnY2YKz73s-14" target="oEpedYLgEpOnY2YKz73s-9">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="414" y="340" />
+              <mxPoint x="255" y="340" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-14" value="WizardWindow" style="html=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="359" y="360" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=diamond;startFill=1;" edge="1" parent="1" source="oEpedYLgEpOnY2YKz73s-13" target="oEpedYLgEpOnY2YKz73s-9">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="255" y="360" as="sourcePoint" />
+            <mxPoint x="265" y="420" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-23" value="Areas are about how to draw its content in the passed region" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;size=14;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;spacingLeft=5;align=left;" vertex="1" parent="1">
+          <mxGeometry x="510" y="15" width="120" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-25" value="Used to erase a type of an area" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;size=14;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;spacingLeft=5;align=left;" vertex="1" parent="1">
+          <mxGeometry x="380" y="155" width="140" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-26" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=2;rounded=0;" edge="1" parent="1" source="oEpedYLgEpOnY2YKz73s-2" target="oEpedYLgEpOnY2YKz73s-25">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="280" y="260" as="sourcePoint" />
+            <mxPoint x="330" y="210" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-27" value="Manages a memory for a particular instance of an area, and provides scrolling functionality." style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;size=14;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;spacingLeft=5;align=left;" vertex="1" parent="1">
+          <mxGeometry x="380" y="240" width="140" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-28" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=2;rounded=0;" edge="1" parent="1" source="oEpedYLgEpOnY2YKz73s-9" target="oEpedYLgEpOnY2YKz73s-27">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="320" y="194" as="sourcePoint" />
+            <mxPoint x="390" y="193" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-30" value="" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.annotation_2;align=left;labelPosition=right;pointerEvents=1;" vertex="1" parent="1">
+          <mxGeometry x="469" y="5" width="50" height="125" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-31" value="" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.annotation_2;align=left;labelPosition=right;pointerEvents=1;" vertex="1" parent="1">
+          <mxGeometry x="510" y="322.5" width="50" height="125" as="geometry" />
+        </mxCell>
+        <mxCell id="oEpedYLgEpOnY2YKz73s-32" value="Manages an occupied region, provides more complicated UI behaviour" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;size=14;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;spacingLeft=5;align=left;" vertex="1" parent="1">
+          <mxGeometry x="550" y="342.5" width="140" height="85" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>

@@ -35,110 +35,13 @@ pub const HandleButtonResult = enum {
 
 pub const Area = @import("Area.zig");
 pub const Button = @import("Button.zig");
+pub const ManagePointsWindow = @import("ManagePointsWindow.zig");
 pub const ModalWindow = @import("ModalWindow.zig");
 pub const OptionsArea = @import("OptionsArea.zig").OptionsArea;
-pub const ScrollableArea = @import("ScrollableArea.zig").ScrollableArea;
+pub const Panel = @import("Panel.zig");
 pub const TabbedWindow = @import("TabbedWindow.zig");
 pub const TextArea = @import("TextArea.zig");
 pub const WindowComposer = @import("WindowComposer.zig").WindowComposer;
-
-
-pub const NotificationOptions = struct {
-    title: []const u8 = &.{},
-    max_region: p.Region = .init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS),
-    text_align: g.TextAlign = .center,
-};
-
-/// Shows a multiline message in the modal window.
-/// Example:
-/// ```
-/// ┌───────────────Title───────────────┐
-/// │               Multi               │
-/// │               line                │
-/// │              message              │
-/// └───────────────────────────────────┘
-///═══════════════════════════════════════
-///                                Close
-/// ```
-pub fn notification(
-    alloc: std.mem.Allocator,
-    message: []const u8,
-    opts: NotificationOptions,
-) !ModalWindow {
-    var window = ModalWindow.init(alloc, opts.max_region);
-    try window.formatTitle("{s}", .{opts.title});
-
-    var text_area = try window.changeContent(TextArea);
-    text_area.* = .initEmpty(window.allocator());
-    var itr = std.mem.splitScalar(u8, message, '\n');
-    while (itr.next()) |msg_line| {
-        const line = try text_area.addEmptyLine();
-        const width = g.DISPLAY_COLS - 2;
-        const pad = switch (opts.text_align) {
-            .left => 0,
-            .center => p.diff(msg_line.len, width) / 2,
-            .right => p.diff(msg_line.len, width),
-        };
-        _ = try std.fmt.bufPrint(line[pad..], "{s}", .{msg_line});
-    }
-    window.shrinkToContent();
-    return window;
-}
-
-/// Approximate example:
-/// ```
-/// ┌───────────────Club────────────────┐
-/// │A gnarled piece of wood, scarred   │
-/// │from use. Deals blunt damage.      │
-/// │Cheap and easy to use.             │
-/// │                                   │
-/// │Damage: cutting 2-3                │
-/// │Weight: 3                          │
-/// └───────────────────────────────────┘
-///═══════════════════════════════════════
-///                                Close
-/// ```
-pub fn entityDescription(
-    alloc: std.mem.Allocator,
-    session: *const g.GameSession,
-    entity: g.Entity,
-    window_region: p.Region,
-) !ModalWindow {
-    var window = ModalWindow.init(alloc, window_region);
-    try window.formatTitle("{f}", .{g.Description.actualNameFormatter(session.journal, entity)});
-
-    const area: *TextArea = try window.changeContent(TextArea);
-    area.* = .initEmpty(window.allocator());
-    if (session.player.id == entity.id) {
-        try g.Description.describePlayer(session.journal, entity, area);
-    } else if (session.registry.has(entity, c.EnemyState)) {
-        try g.Description.describeEnemy(session.journal, entity, area);
-    } else {
-        const is_equipped = g.meta.isEquipped(&session.registry, session.player, entity);
-        try g.Description.describeItem(session.journal, entity, is_equipped, area);
-    }
-    return window;
-}
-
-/// Example:
-/// ```
-/// ┌──────────────Title───────────────┐
-/// │              Option              │
-/// │░░░░░░░░░░░░░ Option ░░░░░░░░░░░░░│
-/// │              Option              │
-/// └──────────────────────────────────┘
-///═══════════════════════════════════════
-///                          Close Choose
-/// ```
-pub fn options(
-    alloc: std.mem.Allocator,
-    comptime Item: type,
-    owner: *anyopaque,
-) !ModalWindow {
-    var window = try ModalWindow.initFullScreen(alloc);
-    _ = try window.createArea(OptionsArea(Item), .init(owner, .center));
-    return window;
-}
 
 pub fn updateAreaWithItems(
     area: *OptionsArea(g.Entity),

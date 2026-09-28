@@ -104,12 +104,12 @@ pub fn updateTabs(self: *Self) !void {
     self.windows.main_window.tabs[TAB_REPAIR].scrollable_area.clearRetainingCapacity();
 
     const active_tab = self.windows.main_window.activeTab();
-    const active_content: *w.OptionsArea(g.Entity) = @ptrCast(@alignCast(active_tab.scrollable_area.content.underlying));
+    const active_content: *w.OptionsArea(g.Entity) = @ptrCast(@alignCast(active_tab.content.content.underlying));
 
     var itr = self.inventory.items.iterator();
     while (itr.next()) |item_ptr| {
         const item = item_ptr.*;
-        var buffer: [w.TabbedWindow.TAB_REGION.cols + 4]u8 = undefined;
+        var buffer: [w.TabbedWindow.TAB_CONTENT_REGION.cols + 4]u8 = undefined;
         if (self.session.journal.isKnown(item)) {
             if (self.isWeaponOrArmor(item)) {
                 if (g.meta.isBroken(&self.session.registry, item)) {
@@ -136,10 +136,10 @@ pub fn updateTabs(self: *Self) !void {
             );
         }
     }
-    if (active_tab.scrollable_area.content.totalLines() > 0) {
+    if (active_tab.content.content.totalLines() > 0) {
         const selected_line = active_content.selectedLine() orelse 0;
         try active_content.selectLine(
-            if (selected_line < active_tab.scrollable_area.content.totalLines())
+            if (selected_line < active_tab.content.content.totalLines())
                 selected_line
             else
                 active_content.options.items.len - 1,
@@ -150,7 +150,7 @@ pub fn updateTabs(self: *Self) !void {
 //[¿ A yellow potion                  22$ ]
 const line_with_price_fmt = std.fmt.comptimePrint(
     "{{u}} {{s:<{d}}}{{d:4}}$ ",
-    .{w.TabbedWindow.TAB_REGION.cols - 10}, // ("{u} ".len == 2) + ("0000$ ".len == 6) + 2 for borders
+    .{w.TabbedWindow.TAB_CONTENT_REGION.cols - 10}, // ("{u} ".len == 2) + ("0000$ ".len == 6) + 2 for borders
 );
 
 fn formatLineWithPrice(self: *Self, buffer: []u8, item: g.Entity, price: u16) ![]const u8 {

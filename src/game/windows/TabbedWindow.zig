@@ -25,60 +25,70 @@ const log = std.log.scoped(.windows);
 const WHOLE_WINDOW_REGION = p.Region.init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS); // -2 rows for infoBar
 const MAX_TABS = 3;
 
-/// The region for tab window. It includes a space for the window's border, but that border is not
-/// drawn.
-pub const TAB_REGION: p.Region = .{
-    .top_left = .{
-        // reserved lines for the title, separator and one line for upper border
-        .row = 3,
-        // reserved line for the border
-        .col = 1,
-    },
-    // -2 rows for infoBar, -2 for title
-    .rows = g.DISPLAY_ROWS - 2 - 2,
-    .cols = g.DISPLAY_COLS,
+const Tab = struct {
+    /// The region for a tab. It includes a space for the window's border, but that border is not
+    /// drawn.
+    const CONTENT_REGION: p.Region = .{
+        .top_left = .{
+            // reserved lines for the title, separator and one line for upper border
+            .row = 3,
+            // reserved line for the border
+            .col = 1,
+        },
+        // -2 rows for infoBar, -2 for title
+        .rows = g.DISPLAY_ROWS - 2 - 2,
+        .cols = g.DISPLAY_COLS,
+    };
+    title: []const u8,
+    panel: w.Panel,
 };
 
 const Self = @This();
 
-tabs: [MAX_TABS]w.ModalWindow = undefined,
+tabs: [MAX_TABS]Tab = undefined,
 tabs_len: usize = 0,
 active_tab_idx: usize = 0,
 is_redrawing_required: bool = true,
 
 pub fn deinit(self: *Self) void {
+    for (0..self.tabs_len) |idx| {
+        self.tabs[idx].panel.deinit();
+    }
     self.tabs_len = 0;
     self.tabs = undefined;
 }
 
-/// Adds one more tab with empty content to this window.
-pub fn addEmptyTab(self: *Self, alloc: std.mem.Allocator, title: []const u8) !*w.ModalWindow {
+/// Adds one more tab with options to this window.
+pub fn addOptionsTab(
+    self: *Self,
+    alloc: std.mem.Allocator,
+    comptime Item: type,
+    comptime title: []const u8,
+) !*w.OptionsArea(Item) {
     std.debug.assert(self.tabs_len < MAX_TABS);
     self.tabs_len += 1;
     const tab = &self.tabs[self.tabs_len - 1];
-    tab.* = .init(alloc, TAB_REGION);
-    try tab.formatTitle("{s}", .{title});
-    return tab;
+    tab.title = title;
+    return tab.panel.initWithOptions(alloc, Item);
 }
 
 pub fn removeLastTab(self: *Self) void {
     if (self.tabs_len == 0) return;
-    self.tabs[self.tabs_len - 1].deinit();
+    self.tabs[self.tabs_len - 1].panel.deinit();
     self.tabs[self.tabs_len - 1] = undefined;
     self.tabs_len -= 1;
     if (self.active_tab_idx == self.tabs_len)
         self.active_tab_idx -|= 1;
 }
 
-pub fn activeTab(self: *Self) *w.ModalWindow {
+pub fn activeTab(self: *Self) *Tab {
     return &self.tabs[self.active_tab_idx];
 }
 
-/// true means the window should be closed
 pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
     self.is_redrawing_required = true;
     const tab = self.activeTab();
-    if (try tab.handleButton(btn) == .close_window)
+    if (try tab.panel.handleButton(btn) == .close_window)
         return .close_window;
 
     switch (btn.game_button) {
@@ -94,9 +104,6 @@ pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
 }
 
 pub fn draw(self: *Self, render: g.Render) !void {
-    if (!self.is_redrawing_required) return;
-    defer self.is_redrawing_required = false;
-
     // Draw the tab titles
     const tab_title_width: usize = (WHOLE_WINDOW_REGION.cols - 2) / self.tabs_len;
     try render.drawDoubledBorder(WHOLE_WINDOW_REGION, g.Render.default_filler);
@@ -106,7 +113,7 @@ pub fn draw(self: *Self, render: g.Render) !void {
             .movedToNTimes(.right, @intCast(1 + idx * tab_title_width));
         try render.drawTextWithAlign(
             tab_title_width,
-            self.tabs[idx].title(),
+            self.tabs[idx].title,
             cursor,
             .normal,
             .center,
@@ -158,8 +165,5 @@ pub fn draw(self: *Self, render: g.Render) !void {
         }
     }
 
-    // Draw the content and buttons
-    const active_tab = &self.tabs[self.active_tab_idx];
-    try active_tab.drawContent(render);
-    try active_tab.drawButtons(render);
+    try self.activeTab().panel.draw(render, Tab.CONTENT_REGION);
 }

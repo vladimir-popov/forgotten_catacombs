@@ -139,17 +139,18 @@ pub fn OptionsArea(comptime Item: type) type {
             label: []const u8,
             item: Item,
             handler: ButtonHandler,
-        ) !void {
+        ) !*Option {
             std.debug.assert(label.len < LINE_BUFFER_SIZE);
 
-            const line = try self.options.addOne(self.alloc);
-            line.* = .{
+            const option = try self.options.addOne(self.alloc);
+            option.* = .{
                 .item = item,
                 .label_len = label.len,
                 .label_buffer = undefined,
                 .button_handler = handler,
             };
-            @memmove(line.label_buffer[0..line.label_len], label);
+            @memmove(option.label_buffer[0..option.label_len], label);
+            return option;
         }
 
         pub fn addOptionFmt(
@@ -158,29 +159,30 @@ pub fn OptionsArea(comptime Item: type) type {
             args: anytype,
             item: Item,
             handler: ButtonHandler,
-        ) !void {
-            const line = try self.options.addOne(self.alloc);
-            line.* = .{
+        ) !*Option {
+            const option = try self.options.addOne(self.alloc);
+            option.* = .{
                 .item = item,
                 .label_len = 0,
                 .label_buffer = undefined,
                 .button_handler = handler,
             };
-            line.label_len = (try std.fmt.bufPrint(&line.label_buffer, fmt, args)).len;
+            option.label_len = (try std.fmt.bufPrint(&option.label_buffer, fmt, args)).len;
+            return option;
         }
 
         pub fn addEmptyOption(
             self: *Self,
             item: Item,
         ) !*Option {
-            const line = try self.options.addOne(self.alloc);
-            line.* = .{
+            const option = try self.options.addOne(self.alloc);
+            option.* = .{
                 .item = item,
                 .label_len = 0,
                 .label_buffer = @splat(' '),
                 .button_handler = .do_nothing,
             };
-            return line;
+            return option;
         }
 
         pub fn selectLine(self: *Self, idx: usize) !void {

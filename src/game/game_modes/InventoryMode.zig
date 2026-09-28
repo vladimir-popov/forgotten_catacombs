@@ -113,9 +113,7 @@ fn tabWithDrop(self: *Self) ?*w.ModalWindow {
 }
 
 fn addInventoryTab(self: *Self) !void {
-    const tab = try self.windows.main_window.addEmptyTab(self.session.mode_arena.allocator(), "Inventory");
-    const area = try tab.changeContent(w.OptionsArea(g.Entity));
-    area.* = .initEmpty(tab.allocator(), self, .left);
+    _ = try self.windows.main_window.addOptionsTab(self.session.mode_arena.allocator(), g.Entity, "Inventory");
     try self.updateInventoryTab();
 }
 
@@ -123,7 +121,7 @@ fn addInventoryTab(self: *Self) !void {
 pub fn updateInventoryTab(self: *Self) !void {
     const tab = self.tabWithInventory();
     try w.updateAreaWithItems(
-        @ptrCast(@alignCast(tab.scrollable_area.content.underlying)),
+        @ptrCast(@alignCast(tab.panel.area.underlying)),
         self,
         self.inventory.items,
         formatInventoryLine,
@@ -155,7 +153,7 @@ fn formatInventoryLine(
 
 const inventory_line_fmt = std.fmt.comptimePrint(
     "{{u}} {{s:<{d}}}{{s}} ",
-    .{w.TabbedWindow.TAB_REGION.cols - 11}, // 12 == ("{u} ".len == 2) + ("weapon ".len == 7) + (2 for borers)
+    .{w.TabbedWindow.TAB_CONTENT_REGION.cols - 11}, // 12 == ("{u} ".len == 2) + ("weapon ".len == 7) + (2 for borers)
 );
 
 fn useCombineDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
@@ -428,7 +426,11 @@ fn takeSelectedItem(ptr: *anyopaque, _: usize, selected_item: g.Entity) !w.Handl
     } else {
         if (self.inventory.isFull()) {
             const window = try self.windows.newModalWindow();
-            window.* = try w.notification(alloc, "Your inventory is full!", .{ .max_region = MODAL_WINDOW_REGION });
+            try window.initNotification(
+                self.allocator(),
+                "Your inventory is full!",
+                .{ .max_region = MODAL_WINDOW_REGION },
+            );
             return .keep_open;
         }
         try self.inventory.items.add(selected_item);

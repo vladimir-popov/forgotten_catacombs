@@ -144,7 +144,7 @@ fn drawBalance(self: Self) !void {
 
 const product_fmt = std.fmt.comptimePrint(
     "{{u}} {{s:<{d}}}{{d:4}}$ ",
-    .{w.TabbedWindow.TAB_REGION.cols - 10}, // "{u} ".len == 2 + "0000$".len == 5 + 2 for pads
+    .{w.TabbedWindow.TAB_CONTENT_REGION.cols - 10}, // "{u} ".len == 2 + "0000$".len == 5 + 2 for pads
 );
 
 fn formatProduct(self: *Self, line: *w.TextArea.Line, item: g.Entity, for_buying: bool) ![]const u8 {
@@ -174,7 +174,7 @@ fn formatItemForSelling(line: *w.TextArea.Line, ptr: *anyopaque, item: g.Entity)
 fn updateBuyingTab(self: *Self) !void {
     const tab = self.buyingTab();
     try w.updateAreaWithItems(
-        @ptrCast(@alignCast(tab.scrollable_area.content.underlying)),
+        @ptrCast(@alignCast(tab.panel.area.underlying)),
         self,
         self.shop.items,
         formatItemForBuying,
@@ -185,7 +185,7 @@ fn updateBuyingTab(self: *Self) !void {
 fn updateSellingTab(self: *Self) !void {
     const tab = self.sellingTab();
     try w.updateAreaWithItems(
-        @ptrCast(@alignCast(tab.scrollable_area.content.underlying)),
+        @ptrCast(@alignCast(tab.panel.area.underlying)),
         self,
         self.inventory.items,
         formatItemForSelling,
