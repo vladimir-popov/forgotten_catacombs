@@ -8,17 +8,17 @@ const log = std.log.scoped(.windows);
 
 const Self = @This();
 
-area: w.Area,
 arena: std.heap.ArenaAllocator,
+area: w.Area,
 scrolled_lines: usize = 0,
 
-pub fn initWithText(self: *Self, alloc: std.mem.Allocator) !w.TextArea {
-    var arena = std.heap.ArenaAllocator.init(alloc);
-    const text_area = try arena.allocator().create(w.TextArea);
-    self.* = .{
-        .area = text_area.area(),
-        .arena = arena,
-    };
+pub fn initWithText(self: *Self, alloc: std.mem.Allocator) !*w.TextArea {
+    self.scrolled_lines = 0;
+    self.arena = std.heap.ArenaAllocator.init(alloc);
+    const text_area = try self.arena.allocator().create(w.TextArea);
+    errdefer self.arena.deinit();
+    text_area.* = .initEmpty(self.arena.allocator());
+    self.area = text_area.area();
     return text_area;
 }
 
@@ -26,22 +26,20 @@ pub fn initWithOptions(
     self: *Self,
     alloc: std.mem.Allocator,
     comptime Item: type,
+    context: *anyopaque,
+    text_align: g.TextAlign,
 ) !*w.OptionsArea(Item) {
-    var arena = std.heap.ArenaAllocator.init(alloc);
-    const options_area = try arena.allocator().create(w.OptionsArea(Item));
-    self.* = .{
-        .area = options_area.area(),
-        .arena = arena,
-    };
+    self.scrolled_lines = 0;
+    self.arena = std.heap.ArenaAllocator.init(alloc);
+    const options_area = try self.arena.allocator().create(w.OptionsArea(Item));
+    errdefer self.arena.deinit();
+    options_area.* = .initEmpty(self.arena.allocator(), context, text_align);
+    self.area = options_area.area();
     return options_area;
 }
 
 pub fn deinit(self: *Self) void {
     self.arena.deinit();
-}
-
-pub fn allocator(self: *Self) std.mem.Allocator {
-    return self.arena.allocator();
 }
 
 pub fn isScrollRequired(self: *const Self, region: p.Region) bool {
@@ -72,19 +70,14 @@ pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
     if (try self.area.handleButton(btn) == .close_window)
         return .close_window;
 
-    if (!self.isScrollRequired()) return .keep_open;
-    if (self.area.selectedLine()) |selected_line| {
-        if (self.region.rows + self.scrolled_lines > selected_line and selected_line >= self.scrolled_lines)
-            return .keep_open;
-    }
-
     switch (btn.game_button) {
         .up => {
             if (self.scrolled_lines > 0)
                 self.scrolled_lines -= 1;
         },
         .down => {
-            if (self.scrolled_lines < self.maxScrollingCount())
+            // if (self.scrolled_lines < self.maxScrollingCount())
+            if (self.scrolled_lines < self.area.totalLines())
                 self.scrolled_lines += 1;
         },
         else => {},
@@ -94,8 +87,8 @@ pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
 
 pub fn draw(self: *const Self, render: g.Render, region: p.Region) !void {
     // Draw the scrollbar
-    if (self.isScrollRequired()) {
-        const progress = scrollingProgress(self.scrolled_lines, region.rows, self.maxScrollingCount());
+    if (self.isScrollRequired(region)) {
+        const progress = scrollingProgress(self.scrolled_lines, region.rows, self.maxScrollingCount(region));
         var point = region.topRight();
         for (0..region.rows) |i| {
             if (i == progress)
@@ -106,7 +99,7 @@ pub fn draw(self: *const Self, render: g.Render, region: p.Region) !void {
         }
     }
     // Draw the content inside the region excluding a space for the scrollbar
-    const right_pad: u8 = if (self.isScrollRequired()) 1 else 0;
+    const right_pad: u8 = if (self.isScrollRequired(region)) 1 else 0;
     try self.area.draw(render, region.innerRegion(0, right_pad, 0, 0), self.scrolled_lines);
 }
 

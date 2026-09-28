@@ -7,7 +7,7 @@ const w = g.windows;
 /// This region includes a space for borders.
 pub const DEFAULT_MAX_REGION: p.Region = p.Region.init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS);
 
-pub const Options = struct {
+pub const Params = struct {
     title: []const u8 = &.{},
     max_region: p.Region = DEFAULT_MAX_REGION,
 };
@@ -19,15 +19,15 @@ title_len: usize,
 panel: w.Panel,
 region: p.Region,
 
-pub fn initFullScreenText(
-    self: *Self,
-    alloc: std.mem.Allocator,
-    window_title: []const u8,
-) !w.TextArea {
-    self.region = DEFAULT_MAX_REGION;
-    try self.formatTitle("{s}", .{window_title});
+pub fn initWithText(self: *Self, alloc: std.mem.Allocator, params: Params) !*w.TextArea {
+    self.region = params.max_region;
+    try self.formatTitle("{s}", .{params.title});
     const area = self.panel.initWithText(alloc);
     return area;
+}
+
+pub fn initFullScreenText(self: *Self, alloc: std.mem.Allocator, window_title: []const u8) !*w.TextArea {
+    return try self.initWithText(alloc, .{ .title = window_title, .max_region = DEFAULT_MAX_REGION });
 }
 
 /// Example:
@@ -40,19 +40,17 @@ pub fn initFullScreenText(
 ///═══════════════════════════════════════
 ///                          Close Choose
 /// ```
-pub fn initOptions(
+pub fn initWithOptions(
     self: *Self,
     alloc: std.mem.Allocator,
     comptime Item: type,
     context: *anyopaque,
     text_align: g.TextAlign,
-    opts: Options,
-) !w.OptionsArea(Item) {
-    self.region = opts.max_region;
-    try self.formatTitle("{s}", .{opts.title});
-    const area = self.panel.initWithOptions(alloc, Item);
-    area.* = .initEmpty(alloc, context, text_align);
-    self.shrinkToContent();
+    params: Params,
+) !*w.OptionsArea(Item) {
+    self.region = params.max_region;
+    try self.formatTitle("{s}", .{params.title});
+    const area = self.panel.initWithOptions(alloc, Item, context, text_align);
     return area;
 }
 
@@ -69,11 +67,13 @@ pub fn initNotification(
     self: *Self,
     alloc: std.mem.Allocator,
     message: []const u8,
-    opts: Options,
+    params: Params,
 ) !void {
-    self.region = opts.max_region;
-    try self.formatTitle("{s}", .{opts.title});
+    self.region = params.max_region;
+    try self.formatTitle("{s}", .{params.title});
     const text_area = try self.panel.initWithText(alloc);
+    errdefer self.panel.deinit();
+
     var itr = std.mem.splitScalar(u8, message, '\n');
     while (itr.next()) |msg_line| {
         const line = try text_area.addEmptyLine();
@@ -100,14 +100,23 @@ pub fn initNotification(
 pub fn initEntityDescription(
     self: *Self,
     alloc: std.mem.Allocator,
-    session: *const g.GameSession,
+    session: *g.GameSession,
     entity: g.Entity,
-    opts: Options,
+    max_region: p.Region,
 ) !void {
-    self.region = opts.max_region;
+    self.region = max_region;
     try self.formatTitle("{f}", .{g.Description.actualNameFormatter(session.journal, entity)});
     const text_area = try self.panel.initWithText(alloc);
+    errdefer self.panel.deinit();
+
     if (session.player.id == entity.id) {
+        text_area.b_button = .{ .button = .up_level, .context = session, .handler = struct {
+            fn upLevel(ptr: *anyopaque) !w.HandleButtonResult {
+                const ss: *g.GameSession = @ptrCast(@alignCast(ptr));
+                try ss.levelUp();
+                return .close_window;
+            }
+        }.upLevel };
         try g.Description.describePlayer(session.journal, entity, text_area);
     } else if (session.registry.has(entity, g.components.EnemyState)) {
         try g.Description.describeEnemy(session.journal, entity, text_area);
@@ -149,7 +158,6 @@ pub fn shrinkToContent(self: *Self) void {
         .rows = @min(rows, max_region.rows),
         .cols = max_region.cols,
     };
-    self.panel.region = self.region.innerRegion(1, 1, 1, 1);
 }
 
 pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
@@ -174,7 +182,7 @@ fn drawTitle(self: *const Self, render: g.Render) !void {
 
 /// Draws the content of its inner scrollable panel
 pub fn drawContent(self: *const Self, render: g.Render) !void {
-    try self.panel.draw(render);
+    try self.panel.draw(render, self.region.innerRegion(1, 1, 1, 1));
 }
 
 /// Draws the border around its region

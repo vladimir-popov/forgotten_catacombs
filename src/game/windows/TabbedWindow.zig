@@ -25,10 +25,10 @@ const log = std.log.scoped(.windows);
 const WHOLE_WINDOW_REGION = p.Region.init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS); // -2 rows for infoBar
 const MAX_TABS = 3;
 
-const Tab = struct {
+pub const Tab = struct {
     /// The region for a tab. It includes a space for the window's border, but that border is not
     /// drawn.
-    const CONTENT_REGION: p.Region = .{
+    pub const CONTENT_REGION: p.Region = .{
         .top_left = .{
             // reserved lines for the title, separator and one line for upper border
             .row = 3,
@@ -69,7 +69,7 @@ pub fn addOptionsTab(
     self.tabs_len += 1;
     const tab = &self.tabs[self.tabs_len - 1];
     tab.title = title;
-    return tab.panel.initWithOptions(alloc, Item);
+    return tab.panel.initWithOptions(alloc, Item, self, .left);
 }
 
 pub fn removeLastTab(self: *Self) void {

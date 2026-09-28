@@ -8,7 +8,7 @@ const w = g.windows;
 
 const log = std.log.scoped(.explore_mode);
 
-const ExploreMode = @This();
+const Self = @This();
 const EntitiesOnScreen = std.AutoHashMapUnmanaged(p.Point, [c.Position.ZOrder.count]?g.Entity);
 
 session: *g.GameSession,
@@ -17,93 +17,71 @@ entities_on_screen: EntitiesOnScreen,
 entity_in_focus: g.Entity,
 /// Highlighted a focused place in the dungeon
 place_in_focus: p.Point,
-/// The window to show a list with entities on the place in focus
-entities_window: ?w.ModalWindow = null,
-description_window: ?w.ModalWindow = null,
+composer: w.WindowComposer(Self),
 
-pub fn init(self: *ExploreMode, session: *g.GameSession) !void {
+pub fn init(self: *Self, session: *g.GameSession) !void {
     self.* = .{
         .session = session,
         .entity_in_focus = session.player,
         .place_in_focus = session.level.playerPosition().place,
         .entities_on_screen = .empty,
+        .composer = .{ .main_window = self },
     };
     try self.updateEntitiesOnScreen();
-    try self.draw();
+    try self.draw(self.session.render);
 }
 
-pub fn tick(self: *ExploreMode) anyerror!void {
-    // Nothing should happened until the player push a button
+pub fn tick(self: *Self) anyerror!void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
-        if (self.description_window) |*description_window| {
-            if (try description_window.handleButton(btn) == .close_window) {
-                try description_window.hide(self.session.render, .from_buffer);
-                description_window.deinit();
-                self.description_window = null;
-            } else if (self.isLevelUp()) {
-                if (btn.game_button == .b)
-                    try self.session.levelUp();
-            }
-        } else if (self.entities_window) |*entities_window| {
-            if (try entities_window.handleButton(btn) == .close_window) {
-                try entities_window.hide(self.session.render, .from_buffer);
-                entities_window.deinit();
-                self.entities_window = null;
-            }
-        } else {
-            switch (btn.game_button) {
-                .b => {
-                    if (btn.state == .hold and self.countOfEntitiesInFocus() > 1) {
-                        if (self.entitiesInFocus()) |entities| {
-                            self.entities_window = try self.windowWithEntities(entities);
-                        }
-                    } else {
-                        self.description_window = try self.windowWithDescription();
-                    }
-                },
-                .a => {
-                    try self.session.continuePlay(self.entity_in_focus, null);
-                    return;
-                },
-                .left, .right, .up, .down => {
-                    self.moveFocus(btn.toDirection().?);
-                },
-            }
+        if (try self.composer.handleButton(btn) == .close_window) {
+            try self.session.continuePlay(self.entity_in_focus, null);
+            return;
         }
-        try self.draw();
+        try self.composer.draw(self.session.render);
     }
 }
 
-inline fn isLevelUp(self: ExploreMode) bool {
+pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
+    switch (btn.game_button) {
+        .b => {
+            if (btn.state == .hold and self.countOfEntitiesInFocus() > 1) {
+                if (self.entitiesInFocus()) |entities| {
+                    try self.showWindowWithEntities(entities);
+                }
+            } else {
+                try self.showWindowWithEntityDescription();
+            }
+        },
+        .a => {
+            return .close_window;
+        },
+        .left, .right, .up, .down => {
+            self.moveFocus(btn.toDirection().?);
+        },
+    }
+    return .keep_open;
+}
+
+pub fn draw(self: *Self, render: g.Render) !void {
+    try render.drawScene(self.session, self.entity_in_focus);
+    try render.drawLeftButton("Describe", self.countOfEntitiesInFocus() > 1);
+    if (self.canBeATarget()) {
+        try render.drawRightButton("Target", false);
+    } else {
+        try render.drawRightButton("Cancel", false);
+    }
+    // Draw the name or health of the entity in focus
+    var buf: [g.DISPLAY_COLS]u8 = undefined;
+    const len = @min(try self.statusLine(self.entity_in_focus, &buf), g.Render.INFO_ZONE_LENGTH);
+    try render.drawInfo(buf[0..len]);
+}
+
+inline fn isLevelUp(self: Self) bool {
     return self.entity_in_focus.eql(self.session.player) and
         g.meta.isLevelUp(&self.session.registry, self.session.player);
 }
 
-fn draw(self: *ExploreMode) !void {
-    if (self.description_window) |*window| {
-        try window.draw(self.session.render);
-        if (self.isLevelUp()) {
-            try self.session.render.drawLeftButton("Up level", false);
-            try self.session.render.drawInfo("Level up!");
-        }
-    } else if (self.entities_window) |*window| {
-        try window.draw(self.session.render);
-    } else {
-        try self.session.render.drawScene(self.session, self.entity_in_focus);
-        try self.session.render.drawLeftButton("Describe", self.countOfEntitiesInFocus() > 1);
-        if (self.canBeATarget()) {
-            try self.session.render.drawRightButton("Target", false);
-        } else {
-            try self.session.render.drawRightButton("Cancel", false);
-        }
-        // Draw the name or health of the entity in focus
-        var buf: [g.DISPLAY_COLS]u8 = undefined;
-        const len = @min(try self.statusLine(self.entity_in_focus, &buf), g.Render.INFO_ZONE_LENGTH);
-        try self.session.render.drawInfo(buf[0..len]);
-    }
-}
-
-fn canBeATarget(self: *const ExploreMode) bool {
+fn canBeATarget(self: *const Self) bool {
     const weapon = g.meta.getWeapon(&self.session.registry, self.session.player);
     const player_position = self.session.level.playerPosition();
     return self.session.actions.calculateQuickActionForTarget(
@@ -113,7 +91,7 @@ fn canBeATarget(self: *const ExploreMode) bool {
     ) != null;
 }
 
-fn statusLine(self: ExploreMode, entity: g.Entity, line: []u8) !usize {
+fn statusLine(self: Self, entity: g.Entity, line: []u8) !usize {
     var len: usize = 0;
     if (self.session.runtime.isDevMode()) {
         len += (try std.fmt.bufPrint(line[len..], "{d}:", .{entity.id})).len;
@@ -125,7 +103,7 @@ fn statusLine(self: ExploreMode, entity: g.Entity, line: []u8) !usize {
     return len;
 }
 
-fn updateEntitiesOnScreen(self: *ExploreMode) !void {
+fn updateEntitiesOnScreen(self: *Self) !void {
     const alloc = self.session.mode_arena.allocator();
     self.entities_on_screen.clearRetainingCapacity();
     const level = &self.session.level;
@@ -150,13 +128,13 @@ fn updateEntitiesOnScreen(self: *ExploreMode) !void {
     log.debug("ExploreMode has been refreshed. Entities on screen:\n{any}", .{self.entities_on_screen});
 }
 
-fn entitiesInFocus(self: ExploreMode) ?[c.Position.ZOrder.count]?g.Entity {
+fn entitiesInFocus(self: Self) ?[c.Position.ZOrder.count]?g.Entity {
     if (self.entities_on_screen.get(self.place_in_focus)) |entities|
         return entities;
     return null;
 }
 
-fn countOfEntitiesInFocus(self: ExploreMode) usize {
+fn countOfEntitiesInFocus(self: Self) usize {
     var count: usize = 0;
     if (self.entities_on_screen.get(self.place_in_focus)) |entities| {
         for (entities) |entity| {
@@ -168,7 +146,7 @@ fn countOfEntitiesInFocus(self: ExploreMode) usize {
     return count;
 }
 
-fn moveFocus(self: *ExploreMode, direction: p.Direction) void {
+fn moveFocus(self: *Self, direction: p.Direction) void {
     var nearest_place = self.place_in_focus;
     var min_distance: f32 = std.math.floatMax(f32);
     var itr = self.entities_on_screen.iterator();
@@ -221,17 +199,21 @@ inline fn sub(x: u8, y: u8) u8 {
     return if (y > x) y - x else x - y;
 }
 
-fn windowWithEntities(
-    self: *ExploreMode,
+fn showWindowWithEntities(
+    self: *Self,
     variants: [c.Position.ZOrder.count]?g.Entity,
-) !w.ModalWindow {
-    var window = w.ModalWindow.init(self.session.mode_arena.allocator(), w.ModalWindow.DEFAULT_MAX_REGION);
-    var area = try window.changeContent(w.OptionsArea(g.Entity));
-    area.* = .initEmpty(window.allocator(), self, .center);
+) !void {
+    const area = try self.composer.showModalWindowWithOptions(
+        self.session.mode_arena.allocator(),
+        &.{},
+        g.Entity,
+        self,
+        .center,
+    );
     for (variants) |maybe_entity| {
         if (maybe_entity) |entity| {
             var buf: [32]u8 = undefined;
-            try area.addOption(
+            _ = try area.addOption(
                 try g.Description.printActualName(&buf, self.session.journal, entity),
                 entity,
                 .{ .handle_release_button = showEntityDescription },
@@ -241,21 +223,19 @@ fn windowWithEntities(
                 try area.selectLine(area.options.items.len - 1);
         }
     }
-    return window;
 }
 
 fn showEntityDescription(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!w.HandleButtonResult {
-    const self: *ExploreMode = @ptrCast(@alignCast(ptr));
+    const self: *Self = @ptrCast(@alignCast(ptr));
     self.entity_in_focus = entity;
-    self.description_window = try self.windowWithDescription();
+    try self.showWindowWithEntityDescription();
     return .keep_open;
 }
 
-fn windowWithDescription(self: *ExploreMode) !w.ModalWindow {
-    return try w.entityDescription(
+fn showWindowWithEntityDescription(self: *Self) !void {
+    try self.composer.showEntityDescription(
         self.session.mode_arena.allocator(),
         self.session,
         self.entity_in_focus,
-        g.windows.ModalWindow.DEFAULT_MAX_REGION,
     );
 }

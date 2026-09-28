@@ -33,9 +33,10 @@ pub const HandleButtonResult = enum {
     keep_open,
 };
 
+pub const wizard = @import("wizard/wizard_pkg.zig");
+
 pub const Area = @import("Area.zig");
 pub const Button = @import("Button.zig");
-pub const ManagePointsWindow = @import("ManagePointsWindow.zig");
 pub const ModalWindow = @import("ModalWindow.zig");
 pub const OptionsArea = @import("OptionsArea.zig").OptionsArea;
 pub const Panel = @import("Panel.zig");
@@ -55,7 +56,7 @@ pub fn updateAreaWithItems(
     var itr = items.iterator();
     while (itr.next()) |item_ptr| {
         var line: TextArea.Line = undefined;
-        try area.addOption(
+        _ = try area.addOption(
             try formatLine(&line, context, item_ptr.*),
             item_ptr.*,
             handler,

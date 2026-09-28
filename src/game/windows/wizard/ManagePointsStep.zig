@@ -1,9 +1,8 @@
 const std = @import("std");
-const g = @import("../game_pkg.zig");
+const g = @import("../../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 const w = g.windows;
-
 
 /// ```
 /// ╔════════════════════════════════════════╗
@@ -18,23 +17,27 @@ const w = g.windows;
 /// ║                                        ║
 /// ║                                        ║
 /// ║════════════════════════════════════════║
-/// ║    2 points remain   Cancel  Describe  ║
+/// ║    2 points remain           Describe  ║
 /// ╚════════════════════════════════════════╝
 /// ```
-pub fn manageSkillsWindow(
-    alloc: std.mem.Allocator,
-    skills: *c.Skills,
-    remaining_points: u2,
-) !ManagePointsWindow("Skills", c.Skills.Skill, 0, 10) {
-    return try .init(alloc, &skills.values, remaining_points);
+pub fn ManageSkillsStep(comptime Context: type) type {
+    return ManagePointsStep("Skills:", Context, c.Skills.Skill, "skills", 0, 10);
 }
 
-pub fn ManagePointsWindow(
+pub fn ManageStatsStep(comptime Context: type) type {
+    return ManagePointsStep("Stats:", Context, c.Stats.Stat, "stats", -2, 5);
+}
+
+fn ManagePointsStep(
     comptime title: []const u8,
+    Context: type,
     Value: type,
+    comptime field_name: []const u8,
     min_points: comptime_int, // inclusive
     max_points: comptime_int, // inclusive
 ) type {
+    std.debug.assert(@hasField(Context, field_name));
+
     return struct {
         const AREA_REGION: p.Region = .{
             .top_left = .{ .row = 4, .col = 2 },
@@ -44,19 +47,17 @@ pub fn ManagePointsWindow(
 
         const Self = @This();
 
+        alloc: std.mem.Allocator,
         values: *std.enums.EnumArray(Value, i4),
         remaining_points: u2,
         original_points: u2,
         windows: w.WindowComposer(w.ModalWindow),
 
-        pub fn init(
-            self: *Self,
-            alloc: std.mem.Allocator,
-            values: *std.enums.EnumArray(Value, i4),
-            remaining_points: u2,
-        ) !void {
+        pub fn init(self: *Self, alloc: std.mem.Allocator, context: *Context) !void {
+            const remaining_points: u2 = @field(context, field_name ++ "RemainingPoints")(context);
             self.* = .{
-                .values = values,
+                .alloc = alloc,
+                .values = &@field(context, field_name).values,
                 .remaining_points = remaining_points,
                 .original_points = remaining_points,
                 .windows = .init(
@@ -70,18 +71,26 @@ pub fn ManagePointsWindow(
                     w.ModalWindow.DEFAULT_MAX_REGION,
                 ),
             };
-            const options: *w.OptionsArea(Value) = self.windows.main_window.panel.area.underlying;
+            const options: *w.OptionsArea(Value) = @ptrCast(@alignCast(self.windows.main_window.panel.area.underlying));
             for (std.enums.values(Value)) |value| {
                 const option = try options.addOptionFmt(
                     "{s}",
                     .{g.components.Description.Preset.castByNameAndGet(value).name},
                     showDescription,
                 );
-                option.label_buffer[option.label_len - 3] = '0' + @as(u8, @intCast(values.get(value)));
+                option.label_buffer[option.label_len - 3] = '0' + @as(u8, @intCast(self.values.get(value)));
             }
         }
 
-        pub fn handleButton(self: *Self, btn: g.Button) !void {
+        pub fn deinit(self: *Self) void {
+            self.windows.deinit();
+        }
+
+        pub fn isDone(self: Self) bool {
+            return self.remaining_points == 0;
+        }
+
+        pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
             switch (btn.game_button) {
                 .left, .right => if (self.windows.modal_windows_count == 0) {
                     const option = self.windows.main_window.selectedOption().?;
@@ -94,9 +103,10 @@ pub fn ManagePointsWindow(
                     option.label_buffer[option.label_len - 3] = '0' + @as(u8, @intCast(new_value));
                 },
                 else => {
-                    _ = try self.windows.handleButton(btn);
+                    return try self.windows.handleButton(btn);
                 },
             }
+            return .keep_open;
         }
 
         fn selectedValue(self: Self) Value {
@@ -127,7 +137,7 @@ pub fn ManagePointsWindow(
             const self: *Self = @ptrCast(@alignCast(ptr));
             const description = g.components.Description.Preset.castByNameAndGet(value);
             const window = try self.windows.newModalWindow();
-            const area = window.initFullScreenText(description.name);
+            const area = window.initFullScreenText(self.alloc, description.name);
             for (description.description) |descr_line| {
                 try area.printLineFmt("{s}", .{descr_line});
             }

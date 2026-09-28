@@ -385,7 +385,7 @@ fn handleInput(self: *Self) !bool {
                         return true;
                     },
                     .hold => {
-                        self.quick_actions_window = try self.windowWithQuickActions();
+                        try self.initWindowWithQuickActions();
                         try self.quick_actions_window.?.draw(self.session.render);
                         return false;
                     },
@@ -625,17 +625,31 @@ const TargetsIterator = struct {
 };
 
 /// Builds a window with quick actions list
-fn windowWithQuickActions(self: *Self) !w.ModalWindow {
-    var window = w.ModalWindow.init(self.session.mode_arena.allocator(), w.ModalWindow.DEFAULT_MAX_REGION);
-    const area = try window.changeContent(w.OptionsArea(void));
-    area.* = .initEmpty(window.allocator(), self, .center);
+fn initWindowWithQuickActions(self: *Self) !void {
+    std.debug.assert(self.quick_actions_window == null);
+
+    self.quick_actions_window = @as(w.ModalWindow, undefined);
+    const window = &self.quick_actions_window.?;
+
+    const area = try window.initWithOptions(
+        self.session.mode_arena.allocator(),
+        void,
+        self,
+        .center,
+        .{ .max_region = w.ModalWindow.DEFAULT_MAX_REGION },
+    );
+
+    errdefer window.deinit();
     for (self.quick_actions.actions.items, 0..) |qa, idx| {
-        try area.addOption(qa.toString(), {}, .{ .handle_release_button = chooseQuickAction });
+        _ = try area.addOption(
+            qa.toString(),
+            {},
+            .{ .handle_release_button = chooseQuickAction },
+        );
         if (idx == self.quick_actions.selected_idx)
             try area.selectLine(idx);
     }
     window.shrinkToContent();
-    return window;
 }
 
 /// Sets the index of the current quick action to the currently selected item in the window
