@@ -11,7 +11,9 @@ pub fn WizardWindow(comptime Steps: type, Context: type) type {
     return struct {
         const Self = @This();
 
+        /// A context that should be initialized during this wizard
         context: *Context,
+        /// Used to create/destroy the current step of the wizard
         step_arena: std.heap.ArenaAllocator,
         steps: Steps = undefined,
         current_step: usize = 0,
@@ -21,7 +23,7 @@ pub fn WizardWindow(comptime Steps: type, Context: type) type {
                 .step_arena = .init(alloc),
                 .context = context,
             };
-            try self.initCurrentStep();
+            try self.switchToStep(0);
         }
 
         pub fn deinit(self: *Self) void {
@@ -33,28 +35,28 @@ pub fn WizardWindow(comptime Steps: type, Context: type) type {
                 if (self.current_step == idx) {
                     const field = steps_fields[idx];
                     if (try @field(self.steps, field.name).handleButton(btn) == .close_window) {
-                        if (btn.game_button == .a) {
+                        if (btn.game_button == .a and idx + 1 < steps_fields.len) {
                             self.current_step += 1;
-                            try self.initStep(idx + 1);
+                            try self.switchToStep(idx + 1);
                         } else {
                             if (idx == 0) {
                                 self.current_step = 0;
-                                self.initStep(0);
+                                try self.switchToStep(0);
                             } else {
                                 self.current_step -= 1;
-                                self.initStep(idx - 1);
+                                try self.switchToStep(idx - 1);
                             }
                         }
                     }
                 }
             }
-            if (self.current_step == steps_fields.len - 1 and self.current_step == .a)
+            if (self.current_step == steps_fields.len - 1 and btn.game_button == .a)
                 return .close_window
             else
                 return .keep_open;
         }
 
-        fn initStep(self: *Self, comptime idx: comptime_int) !void {
+        fn switchToStep(self: *Self, comptime idx: comptime_int) !void {
             std.debug.assert(self.step_arena.reset(.retain_capacity));
             const field = steps_fields[idx];
             self.steps = @unionInit(Steps, field.name, undefined);

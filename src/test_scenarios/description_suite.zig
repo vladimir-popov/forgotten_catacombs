@@ -8,8 +8,8 @@ test "Describe an item" {
     defer test_session.deinit();
 
     const inventory = try test_session.openInventory();
-    const modal_window = try inventory.chooseItemByName("Torch");
-    try (try modal_window.asOptions()).choose("Describe");
+    const options = try inventory.chooseItemByName("Torch");
+    try options.choose("Describe");
 
     try test_session.runtime.display.expectLooksLike(
         \\┌────────────────Torch─────────────────┐
@@ -32,8 +32,8 @@ test "Describe an unknown potion" {
 
     const inventory = try test_session.openInventory();
     const potion = try inventory.add(g.entities.presets.Potions.get(.healing));
-    const modal_window = try inventory.chooseItemById(potion);
-    try (try modal_window.asOptions()).choose("Describe");
+    const options = try inventory.chooseItemById(potion);
+    try options.choose("Describe");
 
     try test_session.runtime.display.expectLooksLike(
         \\┌────────────A green potion────────────┐
@@ -53,18 +53,20 @@ test "Describe a known potion (after drinking a similar)" {
     var test_session: TestSession = undefined;
     try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
+    errdefer test_session.printDisplay();
+    
 
     // Drink a potion:
     var inventory = try test_session.openInventory();
     const potion_to_drink = try inventory.add(g.entities.presets.Potions.get(.healing));
-    var modal_window = try inventory.chooseItemById(potion_to_drink);
-    try (try modal_window.asOptions()).choose("Drink");
+    var options = try inventory.chooseItemById(potion_to_drink);
+    try options.choose("Drink");
 
     // Check the description:
     inventory = try test_session.openInventory();
     const potion_to_describe = try inventory.add(g.entities.presets.Potions.get(.healing));
-    modal_window = try inventory.chooseItemById(potion_to_describe);
-    try (try modal_window.asOptions()).choose("Describe");
+    options = try inventory.chooseItemById(potion_to_describe);
+    try options.choose("Describe");
 
     try test_session.runtime.display.expectLooksLike(
         \\┌───────────────Healing────────────────┐

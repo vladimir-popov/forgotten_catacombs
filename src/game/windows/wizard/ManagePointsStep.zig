@@ -36,8 +36,6 @@ fn ManagePointsStep(
     min_points: comptime_int, // inclusive
     max_points: comptime_int, // inclusive
 ) type {
-    std.debug.assert(@hasField(Context, field_name));
-
     return struct {
         const AREA_REGION: p.Region = .{
             .top_left = .{ .row = 4, .col = 2 },
@@ -51,39 +49,39 @@ fn ManagePointsStep(
         values: *std.enums.EnumArray(Value, i4),
         remaining_points: u2,
         original_points: u2,
-        windows: w.WindowComposer(w.ModalWindow),
+        main_window: w.ModalWindow(w.OptionsArea(Value)),
+        compositor: w.WindowCompositor(w.ModalWindow(w.OptionsArea(Value))),
 
         pub fn init(self: *Self, alloc: std.mem.Allocator, context: *Context) !void {
-            const remaining_points: u2 = @field(context, field_name ++ "RemainingPoints")(context);
+            const remaining_points: u2 = @field(Context, field_name ++ "RemainingPoints")(context);
             self.* = .{
                 .alloc = alloc,
                 .values = &@field(context, field_name).values,
                 .remaining_points = remaining_points,
                 .original_points = remaining_points,
-                .windows = .init(
-                    .initOptions(
-                        alloc,
-                        Value,
-                        self,
-                        .left,
-                        .{ .title = title, .max_region = w.ModalWindow.DEFAULT_MAX_REGION },
-                    ),
-                    w.ModalWindow.DEFAULT_MAX_REGION,
+                .main_window = try w.modal_window.withOptions(
+                    alloc,
+                    Value,
+                    self,
+                    .left,
+                    .{ .title = title, .max_region = w.FULL_SCREEN_REGION },
                 ),
+                .compositor = .init(alloc, &self.main_window, w.FULL_SCREEN_REGION),
             };
-            const options: *w.OptionsArea(Value) = @ptrCast(@alignCast(self.windows.main_window.panel.area.underlying));
+            const options: *w.OptionsArea(Value) = &self.main_window.panel.area;
             for (std.enums.values(Value)) |value| {
                 const option = try options.addOptionFmt(
                     "{s}",
                     .{g.components.Description.Preset.castByNameAndGet(value).name},
-                    showDescription,
+                    value,
+                    .{ .handle_release_button = showDescription },
                 );
                 option.label_buffer[option.label_len - 3] = '0' + @as(u8, @intCast(self.values.get(value)));
             }
         }
 
         pub fn deinit(self: *Self) void {
-            self.windows.deinit();
+            self.compositor.deinit();
         }
 
         pub fn isDone(self: Self) bool {
@@ -92,8 +90,8 @@ fn ManagePointsStep(
 
         pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
             switch (btn.game_button) {
-                .left, .right => if (self.windows.modal_windows_count == 0) {
-                    const option = self.windows.main_window.selectedOption().?;
+                .left, .right => if (self.compositor.modal_windows_count == 0) {
+                    const option = self.main_window.panel.area.selectedOption().?;
                     if (btn.game_button == .right)
                         self.increase(option.item)
                     else
@@ -103,7 +101,7 @@ fn ManagePointsStep(
                     option.label_buffer[option.label_len - 3] = '0' + @as(u8, @intCast(new_value));
                 },
                 else => {
-                    return try self.windows.handleButton(btn);
+                    return try self.compositor.handleButton(btn);
                 },
             }
             return .keep_open;
@@ -136,15 +134,16 @@ fn ManagePointsStep(
         ) anyerror!w.HandleButtonResult {
             const self: *Self = @ptrCast(@alignCast(ptr));
             const description = g.components.Description.Preset.castByNameAndGet(value);
-            const window = try self.windows.newModalWindow();
-            const area = window.initFullScreenText(self.alloc, description.name);
+            const window = try self.compositor.showModalWindowWithText(self.alloc, description.name);
+            const area = &window.panel.area;
             for (description.description) |descr_line| {
                 try area.printLineFmt("{s}", .{descr_line});
             }
+            return .keep_open;
         }
 
-        pub fn draw(self: Self, render: g.Render) !void {
-            try self.windows.draw(render);
+        pub fn draw(self: *Self, render: g.Render) !void {
+            try self.compositor.draw(render);
             var buf: [15]u8 = undefined;
             try render.drawInfo(
                 try std.fmt.bufPrint(&buf, "{d} points remain", .{self.remaining_points}),

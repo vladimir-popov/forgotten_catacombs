@@ -35,9 +35,7 @@ pub fn shopWallet(self: Self) *c.Wallet {
 /// If the item was found, the button is pressed and Options available for the item is returned.
 pub fn chooseItemByName(self: Self, name: []const u8) !Options {
     const options = Options{
-        .options_area = @ptrCast(@alignCast(
-            self.tradingMode().main_window.activeTab().area.content.underlying,
-        )),
+        .options_area = self.tradingMode().activeTab(),
         .test_session = self.test_session,
     };
     try options.choose(name);
@@ -49,9 +47,7 @@ pub fn chooseItemByName(self: Self, name: []const u8) !Options {
 
 pub fn chooseItemById(self: Self, item: g.Entity) !Options {
     const options = Options{
-        .options_area = @ptrCast(@alignCast(
-            self.tradingMode().main_window.activeTab().area.content.underlying,
-        )),
+        .options_area = self.tradingMode().activeTab(),
         .test_session = self.test_session,
     };
     try options.chooseById(item);
@@ -65,16 +61,9 @@ pub fn chooseItemById(self: Self, item: g.Entity) !Options {
 
 pub fn chooseItemByIndex(self: Self, idx: usize) !Options {
     const options = Options{
-        .options_area = @ptrCast(@alignCast(
-            self.tradingMode().main_window.activeTab().scrollable_area.content.underlying,
-        )),
+        .options_area = self.tradingMode().activeTab(),
         .test_session = self.test_session,
     };
     try options.chooseByIndex(idx);
-    return .{
-        .test_session = self.test_session,
-        .options_area = @ptrCast(@alignCast(
-            self.tradingMode().modal_windows.topWindow().?.scrollable_area.content.underlying,
-        )),
-    };
+    return options;
 }

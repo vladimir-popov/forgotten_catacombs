@@ -112,8 +112,8 @@ test "Drink an spoiled bouillon" {
 fn drinkPotion(test_session: *TestSession, potion: g.entities.presets.Potions.Tag) !void {
     const inventory = try test_session.openInventory();
     const potion_id = try inventory.add(g.entities.presets.Potions.get(potion));
-    var modal_window = try inventory.chooseItemById(potion_id);
-    try (try modal_window.asOptions()).choose("Drink");
+    var options = try inventory.chooseItemById(potion_id);
+    try options.choose("Drink");
     try inventory.close();
 
     try std.testing.expect(!test_session.player.inventory().items.contains(potion_id));

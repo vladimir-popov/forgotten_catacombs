@@ -143,6 +143,7 @@ pub fn completeRound(self: *Self) !void {
 }
 
 pub fn openInventory(self: *Self) !Inventory {
+    std.debug.assert(self.session.mode != .inventory);
     try self.session.manageInventory();
     try self.tick(.{});
     std.debug.assert(self.session.mode == .inventory);

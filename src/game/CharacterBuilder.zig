@@ -21,10 +21,10 @@ stats: c.Stats = undefined,
 skills: c.Skills = undefined,
 health: c.Health = undefined,
 wizard: w.wizard.WizardWindow(union {
-    archetype: w.wizard.ChooseArchetypeStep,
-    stats: w.wizard.ManagePointsStep.ManageStatsStep(Self),
-    skills: w.wizard.ManagePointsStep.ManageSkillsStep(Self),
-    confirm: w.wizard.ConfirmCharacterStep,
+    archetype: w.wizard.ChooseArchetypeStep(Self),
+    stats: w.wizard.ManageStatsStep(Self),
+    skills: w.wizard.ManageSkillsStep(Self),
+    confirm: w.wizard.ConfirmCharacterStep(Self),
 }, Self) = undefined,
 
 pub fn init(self: *Self, alloc: std.mem.Allocator) !void {

@@ -33,16 +33,23 @@ pub const HandleButtonResult = enum {
     keep_open,
 };
 
+pub const modal_window = @import("modal_window.zig");
+pub const options_area = @import("options_area.zig");
+pub const scrollable_panel = @import("scrollable_panel.zig");
+pub const tabbed_window = @import("tabbed_window.zig");
 pub const wizard = @import("wizard/wizard_pkg.zig");
 
-pub const Area = @import("Area.zig");
 pub const Button = @import("Button.zig");
-pub const ModalWindow = @import("ModalWindow.zig");
-pub const OptionsArea = @import("OptionsArea.zig").OptionsArea;
-pub const Panel = @import("Panel.zig");
-pub const TabbedWindow = @import("TabbedWindow.zig");
+pub const OptionsArea = options_area.OptionsArea;
+pub const ModalWindow = modal_window.ModalWindow;
+pub const ScrollablePanel = scrollable_panel.ScrollablePanel;
+pub const TabbedWindow = tabbed_window.TabbedWindow;
 pub const TextArea = @import("TextArea.zig");
-pub const WindowComposer = @import("WindowComposer.zig").WindowComposer;
+pub const WindowCompositor = @import("WindowCompositor.zig").WindowCompositor;
+
+/// A maximal region which can be occupied by a window.
+/// This region includes a space for borders.
+pub const FULL_SCREEN_REGION: p.Region = p.Region.init(1, 1, g.DISPLAY_ROWS - 2, g.DISPLAY_COLS);
 
 pub fn updateAreaWithItems(
     area: *OptionsArea(g.Entity),

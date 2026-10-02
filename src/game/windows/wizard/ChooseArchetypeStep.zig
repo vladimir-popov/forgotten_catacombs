@@ -21,25 +21,29 @@ const p = g.primitives;
 const w = g.windows;
 
 pub fn ChooseArchetypeStep(comptime Context: type) type {
-    std.debug.assert(@hasField(Context, "archetype"));
     return struct {
         const Self = @This();
 
-        windows: w.WindowComposer(w.ModalWindow),
+        const MainWindow = w.ModalWindow(w.OptionsArea(g.meta.PlayerArchetype));
+
+        alloc: std.mem.Allocator,
+        main_window: MainWindow,
+        compositor: w.WindowCompositor(MainWindow),
         context: *Context,
 
         pub fn init(self: *Self, alloc: std.mem.Allocator, context: *Context) !void {
+            self.alloc = alloc;
             self.context = context;
-            try self.windows.init(.initOptions(
+            self.main_window = try w.modal_window.withOptions(
                 alloc,
                 g.meta.PlayerArchetype,
                 self,
                 .center,
-                .{ .title = "Choose your archetype:", .max_region = w.ModalWindow.DEFAULT_MAX_REGION },
-            ), w.ModalWindow.DEFAULT_MAX_REGION);
+                .{ .title = "Choose your archetype:", .max_region = w.FULL_SCREEN_REGION },
+            );
 
             const options: *w.OptionsArea(g.meta.PlayerArchetype) =
-                @ptrCast(@alignCast(self.windows.main_window.panel.area.underlying));
+                &self.main_window.panel.area;
 
             for (std.enums.values(g.meta.PlayerArchetype)) |arch| {
                 const option = try options.addEmptyOption(arch);
@@ -52,25 +56,25 @@ pub fn ChooseArchetypeStep(comptime Context: type) type {
         }
 
         pub fn deinit(self: *Self) void {
-            self.windows.deinit();
+            self.compositor.deinit();
         }
 
         pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
-            if (self.windows.modal_windows_count == 0) {
+            if (self.compositor.modal_windows_count == 0) {
                 switch (btn.game_button) {
                     .a => {
                         const options: *w.OptionsArea(g.meta.PlayerArchetype) =
-                            @ptrCast(@alignCast(self.windows.main_window.panel.area.underlying));
+                            &self.main_window.panel.area;
                         self.context.archetype = options.selectedItem().?;
                         return .close_window;
                     },
                     .b => {
                         const options: *w.OptionsArea(g.meta.PlayerArchetype) =
-                            @ptrCast(@alignCast(self.windows.main_window.panel.area.underlying));
+                            &self.main_window.panel.area;
                         const value = options.selectedItem().?;
                         const description = g.components.Description.Preset.castByNameAndGet(value);
-                        const window = try self.windows.newModalWindow();
-                        const area = window.initFullScreenText(self.alloc, description.name);
+                        const window = try self.compositor.showModalWindowWithText(self.alloc, description.name);
+                        const area = &window.panel.area;
                         for (description.description) |descr_line| {
                             try area.printLineFmt("{s}", .{descr_line});
                         }
@@ -78,13 +82,13 @@ pub fn ChooseArchetypeStep(comptime Context: type) type {
                     else => {},
                 }
             } else {
-                return try self.windows.handleButton(btn);
+                return try self.compositor.handleButton(btn);
             }
             return .keep_open;
         }
 
         pub fn draw(self: *Self, render: g.Render) !void {
-            try self.windows.draw(render);
+            try self.main_window.draw(render);
             try render.drawLeftButton("Describe", false);
             try render.drawRightButton("Choose", false);
         }

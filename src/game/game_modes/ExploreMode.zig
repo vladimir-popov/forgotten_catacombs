@@ -17,7 +17,7 @@ entities_on_screen: EntitiesOnScreen,
 entity_in_focus: g.Entity,
 /// Highlighted a focused place in the dungeon
 place_in_focus: p.Point,
-composer: w.WindowComposer(Self),
+compositor: w.WindowCompositor(Self),
 
 pub fn init(self: *Self, session: *g.GameSession) !void {
     self.* = .{
@@ -25,7 +25,11 @@ pub fn init(self: *Self, session: *g.GameSession) !void {
         .entity_in_focus = session.player,
         .place_in_focus = session.level.playerPosition().place,
         .entities_on_screen = .empty,
-        .composer = .{ .main_window = self },
+        .compositor = .init(
+            session.mode_arena.allocator(),
+            self,
+            w.FULL_SCREEN_REGION,
+        ),
     };
     try self.updateEntitiesOnScreen();
     try self.draw(self.session.render);
@@ -33,11 +37,11 @@ pub fn init(self: *Self, session: *g.GameSession) !void {
 
 pub fn tick(self: *Self) anyerror!void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
-        if (try self.composer.handleButton(btn) == .close_window) {
+        if (try self.compositor.handleButton(btn) == .close_window) {
             try self.session.continuePlay(self.entity_in_focus, null);
             return;
         }
-        try self.composer.draw(self.session.render);
+        try self.compositor.draw(self.session.render);
     }
 }
 
@@ -203,7 +207,7 @@ fn showWindowWithEntities(
     self: *Self,
     variants: [c.Position.ZOrder.count]?g.Entity,
 ) !void {
-    const area = try self.composer.showModalWindowWithOptions(
+    const window = try self.compositor.showModalWindowWithOptions(
         self.session.mode_arena.allocator(),
         &.{},
         g.Entity,
@@ -213,14 +217,14 @@ fn showWindowWithEntities(
     for (variants) |maybe_entity| {
         if (maybe_entity) |entity| {
             var buf: [32]u8 = undefined;
-            _ = try area.addOption(
+            _ = try window.panel.area.addOption(
                 try g.Description.printActualName(&buf, self.session.journal, entity),
                 entity,
                 .{ .handle_release_button = showEntityDescription },
             );
             if (entity.eql(self.entity_in_focus))
                 // the variants array has to have at least one (focused) entity
-                try area.selectLine(area.options.items.len - 1);
+                try window.panel.area.selectLine(window.panel.area.options.items.len - 1);
         }
     }
 }
@@ -233,7 +237,7 @@ fn showEntityDescription(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!w
 }
 
 fn showWindowWithEntityDescription(self: *Self) !void {
-    try self.composer.showEntityDescription(
+    try self.compositor.showEntityDescription(
         self.session.mode_arena.allocator(),
         self.session,
         self.entity_in_focus,

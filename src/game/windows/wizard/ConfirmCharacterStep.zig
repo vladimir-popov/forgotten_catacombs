@@ -27,20 +27,17 @@ const PANEL_REGION: p.Region = .{
 };
 
 pub fn ConfirmCharacterStep(comptime Context: type) type {
-    std.debug.assert(@hasField(Context, "stats"));
-    std.debug.assert(@hasField(Context, "skills"));
-    std.debug.assert(@hasField(Context, "health"));
-
     return struct {
         const Self = @This();
 
-        panel: w.Panel = undefined,
         context: *Context,
+        panel: w.ScrollablePanel(w.TextArea),
 
         pub fn init(self: *Self, alloc: std.mem.Allocator, context: *Context) !void {
             self.context = context;
-            const text_area = try self.panel.initWithText(alloc);
+            self.panel = .{ .area = .initEmpty(alloc), .region = PANEL_REGION };
             self.context.health = g.meta.initialHealth(self.context.stats.get(.constitution));
+            const text_area = &self.panel.area;
             try g.Description.describeProgression(1, 0, text_area);
             _ = try text_area.addEmptyLine();
             try g.Description.describeHealth(&self.context.health, text_area);
@@ -60,8 +57,9 @@ pub fn ConfirmCharacterStep(comptime Context: type) type {
                     return .close_window;
                 },
                 .up, .down => {
-                    _ = self.panel.handleButton(btn);
+                    _ = try self.panel.handleButton(btn);
                 },
+                else => {},
             }
             return .keep_open;
         }
@@ -74,7 +72,7 @@ pub fn ConfirmCharacterStep(comptime Context: type) type {
                 .normal,
                 .center,
             );
-            try self.panel.draw(render, PANEL_REGION);
+            try self.panel.draw(render);
             try render.cleanInfo();
             try render.drawRightButton("Play", false);
         }

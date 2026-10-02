@@ -4,6 +4,7 @@ pub const BitMap = @import("BitMap.zig").BitMap;
 pub const Bresenham = @import("Bresenham.zig");
 pub const DijkstraMap = @import("DijkstraMap.zig");
 pub const EntitiesSet = @import("EntitiesSet.zig");
+pub const HList = @import("HList.zig").HList;
 pub const MergeEnums = @import("MergeEnums.zig").MergeEnums;
 pub const Preset = @import("Preset.zig").Preset;
 pub const Set = @import("Set.zig").Set;
@@ -57,6 +58,19 @@ pub inline fn enumStrValues(comptime E: type) [@typeInfo(E).@"enum".fields.len][
         }
         return res;
     }
+}
+
+pub fn mapTypes(
+    comptime Types: anytype,
+    comptime Mapper: anytype,
+) type {
+    var mapped: [Types.len]type = undefined;
+
+    inline for (Types, 0..) |T, i| {
+        mapped[i] = Mapper(T);
+    }
+
+    return @Tuple(&mapped);
 }
 
 pub fn EnumSetFormatter(comptime E: type) type {

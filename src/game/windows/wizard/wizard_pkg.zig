@@ -1,4 +1,5 @@
-pub const ChooseArchetypeStep = @import("ChooseArchetypeStep.zig");
-pub const ConfirmCharacterStep = @import("ConfirmCharacterStep.zig");
-pub const ManagePointsStep = @import("ManagePointsStep.zig");
+pub const ChooseArchetypeStep = @import("ChooseArchetypeStep.zig").ChooseArchetypeStep;
+pub const ConfirmCharacterStep = @import("ConfirmCharacterStep.zig").ConfirmCharacterStep;
+pub const ManageStatsStep = @import("ManagePointsStep.zig").ManageStatsStep;
+pub const ManageSkillsStep = @import("ManagePointsStep.zig").ManageSkillsStep;
 pub const WizardWindow = @import("WizardWindow.zig").WizardWindow;

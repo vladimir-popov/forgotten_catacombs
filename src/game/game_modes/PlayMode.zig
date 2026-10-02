@@ -19,8 +19,8 @@ session: *g.GameSession,
 target: ?g.Entity = null,
 quick_actions: QuickActions,
 is_players_turn: bool = true,
-quick_actions_window: ?w.ModalWindow = null,
-/// If defined, then all input should be ignored.
+quick_actions_window: ?w.ModalWindow(w.OptionsArea(void)) = null,
+/// If defined then all input should be ignored.
 notification_to_show: ?NotificationMessage = null,
 
 // This is a buffer for an action. It should help to avoid putting action on the stack
@@ -628,18 +628,14 @@ const TargetsIterator = struct {
 fn initWindowWithQuickActions(self: *Self) !void {
     std.debug.assert(self.quick_actions_window == null);
 
-    self.quick_actions_window = @as(w.ModalWindow, undefined);
-    const window = &self.quick_actions_window.?;
-
-    const area = try window.initWithOptions(
+    self.quick_actions_window = try w.modal_window.withOptions(
         self.session.mode_arena.allocator(),
         void,
         self,
         .center,
-        .{ .max_region = w.ModalWindow.DEFAULT_MAX_REGION },
+        .{ .max_region = w.FULL_SCREEN_REGION },
     );
-
-    errdefer window.deinit();
+    const area = &self.quick_actions_window.?.panel.area;
     for (self.quick_actions.actions.items, 0..) |qa, idx| {
         _ = try area.addOption(
             qa.toString(),
@@ -649,7 +645,7 @@ fn initWindowWithQuickActions(self: *Self) !void {
         if (idx == self.quick_actions.selected_idx)
             try area.selectLine(idx);
     }
-    window.shrinkToContent();
+    self.quick_actions_window.?.shrinkToContent();
 }
 
 /// Sets the index of the current quick action to the currently selected item in the window
