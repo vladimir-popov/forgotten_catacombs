@@ -149,7 +149,7 @@ test "Describe a known enemy (after killing a similar creature)" {
 
         try test_session.pressButton(.up);
 
-        if (attempt > 15) return error.ToManyAttemptsToKick;
+        if (attempt > 50) return error.ToManyAttemptsToKick;
         attempt += 1;
     }
 

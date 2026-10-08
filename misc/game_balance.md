@@ -34,12 +34,12 @@ final boss. Each regular tier has its own enemies, weapons, and armor.
 
 Biome distribution:
 
-| Floors    | Biome     | Role |
-| --------- | --------- | ---- |
-| `0`       | Start     | safe starting location |
+| Floors    | Biome     | Role                                               |
+| --------- | --------- | ----                                               |
+| `0`       | Start     | safe starting location                             |
 | `1 .. 4`  | Caves     | natural threats, beasts, insects, burrow creatures |
-| `5 .. 8`  | Catacombs | ancient shelter, machines, old security systems |
-| `9`       | Final     | final boss depth |
+| `5 .. 8`  | Catacombs | ancient shelter, machines, old security systems    |
+| `9`       | Final     | final boss depth                                   |
 
 Entity generation should be tied to dungeon depth. Dungeon depth defines the
 current biome, and the biome defines which tier range and entity families are

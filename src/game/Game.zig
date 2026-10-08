@@ -74,7 +74,7 @@ pub fn tick(self: *Self) !void {
         .welcome => if (try self.runtime.readPushedButtons()) |btn| {
             _ = try self.state.welcome.menu.handleButton(btn);
             if (btn.game_button.isMove())
-                try self.state.welcome.menu.draw(self.render, WelcomeScreen.MENU_REGION, 0);
+                try self.state.welcome.menu.drawContent(self.render, WelcomeScreen.MENU_REGION, 0);
         },
         .game_over, .manual, .about => if (try self.runtime.readPushedButtons()) |btn| {
             switch (btn.game_button) {
@@ -133,9 +133,9 @@ noinline fn welcome(self: *Self) !void {
 
     // keep menu item selected
     switch (from_state) {
-        .about => try self.state.welcome.menu.selectLine(self.state.welcome.menu.options.items.len - 1),
-        .manual => try self.state.welcome.menu.selectLine(self.state.welcome.menu.options.items.len - 2),
-        else => try self.state.welcome.menu.selectLine(0),
+        .about => self.state.welcome.menu.selectLine(self.state.welcome.menu.options.items.len - 1),
+        .manual => self.state.welcome.menu.selectLine(self.state.welcome.menu.options.items.len - 2),
+        else => self.state.welcome.menu.selectLine(0),
     }
     try self.render.clearDisplay();
     try self.drawWelcomeScreen();
@@ -282,7 +282,7 @@ fn drawWelcomeScreen(self: Self) !void {
         .normal,
         .center,
     );
-    try self.state.welcome.menu.draw(self.render, WelcomeScreen.MENU_REGION, 0);
+    try self.state.welcome.menu.drawContent(self.render, WelcomeScreen.MENU_REGION, 0);
 }
 
 ///```

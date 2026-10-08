@@ -14,7 +14,7 @@ pub const PlayMode = @import("game_modes/PlayMode.zig");
 pub const ModifyMode = @import("game_modes/ModifyMode.zig");
 pub const SaveLoadMode = @import("game_modes/SaveLoadMode.zig");
 pub const TradingMode = @import("game_modes/TradingMode.zig");
-pub const LevelUp = @import("game_modes/LevelUp.zig");
+pub const LevelUpMode = @import("game_modes/LevelUpMode.zig");
 
 const log = std.log.scoped(.game_session);
 
@@ -26,7 +26,7 @@ pub const Mode = union(enum) {
     explore: *ExploreMode,
     explore_level: *ExploreLevelMode,
     inventory: *InventoryMode,
-    level_up: *LevelUp,
+    level_up: *LevelUpMode,
     modify_recognize: *ModifyMode,
     play: *PlayMode,
     save_load: *SaveLoadMode,
@@ -331,8 +331,8 @@ noinline fn handleEvent(self: *Self, event_idx: usize) !void {
             },
             .to_level_up => {
                 _ = self.mode_arena.reset(.retain_capacity);
-                self.mode = .{ .level_up = try self.mode_arena.allocator().create(LevelUp) };
-                self.mode.level_up.* = try LevelUp.init(self);
+                self.mode = .{ .level_up = try self.mode_arena.allocator().create(LevelUpMode) };
+                try self.mode.level_up.init(self);
                 try self.mode.level_up.draw(self.render);
             },
             .to_inventory => {

@@ -19,22 +19,18 @@ pub inline fn experienceToNextLevel(current_level: u4) u16 {
 }
 
 pub inline fn isLevelUp(registry: *g.Registry, player: g.Entity) bool {
-    if (registry.get(player, c.LevelUp)) |level_up| {
-        const exp = registry.getUnsafe(player, c.Experience);
-        return level_up.last_handled_level < exp.actualLevel();
-    } else {
-        return false;
-    }
+    const exp = registry.getUnsafe(player, c.Experience);
+    return exp.last_handled_level < exp.actualLevel();
 }
 
 /// Adds exp to the player's Experience. If it leads to level up,
-/// increases the player level, updates the LevelUp component for the player,
-/// recovers its hp and return `true`. Otherwise returns `false`.
+/// increases the player level, recovers its hp and return `true`.
+/// Otherwise returns `false`.
 pub fn addExperience(registry: *g.Registry, player: g.Entity, exp: u16) !bool {
     const experience = registry.getUnsafe(player, c.Experience);
     experience.experience +|= exp;
     if (experience.actualLevel() > experience.level) {
-        _ = try registry.getOrSet(player, c.LevelUp, .{ .last_handled_level = experience.level });
+        experience.level = experience.actualLevel();
         const health = registry.getUnsafe(player, c.Health);
         health.current_hp = health.max;
         return true;
@@ -52,6 +48,7 @@ pub fn statsFromArchetype(archetype: PlayerArchetype) c.Stats {
     };
 }
 
+/// Applies all bonuses and return an actual stats of the entity.
 pub fn getActualStats(registry: *const g.Registry, entity: g.Entity) c.Stats {
     var stats: c.Stats = if (registry.get(entity, c.Stats)) |stats| stats.* else c.Stats.zeros;
     if (registry.get(entity, c.Equipment)) |equipment| {

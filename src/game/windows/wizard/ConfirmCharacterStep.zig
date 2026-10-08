@@ -2,7 +2,7 @@
 //!
 //! ```
 //! ╔════════════════════════════════════════╗
-//! ║       Start with this character?       ║
+//! ║     Continue with this character?      ║
 //! ║  ┌                                     ║
 //! ║   Level: {d}                          ▒║
 //! ║   Experience: {d}/{d}                 ░║
@@ -36,6 +36,7 @@ pub fn ConfirmCharacterStep(comptime Context: type) type {
         context: *Context,
         panel: w.ScrollablePanel(w.TextArea),
 
+        /// Builds the character summary from the shared context.
         pub fn init(self: *Self, alloc: std.mem.Allocator, context: *Context) !void {
             self.context = context;
             self.panel = .{ .area = .initEmpty(alloc), .region = PANEL_REGION };
@@ -50,10 +51,25 @@ pub fn ConfirmCharacterStep(comptime Context: type) type {
             try g.Description.describeStats(&self.context.stats, text_area);
         }
 
+        /// Releases the summary text area.
         pub fn deinit(self: *Self) void {
             self.panel.deinit();
         }
 
+        /// No additional work is required when the summary is accepted.
+        pub fn commit(_: *Self) !void {}
+
+        /// No changes are made by this read-only step.
+        pub fn rollback(_: *Self) !void {}
+
+        /// Returns the final `Play` button.
+        pub fn getButtons(_: *Self) w.Buttons {
+            return .{
+                .right = .{ .label = "Play" },
+            };
+        }
+
+        /// Handles scrolling and completion of the summary.
         pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
             switch (btn.game_button) {
                 .a => {
@@ -67,17 +83,16 @@ pub fn ConfirmCharacterStep(comptime Context: type) type {
             return .keep_open;
         }
 
-        pub fn draw(self: Self, render: g.Render) !void {
+        /// Draws the character summary.
+        pub fn drawContent(self: Self, render: g.Render) !void {
             try render.drawTextWithAlign(
                 PANEL_REGION.cols,
-                "Start with this character?",
+                "Continue with this character?",
                 .point(1, 1),
                 .normal,
                 .center,
             );
-            try self.panel.draw(render);
-            try render.cleanInfo();
-            try render.drawRightButton("Play", false);
+            try self.panel.drawContent(render);
         }
     };
 }

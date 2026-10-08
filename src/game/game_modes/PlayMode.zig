@@ -641,7 +641,7 @@ fn initWindowWithQuickActions(self: *Self) !void {
             .{ .handle_release_button = chooseQuickAction },
         );
         if (idx == self.quick_actions.selected_idx)
-            try area.selectLine(idx);
+            area.selectLine(idx);
     }
     self.quick_actions_window.?.shrinkToContent();
 }

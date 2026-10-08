@@ -3,6 +3,7 @@ const g = @import("../game_pkg.zig");
 const p = g.primitives;
 const w = g.windows;
 
+/// Common configuration for a modal window constructor.
 pub const Params = struct {
     title: []const u8 = &.{},
     max_region: p.Region = w.FULL_SCREEN_REGION,
@@ -19,11 +20,6 @@ pub fn withText(alloc: std.mem.Allocator, params: Params) !ModalWindow(w.TextAre
     };
     try self.formatTitle("{s}", .{params.title});
     return self;
-}
-
-/// Creates a full-screen modal window containing a scrollable text area.
-pub fn fullScreenText(alloc: std.mem.Allocator, window_title: []const u8) !ModalWindow(w.TextArea) {
-    return try .initWithText(alloc, .{ .title = window_title, .max_region = w.FULL_SCREEN_REGION });
 }
 
 /// Creates a modal window containing a selectable list of typed options.
@@ -50,6 +46,17 @@ pub fn withOptions(
         .panel = .{
             .area = w.OptionsArea(Item).initEmpty(alloc, context, text_align),
             .region = params.max_region.innerRegion(1, 1, 1, 1),
+            .button_overrides = .{
+                .left = .{
+                    .button = .{ .label = "Close" },
+                    .context = &.{},
+                    .handler = struct {
+                        fn close(_: *anyopaque, _: *anyopaque, _: bool) !g.windows.HandleButtonResult {
+                            return .close_window;
+                        }
+                    }.close,
+                },
+            },
         },
     };
     try self.formatTitle("{s}", .{params.title});
@@ -83,6 +90,20 @@ pub fn notification(
     return self;
 }
 
+/// Creates a text modal containing a prebuilt description.
+pub fn showDescription(
+    alloc: std.mem.Allocator,
+    description: *const g.Description,
+    max_region: p.Region,
+) !ModalWindow(w.TextArea) {
+    var self = try withText(alloc, .{ .max_region = max_region, .title = description.name });
+    const text_area = &self.panel.area;
+    for (description.description) |line| {
+        try text_area.printLine(line);
+    }
+    return self;
+}
+
 /// Creates a modal window describing a player, enemy, or item entity.
 ///
 /// Approximate example:
@@ -109,13 +130,19 @@ pub fn entityDescription(
     const text_area = &self.panel.area;
     if (session.player.id == entity.id) {
         if (g.meta.isLevelUp(&session.registry, session.player)) {
-            text_area.b_button = .{ .button = .up_level, .context = session, .handler = struct {
-                fn upLevel(ptr: *anyopaque) !g.windows.HandleButtonResult {
-                    const ss: *g.GameSession = @ptrCast(@alignCast(ptr));
-                    try ss.levelUp();
-                    return .close_window;
-                }
-            }.upLevel };
+            self.panel.button_overrides = .{
+                .left = .{
+                    .button = .{ .label = "Lvl up!" },
+                    .context = session,
+                    .handler = struct {
+                        fn upLevel(ptr: *anyopaque, _: *anyopaque, _: bool) !g.windows.HandleButtonResult {
+                            const ss: *g.GameSession = @ptrCast(@alignCast(ptr));
+                            try ss.levelUp();
+                            return .close_window;
+                        }
+                    }.upLevel,
+                },
+            };
         }
         try g.Description.describePlayer(session.journal, entity, text_area);
     } else if (session.registry.has(entity, g.components.EnemyState)) {
@@ -137,15 +164,18 @@ pub fn ModalWindow(comptime Area: type) type {
         panel: w.ScrollablePanel(Area),
         region: p.Region,
 
+        /// Releases the wrapped area's storage.
         pub fn deinit(self: *Self) void {
             self.panel.area.deinit();
         }
 
-        // this method must be either inline or receive a pointer to the self
+        /// Returns the current title without unused buffer bytes.
+        // This method must be either inline or receive a pointer to the self.
         pub fn title(self: *const Self) []const u8 {
             return self.title_buffer[0..self.title_len];
         }
 
+        /// Formats and stores the window title.
         pub fn formatTitle(self: *Self, comptime fmt: []const u8, args: anytype) !void {
             self.title_len = (try std.fmt.bufPrint(&self.title_buffer, fmt, args)).len;
         }
@@ -157,6 +187,7 @@ pub fn ModalWindow(comptime Area: type) type {
         /// height, the window is vertically centered within that region.
         ///
         /// Updates the scrollable area's region to match the resized window.
+        /// Shrinks and vertically centers the window around its content.
         pub fn shrinkToContent(self: *Self) void {
             // Count of rows that should be drawn (including border)
             const rows: usize = self.panel.totalLines() + 2; // 2 for border
@@ -172,15 +203,17 @@ pub fn ModalWindow(comptime Area: type) type {
             self.panel.region = self.region.innerRegion(1, 1, 1, 1);
         }
 
+        /// Delegates input to the scrollable panel.
         pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
             return try self.panel.handleButton(btn);
         }
 
         /// Draws the window with a scrollbar and buttons if they are required.
         pub fn draw(self: *Self, render: g.Render) !void {
-            try self.drawContent(render);
-            try self.drawBorder(render);
+            try render.drawBorder(self.region);
             try self.drawTitle(render);
+            try self.panel.drawContent(render);
+            try self.panel.getButtons().draw(render);
         }
 
         /// Draws the title
@@ -189,16 +222,6 @@ pub fn ModalWindow(comptime Area: type) type {
             const point = self.region.top_left.movedToNTimes(.right, padding / 2);
             const ttl = self.title();
             try render.drawText(ttl, point, .normal);
-        }
-
-        /// Draws the content of its inner scrollable panel
-        pub fn drawContent(self: *const Self, render: g.Render) !void {
-            try self.panel.draw(render);
-        }
-
-        /// Draws the border around its region
-        fn drawBorder(self: *const Self, render: g.Render) !void {
-            try render.drawBorder(self.region);
         }
     };
 }

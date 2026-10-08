@@ -60,6 +60,7 @@ pub fn TabbedWindow(comptime Areas: anytype) type {
         tabs: g.utils.HList(Tabs),
         active_tab_idx: usize = 0,
 
+        /// Deinitializes every tab that has been added to the window.
         pub fn deinit(self: *Self) void {
             inline for (g.utils.HList(Tabs).Fields, 0..) |field, idx| {
                 if (idx < self.tabs.len) {
@@ -69,15 +70,18 @@ pub fn TabbedWindow(comptime Areas: anytype) type {
             self.tabs = undefined;
         }
 
+        /// Returns the area stored in the tab at `idx`, if its type matches.
         pub fn getArea(self: *Self, comptime Area: type, idx: usize) ?*Area {
             const tab = self.tabs.get(Tab(Area), idx) orelse return null;
             return &tab.panel.area;
         }
 
+        /// Returns the area in the active tab, if its type matches.
         pub fn activeTab(self: *Self, comptime Area: type) ?*Area {
             return self.getArea(Area, self.active_tab_idx);
         }
 
+        /// Appends a tab and returns a pointer to its stored area.
         pub fn addTab(self: *Self, title: []const u8, area: anytype) !*@TypeOf(area) {
             const new_tab = self.tabs.append(Tab(@TypeOf(area)){ .title = title, .panel = .{
                 .area = area,
@@ -87,16 +91,20 @@ pub fn TabbedWindow(comptime Areas: anytype) type {
             return &new_tab.panel.area;
         }
 
+        /// Removes the last tab and adjusts the active index if necessary.
         pub fn removeLastTab(self: *Self) void {
             if (self.tabs.removeLast() and self.active_tab_idx > 0)
                 self.active_tab_idx -= 1;
         }
 
+        /// Delegates input to the active tab and handles tab navigation.
         pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
+            var buttons: w.Buttons = undefined;
             inline for (@typeInfo(Tabs).@"struct".fields, 0..) |field, idx| {
                 const TabType = field.type;
                 if (idx == self.active_tab_idx) {
                     const tab = self.tabs.get(TabType, idx).?;
+                    buttons = tab.panel.getButtons();
                     if (try tab.panel.handleButton(btn) == .close_window)
                         return .close_window;
                 }
@@ -108,11 +116,14 @@ pub fn TabbedWindow(comptime Areas: anytype) type {
                 .right => if (self.active_tab_idx < self.tabs.len - 1) {
                     self.active_tab_idx += 1;
                 },
+                .b => if (buttons.left == null)
+                    return .close_window,
                 else => {},
             }
             return .keep_open;
         }
 
+        /// Draws tab headers, the active tab, its panel, and its buttons.
         pub fn draw(self: *Self, render: g.Render) !void {
             if (self.tabs.len == 0) return;
 
@@ -189,7 +200,14 @@ pub fn TabbedWindow(comptime Areas: anytype) type {
                     const TabType = field.type;
                     if (idx == self.active_tab_idx) {
                         const panel = &self.tabs.get(TabType, idx).?.panel;
-                        try panel.draw(render);
+                        try panel.drawContent(render);
+                        const buttons = panel.getButtons();
+                        try buttons.draw(render);
+                        if (buttons.right == null) {
+                            try render.drawRightButton("Close", false);
+                        } else if (buttons.left == null) {
+                            try render.drawLeftButton("Close", false);
+                        }
                     }
                 }
             }

@@ -144,7 +144,7 @@ pub fn updateTabs(self: *Self) !void {
     }
     if (active_content.totalLines() > 0) {
         const selected_line = active_content.selectedLine() orelse 0;
-        try active_content.selectLine(
+        active_content.selectLine(
             if (selected_line < active_content.totalLines())
                 selected_line
             else

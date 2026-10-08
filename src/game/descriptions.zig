@@ -82,50 +82,108 @@ pub const Archetypes = struct {
 
 pub const Stats = struct {
     pub const Enum = std.meta.FieldEnum(Stats);
-    strength: g.Description = .{ .name = "Strength" },
-    dexterity: g.Description = .{ .name = "Dexterity" },
-    perception: g.Description = .{ .name = "Perception" },
-    intelligence: g.Description = .{ .name = "Intelligence" },
-    constitution: g.Description = .{ .name = "Constitution" },
+
+    strength: g.Description = .{
+        .name = "Strength",
+        .description = &.{
+            "A measure of a character's physical",
+            "power.  It determines how hard they",
+            "can  strike  and  how much they can",
+            "lift, hold, or break. High strength",
+            "helps deliver devastating blows and",
+            "carry heavy equipment.",
+        },
+    },
+
+    dexterity: g.Description = .{
+        .name = "Dexterity",
+        .description = &.{
+            "A  measure of a character's agility",
+            "and coordination. It reflects their",
+            "ability to move precisely, quickly,",
+            "and  reliably. Dexterity determines",
+            "how   well  they  avoid  traps  and",
+            "blows,   handle   tools,   and  mix",
+            "potions without spilling a drop.",
+        },
+    },
+
+    perception: g.Description = .{
+        .name = "Perception",
+        .description = &.{
+            "A  measure of a character's ability",
+            "to  notice  details and dangers. It",
+            "determines  the  chance of spotting",
+            "traps,  hidden items, or an enemy's",
+            "incoming attack.",
+        },
+    },
+
+    intelligence: g.Description = .{
+        .name = "Intelligence",
+        .description = &.{
+            "A  measure  of a character's mental",
+            "abilities. It determines how easily",
+            "they   uncover   the   secrets   of",
+            "unfamiliar     items,    understand",
+            "mechanisms,  and  show  an aptitude",
+            "for alchemy.",
+        },
+    },
+
+    constitution: g.Description = .{
+        .name = "Constitution",
+        .description = &.{
+            "A measure of a character's physical",
+            "endurance.  It  determines how much",
+            "hardship   and   injury   they  can",
+            "withstand.   Constitution   affects",
+            "maximum  health  and how quickly it",
+            "increases when leveling up.",
+        },
+    },
 };
 
 pub const Skills = struct {
     pub const Enum = std.meta.FieldEnum(Skills);
-    weapon_mastery: g.Description = .{
-        .name = "Weapon Mastery",
-        .description = &.{
-            "Possessing this skill  allows  you",
-            "to use any weapon more effectively",
-            "and miss less often.",
-        },
-    },
-    mechanics: g.Description = .{
-        .name = "Mechanics",
-        .description = &.{
-            "Knowledge in the field of mechanics",
-            "helps  you  pick  locks  and disarm",
-            "traps.",
-        },
-    },
-    stealth: g.Description = .{
-        .name = "Stealth",
-        .description = &.{
-            "Stealth  is the ability  to  remain",
-            "unseen — to stay out  of sight  and",
-            "avoid    waking    the   slumbering",
-            "inhabitants of the dungeons.",
-        },
-    },
     echo_of_knowledge: g.Description = .{
         .name = "Echo of knowledge",
         .description = &.{
-            "The character possesses  an  innate",
+            "This  is  more of an innate ability",
+            "than an acquired skill. A character",
+            "with  this  skill  has an intuitive",
             "understanding  of  the sciences and",
-            "technologies of past civilizations.",
-            "This    ability   allows   you   to",
-            "comprehend  devices  and  artifacts",
-            "from  the past and to apply them in",
-            "practice.",
+            "technologies of past civilizations,",
+            "allowing them to understand and use",
+            "their devices and artifacts.",
+        },
+    },
+
+    mechanics: g.Description = .{
+        .name = "Mechanics",
+        .description = &.{
+            "Knowledge   of  mechanics  helps  a",
+            "character  pick  locks  and  disarm",
+            "traps.",
+        },
+    },
+
+    stealth: g.Description = .{
+        .name = "Stealth",
+        .description = &.{
+            "The  ability  to  remain unnoticed,",
+            "stay out of sight, and avoid waking",
+            "the  sleeping  inhabitants  of  the",
+            "dungeons.",
+        },
+    },
+
+    weapon_mastery: g.Description = .{
+        .name = "Weapon Mastery",
+        .description = &.{
+            "This  skill  helps  a character use",
+            "any  weapon  more  effectively  and",
+            "miss less often.",
         },
     },
 };

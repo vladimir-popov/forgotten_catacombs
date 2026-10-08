@@ -6,6 +6,19 @@ const w = g.windows;
 
 const log = std.log.scoped(.windows);
 
+/// Optional replacements for the panel's left and right button behavior.
+pub const ButtonOverrides = struct {
+    /// A button label, borrowed context, and callback for one side.
+    pub const Override = struct {
+        button: w.Button,
+        context: *anyopaque,
+        handler: *const fn (context: *anyopaque, area: *anyopaque, is_helt: bool) anyerror!w.HandleButtonResult,
+    };
+
+    left: ?Override = null,
+    right: ?Override = null,
+};
+
 /// Wraps an area with scrolling, a scrollbar, and contextual action buttons.
 pub fn ScrollablePanel(comptime Area: type) type {
     return struct {
@@ -14,40 +27,61 @@ pub fn ScrollablePanel(comptime Area: type) type {
         area: Area,
         region: p.Region,
         scrolled_lines: usize = 0,
+        /// Overrides for the buttons of the area. Absent by default.
+        button_overrides: ButtonOverrides = .{},
 
+        /// Returns whether the content exceeds the visible region.
         pub fn isScrollRequired(self: *const Self) bool {
             return self.area.totalLines() > self.region.rows;
         }
 
-        fn maxScrollingCount(self: *const Self) usize {
+        /// Returns the largest valid scroll offset.
+        pub fn maxScrollingLines(self: *const Self) usize {
             return self.area.totalLines() -| self.region.rows;
         }
 
+        /// Returns the number of content lines.
         pub fn totalLines(self: Self) usize {
             return self.area.totalLines();
         }
 
-        pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
-            if (try self.area.handleButton(btn) == .close_window)
-                return .close_window;
+        /// Returns overridden buttons or delegates to the wrapped area.
+        pub fn getButtons(self: *Self) w.Buttons {
+            return .{
+                .left = if (self.button_overrides.left) |override| override.button else self.area.getButtons().left,
+                .right = if (self.button_overrides.right) |override| override.button else self.area.getButtons().right,
+            };
+        }
 
+        /// Handles scrolling, overrides, and finally the wrapped area.
+        pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
             switch (btn.game_button) {
+                .a, .b => {
+                    const maybe_override = if (btn.game_button == .a)
+                        self.button_overrides.right
+                    else
+                        self.button_overrides.left;
+                    if (maybe_override) |override| {
+                        return try override.handler(override.context, &self.area, btn.state == .hold);
+                    }
+                },
                 .up => {
                     if (self.scrolled_lines > 0)
                         self.scrolled_lines -= 1;
                 },
                 .down => {
-                    if (self.scrolled_lines < self.maxScrollingCount())
+                    if (self.scrolled_lines < self.maxScrollingLines())
                         self.scrolled_lines += 1;
                 },
                 else => {},
             }
-            return .keep_open;
+            return try self.area.handleButton(btn);
         }
 
-        pub fn draw(self: *const Self, render: g.Render) !void {
+        /// Draws the scrollbar and the visible portion of the wrapped area.
+        pub fn drawContent(self: *const Self, render: g.Render) !void {
             const region = self.region;
-            const max_scroll_count = self.maxScrollingCount();
+            const max_scroll_count = self.maxScrollingLines();
             const scroll = @min(self.scrolled_lines, max_scroll_count);
 
             // Draw the scrollbar
@@ -64,17 +98,7 @@ pub fn ScrollablePanel(comptime Area: type) type {
             }
             // Draw the content inside the region excluding a space for the scrollbar
             const right_pad: u8 = if (self.isScrollRequired()) 1 else 0;
-            try self.area.draw(render, region.innerRegion(0, right_pad, 0, 0), scroll);
-            if (self.area.leftButton()) |btn| {
-                try render.drawLeftButton(btn.text, btn.has_alternatives);
-            } else {
-                try render.hideLeftButton();
-            }
-            if (self.area.rightButton()) |btn| {
-                try render.drawRightButton(btn.text, btn.has_alternatives);
-            } else {
-                try render.hideRightButton();
-            }
+            try self.area.drawContent(render, region.innerRegion(0, right_pad, 0, 0), scroll);
         }
 
         fn scrollingProgress(scrolled_lines: usize, area_height: usize, max_scroll_count: usize) usize {

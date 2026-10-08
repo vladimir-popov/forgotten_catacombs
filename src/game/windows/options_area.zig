@@ -23,6 +23,7 @@ pub fn OptionsArea(comptime Item: type) type {
     return struct {
         const Self = @This();
 
+        /// Callbacks invoked when an option is activated or held.
         pub const ButtonHandler = struct {
             handle_release_button: *const fn (
                 context: *anyopaque,
@@ -36,13 +37,15 @@ pub fn OptionsArea(comptime Item: type) type {
                 item: Item,
             ) anyerror!w.HandleButtonResult = null,
 
-            const do_nothing: ButtonHandler = .{ .handle_release_button = doNothing };
+            /// A handler that leaves the area open without performing an action.
+            pub const do_nothing: ButtonHandler = .{ .handle_release_button = doNothing };
 
             fn doNothing(_: *anyopaque, _: usize, _: Item) anyerror!w.HandleButtonResult {
                 return .keep_open;
             }
         };
 
+        /// A labeled item and the callbacks associated with it.
         pub const Option = struct {
             /// A buffer for a label content
             label_buffer: [LINE_BUFFER_SIZE]u8,
@@ -51,24 +54,9 @@ pub fn OptionsArea(comptime Item: type) type {
             item: Item,
             button_handler: ButtonHandler,
 
-            /// Returns a slice with a text of the label (no additional spaces).
+            /// Returns the label without trailing padding.
             pub fn label(self: *const @This()) []const u8 {
                 return self.label_buffer[0..self.label_len];
-            }
-
-            pub fn onRightButtonPressed(
-                self: Option,
-                state: g.Button.State,
-                context: *anyopaque,
-                selected_line: usize,
-            ) !w.HandleButtonResult {
-                switch (state) {
-                    .released => return try self.button_handler.handle_release_button(context, selected_line, self.item),
-                    .hold => return if (self.button_handler.handle_hold_button) |handle|
-                        handle(context, selected_line, self.item)
-                    else
-                        .keep_open,
-                }
             }
         };
 
@@ -80,57 +68,88 @@ pub fn OptionsArea(comptime Item: type) type {
         /// The absolute index of the selected line (includes the lines out of scroll)
         selected_line: usize = 0,
 
+        /// Creates an empty options area with a borrowed handler context.
         pub fn initEmpty(alloc: std.mem.Allocator, context: *anyopaque, text_align: g.TextAlign) Self {
             return .{ .alloc = alloc, .context = context, .text_align = text_align, .options = .empty };
         }
 
+        /// Releases the option labels and backing storage.
         pub fn deinit(self: *Self) void {
             self.options.deinit(self.alloc);
         }
 
-        pub fn area(self: *Self) w.Area {
-            return .{ .underlying = self, .vtable = w.Area.vtableFor(Self) };
-        }
+        /// Returns the button shown for the current selection.
+        pub fn getButtons(self: *Self) w.Buttons {
+            if (self.options.items.len == 0) {
+                return .{};
+            }
 
-        pub fn clearRetainingCapacity(self: *Self) void {
-            self.options.clearRetainingCapacity();
-            self.selected_line = 0;
-        }
-
-        pub fn totalLines(self: *const Self) usize {
-            return self.options.items.len;
-        }
-
-        pub fn leftButton(self: *const Self) ?w.Button {
-            return if (self.options.items.len > 0) .close else null;
-        }
-
-        pub fn rightButton(self: *const Self) ?w.Button {
-            return if (self.options.items.len > 0)
-                if (self.options.items[self.selected_line].button_handler.handle_hold_button) |_|
-                    .choose_with_alternatives
-                else
-                    .choose
+            const has_alternative = if (self.selectedOption()) |opt|
+                opt.button_handler.handle_hold_button != null
             else
-                .close;
+                false;
+
+            return .{
+                .right = .{ .label = "Choose", .has_alternative = has_alternative },
+            };
         }
 
+        /// Handles selection movement and option activation.
         pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
             switch (btn.game_button) {
                 .up => self.selectPreviousLine(),
                 .down => self.selectNextLine(),
                 .a => if (self.options.items.len > 0) {
                     const option = self.options.items[self.selected_line];
-                    if (btn.state == .released) {
-                        return try option.onRightButtonPressed(btn.state, self.context, self.selected_line);
-                    }
-                } else {
-                    return .close_window;
+                    const is_helt = btn.state == .hold;
+                    return if (!is_helt)
+                        try option.button_handler.handle_release_button(self.context, self.selected_line, option.item)
+                    else if (option.button_handler.handle_hold_button) |handle_hold_button|
+                        try handle_hold_button(self.context, self.selected_line, option.item)
+                    else
+                        .keep_open;
                 },
-                .b => if (self.options.items.len > 0) return .close_window,
                 else => {},
             }
             return .keep_open;
+        }
+
+        /// Draws the options line by line inside the passed region. If the region has not enough
+        /// rows, then the options will be scrolled. If the region has not enough columns, then
+        /// the label will be cropped.
+        ///
+        /// - `region` - A region where this aria should be drawn. For left aligned text the first
+        /// symbol will be drawn at the top left corner of the passed region.
+        ///
+        /// - `scrolled` - How many scrolled lines should be skipped.
+        /// Draws the visible options and highlights the selected line.
+        pub fn drawContent(self: *const Self, render: g.Render, region: p.Region, scrolled: usize) !void {
+            // Clear the region
+            try render.fillRegion(g.Render.default_filler, .normal, region);
+            // Draw the options
+            var point = region.top_left;
+            for (0..region.rows) |r| {
+                const line_idx = scrolled + r;
+                if (line_idx < self.options.items.len) {
+                    const label = self.options.items[line_idx].label();
+                    const mode: g.DrawingMode = if (self.selected_line == line_idx) .inverted else .normal;
+                    try render.drawTextWithAlign(region.cols, label, point, mode, self.text_align);
+                } else {
+                    try render.drawHorizontalLine(' ', point, region.cols);
+                }
+                point.move(.down);
+            }
+        }
+
+        /// Removes all options while retaining allocated capacity.
+        pub fn clearRetainingCapacity(self: *Self) void {
+            self.options.clearRetainingCapacity();
+            self.selected_line = 0;
+        }
+
+        /// Returns the number of options.
+        pub fn totalLines(self: *const Self) usize {
+            return self.options.items.len;
         }
 
         /// Adds a labeled option. The `label` is copied to an inner buffer.
@@ -153,6 +172,7 @@ pub fn OptionsArea(comptime Item: type) type {
             return option;
         }
 
+        /// Appends an option with a formatted label.
         pub fn addOptionFmt(
             self: *Self,
             comptime fmt: []const u8,
@@ -171,6 +191,7 @@ pub fn OptionsArea(comptime Item: type) type {
             return option;
         }
 
+        /// Appends an option with a blank label and no-op handler.
         pub fn addEmptyOption(
             self: *Self,
             item: Item,
@@ -185,21 +206,25 @@ pub fn OptionsArea(comptime Item: type) type {
             return option;
         }
 
-        pub fn selectLine(self: *Self, idx: usize) !void {
+        /// Selects an option by its zero-based index.
+        pub fn selectLine(self: *Self, idx: usize) void {
             std.debug.assert(idx < self.options.items.len);
             self.selected_line = idx;
         }
 
+        /// Moves the selection one line up when possible.
         pub fn selectPreviousLine(self: *Self) void {
             if (self.selected_line > 0)
                 self.selected_line -= 1;
         }
 
+        /// Moves the selection one line down when possible.
         pub fn selectNextLine(self: *Self) void {
             if (self.selected_line < self.options.items.len - 1)
                 self.selected_line += 1;
         }
 
+        /// Returns the selected option index, or null when the area is empty.
         pub fn selectedLine(self: Self) ?usize {
             return if (self.options.items.len > 0)
                 self.selected_line
@@ -207,6 +232,7 @@ pub fn OptionsArea(comptime Item: type) type {
                 null;
         }
 
+        /// Returns the selected option, if one exists.
         pub fn selectedOption(self: *const Self) ?*Option {
             return if (self.selectedLine()) |idx|
                 &self.options.items[idx]
@@ -214,41 +240,12 @@ pub fn OptionsArea(comptime Item: type) type {
                 null;
         }
 
+        /// Returns the item stored in the selected option.
         pub fn selectedItem(self: *const Self) ?Item {
             return if (self.selectedLine()) |idx|
                 self.options.items[idx].item
             else
                 null;
-        }
-
-        /// Draws the options line by line inside the passed region. If the region has not enough
-        /// rows, then the options will be scrolled. If the region has not enough columns, then
-        /// the label will be cropped.
-        ///
-        /// - `region` - A region where this aria should be drawn. For left aligned text the first
-        /// symbol will be drawn at the top left corner of the passed region.
-        ///
-        /// - `scrolled` - How many scrolled lines should be skipped.
-        pub fn draw(self: *const Self, render: g.Render, region: p.Region, scrolled: usize) !void {
-            log.debug(
-                "Draw {d} options inside {any}; Scrolled lines {d}; Selected line is {any};",
-                .{ self.options.items.len, region, scrolled, self.selected_line },
-            );
-            // Clear the region
-            try render.fillRegion(g.Render.default_filler, .normal, region);
-            // Draw the options
-            var point = region.top_left;
-            for (0..region.rows) |r| {
-                const line_idx = scrolled + r;
-                if (line_idx < self.options.items.len) {
-                    const label = self.options.items[line_idx].label();
-                    const mode: g.DrawingMode = if (self.selected_line == line_idx) .inverted else .normal;
-                    try render.drawTextWithAlign(region.cols, label, point, mode, self.text_align);
-                } else {
-                    try render.drawHorizontalLine(' ', point, region.cols);
-                }
-                point.move(.down);
-            }
         }
     };
 }

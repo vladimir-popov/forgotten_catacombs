@@ -5,6 +5,7 @@ const w = g.windows;
 
 const Self = @This();
 
+/// Type-erased interface for an area used by a generic panel.
 pub const VTable = struct {
     /// Returns the total lines of this are content.
     totalLinesFn: *const fn (ptr: *anyopaque) usize,
@@ -37,34 +38,42 @@ pub const VTable = struct {
 underlying: *anyopaque,
 vtable: *const VTable,
 
+/// Returns the number of content lines.
 pub fn totalLines(self: Self) usize {
     return self.vtable.totalLinesFn(self.underlying);
 }
 
+/// Returns the selected line, if the wrapped area supports selection.
 pub fn selectedLine(self: Self) ?usize {
     return self.vtable.selectedLineFn(self.underlying);
 }
 
+/// Clears the wrapped area while retaining its capacity.
 pub fn clearRetainingCapacity(self: *Self) void {
     self.vtable.clearRetainingCapacityFn(self.underlying);
 }
 
+/// Returns the wrapped area's left button.
 pub fn leftButton(self: *const Self) ?w.Button {
     return self.vtable.leftButtonFn(self.underlying);
 }
 
+/// Returns the wrapped area's right button.
 pub fn rightButton(self: *const Self) ?w.Button {
     return self.vtable.rightButtonFn(self.underlying);
 }
 
+/// Forwards a button to the wrapped area.
 pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
     return self.vtable.handleButtonFn(self.underlying, btn);
 }
 
+/// Draws the wrapped area in `region` at the supplied scroll offset.
 pub fn draw(self: *const Self, render: g.Render, region: p.Region, scrolled: usize) !void {
     return self.vtable.drawFn(self.underlying, render, region, scrolled);
 }
 
+/// Builds a vtable for a concrete area type.
 pub fn vtableFor(comptime T: type) *const VTable {
     return &struct {
         fn totalLinesFn(ptr: *anyopaque) usize {
@@ -108,6 +117,7 @@ pub fn vtableFor(comptime T: type) *const VTable {
     }.vtable;
 }
 
+/// A no-op area implementation for an empty panel.
 pub const empty: Self = .{
     .underlying = undefined,
     .vtable = &.{

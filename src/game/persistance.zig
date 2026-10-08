@@ -438,7 +438,6 @@ test "All components should be serializable" {
         .initiative = c.Initiative{ .move_points = 5 },
         .inventory = inventory,
         .ladder = c.Ladder{ .id = .{ .id = 2 }, .direction = .down, .target_ladder = .{ .id = 3 } },
-        .level_up = .{ .last_handled_level = 3 },
         .pile = pile,
         .price = .{ .value = 100 },
         .poison = .{ .damage = 42 },
