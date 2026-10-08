@@ -36,7 +36,7 @@ pub fn OptionsArea(comptime Item: type) type {
                 item: Item,
             ) anyerror!w.HandleButtonResult = null,
 
-            const do_nothing: ButtonHandler = .{ .handle_release_button = doNothing };
+            pub const do_nothing: ButtonHandler = .{ .handle_release_button = doNothing };
 
             fn doNothing(_: *anyopaque, _: usize, _: Item) anyerror!w.HandleButtonResult {
                 return .keep_open;
@@ -185,7 +185,7 @@ pub fn OptionsArea(comptime Item: type) type {
             return option;
         }
 
-        pub fn selectLine(self: *Self, idx: usize) !void {
+        pub fn selectLine(self: *Self, idx: usize) void {
             std.debug.assert(idx < self.options.items.len);
             self.selected_line = idx;
         }

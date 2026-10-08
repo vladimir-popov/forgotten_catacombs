@@ -105,6 +105,7 @@ pub fn addEmptyLine(self: *Self) !*Line {
     return line;
 }
 
+/// Creates a copy of the text as a new line.
 pub fn printLine(self: *Self, text: []const u8) !void {
     const line = try self.lines.addOne(self.alloc);
     line.* = @splat(' ');

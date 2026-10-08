@@ -246,7 +246,7 @@ fn showWindowWithEntities(
             );
             if (entity.eql(self.entity_in_focus))
                 // the variants array has to have at least one (focused) entity
-                try window.panel.area.selectLine(window.panel.area.options.items.len - 1);
+                window.panel.area.selectLine(window.panel.area.options.items.len - 1);
         }
     }
 }

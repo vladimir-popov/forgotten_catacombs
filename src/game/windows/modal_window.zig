@@ -83,6 +83,20 @@ pub fn notification(
     return self;
 }
 
+pub fn showDescription(
+    alloc: std.mem.Allocator,
+    description: *const g.Description,
+    max_region: p.Region,
+) !ModalWindow(w.TextArea) {
+    var self = try withText(alloc, .{ .max_region = max_region });
+    try self.formatTitle("{s}", .{description.name});
+    const text_area = &self.panel.area;
+    for (description.description) |line| {
+        try text_area.printLine(line);
+    }
+    return self;
+}
+
 /// Creates a modal window describing a player, enemy, or item entity.
 ///
 /// Approximate example:

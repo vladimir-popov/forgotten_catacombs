@@ -13,9 +13,13 @@ name: []const u8,
 /// A short description of the entity.
 description: []const []const u8 = &.{},
 
+pub fn get(preset: g.components.Description.Preset.Tag) *const @This() {
+    return g.components.Description.Preset.fields.get(preset);
+}
+
 pub fn rawName(registry: *g.Registry, entity: g.Entity) ![]const u8 {
     if (registry.get(entity, c.Description)) |description| {
-        return g.components.Description.Preset.fields.get(description.preset).name;
+        return get(description.preset).name;
     } else {
         return "Unknown";
     }

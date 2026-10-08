@@ -16,9 +16,9 @@ const log = std.log.scoped(.explore_level_mode);
 
 const Self = @This();
 
-archetype: g.meta.PlayerArchetype = undefined,
+archetype: g.meta.PlayerArchetype = .adventurer,
 stats: c.Stats = undefined,
-skills: c.Skills = undefined,
+skills: c.Skills = .zeros,
 health: c.Health = undefined,
 wizard: w.wizard.WizardWindow(union {
     archetype: w.wizard.ChooseArchetypeStep(Self),
@@ -28,6 +28,7 @@ wizard: w.wizard.WizardWindow(union {
 }, Self) = undefined,
 
 pub fn init(self: *Self, alloc: std.mem.Allocator) !void {
+    self.* = .{};
     try self.wizard.init(alloc, self);
 }
 

@@ -133,9 +133,9 @@ noinline fn welcome(self: *Self) !void {
 
     // keep menu item selected
     switch (from_state) {
-        .about => try self.state.welcome.menu.selectLine(self.state.welcome.menu.options.items.len - 1),
-        .manual => try self.state.welcome.menu.selectLine(self.state.welcome.menu.options.items.len - 2),
-        else => try self.state.welcome.menu.selectLine(0),
+        .about => self.state.welcome.menu.selectLine(self.state.welcome.menu.options.items.len - 1),
+        .manual => self.state.welcome.menu.selectLine(self.state.welcome.menu.options.items.len - 2),
+        else => self.state.welcome.menu.selectLine(0),
     }
     try self.render.clearDisplay();
     try self.drawWelcomeScreen();

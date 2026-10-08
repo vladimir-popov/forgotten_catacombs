@@ -338,7 +338,7 @@ fn updateDropTab(self: *Self, drop: g.Entity) !void {
         try self.addDropOption(options_area, drop);
     }
     if (options_area.options.items.len > 0) {
-        try options_area.selectLine(if (selected_line < options_area.options.items.len)
+        options_area.selectLine(if (selected_line < options_area.options.items.len)
             selected_line
         else
             options_area.options.items.len - 1);

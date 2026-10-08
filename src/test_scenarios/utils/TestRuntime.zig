@@ -36,6 +36,10 @@ pub fn deinit(self: *Self) void {
     self.pushed_buttons.deinit(self.alloc);
 }
 
+pub fn printDisplay(self: Self) void {
+    std.debug.print("{f}", .{std.fmt.alt(self.display, .ttyFormat)});
+}
+
 pub fn runtime(self: *Self) g.Runtime {
     return .{
         .context = self,

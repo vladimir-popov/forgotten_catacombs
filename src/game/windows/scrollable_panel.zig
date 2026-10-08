@@ -19,7 +19,7 @@ pub fn ScrollablePanel(comptime Area: type) type {
             return self.area.totalLines() > self.region.rows;
         }
 
-        fn maxScrollingCount(self: *const Self) usize {
+        pub fn maxScrollingLines(self: *const Self) usize {
             return self.area.totalLines() -| self.region.rows;
         }
 
@@ -37,7 +37,7 @@ pub fn ScrollablePanel(comptime Area: type) type {
                         self.scrolled_lines -= 1;
                 },
                 .down => {
-                    if (self.scrolled_lines < self.maxScrollingCount())
+                    if (self.scrolled_lines < self.maxScrollingLines())
                         self.scrolled_lines += 1;
                 },
                 else => {},
@@ -47,7 +47,7 @@ pub fn ScrollablePanel(comptime Area: type) type {
 
         pub fn draw(self: *const Self, render: g.Render) !void {
             const region = self.region;
-            const max_scroll_count = self.maxScrollingCount();
+            const max_scroll_count = self.maxScrollingLines();
             const scroll = @min(self.scrolled_lines, max_scroll_count);
 
             // Draw the scrollbar

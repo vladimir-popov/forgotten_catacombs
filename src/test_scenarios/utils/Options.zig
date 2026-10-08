@@ -14,7 +14,7 @@ test_session: *TestSession,
 pub fn choose(self: Self, option_name: []const u8) !void {
     for (self.options_area.options.items, 0..) |*option, idx| {
         if (std.mem.containsAtLeast(u8, option.label(), 1, option_name)) {
-            try self.options_area.selectLine(idx);
+            self.options_area.selectLine(idx);
             try self.test_session.pressButton(.a);
             return;
         }
@@ -26,7 +26,7 @@ pub fn choose(self: Self, option_name: []const u8) !void {
 pub fn chooseById(self: Self, item_id: g.Entity) !void {
     for (self.options_area.options.items, 0..) |*option, idx| {
         if (option.item.eql(item_id)) {
-            try self.options_area.selectLine(idx);
+            self.options_area.selectLine(idx);
             try self.test_session.pressButton(.a);
             return;
         }
@@ -36,7 +36,7 @@ pub fn chooseById(self: Self, item_id: g.Entity) !void {
 }
 
 pub fn chooseByIndex(self: Self, idx: usize) !void {
-    try self.options_area.selectLine(idx);
+    self.options_area.selectLine(idx);
     try self.test_session.pressButton(.a);
 }
 

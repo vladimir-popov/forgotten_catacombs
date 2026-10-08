@@ -5,6 +5,7 @@ const p = g.primitives;
 const TestRuntime = @import("TestRuntime.zig");
 const Inventory = @import("Inventory.zig");
 const Player = @import("Player.zig");
+const TickOptions = @import("TickOptions.zig");
 const TestLocation = @import("TestLocation.zig");
 
 pub const log = std.log.scoped(.test_session);
@@ -94,13 +95,6 @@ pub fn deinit(self: *Self) void {
     self.arena.deinit();
 }
 
-pub const TickOptions = struct {
-    /// How many times repeat the tick. Default is 1.
-    count: u8 = 1,
-    /// How many milliseconds add to the clock on one tick. Default = 1000.
-    duration_ms: u16 = 1000,
-};
-
 /// Creates a new empty last_frame buffer,
 /// increase a clock on 1 second,
 /// runs the method `session.tick(.{})`,
@@ -115,7 +109,7 @@ pub fn tick(self: *Self, opts: TickOptions) !void {
 }
 
 pub fn printDisplay(self: Self) void {
-    std.debug.print("{f}", .{std.fmt.alt(self.runtime.display, .ttyFormat)});
+    self.runtime.printDisplay();
 }
 
 /// In Play mode it ticks until the state become `.player_turn`.

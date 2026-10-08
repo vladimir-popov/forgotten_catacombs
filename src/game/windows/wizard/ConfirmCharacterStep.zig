@@ -54,6 +54,10 @@ pub fn ConfirmCharacterStep(comptime Context: type) type {
             self.panel.deinit();
         }
 
+        pub fn isDone(self: Self) bool {
+            return self.panel.scrolled_lines == self.panel.maxScrollingLines();
+        }
+
         pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
             switch (btn.game_button) {
                 .a => {

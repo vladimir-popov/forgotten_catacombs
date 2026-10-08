@@ -34,53 +34,47 @@ pub fn WizardWindow(comptime Steps: type, Context: type) type {
         }
 
         pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
+            const current_step = self.current_step;
             inline for (0..steps_fields.len) |idx| {
-                if (self.current_step == idx) {
+                if (current_step == idx) {
                     const field = steps_fields[idx];
-                    if (try @field(self.steps, field.name).handleButton(btn) == .close_window) {
-                        if (btn.game_button == .a and idx + 1 < steps_fields.len) {
-                            self.current_step += 1;
-                            try self.switchToStep(idx + 1);
-                        } else {
-                            if (idx == 0) {
-                                self.current_step = 0;
-                                try self.switchToStep(0);
-                            } else {
-                                self.current_step -= 1;
-                                try self.switchToStep(idx - 1);
-                            }
+                    if (btn.game_button == .b and idx > 0) {
+                        try self.switchToStep(idx - 1);
+                    } else if (try @field(self.steps, field.name).handleButton(btn) == .close_window) {
+                        if (btn.game_button == .a) {
+                            if (idx + 1 < steps_fields.len)
+                                try self.switchToStep(idx + 1)
+                            else
+                                return .close_window;
                         }
                     }
                 }
             }
-            if (self.current_step == steps_fields.len - 1 and btn.game_button == .a)
-                return .close_window
-            else
-                return .keep_open;
+            return .keep_open;
         }
 
         fn switchToStep(self: *Self, comptime idx: comptime_int) !void {
             std.debug.assert(self.step_arena.reset(.retain_capacity));
             const field = steps_fields[idx];
             self.steps = @unionInit(Steps, field.name, undefined);
+            self.current_step = idx;
             try @field(self.steps, field.name).init(self.step_arena.allocator(), self.context);
         }
 
         pub fn draw(self: *Self, render: g.Render) !void {
-            if (self.current_step > 0)
-                try render.drawLeftButton("Back", false);
-
-            if (self.current_step + 1 < steps_fields.len)
-                try render.drawRightButton("Next", false)
-            else
-                try render.drawRightButton("Done", false);
-
+            var is_step_completed = false;
             inline for (0..steps_fields.len) |idx| {
                 if (self.current_step == idx) {
                     const field = steps_fields[idx];
                     try @field(self.steps, field.name).draw(render);
+                    is_step_completed = @field(self.steps, field.name).isDone();
                 }
             }
+            if (self.current_step > 0)
+                try render.drawLeftButton("Back", false);
+
+            if (self.current_step + 1 < steps_fields.len and is_step_completed)
+                try render.drawRightButton("Next", false);
         }
     };
 }

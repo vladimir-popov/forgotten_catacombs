@@ -8,7 +8,7 @@ const w = g.windows;
 ///
 /// ```
 /// ╔════════════════════════════════════════╗
-/// ║                 Skill:                 ║
+/// ║      Distribute the skill points:      ║
 /// ║════════════════════════════════════════║
 /// ║ ┌                                      ║
 /// ║  Weapon Mastery                      0 ║
@@ -23,12 +23,12 @@ const w = g.windows;
 /// ╚════════════════════════════════════════╝
 /// ```
 pub fn ManageSkillsStep(comptime Context: type) type {
-    return ManagePointsStep("Skills:", Context, c.Skills.Skill, "skills", 0, 10);
+    return ManagePointsStep("Distribute the skill points:", Context, c.Skills.Skill, "skills", 0, 10);
 }
 
 /// Creates a wizard window for distributing points between character stats.
 pub fn ManageStatsStep(comptime Context: type) type {
-    return ManagePointsStep("Stats:", Context, c.Stats.Stat, "stats", -2, 5);
+    return ManagePointsStep("Distribute the stats points:", Context, c.Stats.Stat, "stats", -2, 5);
 }
 
 fn ManagePointsStep(
@@ -52,8 +52,8 @@ fn ManagePointsStep(
         values: *std.enums.EnumArray(Value, i4),
         remaining_points: u2,
         original_points: u2,
-        main_window: w.ModalWindow(w.OptionsArea(Value)),
-        compositor: w.WindowCompositor,
+        area: w.OptionsArea(Value),
+        description_window: ?w.ModalWindow(w.TextArea),
 
         pub fn init(self: *Self, alloc: std.mem.Allocator, context: *Context) !void {
             const remaining_points: u2 = @field(Context, field_name ++ "RemainingPoints")(context);
@@ -62,29 +62,31 @@ fn ManagePointsStep(
                 .values = &@field(context, field_name).values,
                 .remaining_points = remaining_points,
                 .original_points = remaining_points,
-                .main_window = try w.modal_window.withOptions(
-                    alloc,
-                    Value,
-                    self,
-                    .left,
-                    .{ .title = title, .max_region = w.FULL_SCREEN_REGION },
-                ),
-                .compositor = try .init(alloc, &self.main_window, w.FULL_SCREEN_REGION),
+                .area = .initEmpty(alloc, self, .left),
+                .description_window = null,
             };
-            const options: *w.OptionsArea(Value) = &self.main_window.panel.area;
+
             for (std.enums.values(Value)) |value| {
-                const option = try options.addOptionFmt(
-                    "{s}",
+                const fmt = std.fmt.comptimePrint("{{s: <{d}}}", .{AREA_REGION.cols});
+                const option = try self.area.addOptionFmt(
+                    fmt,
                     .{g.components.Description.Preset.castByNameAndGet(value).name},
                     value,
                     .{ .handle_release_button = showDescription },
                 );
-                option.label_buffer[option.label_len - 3] = '0' + @as(u8, @intCast(self.values.get(value)));
+                const x = self.values.get(value);
+                if (x < 0) {
+                    option.label_buffer[option.label_len - 4] = '-';
+                }
+                option.label_buffer[option.label_len - 3] = '0' + @as(u8, @intCast(@abs(x)));
             }
         }
 
         pub fn deinit(self: *Self) void {
-            self.compositor.deinit();
+            self.area.deinit();
+            if (self.description_window) |*win| {
+                win.deinit();
+            }
         }
 
         pub fn isDone(self: Self) bool {
@@ -92,26 +94,54 @@ fn ManagePointsStep(
         }
 
         pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
-            switch (btn.game_button) {
-                .left, .right => if (self.compositor.modal_windows_count == 0) {
-                    const option = self.main_window.panel.area.selectedOption().?;
-                    if (btn.game_button == .right)
-                        self.increase(option.item)
-                    else
-                        self.decrise(option.item);
+            if (self.description_window) |*win| {
+                if (try win.handleButton(btn) == .close_window) {
+                    win.deinit();
+                    self.description_window = null;
+                }
+            } else {
+                switch (btn.game_button) {
+                    .left, .right => {
+                        const option = self.area.selectedOption().?;
+                        if (btn.game_button == .right)
+                            self.increase(option.item)
+                        else
+                            self.decrise(option.item);
 
-                    const new_value = self.values.get(option.item);
-                    option.label_buffer[option.label_len - 3] = '0' + @as(u8, @intCast(new_value));
-                },
-                else => if (try self.compositor.handleButton(btn) == .closed_main_window) {
-                    return .close_window;
-                },
+                        const x = self.values.get(option.item);
+                        if (x < 0) {
+                            option.label_buffer[option.label_len - 4] = '-';
+                        } else {
+                            option.label_buffer[option.label_len - 4] = ' ';
+                        }
+                        option.label_buffer[option.label_len - 3] = '0' + @as(u8, @intCast(@abs(x)));
+                    },
+                    .up, .down => _ = try self.area.handleButton(btn),
+                    .a => if (self.remaining_points > 0) {
+                        return try self.area.handleButton(btn);
+                    } else {
+                        return .close_window;
+                    },
+                    else => {},
+                }
             }
             return .keep_open;
         }
 
-        fn selectedValue(self: Self) Value {
-            return self.options.selectedItem().?;
+        pub fn draw(self: *Self, render: g.Render) !void {
+            if (self.description_window) |*win| {
+                try win.draw(render);
+            } else {
+                try render.clearDisplay();
+                try render.drawTextWithAlign(w.FULL_SCREEN_REGION.cols, title, .point(1, 1), .normal, .center);
+                try self.area.draw(render, AREA_REGION, 0);
+                var buf: [15]u8 = undefined;
+                try render.drawInfo(
+                    try std.fmt.bufPrint(&buf, "{d} points remain", .{self.remaining_points}),
+                );
+                if (self.remaining_points > 0)
+                    try render.drawRightButton("Describe", false);
+            }
         }
 
         fn increase(self: *Self, value: Value) void {
@@ -136,23 +166,13 @@ fn ManagePointsStep(
             value: Value,
         ) anyerror!w.HandleButtonResult {
             const self: *Self = @ptrCast(@alignCast(ptr));
-            const description = g.components.Description.Preset.castByNameAndGet(value);
-            const window = try self.compositor.showModalWindowWithText(self.alloc, description.name);
-            const area = &window.panel.area;
-            for (description.description) |descr_line| {
-                try area.printLineFmt("{s}", .{descr_line});
-            }
-            return .keep_open;
-        }
-
-        pub fn draw(self: *Self, render: g.Render) !void {
-            try self.compositor.draw(render);
-            var buf: [15]u8 = undefined;
-            try render.drawInfo(
-                try std.fmt.bufPrint(&buf, "{d} points remain", .{self.remaining_points}),
+            std.debug.assert(self.description_window == null);
+            self.description_window = try w.modal_window.showDescription(
+                self.alloc,
+                g.components.Description.Preset.castByNameAndGet(value),
+                w.FULL_SCREEN_REGION,
             );
-            if (self.remaining_points > 0)
-                try render.drawRightButton("Describe", false);
+            return .keep_open;
         }
     };
 }

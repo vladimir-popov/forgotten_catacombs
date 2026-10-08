@@ -60,7 +60,7 @@ pub fn updateAreaWithItems(
         );
     }
     if (area.options.items.len > 0) {
-        try area.selectLine(if (selected_line < area.options.items.len)
+        area.selectLine(if (selected_line < area.options.items.len)
             selected_line
         else
             area.options.items.len - 1);
