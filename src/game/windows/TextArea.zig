@@ -18,17 +18,9 @@ const Self = @This();
 /// It has slightly bigger length than `MAX_WIDTH` to be able to store a utf8 symbol.
 pub const Line = [COLS]u8;
 
-pub const ButtonWithHandler = struct {
-    button: w.Button,
-    context: *anyopaque,
-    handler: *const fn (context: *anyopaque) anyerror!w.HandleButtonResult,
-};
-
 alloc: std.mem.Allocator,
 /// The scrollable content of the window
 lines: std.ArrayList(Line) = .empty,
-b_button: ?ButtonWithHandler = null,
-a_button: ?ButtonWithHandler = .{ .button = .close, .context = &.{}, .handler = closeHandler },
 
 pub fn initEmpty(alloc: std.mem.Allocator) Self {
     return .{ .alloc = alloc };
@@ -36,10 +28,6 @@ pub fn initEmpty(alloc: std.mem.Allocator) Self {
 
 pub fn deinit(self: *Self) void {
     self.lines.deinit(self.alloc);
-}
-
-pub fn area(self: *Self) w.Area {
-    return .{ .underlying = self, .vtable = w.Area.vtableFor(Self) };
 }
 
 pub fn totalLines(self: *const Self) usize {
@@ -50,36 +38,7 @@ pub fn selectedLine(_: *const Self) ?usize {
     return null;
 }
 
-pub fn leftButton(self: *const Self) ?w.Button {
-    if (self.b_button) |btn| {
-        return btn.button;
-    }
-    return null;
-}
-
-pub fn rightButton(self: *const Self) ?w.Button {
-    if (self.a_button) |btn| {
-        return btn.button;
-    }
-    return null;
-}
-
-pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
-    switch (btn.game_button) {
-        .a => if (self.a_button) |button| {
-            return try button.handler(button.context);
-        },
-        .b => if (self.b_button) |button| {
-            return try button.handler(button.context);
-        },
-        else => {},
-    }
-    return .keep_open;
-}
-
-fn closeHandler(_: *anyopaque) !w.HandleButtonResult {
-    return .close_window;
-}
+pub fn handleButton(_: *Self, _: g.Button) !void {}
 
 pub fn draw(self: *const Self, render: g.Render, region: p.Region, scrolled: usize) !void {
     // Clear the region

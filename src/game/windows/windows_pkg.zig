@@ -14,6 +14,8 @@ const p = g.primitives;
 
 const log = std.log.scoped(.windows);
 
+pub const AreaButtonResult = enum { none, selection_changed };
+
 /// The result of handling a button. Some window can have default `Close` button (a Description
 /// window as example), or have another logic to request closing itself (a window with options).
 pub const HandleButtonResult = enum {

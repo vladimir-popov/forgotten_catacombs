@@ -27,10 +27,8 @@ pub fn ScrollablePanel(comptime Area: type) type {
             return self.area.totalLines();
         }
 
-        pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
-            if (try self.area.handleButton(btn) == .close_window)
-                return .close_window;
-
+        pub fn handleButton(self: *Self, btn: g.Button) !void {
+            try self.areahandleButton(btn);
             switch (btn.game_button) {
                 .up => {
                     if (self.scrolled_lines > 0)
@@ -42,7 +40,6 @@ pub fn ScrollablePanel(comptime Area: type) type {
                 },
                 else => {},
             }
-            return .keep_open;
         }
 
         pub fn draw(self: *const Self, render: g.Render) !void {
@@ -65,16 +62,6 @@ pub fn ScrollablePanel(comptime Area: type) type {
             // Draw the content inside the region excluding a space for the scrollbar
             const right_pad: u8 = if (self.isScrollRequired()) 1 else 0;
             try self.area.draw(render, region.innerRegion(0, right_pad, 0, 0), scroll);
-            if (self.area.leftButton()) |btn| {
-                try render.drawLeftButton(btn.text, btn.has_alternatives);
-            } else {
-                try render.hideLeftButton();
-            }
-            if (self.area.rightButton()) |btn| {
-                try render.drawRightButton(btn.text, btn.has_alternatives);
-            } else {
-                try render.hideRightButton();
-            }
         }
 
         fn scrollingProgress(scrolled_lines: usize, area_height: usize, max_scroll_count: usize) usize {
