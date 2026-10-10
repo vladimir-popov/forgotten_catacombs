@@ -50,13 +50,13 @@ fn ManagePointsStep(
 
         alloc: std.mem.Allocator,
         values: *std.enums.EnumArray(Value, i4),
-        remaining_points: u2,
-        original_points: u2,
+        remaining_points: u4,
+        original_points: u4,
         area: w.OptionsArea(Value),
         description_window: ?w.ModalWindow(w.TextArea),
 
         pub fn init(self: *Self, alloc: std.mem.Allocator, context: *Context) !void {
-            const remaining_points: u2 = @field(Context, field_name ++ "RemainingPoints")(context);
+            const remaining_points: u4 = @field(Context, field_name ++ "RemainingPoints")(context);
             self.* = .{
                 .alloc = alloc,
                 .values = &@field(context, field_name).values,

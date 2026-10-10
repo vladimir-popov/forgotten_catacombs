@@ -188,13 +188,18 @@ pub const Equipment = struct {
 pub const Experience = struct {
     const reward_denominator = 10;
 
-    pub const first_level: Experience = .{ .experience = 0, .level = 1 };
+    pub const first_level: Experience = .{ .experience = 0, .level = 1, .last_handled_level = 1 };
 
     level: u4,
     experience: u16,
+    /// The last handled level.
+    /// For example, it's possible to get level 2, 3 and 4 before handle any of them.
+    /// The player will have the level 4, but the `last_handled_level` will be 1.
+    /// When level up will be handled once, the `last_handled_level` become 2 and so on.
+    last_handled_level: u4,
 
     pub fn init(experience: u16) Experience {
-        return .{ .level = 1, .experience = experience };
+        return .{ .level = 1, .experience = experience, .last_handled_level = 1 };
     }
 
     pub inline fn reward(reward_exp: u16) Experience {
@@ -213,6 +218,10 @@ pub const Experience = struct {
             level += 1;
         }
         return level;
+    }
+
+    pub fn isLevelUp(self: Experience) bool {
+        return self.last_handled_level < self.actualLevel();
     }
 };
 
@@ -361,14 +370,6 @@ pub const Ladder = struct {
             .{ self.id.id, @tagName(self.direction), self.target_ladder.id },
         );
     }
-};
-
-pub const LevelUp = struct {
-    /// The last level handled level.
-    /// For example, it's possible to get level 2, 3 and 4 before handle any of them.
-    /// The player will have the level 4, but the `last_handled_level` will be 1.
-    /// When level up will be handled once, the `last_handled_level` become 2 and so on.
-    last_handled_level: u4,
 };
 
 /// A wrapper with additional methods around the std.enums.EnumSet(Modification)
@@ -699,7 +700,6 @@ pub const Components = struct {
     initiative: ?Initiative = null,
     inventory: ?Inventory = null,
     ladder: ?Ladder = null,
-    level_up: ?LevelUp = null,
     pile: ?Pile = null,
     poison: ?Poison = null,
     position: ?Position = null,

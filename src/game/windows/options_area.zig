@@ -8,6 +8,8 @@ const log = std.log.scoped(.windows);
 
 const LINE_BUFFER_SIZE = g.DISPLAY_COLS;
 
+pub const HandleButtonEvents = enum { none, select, activate, activate_alt };
+
 /// This is an area with a list of options.
 /// Options with items and right button handlers can be added. An appropriate handler will be
 /// invoked inside the `handleButton` method. The owner, index of the current line and appropriate item

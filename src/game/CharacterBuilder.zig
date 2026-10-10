@@ -36,10 +36,10 @@ pub fn deinit(self: *Self) void {
     self.wizard.deinit();
 }
 
-pub fn statsRemainingPoints(self: *const Self) u2 {
+pub fn statsRemainingPoints(self: *const Self) u4 {
     return if (self.archetype == .adventurer) 2 else 1;
 }
 
-pub fn skillsRemainingPoints(_: *const Self) u2 {
+pub fn skillsRemainingPoints(_: *const Self) u4 {
     return 2;
 }

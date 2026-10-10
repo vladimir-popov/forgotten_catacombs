@@ -53,7 +53,7 @@ pub fn WizardWindow(comptime Steps: type, Context: type) type {
             return .keep_open;
         }
 
-        fn switchToStep(self: *Self, comptime idx: comptime_int) !void {
+        pub fn switchToStep(self: *Self, comptime idx: comptime_int) !void {
             std.debug.assert(self.step_arena.reset(.retain_capacity));
             const field = steps_fields[idx];
             self.steps = @unionInit(Steps, field.name, undefined);
@@ -62,6 +62,8 @@ pub fn WizardWindow(comptime Steps: type, Context: type) type {
         }
 
         pub fn draw(self: *Self, render: g.Render) !void {
+            try render.cleanInfo();
+
             var is_step_completed = false;
             inline for (0..steps_fields.len) |idx| {
                 if (self.current_step == idx) {
@@ -70,6 +72,7 @@ pub fn WizardWindow(comptime Steps: type, Context: type) type {
                     is_step_completed = @field(self.steps, field.name).isDone();
                 }
             }
+
             if (self.current_step > 0)
                 try render.drawLeftButton("Back", false);
 

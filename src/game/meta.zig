@@ -19,12 +19,8 @@ pub inline fn experienceToNextLevel(current_level: u4) u16 {
 }
 
 pub inline fn isLevelUp(registry: *g.Registry, player: g.Entity) bool {
-    if (registry.get(player, c.LevelUp)) |level_up| {
-        const exp = registry.getUnsafe(player, c.Experience);
-        return level_up.last_handled_level < exp.actualLevel();
-    } else {
-        return false;
-    }
+    const exp = registry.getUnsafe(player, c.Experience);
+    return exp.last_handled_level < exp.actualLevel();
 }
 
 /// Adds exp to the player's Experience. If it leads to level up,
@@ -34,7 +30,6 @@ pub fn addExperience(registry: *g.Registry, player: g.Entity, exp: u16) !bool {
     const experience = registry.getUnsafe(player, c.Experience);
     experience.experience +|= exp;
     if (experience.actualLevel() > experience.level) {
-        _ = try registry.getOrSet(player, c.LevelUp, .{ .last_handled_level = experience.level });
         const health = registry.getUnsafe(player, c.Health);
         health.current_hp = health.max;
         return true;

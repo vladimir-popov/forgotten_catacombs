@@ -104,6 +104,40 @@ test "Level up should lead to hp recovery" {
     try std.testing.expectEqual(player_health.max, player_health.current_hp);
 }
 
+test "Up one level" {
+    var test_session: TestSession = undefined;
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
+    defer test_session.deinit();
+    errdefer test_session.printDisplay();
+
+    // Add exp to next level:
+    const player_exp: *c.Experience = test_session.player.experience();
+    player_exp.experience += g.meta.experienceToNextLevel(player_exp.level) + 1;
+
+    // Open level up menu:
+    try test_session.exploreMode();
+    try test_session.pressButton(.b);
+    try test_session.runtime.display.expectLooksLike(
+        \\                     Lvl Up!    Close¶¶¶
+    , .info_bar);
+    try test_session.pressButton(.b);
+
+    try test_session.runtime.display.expectLooksLike(
+        \\            1 points remain            ¶
+        \\════════════════════════════════════════
+        \\                                       ¶
+        \\ Echo of knowledge                  2  ¶
+        \\ Mechanics                          0  ¶
+        \\ Stealth                            0  ¶
+        \\ Weapon Mastery                     0  ¶
+        \\                                       ¶
+        \\                                       ¶
+        \\                                       ¶
+        \\════════════════════════════════════════
+        \\    New level: 2      Cancel    Apply  ¶
+    , .whole_display);
+}
+
 /// Adds a rat with 1 hp to the level, and increase the player's exp to the value of one point less to get the
 /// new level.
 fn addRatAndExp(test_session: *TestSession) !g.Entity {

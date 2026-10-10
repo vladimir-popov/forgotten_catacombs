@@ -2,7 +2,7 @@
 //!
 //! ```
 //! ╔════════════════════════════════════════╗
-//! ║       Start with this character?       ║
+//! ║     Continue with this character?      ║
 //! ║  ┌                                     ║
 //! ║   Level: {d}                          ▒║
 //! ║   Experience: {d}/{d}                 ░║
@@ -74,13 +74,12 @@ pub fn ConfirmCharacterStep(comptime Context: type) type {
         pub fn draw(self: Self, render: g.Render) !void {
             try render.drawTextWithAlign(
                 PANEL_REGION.cols,
-                "Start with this character?",
+                "Continue with this character?",
                 .point(1, 1),
                 .normal,
                 .center,
             );
             try self.panel.draw(render);
-            try render.cleanInfo();
             try render.drawRightButton("Play", false);
         }
     };
