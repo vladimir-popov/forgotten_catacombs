@@ -55,6 +55,9 @@ pub fn ScrollablePanel(comptime Area: type) type {
 
         /// Handles scrolling, overrides, and finally the wrapped area.
         pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
+            if (try self.area.handleButton(btn) == .close_window) {
+                return .close_window;
+            }
             switch (btn.game_button) {
                 .a, .b => {
                     const maybe_override = if (btn.game_button == .a)
@@ -66,16 +69,22 @@ pub fn ScrollablePanel(comptime Area: type) type {
                     }
                 },
                 .up => {
-                    if (self.scrolled_lines > 0)
-                        self.scrolled_lines -= 1;
+                    if (self.area.selectedLine()) |idx| {
+                        // out of visible region
+                        if (idx < self.scrolled_lines)
+                            self.scrolled_lines -= 1;
+                    }
                 },
                 .down => {
-                    if (self.scrolled_lines < self.maxScrollingLines())
-                        self.scrolled_lines += 1;
+                    if (self.area.selectedLine()) |idx| {
+                        // out of visible region
+                        if (idx >= self.scrolled_lines + self.region.rows)
+                            self.scrolled_lines += 1;
+                    }
                 },
                 else => {},
             }
-            return try self.area.handleButton(btn);
+            return .keep_open;
         }
 
         /// Draws the scrollbar and the visible portion of the wrapped area.
