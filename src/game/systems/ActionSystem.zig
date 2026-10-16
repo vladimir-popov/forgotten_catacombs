@@ -19,7 +19,84 @@ pub const ActionResult = union(enum) {
     actor_is_dead,
 };
 
-/// Handles intentions to do some actions.
+pub fn calculateQuickActionForTarget(
+    self: *Self,
+    player_place: p.Point,
+    player_weapon: *const c.Weapon,
+    target_entity: g.Entity,
+) ?g.Action {
+    const registry = &self.session().registry;
+    const target_position =
+        registry.get(target_entity, c.Position) orelse return null;
+
+    // Any action can be applied only to a visible entity
+    if (self.session().level.checkPlaceVisibility(target_position.place) != .visible)
+        return null;
+
+    // An action for an entity under the foot
+    if (player_place.eql(target_position.place)) {
+        if (g.meta.isItem(registry, target_entity)) {
+            const inventory = self.session().registry.getUnsafe(self.session().player, c.Inventory);
+            if (!inventory.isFull())
+                return .action(.pickup, target_entity);
+        }
+        if (registry.get(target_entity, c.Ladder)) |ladder| {
+            // It's impossible to go upper the first level
+            if (ladder.direction == .up and self.session().level.depth == 0) return null;
+
+            return .action(.move_to_level, ladder.*);
+        }
+    }
+
+    // An action cannot be performed diagonally towards an object
+    const is_near4 = player_place.near4(target_position.place);
+
+    // Is it an enemy?
+    if (g.meta.getEnemyType(registry, target_entity)) |_| {
+        // It's always possible to hit neighbors in 4 directions
+        if (is_near4) return .action(.hit, target_entity);
+
+        // Check the achievability of the target
+        const distance: u8 = @intFromFloat(player_place.distanceTo(target_position.place));
+        if (distance <= player_weapon.max_distance) {
+            if (!self.session().level.isObstaclesOnTheLine(player_place, target_position.place))
+                return .action(.hit, target_entity);
+        }
+    }
+
+    if (is_near4) {
+        if (registry.has(target_entity, c.Shop)) {
+            return .action(.trade, target_entity);
+        }
+        if (registry.get(target_entity, c.Description)) |descr| {
+            if (descr.preset == .scientist) {
+                return .action(.modify_recognize, {});
+            }
+        }
+        if (registry.get(target_entity, c.Door)) |door| {
+            // the player should not be able to open/close the door stay in the doorway
+            if (player_place.eql(target_position.place)) {
+                return null;
+            }
+            return switch (door.state) {
+                .opened => .action(.close, .{ .id = target_entity, .place = target_position.place }),
+                .closed => .action(.open, .{ .id = target_entity, .place = target_position.place }),
+            };
+        }
+        if (registry.has(target_entity, c.Trap) and self.session().journal.known_entities.contains(target_entity)) {
+            // the player should not be able to disarm a trap staying on it
+            if (player_place.eql(target_position.place)) {
+                return null;
+            }
+            return .action(.disarm_trap, target_entity);
+        }
+    }
+    return null;
+}
+
+/// Handles the action.
+/// Note: the action must be valid! To choosing a valid action the `actualActionOnMoving` should be
+/// used.
 pub fn doAction(
     self: *Self,
     actor: g.Entity,
@@ -111,129 +188,6 @@ pub fn doAction(
             return .{ .done = speed.moving_speed };
         },
     }
-}
-
-pub fn calculateQuickActionForTarget(
-    self: *Self,
-    player_place: p.Point,
-    player_weapon: *const c.Weapon,
-    target_entity: g.Entity,
-) ?g.Action {
-    const registry = &self.session().registry;
-    const target_position =
-        registry.get(target_entity, c.Position) orelse return null;
-
-    // Any action can be applied only to a visible entity
-    if (self.session().level.checkPlaceVisibility(target_position.place) != .visible)
-        return null;
-
-    // An action for an entity under the foot
-    if (player_place.eql(target_position.place)) {
-        if (g.meta.isItem(registry, target_entity)) {
-            const inventory = self.session().registry.getUnsafe(self.session().player, c.Inventory);
-            if (!inventory.isFull())
-                return .action(.pickup, target_entity);
-        }
-        if (registry.get(target_entity, c.Ladder)) |ladder| {
-            // It's impossible to go upper the first level
-            if (ladder.direction == .up and self.session().level.depth == 0) return null;
-
-            return .action(.move_to_level, ladder.*);
-        }
-    }
-
-    // An action cannot be performed diagonally towards an object
-    const is_near4 = player_place.near4(target_position.place);
-
-    // Is it an enemy?
-    if (g.meta.getEnemyType(registry, target_entity)) |_| {
-        // It's always possible to hit neighbors in 4 directions
-        if (is_near4) return .action(.hit, target_entity);
-
-        // Check the achievability of the target
-        const distance: u8 = @intFromFloat(player_place.distanceTo(target_position.place));
-        if (distance <= player_weapon.max_distance) {
-            if (!self.session().level.isObstaclesOnTheLine(player_place, target_position.place))
-                return .action(.hit, target_entity);
-        }
-    }
-
-    if (is_near4) {
-        if (registry.has(target_entity, c.Shop)) {
-            return .action(.trade, target_entity);
-        }
-        if (registry.get(target_entity, c.Description)) |descr| {
-            if (descr.preset == .scientist) {
-                return .action(.modify_recognize, {});
-            }
-        }
-        if (registry.get(target_entity, c.Door)) |door| {
-            // the player should not be able to open/close the door stay in the doorway
-            if (player_place.eql(target_position.place)) {
-                return null;
-            }
-            return switch (door.state) {
-                .opened => .action(.close, .{ .id = target_entity, .place = target_position.place }),
-                .closed => .action(.open, .{ .id = target_entity, .place = target_position.place }),
-            };
-        }
-        if (registry.has(target_entity, c.Trap) and self.session().journal.known_entities.contains(target_entity)) {
-            // the player should not be able to disarm a trap staying on it
-            if (player_place.eql(target_position.place)) {
-                return null;
-            }
-            return .action(.disarm_trap, target_entity);
-        }
-    }
-    return null;
-}
-
-/// Handles collisions an returns an actual action happened on moving from `from_place` to the `target`,
-/// or `null` if moving is not happening, or impossible.
-pub fn actualActionOnMoving(self: *Self, from_place: p.Point, target: g.Action.Payload.Move.Target) ?g.Action {
-    const place = target.asPlace(from_place);
-    if (from_place.eql(place)) return null;
-
-    switch (self.session().level.cellAt(place)) {
-        .landscape => |cl| if (cl == .floor or cl == .doorway)
-            return .action(.move, .{ .target = target }),
-
-        .entities => |entities| {
-            // Check obstacles
-            if (entities[@intFromEnum(c.Position.ZOrder.obstacle)]) |entity| {
-                if (self.session().registry.get(entity, c.Door)) |_| {
-                    return .action(.open, .{ .id = entity, .place = place });
-                }
-
-                if (g.meta.getEnemyType(&self.session().registry, entity)) |_| {
-                    return .action(.hit, entity);
-                }
-
-                if (self.session().registry.has(entity, c.Shop)) {
-                    return .action(.trade, entity);
-                }
-
-                if (self.session().registry.get(entity, c.Description)) |descr| {
-                    if (descr.preset == .scientist) {
-                        return .action(.modify_recognize, {});
-                    }
-                }
-
-                // the player should not step on the place with entity with z-order = 2
-                return null;
-            }
-            // Check traps
-            if (entities[@intFromEnum(c.Position.ZOrder.item)]) |entity| {
-                if (self.session().registry.get(entity, c.Trap)) |_| {
-                    return .action(.step_in_trap, .{ .trap_entity = entity, .moving_target = target });
-                }
-            }
-            // it's possible to step on the ladder, opened door, teleport, dropped item and
-            // other entities with ZOrder.floor
-            return .action(.move, .{ .target = target });
-        },
-    }
-    return null;
 }
 
 noinline fn doMove(
