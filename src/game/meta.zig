@@ -6,9 +6,6 @@ const cp = g.codepoints;
 
 const log = std.log.scoped(.meta);
 
-pub const EnemyType = g.descriptions.Enemies.Enum;
-pub const PlayerArchetype = g.descriptions.Archetypes.Enum;
-
 /// A numbers of required exp point for level up.
 /// The 0 element is a required amount of exp point to get the
 /// second level.
@@ -39,7 +36,7 @@ pub fn addExperience(registry: *g.Registry, player: g.Entity, exp: u16) !bool {
     }
 }
 
-pub fn statsFromArchetype(archetype: PlayerArchetype) c.Stats {
+pub fn statsFromArchetype(archetype: g.PlayerArchetype) c.Stats {
     return switch (archetype) {
         .adventurer => .init(0, 0, 0, 0, 0),
         .archeologist => .init(-2, 0, 1, 2, 0),
@@ -97,9 +94,9 @@ pub fn isBroken(registry: *const g.Registry, entity: g.Entity) bool {
 }
 
 /// Returns a type of the enemy if it has a description preset from an appropriate namespace.
-pub inline fn getEnemyType(registry: *const g.Registry, entity: g.Entity) ?EnemyType {
+pub inline fn getEnemyType(registry: *const g.Registry, entity: g.Entity) ?g.Enemy {
     return if (registry.get(entity, c.Description)) |descr|
-        std.meta.stringToEnum(EnemyType, @tagName(descr.preset))
+        std.meta.stringToEnum(g.Enemy, @tagName(descr.preset))
     else
         null;
 }

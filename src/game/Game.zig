@@ -152,7 +152,7 @@ fn newGame(ptr: *anyopaque, _: usize, _: void) !w.HandleButtonResult {
     return .keep_open;
 }
 
-pub fn startWithPreset(self: *Self, archetype: g.meta.PlayerArchetype, skills: c.Skills) !void {
+pub fn startWithPreset(self: *Self, archetype: g.PlayerArchetype, skills: c.Skills) !void {
     const stats = g.meta.statsFromArchetype(archetype);
     try self.startGameSession(stats, skills, g.meta.initialHealth(stats.get(.constitution)));
 }

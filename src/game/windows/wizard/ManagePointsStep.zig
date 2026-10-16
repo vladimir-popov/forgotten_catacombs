@@ -74,7 +74,7 @@ fn ManagePointsStep(
                 const fmt = std.fmt.comptimePrint("{{s: <{d}}}", .{AREA_REGION.cols});
                 const option = try self.area.addOptionFmt(
                     fmt,
-                    .{g.components.Description.Preset.castByNameAndGet(value).name},
+                    .{g.descriptions.Preset.castByNameAndGet(value).name},
                     value,
                     .{ .handle_release_button = showDescription },
                 );
@@ -193,7 +193,7 @@ fn ManagePointsStep(
             std.debug.assert(self.description_window == null);
             self.description_window = try w.modal_window.showDescription(
                 self.alloc,
-                g.components.Description.Preset.castByNameAndGet(value),
+                g.descriptions.Preset.castByNameAndGet(value),
                 w.FULL_SCREEN_REGION,
             );
             return .keep_open;

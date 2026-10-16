@@ -1,0 +1,70 @@
+const std = @import("std");
+const Description = @import("../Description.zig");
+
+pub const Enum = std.meta.FieldEnum(@This());
+
+adventurer: Description = .{
+    .name = "Adventurer",
+    .description = &.{
+        "You are  forever  in  search of new",
+        "sensations. Your  main desire is to",
+        "test  your strength  and  feel  the",
+        "taste  of adventure.  You  have  no",
+        "pronounced talents,  but no serious",
+        "flaws   either.   Flexibility   and",
+        "curiosity  make   you  a  versatile",
+        "explorer     of     the   forgotten",
+        "catacombs.",
+    },
+},
+archeologist: Description = .{
+    .name = "Archeologist",
+    .description = &.{
+        "You live for  discoveries.  Nothing",
+        "holds more value for  you than lost",
+        "knowledge  and  the  secrets of the",
+        "past. Every new find is your reward",
+        "and for  it,  you are ready to take",
+        "risks others avoid.  Your  physical",
+        "condition leaves much to be desired",
+        "movements are clumsy, but your mind",
+        "is  sharp  and  your heart knows no",
+        "fear.  Who  knows  -  perhaps  your",
+        "knowledge and curiosity will become",
+        "the  key  to  the  secrets  of  the",
+        "forgotten catacombs.",
+    },
+},
+vandal: Description = .{
+    .name = "Vandal",
+    .description = &.{
+        "You  are  a   straightforward   and",
+        "simple    person.   Philosophy   or",
+        "science  do  not interest you; only",
+        "the thirst  for  profit drives you.",
+        "You stop  at  nothing  for wealth -",
+        "destruction, fighting, or risk  are",
+        "merely tools  to achieve your goal.",
+        "Your strength  and  endurance allow",
+        "you to  survive where others break,",
+        "and your physical power makes you a",
+        "dangerous opponent in close combat.",
+    },
+},
+rogue: Description = .{
+    .name = "Rogue",
+    .description = &.{
+        "You are agile and cunning.Dexterity",
+        "matters more to you than  strength.",
+        "Direct  confrontations are not your",
+        "way:  why  take  risks when you can",
+        "quietly take what you need? Legends",
+        "of forgotten artifacts of the  past",
+        "lure you with the promise of wealth",
+        "Every lock, every trap is merely an",
+        "obstacle on your path to your goal:",
+        "to  become   the   owner   of  lost",
+        "technologies that will sustain  you",
+        "for the rest of your life.",
+    },
+},

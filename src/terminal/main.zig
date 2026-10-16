@@ -93,7 +93,7 @@ pub fn main(init: std.process.Init) !void {
 
 fn parsePreset(
     preset_str: []const u8,
-) ?struct { g.meta.PlayerArchetype, g.components.Skills } {
+) ?struct { g.PlayerArchetype, g.components.Skills } {
     var itr = std.mem.splitScalar(u8, preset_str, ':');
     if (itr.next()) |archetype_str| {
         if (itr.next()) |skills_str| {
@@ -125,8 +125,8 @@ fn parsePreset(
     return null;
 }
 
-fn parseArchetype(str: []const u8) ?g.meta.PlayerArchetype {
-    if (std.meta.stringToEnum(g.meta.PlayerArchetype, str)) |archetype| {
+fn parseArchetype(str: []const u8) ?g.PlayerArchetype {
+    if (std.meta.stringToEnum(g.PlayerArchetype, str)) |archetype| {
         return archetype;
     }
     if (std.mem.eql(u8, "adv", str))

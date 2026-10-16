@@ -7,6 +7,7 @@ const max_words = 64;
 const DescriptionRow = struct {
     name: []const u8,
     description: []const u8,
+    alt_description: ?[]const u8,
 };
 
 pub fn generate(csv: []const u8, writer: *std.Io.Writer, allocator: std.mem.Allocator) !void {
@@ -19,6 +20,7 @@ pub fn generate(csv: []const u8, writer: *std.Io.Writer, allocator: std.mem.Allo
         return error.MissingNameColumn;
     const description_column = findColumn(header_fields[0..header_count], "Description") orelse
         return error.MissingDescriptionColumn;
+    const alt_description_column = findColumn(header_fields[0..header_count], "Alt Description");
 
     var rows: std.ArrayList(DescriptionRow) = .empty;
     defer rows.deinit(allocator);
@@ -30,12 +32,15 @@ pub fn generate(csv: []const u8, writer: *std.Io.Writer, allocator: std.mem.Allo
 
         var fields: [max_columns][]const u8 = undefined;
         const field_count = splitRow(line, &fields) catch return error.TooManyColumns;
-        if (field_count <= @max(name_column, description_column))
+        const last_required_column = @max(name_column, description_column);
+        if (field_count <= last_required_column or
+            (alt_description_column != null and field_count <= alt_description_column.?))
             return error.MissingField;
 
         try rows.append(allocator, .{
             .name = fields[name_column],
             .description = fields[description_column],
+            .alt_description = if (alt_description_column) |column| fields[column] else null,
         });
     }
 
@@ -50,7 +55,13 @@ pub fn generate(csv: []const u8, writer: *std.Io.Writer, allocator: std.mem.Allo
         try writeEscaped(writer, name);
         try writer.writeAll("\",\n    .description = &.{\n");
         try writeWrappedDescription(writer, description);
-        try writer.writeAll("    },\n},\n\n");
+        try writer.writeAll("    },\n");
+        if (row.alt_description) |alt_description| {
+            try writer.writeAll("    .alt_description = &.{\n");
+            try writeWrappedDescription(writer, alt_description);
+            try writer.writeAll("    },\n");
+        }
+        try writer.writeAll("},\n\n");
     }
 }
 

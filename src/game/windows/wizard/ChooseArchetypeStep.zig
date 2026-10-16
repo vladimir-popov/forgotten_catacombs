@@ -37,7 +37,7 @@ pub fn ChooseArchetypeStep(comptime Context: type) type {
 
         alloc: std.mem.Allocator,
         context: *Context,
-        area: w.OptionsArea(g.meta.PlayerArchetype),
+        area: w.OptionsArea(g.PlayerArchetype),
         description_window: ?w.ModalWindow(w.TextArea) = null,
 
         /// Initializes the archetype list and restores the current selection.
@@ -48,10 +48,10 @@ pub fn ChooseArchetypeStep(comptime Context: type) type {
                 .area = .initEmpty(alloc, self, .center),
             };
 
-            for (std.enums.values(g.meta.PlayerArchetype), 0..) |arch, i| {
+            for (std.enums.values(g.PlayerArchetype), 0..) |arch, i| {
                 _ = try self.area.addOptionFmt(
                     "{s}",
-                    .{g.components.Description.Preset.castByNameAndGet(arch).name},
+                    .{g.descriptions.Preset.castByNameAndGet(arch).name},
                     arch,
                     .do_nothing,
                 );
@@ -104,7 +104,7 @@ pub fn ChooseArchetypeStep(comptime Context: type) type {
                         if (self.area.selectedItem()) |archetype| {
                             self.description_window = try w.modal_window.showDescription(
                                 self.alloc,
-                                g.components.Description.Preset.castByNameAndGet(archetype),
+                                g.descriptions.Preset.castByNameAndGet(archetype),
                                 w.FULL_SCREEN_REGION,
                             );
                         }

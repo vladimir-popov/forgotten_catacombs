@@ -5,8 +5,8 @@ const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
-rat: c.Components = archetype.enemy(.{
-    .description = .{ .preset = .rat },
+cave_rat: c.Components = archetype.enemy(.{
+    .description = .{ .preset = .cave_rat },
     .experience = .reward(10),
     .health = .{ .max = 10, .current_hp = 10 },
     .initiative = .empty,
@@ -19,8 +19,8 @@ rat: c.Components = archetype.enemy(.{
     .weapon = .melee(.native, .range(3, 8)),
 }),
 
-snake: c.Components = archetype.enemy(.{
-    .description = .{ .preset = .snake },
+cave_snake: c.Components = archetype.enemy(.{
+    .description = .{ .preset = .cave_snake },
     .experience = .reward(20),
     .stats = .init(0, 1, 0, 0, 0),
     .skills = .zeros,

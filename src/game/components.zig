@@ -161,9 +161,7 @@ pub const Consumable = struct {
 };
 
 pub const Description = struct {
-    pub const Preset = g.utils.Preset(g.Description, g.descriptions);
-
-    preset: Preset.Tag,
+    preset: g.descriptions.Preset.Tag,
 };
 
 pub const Door = struct { state: enum { opened, closed } };
@@ -519,7 +517,7 @@ pub const Shop = struct {
 };
 
 pub const Skills = struct {
-    pub const Skill = g.descriptions.Skills.Enum;
+    pub const Skill = std.meta.FieldEnum(@import("descriptions/Skills.zig"));
 
     pub const zeros: Skills = .init(0, 0, 0, 0);
 
@@ -563,7 +561,7 @@ pub const Sprite = struct {
 };
 
 pub const Stats = struct {
-    pub const Stat = g.descriptions.Stats.Enum;
+    pub const Stat = std.meta.FieldEnum(@import("descriptions/Stats.zig"));
 
     pub const zeros: Stats = .init(0, 0, 0, 0, 0);
 

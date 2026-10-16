@@ -1,5 +1,20 @@
 const std = @import("std");
 
+/// Creates one enum containing all fields from the supplied enum types.
+///
+/// Fields keep the order of the input enum types and their declaration order.
+/// The input enums must be non-empty, and their field names must be unique
+/// across all inputs. The merged enum is generated at compile time and uses
+/// the smallest integer type that can represent all of its tags.
+///
+/// ```zig
+/// const Damage = MergeEnums(.{
+///     enum { fire, acid },
+///     enum { poison },
+/// });
+///
+/// const damage: Damage = .poison;
+/// ```
 pub fn MergeEnums(comptime enums: anytype) type {
     comptime {
         var field_count: usize = 0;

@@ -82,7 +82,7 @@ test "The arrows entity should be removed when the last arrow was issued" {
 fn initFirstLevelWithRat(test_session: *TestSession) !g.Entity {
     // Prepare a game session:
     const pp = test_session.player.position().place.movedToNTimes(.up, 3);
-    const rat = try test_session.session.level.addEnemy(.sleeping, g.entities.enemyAtPlace(.rat, pp));
+    const rat = try test_session.session.level.addEnemy(.sleeping, g.entities.enemyAtPlace(.cave_rat, pp));
 
     // The initial game state:
     try test_session.tick(.{});

@@ -484,9 +484,11 @@ pub fn cellAt(self: *const Self, place: p.Point) Cell {
             found_entity = true;
             // only one entity with the same order can be at the same place
             if (result[order]) |existed_item| {
+                const existed_item_name = try g.Description.rawName(self.registry, existed_item);
+                const entity_name = try g.Description.rawName(self.registry, entity);
                 std.debug.panic(
-                    "Both items {any} and {any} with order {s} at same place {any}",
-                    .{ existed_item, entity, @tagName(position.zorder), place },
+                    "Both items {any} '{s}' and {any} '{s}' with order {s} at same place {any}",
+                    .{ existed_item, existed_item_name, entity, entity_name, @tagName(position.zorder), place },
                 );
             }
             result[order] = entity;

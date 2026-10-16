@@ -14,12 +14,16 @@ inline fn defined(components: c.Components, comptime field: []const u8) void {
 
 /// Checks that components have a relevant to `E` preset of description.
 inline fn hasType(comptime E: type, components: c.Components) void {
-    if (std.meta.stringToEnum(E, @tagName(components.description.?.preset)) == null) {
-        @compileError(std.fmt.comptimePrint(
-            "{s} doesn't have expected type {s}",
-            .{ @tagName(components.description.?.preset), @typeName(E) },
-        ));
+    const preset_name = @tagName(components.description.?.preset);
+    for (std.enums.values(E)) |enum_item| {
+        if (std.mem.eql(u8, preset_name, @tagName(enum_item))) {
+            return;
+        }
     }
+    @compileError(std.fmt.comptimePrint(
+        "{s} doesn't have expected type {s}",
+        .{ @tagName(components.description.?.preset), @typeName(E) },
+    ));
 }
 
 pub fn enemy(components: c.Components) c.Components {
@@ -35,7 +39,7 @@ pub fn enemy(components: c.Components) c.Components {
         defined(components, "state");
         defined(components, "stats");
         defined(components, "weapon");
-        hasType(g.meta.EnemyType, components);
+        hasType(g.Enemy, components);
         return components;
     }
 }

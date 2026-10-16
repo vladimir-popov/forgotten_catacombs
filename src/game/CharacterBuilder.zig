@@ -10,7 +10,7 @@ const log = std.log.scoped(.explore_level_mode);
 
 const Self = @This();
 
-archetype: g.meta.PlayerArchetype = .adventurer,
+archetype: g.PlayerArchetype = .adventurer,
 stats: c.Stats = undefined,
 skills: c.Skills = .zeros,
 health: c.Health = undefined,

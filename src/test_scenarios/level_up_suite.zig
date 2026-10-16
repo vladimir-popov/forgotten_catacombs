@@ -146,7 +146,7 @@ fn addRatAndExp(test_session: *TestSession) !g.Entity {
     player_exp.experience += g.meta.experienceToNextLevel(player_exp.level) - 1;
 
     const pp = test_session.player.position().place.movedToNTimes(.up, 1);
-    var rat: c.Components = g.entities.enemyAtPlace(.rat, pp);
+    var rat: c.Components = g.entities.enemyAtPlace(.cave_rat, pp);
     rat.health.?.current_hp = 1;
     const rat_id = try test_session.session.level.addEnemy(.sleeping, rat);
 

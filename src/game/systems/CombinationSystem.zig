@@ -86,7 +86,7 @@ fn hasComponent(comptime Component: type) MatcherFn {
     }.matches;
 }
 
-fn hasPreset(comptime preset: c.Description.Preset.Tag) MatcherFn {
+fn hasPreset(comptime preset: g.descriptions.Preset.Tag) MatcherFn {
     return struct {
         fn matches(registry: *const g.Registry, entity: g.Entity) bool {
             if (registry.get(entity, c.Description)) |description| {

@@ -5,6 +5,8 @@ const cp = g.codepoints;
 
 const log = std.log.scoped(.description);
 
+const Self = @This();
+
 /// A short name of the entity.
 name: []const u8,
 
@@ -13,8 +15,10 @@ name: []const u8,
 /// A short description of the entity.
 description: []const []const u8 = &.{},
 
-pub fn get(preset: g.components.Description.Preset.Tag) *const @This() {
-    return g.components.Description.Preset.fields.get(preset);
+alt_description: []const []const u8 = &.{},
+
+pub fn get(preset: g.descriptions.Preset.Tag) *const Self {
+    return g.descriptions.Preset.fields.get(preset);
 }
 
 pub fn rawName(registry: *g.Registry, entity: g.Entity) ![]const u8 {
@@ -45,7 +49,7 @@ pub const ActualNameFormatter = struct {
                 return try writer.print(
                     "{s} {d}",
                     .{
-                        g.components.Description.Preset.fields.get(description.preset).name,
+                        g.descriptions.Preset.fields.get(description.preset).name,
                         self.journal.registry.getUnsafe(self.entity, c.Wallet).money,
                     },
                 );
@@ -169,10 +173,11 @@ pub fn describeEnemy(
     enemy: g.Entity,
     text_area: *g.windows.TextArea,
 ) !void {
-    try writeDescription(journal, enemy, text_area);
     _ = try text_area.addEmptyLine();
     const enemy_type = g.meta.getEnemyType(journal.registry, enemy) orelse @panic("Unknown enemy");
     if (journal.known_enemies.contains(enemy_type)) {
+        try writeAltDescription(journal, enemy, text_area);
+
         if (journal.registry.get(enemy, c.Health)) |health| {
             try describeHealth(health, text_area);
         }
@@ -196,6 +201,7 @@ pub fn describeEnemy(
                 try text_area.printLine("Not too fast.");
         }
     } else {
+        try writeDescription(journal, enemy, text_area);
         try text_area.printLine("Who knows what to expect from this");
         try text_area.printLine("creature?");
     }
@@ -249,7 +255,19 @@ fn writeDescription(
     text_area: *g.windows.TextArea,
 ) !void {
     if (journal.registry.get(entity, c.Description)) |descr| {
-        const description = g.components.Description.Preset.fields.get(descr.preset).description;
+        const description = g.descriptions.Preset.fields.get(descr.preset).description;
+        for (description) |str|
+            try text_area.printLine(str);
+    }
+}
+
+fn writeAltDescription(
+    journal: g.Journal,
+    entity: g.Entity,
+    text_area: *g.windows.TextArea,
+) !void {
+    if (journal.registry.get(entity, c.Description)) |descr| {
+        const description = g.descriptions.Preset.fields.get(descr.preset).alt_description;
         for (description) |str|
             try text_area.printLine(str);
     }
@@ -551,7 +569,7 @@ test "Describe an unknown rat" {
     var registry = try g.Registry.init(&game_state_arena);
     const journal = try g.Journal.init(&registry, std.enums.values(g.Color));
 
-    const id = try registry.addNewEntity(g.entities.presets.Enemies.get(.rat));
+    const id = try registry.addNewEntity(g.entities.presets.Enemies.get(.cave_rat));
     var text_area: g.windows.TextArea = .initEmpty(std.testing.allocator);
     defer text_area.deinit();
 
@@ -577,7 +595,7 @@ test "Describe a known rat" {
     var registry = try g.Registry.init(&game_state_arena);
     var journal = try g.Journal.init(&registry, std.enums.values(g.Color));
 
-    const id = try registry.addNewEntity(g.entities.presets.Enemies.get(.rat));
+    const id = try registry.addNewEntity(g.entities.presets.Enemies.get(.cave_rat));
     try journal.markEnemyAsKnown(g.meta.getEnemyType(&registry, id) orelse unreachable);
     var text_area: g.windows.TextArea = .initEmpty(std.testing.allocator);
     defer text_area.deinit();

@@ -36,8 +36,9 @@ Generated food entities are sorted alphabetically by `Name`.
 
 ## Generate Description Presets
 
-The `descriptions` command generates description declarations from
-the `Name` and `Description` columns of a CSV file.
+The `descriptions` command generates description declarations from the `Name`
+and `Description` columns of a CSV file. If the CSV also contains an
+`Alt Description` column, its text is emitted as the `.alt_description` field.
 
 Run it from the project root:
 
@@ -48,9 +49,10 @@ zig run misc/tools/main.zig -- descriptions misc/entities/Food.csv
 The output is a fragment for `src/game/descriptions.zig`. Insert it inside the
 corresponding description group, such as `pub const Food = struct`.
 
-Description text is split into lines no longer than 35 characters. Additional
-spaces are distributed between words to justify every line except the last.
-Generated description presets are sorted alphabetically by `Name`.
+Description and alternate description text are split into lines no longer than
+35 characters. Additional spaces are distributed between words to justify
+every line except the last. Generated description presets are sorted
+alphabetically by `Name`.
 
 ## Generate Random Weights
 

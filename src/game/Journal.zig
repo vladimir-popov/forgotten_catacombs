@@ -22,7 +22,7 @@ known_entities: std.AutoHashMapUnmanaged(g.Entity, void) = .empty,
 /// A set of known potions (usually means drunk potions).
 known_potions: std.AutoHashMapUnmanaged(c.Potion, void) = .empty,
 /// A set of known class of enemies.
-known_enemies: std.AutoHashMapUnmanaged(g.meta.EnemyType, void) = .empty,
+known_enemies: std.AutoHashMapUnmanaged(g.Enemy, void) = .empty,
 
 pub fn init(registry: *g.Registry, colors: []const g.Color) !Self {
     return .{ .registry = registry, .colors = colors };
@@ -57,7 +57,7 @@ pub fn unknownPotionColor(self: *const Self, potion: c.Potion) ?g.Color {
     return null;
 }
 
-pub fn markEnemyAsKnown(self: *Self, enemy_type: g.meta.EnemyType) !void {
+pub fn markEnemyAsKnown(self: *Self, enemy_type: g.Enemy) !void {
     log.debug("Mark the creature {t} as known", .{enemy_type});
     try self.known_enemies.put(self.registry.allocator(), enemy_type, {});
 }
