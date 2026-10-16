@@ -73,6 +73,8 @@ pub fn ScrollablePanel(comptime Area: type) type {
                         // out of visible region
                         if (idx < self.scrolled_lines)
                             self.scrolled_lines -= 1;
+                    } else if (self.scrolled_lines > 0) {
+                        self.scrolled_lines -= 1;
                     }
                 },
                 .down => {
@@ -80,6 +82,8 @@ pub fn ScrollablePanel(comptime Area: type) type {
                         // out of visible region
                         if (idx >= self.scrolled_lines + self.region.rows)
                             self.scrolled_lines += 1;
+                    } else if (self.scrolled_lines < self.maxScrollingLines()) {
+                        self.scrolled_lines += 1;
                     }
                 },
                 else => {},
