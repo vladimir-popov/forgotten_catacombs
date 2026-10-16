@@ -173,11 +173,10 @@ pub fn describeEnemy(
     enemy: g.Entity,
     text_area: *g.windows.TextArea,
 ) !void {
-    _ = try text_area.addEmptyLine();
     const enemy_type = g.meta.getEnemyType(journal.registry, enemy) orelse @panic("Unknown enemy");
     if (journal.known_enemies.contains(enemy_type)) {
         try writeAltDescription(journal, enemy, text_area);
-
+        _ = try text_area.addEmptyLine();
         if (journal.registry.get(enemy, c.Health)) |health| {
             try describeHealth(health, text_area);
         }
@@ -202,6 +201,7 @@ pub fn describeEnemy(
         }
     } else {
         try writeDescription(journal, enemy, text_area);
+        _ = try text_area.addEmptyLine();
         try text_area.printLine("Who knows what to expect from this");
         try text_area.printLine("creature?");
     }

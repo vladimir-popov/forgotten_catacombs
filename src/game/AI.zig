@@ -62,7 +62,7 @@ fn actionForWalkingEnemy(
     for (directions) |direction| {
         const place = entity_place.movedTo(direction);
         if (level.isObstacle(place)) continue;
-        return .action(.move, .{ .target = .{ .direction = direction } });
+        return self.tryToMove(place, .{ .direction = direction }) orelse .action(.wait, {});
     }
     log.err("Entity {d} is stuck at {any}. Sleep.", .{ entity.id, entity_place });
     return .action(.go_sleep, entity);
@@ -83,7 +83,7 @@ fn actionForAggressiveEnemy(
             "Entity {any} moves to the player from {any} in direction {s}",
             .{ entity, entity_place, @tagName(vector.direction) },
         );
-        return .action(.move, .{ .target = .{ .direction = vector.direction } });
+        return self.tryToMove(entity_place, .{ .direction = vector.direction }) orelse .action(.wait, {});
     } else {
         log.info("Player is out of reach for {any} (from {any}). Chill.", .{ entity, entity_place });
         return .action(.chill, entity);
@@ -95,4 +95,42 @@ fn isPlayerIsInSight(self: *const Self, entity_place: p.Point) bool {
         vector.distance > 0
     else
         false;
+}
+
+fn tryToMove(self: *const Self, from_place: p.Point, target: g.Action.Payload.Move.Target) ?g.Action {
+    const place = target.asPlace(from_place);
+    if (from_place.eql(place)) return null;
+
+    switch (self.session.level.cellAt(place)) {
+        .landscape => |cl| if (cl == .floor or cl == .doorway) {
+            return .action(.move, .{ .target = target });
+        },
+
+        .entities => |entities| {
+            // Check obstacles
+            if (entities[@intFromEnum(c.Position.ZOrder.obstacle)]) |entity| {
+                if (self.session.registry.get(entity, c.Door)) |_| {
+                    // TODO: not all enemies are able to open doors
+                    return .action(.open, .{ .id = entity, .place = place });
+                }
+
+                if (g.meta.getEnemyType(&self.session.registry, entity)) |_| {
+                    // TODO: should all enemies be aggressive to each other?
+                    return .action(.hit, entity);
+                }
+
+                return null;
+            }
+            // Check traps
+            if (entities[@intFromEnum(c.Position.ZOrder.item)]) |entity| {
+                if (self.session.registry.get(entity, c.Trap)) |_| {
+                    return .action(.step_in_trap, .{ .trap_entity = entity, .moving_target = target });
+                }
+            }
+            // it's possible to step on the ladder, opened door, teleport, dropped item and
+            // other entities with ZOrder.floor
+            return .action(.move, .{ .target = target });
+        },
+    }
+    return null;
 }
