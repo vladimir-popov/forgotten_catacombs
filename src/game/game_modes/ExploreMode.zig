@@ -249,6 +249,7 @@ fn showWindowWithEntities(
                 window.panel.area.selectLine(window.panel.area.options.items.len - 1);
         }
     }
+    window.shrinkToContent();
 }
 
 fn showEntityDescription(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!w.HandleButtonResult {

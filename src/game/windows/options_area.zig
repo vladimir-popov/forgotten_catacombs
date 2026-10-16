@@ -220,7 +220,7 @@ pub fn OptionsArea(comptime Item: type) type {
 
         /// Moves the selection one line down when possible.
         pub fn selectNextLine(self: *Self) void {
-            if (self.selected_line < self.options.items.len - 1)
+            if (self.selected_line + 1 < self.options.items.len)
                 self.selected_line += 1;
         }
 

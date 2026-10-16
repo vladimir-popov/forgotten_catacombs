@@ -36,16 +36,16 @@ test "Describe an unknown potion" {
     try modal_windows.options(g.Entity).choose("Describe");
 
     try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║                                      ║
         \\┌────────────A green potion────────────┐
         \\│ A swirling liquid of green color     │
         \\│ rests in a vial.                     │
-        \\│                                      │
-        \\│                                      │
-        \\│                                      │
-        \\│                                      │
-        \\│                                      │
-        \\│                                      │
         \\└──────────────────────────────────────┘
+        \\║└────────────────────────────────────┘║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
     , .game_area);
 }
 
@@ -68,16 +68,16 @@ test "Describe a known potion (after drinking a similar)" {
     try modal_windows.options(g.Entity).choose("Describe");
 
     try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
         \\┌───────────────Healing────────────────┐
         \\│ The  warm  medicinal brew smells of  │
         \\│ herbs  and  honey.  A  few  careful  │
         \\│ swallows restore strength, dull the  │
         \\│ pain,  and help the body endure its  │
         \\│ deepest wounds.                      │
-        \\│                                      │
-        \\│                                      │
-        \\│                                      │
         \\└──────────────────────────────────────┘
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
     , .game_area);
 }
 
@@ -98,15 +98,15 @@ test "Describe an unknown enemy" {
     try test_session.pressButton(.b);
 
     try test_session.runtime.display.expectLooksLike(
-        \\┌─────────────────Rat──────────────────┐
-        \\│ A big, nasty rat with vicious eyes   │
-        \\│ that thrives in dark corners and     │
-        \\│ forgotten cellars.                   │
+        \\┌───────────────Cave Rat───────────────┐
+        \\│ A  massive hunched body the size of  │
+        \\│ a dog covered in sparse matted fur.  │
+        \\│ Its  elongated snout ends with long  │
+        \\│ yellow  incisors,  while  its small  │
+        \\│ cloudy eyes always seem hungry.      │
         \\│                                      │
         \\│ Who knows what to expect from this   │
         \\│ creature?                            │
-        \\│                                      │
-        \\│                                      │
         \\└──────────────────────────────────────┘
     , .game_area);
 }
@@ -160,15 +160,15 @@ test "Describe a known enemy (after killing a similar creature)" {
     try test_session.pressButton(.b);
 
     try test_session.runtime.display.expectLooksLike(
-        \\┌─────────────────Rat──────────────────┐
-        \\│ A big, nasty rat with vicious eyes  ▒│
-        \\│ that thrives in dark corners and    ░│
-        \\│ forgotten cellars.                  ░│
+        \\┌───────────────Cave Rat───────────────┐
+        \\│ A  large  and  persistent  creature ▒│
+        \\│ that stands out neither by strength ░│
+        \\│ nor   speed.  Still,  its  bite  is ░│
+        \\│ capable of causing serious trouble. ░│
         \\│                                     ░│
         \\│ Health: 10/10                       ░│
         \\│                                     ░│
         \\│ Damage: 3-8                         ░│
-        \\│                                     ░│
         \\└──────────────────────────────────────┘
     , .game_area);
 }

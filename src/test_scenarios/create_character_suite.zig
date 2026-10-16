@@ -61,6 +61,7 @@ test "Create a new character" {
     // Check a description:
     try test_game.pressButton(.a);
     try test_game.runtime.display.expectLooksLike(
+        \\                                       ¶
         \\┌───────────────Strength───────────────┐
         \\│ A measure of a character's physical  │
         \\│ power.  It determines how hard they  │
@@ -68,9 +69,8 @@ test "Create a new character" {
         \\│ lift, hold, or break. High strength  │
         \\│ helps deliver devastating blows and  │
         \\│ carry heavy equipment.               │
-        \\│                                      │
-        \\│                                      │
         \\└──────────────────────────────────────┘
+        \\                                       ¶
         \\                                       ¶
         \\                       Back     Close  ¶
     , .whole_display);
@@ -124,8 +124,8 @@ test "Create a new character" {
         \\│ technologies of past civilizations,  │
         \\│ allowing them to understand and use  │
         \\│ their devices and artifacts.         │
-        \\│                                      │
         \\└──────────────────────────────────────┘
+        \\                                       ¶
         \\                                       ¶
         \\                       Back     Close  ¶
     , .whole_display);

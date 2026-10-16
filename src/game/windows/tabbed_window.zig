@@ -116,7 +116,9 @@ pub fn TabbedWindow(comptime Areas: anytype) type {
                 .right => if (self.active_tab_idx < self.tabs.len - 1) {
                     self.active_tab_idx += 1;
                 },
-                .b => if (buttons.left == null)
+                .a => if (buttons.right == null)
+                    return .close_window,
+                .b => if (buttons.left == null and buttons.right != null)
                     return .close_window,
                 else => {},
             }

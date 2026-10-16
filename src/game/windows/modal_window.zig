@@ -101,6 +101,7 @@ pub fn showDescription(
     for (description.description) |line| {
         try text_area.printLine(line);
     }
+    self.shrinkToContent();
     return self;
 }
 
@@ -151,6 +152,7 @@ pub fn entityDescription(
         const is_equipped = g.meta.isEquipped(&session.registry, session.player, entity);
         try g.Description.describeItem(session.journal, entity, is_equipped, text_area);
     }
+    self.shrinkToContent();
     return self;
 }
 

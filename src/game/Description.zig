@@ -578,9 +578,11 @@ test "Describe an unknown rat" {
 
     // then:
     try expectContent(text_area,
-        \\A big, nasty rat with vicious eyes
-        \\that thrives in dark corners and
-        \\forgotten cellars.
+        \\A  massive hunched body the size of
+        \\a dog covered in sparse matted fur.
+        \\Its  elongated snout ends with long
+        \\yellow  incisors,  while  its small
+        \\cloudy eyes always seem hungry.
         \\
         \\Who knows what to expect from this
         \\creature?
@@ -605,9 +607,10 @@ test "Describe a known rat" {
 
     // then:
     try expectContent(text_area,
-        \\A big, nasty rat with vicious eyes
-        \\that thrives in dark corners and
-        \\forgotten cellars.
+        \\A  large  and  persistent  creature
+        \\that stands out neither by strength
+        \\nor   speed.  Still,  its  bite  is
+        \\capable of causing serious trouble.
         \\
         \\Health: 10/10
         \\
@@ -646,7 +649,7 @@ test "Describe a melee weapon" {
         \\Effects:
         \\  fire
         \\
-        \\Radius of light: 3
+        \\Radius of light: 5
     );
 }
 
