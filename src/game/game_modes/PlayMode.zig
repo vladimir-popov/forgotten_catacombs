@@ -79,9 +79,11 @@ pub fn tick(self: *Self) !void {
 /// Can be invoked from the `tick` or as continue of the playing after switching the game mode.
 pub fn playerTurn(self: *Self) !void {
     const initiative = self.session.registry.getUnsafe(self.session.player, c.Initiative);
+    const speed = self.session.registry.getUnsafe(self.session.player, c.Speed);
     const action = &self.action_buffer;
-    switch (try self.doTurn(self.session.player, action, initiative)) {
-        .done => |spent_move_points| {
+    switch (try self.doTurn(self.session.player, action, speed, initiative)) {
+        .done => {
+            const spent_move_points = action.movePoints(speed);
             // Force change the target
             switch (action.tag) {
                 .hit => {
@@ -123,8 +125,10 @@ fn enemiesTurn(self: *Self) !void {
         if (initiative.move_points < speed.moving_speed and initiative.move_points < speed.atack_speed)
             continue;
 
-        var action = self.session.ai.action(npc);
-        _ = try self.doTurn(npc, &action, initiative);
+        if (self.session.ai.chooseAction(npc, speed, initiative)) |act| {
+            self.action_buffer = act;
+            _ = try self.doTurn(npc, &self.action_buffer, speed, initiative);
+        }
     }
 }
 
@@ -134,15 +138,15 @@ fn doTurn(
     self: *Self,
     actor: g.Entity,
     action: *const g.actions.Action,
+    speed: *const c.Speed,
     initiative: *c.Initiative,
 ) !ActionResult {
     log.info("The turn of the entity {d}.", .{actor.id});
     defer log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
 
-    const speed = self.session.registry.getUnsafe(actor, c.Speed).*;
-
-    switch (try self.session.actions.doAction(actor, action, speed)) {
-        .done => |spent_move_points| {
+    switch (try self.session.actions.doAction(actor, action)) {
+        .done => {
+            const spent_move_points = action.movePoints(speed);
             log.info("Entity {d} spent {d} move points", .{ actor.id, spent_move_points });
             initiative.move_points -= spent_move_points;
             initiative.spent_move_points += spent_move_points;
@@ -151,7 +155,7 @@ fn doTurn(
             for (0..cycles) |_| {
                 try self.onCycleCompleted(actor);
             }
-            return .{ .done = spent_move_points };
+            return .done;
         },
         .actor_is_dead => {
             return .actor_is_dead;

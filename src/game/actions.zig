@@ -99,10 +99,18 @@ pub const Action = struct {
         self.payload = @unionInit(Payload, @tagName(tag), payload);
     }
 
+    pub fn movePoints(self: Action, speed: *const c.Speed) u8 {
+        return switch (self.tag) {
+            .hit => speed.atack_speed,
+            else => speed.moving_speed,
+        };
+    }
+
     fn PayloadType(comptime tag: Tag) type {
         return @typeInfo(Payload).@"union".fields[@intFromEnum(tag)].type;
     }
 
+    // Use to choose the most priority target
     pub fn priority(self: Action) u8 {
         return switch (self.tag) {
             .hit => 10,

@@ -317,6 +317,7 @@ pub const Improvements = struct {
 };
 
 pub const Initiative = struct {
+    /// Accumulated points to spent on actions.
     move_points: g.MovePoints,
     /// How many move points the player or an enemy spent within the last turn.
     /// We need it to count completed cycles.

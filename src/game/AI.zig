@@ -10,23 +10,23 @@ const Self = @This();
 session: *const g.GameSession,
 rand: std.Random,
 
-/// Calculates the next action for the entity.
-/// Do not mutate anything, only creates an action.
-pub fn action(
+/// Chooses the next action for the entity, or returns
+/// `null` if the initiative is not enough for any action.
+pub fn chooseAction(
     self: *const Self,
     npc: g.Entity,
-) g.actions.Action {
+    speed: *const c.Speed,
+    initiative: *const c.Initiative,
+) ?g.Action {
     const npc_place = self.session.registry.getUnsafe(npc, c.Position).place;
     const npc_state = self.session.registry.getUnsafe(npc, c.EnemyState);
     const player_place = self.session.level.playerPosition().place;
 
-    const act = switch (npc_state.*) {
-        .sleeping => self.actionForSleepingEnemy(npc, npc_place, player_place),
-        .walking => self.actionForWalkingEnemy(npc, npc_place, player_place),
-        .aggressive => self.actionForAggressiveEnemy(npc, npc_place, player_place),
+    return switch (npc_state.*) {
+        .sleeping => self.actionForSleepingEnemy(npc, npc_place, player_place, speed, initiative.move_points),
+        .walking => self.actionForWalkingEnemy(npc, npc_place, player_place, speed, initiative.move_points),
+        .aggressive => self.actionForAggressiveEnemy(npc, npc_place, player_place, speed, initiative.move_points),
     };
-    log.debug("The action for the entity {d} in state {s} is {any}", .{ npc.id, @tagName(npc_state.*), act });
-    return act;
 }
 
 fn actionForSleepingEnemy(
@@ -34,8 +34,15 @@ fn actionForSleepingEnemy(
     entity: g.Entity,
     entity_place: p.Point,
     player_place: p.Point,
-) g.actions.Action {
-    if (entity_place.near8(player_place)) return .action(.get_angry, entity);
+    speed: *const c.Speed,
+    max_move_points: u8,
+) ?g.Action {
+    if (speed.moving_speed > max_move_points)
+        return null;
+
+    if (entity_place.near8(player_place))
+        return .action(.get_angry, entity);
+
     if (self.isPlayerIsInSight(entity_place)) {
         // TODO Probability of waking up should depends on player's skills
         if (self.rand.uintLessThan(u8, 10) == 0) return .action(.get_angry, entity);
@@ -43,15 +50,19 @@ fn actionForSleepingEnemy(
     return .action(.wait, {});
 }
 
+/// Returns an action or null if not enough move points.
 fn actionForWalkingEnemy(
     self: *const Self,
     entity: g.Entity,
     entity_place: p.Point,
     player_place: p.Point,
-) g.actions.Action {
-    if (entity_place.near8(player_place)) return .action(.get_angry, entity);
+    speed: *const c.Speed,
+    max_move_points: u8,
+) ?g.Action {
+    if (entity_place.near8(player_place) and speed.moving_speed <= max_move_points)
+        return .action(.get_angry, entity);
 
-    if (self.isPlayerIsInSight(entity_place)) {
+    if (self.isPlayerIsInSight(entity_place) and speed.moving_speed <= max_move_points) {
         // TODO Probability of become aggressive should depends on player's skills
         if (self.rand.uintLessThan(u8, 10) > 3) return .action(.get_angry, entity);
     }
@@ -62,19 +73,28 @@ fn actionForWalkingEnemy(
     for (directions) |direction| {
         const place = entity_place.movedTo(direction);
         if (level.isObstacle(place)) continue;
-        return self.tryToMove(place, .{ .direction = direction }) orelse .action(.wait, {});
+        const act: g.Action = self.tryToMove(place, .{ .direction = direction }) orelse .action(.wait, {});
+        if (act.movePoints(speed) <= max_move_points) {
+            return act;
+        }
     }
     log.err("Entity {d} is stuck at {any}. Sleep.", .{ entity.id, entity_place });
-    return .action(.go_sleep, entity);
+    if (speed.moving_speed <= max_move_points)
+        return .action(.go_sleep, entity);
+
+    return null;
 }
 
+/// Returns an action or null if not enough move points.
 fn actionForAggressiveEnemy(
     self: *const Self,
     entity: g.Entity,
     entity_place: p.Point,
     player_place: p.Point,
-) g.actions.Action {
-    if (entity_place.near4(player_place)) {
+    speed: *const c.Speed,
+    max_move_points: u8,
+) ?g.Action {
+    if (entity_place.near4(player_place) and speed.atack_speed <= max_move_points) {
         return .action(.hit, self.session.player);
     }
     const level = &self.session.level;
@@ -83,11 +103,15 @@ fn actionForAggressiveEnemy(
             "Entity {any} moves to the player from {any} in direction {s}",
             .{ entity, entity_place, @tagName(vector.direction) },
         );
-        return self.tryToMove(entity_place, .{ .direction = vector.direction }) orelse .action(.wait, {});
-    } else {
+        const act: g.Action = self.tryToMove(entity_place, .{ .direction = vector.direction }) orelse .action(.wait, {});
+        if (act.movePoints(speed) <= max_move_points) {
+            return act;
+        }
+    } else if (speed.moving_speed <= max_move_points) {
         log.info("Player is out of reach for {any} (from {any}). Chill.", .{ entity, entity_place });
         return .action(.chill, entity);
     }
+    return null;
 }
 
 fn isPlayerIsInSight(self: *const Self, entity_place: p.Point) bool {
@@ -97,7 +121,13 @@ fn isPlayerIsInSight(self: *const Self, entity_place: p.Point) bool {
         false;
 }
 
-fn tryToMove(self: *const Self, from_place: p.Point, target: g.Action.Payload.Move.Target) ?g.Action {
+/// Returns the action required to move from `from_place` toward `target`,
+/// or `null` if no action is possible.
+fn tryToMove(
+    self: *const Self,
+    from_place: p.Point,
+    target: g.Action.Payload.Move.Target,
+) ?g.Action {
     const place = target.asPlace(from_place);
     if (from_place.eql(place)) return null;
 
@@ -116,7 +146,7 @@ fn tryToMove(self: *const Self, from_place: p.Point, target: g.Action.Payload.Mo
 
                 if (g.meta.getEnemyType(&self.session.registry, entity)) |_| {
                     // TODO: should all enemies be aggressive to each other?
-                    return .action(.hit, entity);
+                    return .action(.wait, {});
                 }
 
                 return null;

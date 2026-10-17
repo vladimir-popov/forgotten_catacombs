@@ -12,9 +12,9 @@ inline fn session(self: *Self) *g.GameSession {
     return @alignCast(@fieldParentPtr("actions", self));
 }
 
-pub const ActionResult = union(enum) {
+pub const ActionResult = enum {
     /// Action successfully happened and move points were spent
-    done: g.MovePoints,
+    done,
     /// An action lead to the death of the actor
     actor_is_dead,
 };
@@ -95,33 +95,30 @@ pub fn calculateQuickActionForTarget(
 }
 
 /// Handles the action.
-/// Note: the action must be valid! To choosing a valid action the `actualActionOnMoving` should be
-/// used.
 pub fn doAction(
     self: *Self,
     actor: g.Entity,
     action: *const g.Action,
-    speed: c.Speed,
 ) !ActionResult {
     switch (action.tag) {
         .drink => {
             if (try self.drinkPotion(actor, action.payload.drink))
-                return .{ .done = speed.moving_speed }
+                return .done
             else
                 return .actor_is_dead;
         },
         .eat => {
             try self.eat(actor, action.payload.eat);
-            return .{ .done = speed.moving_speed };
+            return .done;
         },
         .open_inventory => {
             try self.session().manageInventory();
-            return .{ .done = speed.moving_speed };
+            return .done;
         },
         .move => {
             const from_position = self.session().registry.getUnsafe(actor, c.Position);
             try self.doMove(actor, from_position, action.payload.move.target);
-            return .{ .done = speed.moving_speed };
+            return .done;
         },
         .step_in_trap => {
             return if (try self.stepInTrap(
@@ -129,63 +126,63 @@ pub fn doAction(
                 action.payload.step_in_trap.trap_entity,
                 action.payload.step_in_trap.moving_target,
             ))
-                .{ .done = speed.moving_speed }
+                .done
             else
                 .actor_is_dead;
         },
         .disarm_trap => {
             return if (try self.tryToDisarmTrap(actor, action.payload.disarm_trap))
-                .{ .done = speed.moving_speed }
+                .done
             else
                 .actor_is_dead;
         },
         .move_to_level => {
             try self.session().movePlayerToLevel(action.payload.move_to_level);
-            return .{ .done = speed.moving_speed };
+            return .done;
         },
         .hit => if (try self.session().damage.tryToHit(actor, action.payload.hit)) {
-            return .{ .done = speed.atack_speed };
+            return .done;
         } else {
             return .actor_is_dead;
         },
         .open => {
             try self.openDoor(action.payload.open);
-            return .{ .done = speed.moving_speed };
+            return .done;
         },
         .close => {
             try self.closeDoor(action.payload.close);
-            return .{ .done = speed.moving_speed };
+            return .done;
         },
         .pickup => {
             try self.pickup(actor, action.payload.pickup);
-            return .{ .done = speed.moving_speed };
+            return .done;
         },
         .go_sleep => {
             try self.goSleep(action.payload.go_sleep);
-            return .{ .done = speed.moving_speed };
+            return .done;
         },
         .chill => {
             try self.chill(action.payload.chill);
-            return .{ .done = speed.moving_speed };
+            return .done;
         },
         .get_angry => {
             try self.getAngry(action.payload.get_angry);
-            return .{ .done = speed.moving_speed };
+            return .done;
         },
         .modify_recognize => {
             try self.session().modifyRecognize();
-            return .{ .done = speed.moving_speed };
+            return .done;
         },
         .trade => {
             try self.session().trade(action.payload.trade);
-            return .{ .done = speed.moving_speed };
+            return .done;
         },
         .wait => {
             try self.session().registry.set(
                 actor,
                 c.Animation.initStatic(.wait, self.session().player.eql(actor)),
             );
-            return .{ .done = speed.moving_speed };
+            return .done;
         },
     }
 }
