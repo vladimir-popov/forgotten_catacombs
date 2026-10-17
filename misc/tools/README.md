@@ -31,8 +31,41 @@ The description text is not copied to the generated file. Instead, the
 For example, `Traveler Ration` becomes `traveler_ration`.
 
 The description presets referenced by the generated code must be declared in
-`src/game/descriptions.zig` separately.
+the corresponding module under `src/game/descriptions/` separately.
 Generated food entities are sorted alphabetically by `Name`.
+
+## Generate Enemy Entities
+
+The `enemies` command generates enemy entity definitions from
+`misc/entities/Enemies.csv`.
+
+Run it from the project root:
+
+```sh
+zig run misc/tools/main.zig -- enemies misc/entities/Enemies.csv \
+  > /tmp/enemies.zig
+```
+
+The CSV must contain the `Symbol`, `Name`, `Trait`, `Damage`, `Armor`, `HP`,
+and `XP` columns. `Damage` accepts a range such as `1–2`; a numeric `Armor`
+value is emitted as a fixed protection range. `Name` is converted to
+`snake_case` for the entity and description preset names.
+
+The output is a Zig source fragment with a file documentation comment and the
+required imports. Immediately before the entity definitions, it includes an
+alphabetized reference listing every distinct Trait found in the input and its
+current component mapping. The generated definitions use `.bullets` for
+`RNG(n)` weapons.
+`SPD+`, `ATK+`, `SPD-`, `ATK-`, and `STATIC` are mapped to the corresponding
+`Speed` presets where available. `F+`, `A+`, and `P+` are combined into one
+`.improvements` component. `POISON`, `FIRE`, and `ACID` are weapon effects;
+`ARM` uses the `Armor` value. Stat traits and any mapping still marked `TODO`
+need review before replacing the hand-maintained `src/game/entities/enemies.zig`.
+An unrecognized Trait stops generation and prints a diagnostic to standard
+error explaining that support must be added both to the game code and to
+`misc/tools/generate_enemies.zig`.
+
+The generator does not sort enemy definitions; it preserves CSV row order.
 
 ## Generate Description Presets
 

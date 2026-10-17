@@ -14,6 +14,7 @@ inline fn defined(components: c.Components, comptime field: []const u8) void {
 
 /// Checks that components have a relevant to `E` preset of description.
 inline fn hasType(comptime E: type, components: c.Components) void {
+    @setEvalBranchQuota(5000);
     const preset_name = @tagName(components.description.?.preset);
     for (std.enums.values(E)) |enum_item| {
         if (std.mem.eql(u8, preset_name, @tagName(enum_item))) {

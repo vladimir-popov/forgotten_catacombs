@@ -2,6 +2,7 @@ const std = @import("std");
 
 const armor = @import("generate_armor.zig");
 const descriptions = @import("generate_descriptions.zig");
+const enemies = @import("generate_enemies.zig");
 const food = @import("generate_food.zig");
 const names_enum = @import("generate_names_enum.zig");
 const potions = @import("generate_potions.zig");
@@ -17,6 +18,9 @@ pub fn main(init: std.process.Init) !void {
     var buffer: [4096]u8 = undefined;
     var stdout = std.Io.File.stdout().writer(init.io, &buffer);
     defer stdout.interface.flush() catch {};
+    var error_buffer: [1024]u8 = undefined;
+    var stderr = std.Io.File.stderr().writer(init.io, &error_buffer);
+    defer stderr.interface.flush() catch {};
 
     const command = args.next() orelse {
         try writeUsage(&stdout.interface);
@@ -43,6 +47,8 @@ pub fn main(init: std.process.Init) !void {
         try armor.generate(csv, &stdout.interface, init.gpa);
     } else if (std.mem.eql(u8, command, "descriptions")) {
         try descriptions.generate(csv, &stdout.interface, init.gpa);
+    } else if (std.mem.eql(u8, command, "enemies")) {
+        try enemies.generate(csv, &stdout.interface, &stderr.interface, init.gpa);
     } else if (std.mem.eql(u8, command, "food")) {
         try food.generate(csv, &stdout.interface, init.gpa);
     } else if (std.mem.eql(u8, command, "names-enum")) {
@@ -64,6 +70,7 @@ fn writeUsage(writer: *std.Io.Writer) !void {
             "Commands:\n" ++
             "  armor         Generate armor entities\n" ++
             "  descriptions  Generate description presets\n" ++
+            "  enemies       Generate enemy entities and print Trait mappings\n" ++
             "  food          Generate food entities\n" ++
             "  names-enum    Generate enum values from names\n" ++
             "  potions       Generate potion entities\n" ++

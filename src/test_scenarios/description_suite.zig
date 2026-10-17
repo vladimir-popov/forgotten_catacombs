@@ -166,9 +166,9 @@ test "Describe a known enemy (after killing a similar creature)" {
         \\│ nor   speed.  Still,  its  bite  is ░│
         \\│ capable of causing serious trouble. ░│
         \\│                                     ░│
-        \\│ Health: 10/10                       ░│
+        \\│ Health: 12/12                       ░│
         \\│                                     ░│
-        \\│ Damage: 3-8                         ░│
+        \\│ Damage: 1-2                         ░│
         \\└──────────────────────────────────────┘
     , .game_area);
 }

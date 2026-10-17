@@ -128,6 +128,7 @@ pub const Breakages = struct {
     modifications: Modifications,
 
     pub const empty: Breakages = .{ .modifications = .initEmpty() };
+    pub const @"fire-": Breakages = .{ .modifications = .init(&.{.fire}) };
 
     const all_proportions: [std.enums.values(Modification).len]u8 = blk: {
         var proportions: [std.enums.values(Modification).len]u8 = @splat(5);
@@ -553,6 +554,13 @@ pub const Speed = struct {
     atack_speed: g.MovePoints,
 
     pub const default: Speed = .{ .moving_speed = g.MOVE_POINTS_IN_TURN, .atack_speed = g.MOVE_POINTS_IN_TURN };
+    pub const @"spd+": Speed = .{ .moving_speed = g.MOVE_POINTS_IN_TURN - 2, .atack_speed = g.MOVE_POINTS_IN_TURN };
+    pub const @"atk+": Speed = .{ .moving_speed = g.MOVE_POINTS_IN_TURN, .atack_speed = g.MOVE_POINTS_IN_TURN - 2 };
+    pub const @"static; atk+": Speed = .{ .moving_speed = std.math.maxInt(u8), .atack_speed = g.MOVE_POINTS_IN_TURN - 2 };
+    pub const @"spd+; atk+": Speed = .{ .moving_speed = g.MOVE_POINTS_IN_TURN - 2, .atack_speed = g.MOVE_POINTS_IN_TURN - 2 };
+    pub const @"spd-": Speed = .{ .moving_speed = g.MOVE_POINTS_IN_TURN + 2, .atack_speed = g.MOVE_POINTS_IN_TURN };
+    pub const @"atk-": Speed = .{ .moving_speed = g.MOVE_POINTS_IN_TURN, .atack_speed = g.MOVE_POINTS_IN_TURN + 2 };
+    pub const @"spd-; atk-": Speed = .{ .moving_speed = g.MOVE_POINTS_IN_TURN + 2, .atack_speed = g.MOVE_POINTS_IN_TURN + 2 };
 };
 
 /// Describes how and where something should look.
@@ -564,6 +572,8 @@ pub const Stats = struct {
     pub const Stat = std.meta.FieldEnum(@import("descriptions/Stats.zig"));
 
     pub const zeros: Stats = .init(0, 0, 0, 0, 0);
+
+    pub const @"dex+1": Stats = init(0, 1, 0, 0, 0);
 
     values: std.enums.EnumArray(Stat, i4),
 

@@ -612,9 +612,9 @@ test "Describe a known rat" {
         \\nor   speed.  Still,  its  bite  is
         \\capable of causing serious trouble.
         \\
-        \\Health: 10/10
+        \\Health: 12/12
         \\
-        \\Damage: 3-8
+        \\Damage: 1-2
         \\
         \\Not too fast.
     );
