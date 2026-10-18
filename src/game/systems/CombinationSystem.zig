@@ -54,7 +54,7 @@ pub fn canBeCombined(self: *Self, ingredient: Ingredient, item: g.Entity) ?Resol
     return null;
 }
 
-pub fn combine(self: *Self, resolved_combination: ResolvedCombination) !void {
+pub fn combine(self: *Self, resolved_combination: ResolvedCombination) void {
     switch (resolved_combination.combination) {
         .refill_lamp => {
             const lamp = self.session().registry.getUnsafe(resolved_combination.subject, c.SourceOfLight);

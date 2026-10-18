@@ -63,7 +63,7 @@ pub const Buttons = struct {
     right: ?Button = null,
 
     /// Draws both buttons and hides sides that are not present.
-    pub fn draw(self: Buttons, render: g.Render) !void {
+    pub fn draw(self: Buttons, render: g.Render) g.SystemError!void {
         if (self.left) |button| {
             try render.drawLeftButton(button.label, button.has_alternative);
         } else {
@@ -82,9 +82,9 @@ pub fn updateAreaWithItems(
     area: *OptionsArea(g.Entity),
     context: *anyopaque,
     items: g.utils.EntitiesSet,
-    formatLine: *const fn (line: *TextArea.Line, context: *anyopaque, item: g.Entity) anyerror![]const u8,
+    formatLine: *const fn (line: *TextArea.Line, context: *anyopaque, item: g.Entity) g.SystemError![]const u8,
     handler: OptionsArea(g.Entity).ButtonHandler,
-) !void {
+) g.SystemError!void {
     area.clearRetainingCapacity();
     const selected_line = area.selected_line;
     var itr = items.iterator();

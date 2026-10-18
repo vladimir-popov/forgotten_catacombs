@@ -1,4 +1,5 @@
 const std = @import("std");
+const AllocatorError = std.mem.Allocator.Error;
 const g = @import("game");
 const tty = @import("tty.zig");
 
@@ -90,7 +91,7 @@ pub fn Cmd(comptime cols: u8) type {
         /// The symbol under cursor should be inverted.
         cursor_idx: usize = 0,
 
-        pub fn init(alloc: std.mem.Allocator) !Self {
+        pub fn init(alloc: std.mem.Allocator) AllocatorError!Self {
             return .{
                 .display_buffer = try DisplayBuffer(1, cols).init(alloc),
                 .completion = .all_cheats,

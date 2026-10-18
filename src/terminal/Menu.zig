@@ -1,4 +1,5 @@
 const std = @import("std");
+const AllocatorError = std.mem.Allocator.Error;
 const g = @import("game");
 const p = g.primitives;
 const tty = @import("tty.zig");
@@ -26,7 +27,7 @@ pub fn Menu(comptime ROWS: u8, comptime COLS: u8) type {
         items_count: u4 = 0,
         selected_item: u4 = 0,
 
-        pub fn init(alloc: std.mem.Allocator) !Self {
+        pub fn init(alloc: std.mem.Allocator) AllocatorError!Self {
             return .{ .buffer = try DisplayBuffer(ROWS, COLS).init(alloc) };
         }
 
@@ -34,7 +35,7 @@ pub fn Menu(comptime ROWS: u8, comptime COLS: u8) type {
             self.buffer.deinit();
         }
 
-        pub fn handleKeyboardButton(self: *Self, btn: g.Button) !void {
+        pub fn handleKeyboardButton(self: *Self, btn: g.Button) void {
             switch (btn.game_button) {
                 .a => if (self.items_count > 0) {
                     const game_object = self.items[self.selected_item].game_object;
@@ -49,23 +50,23 @@ pub fn Menu(comptime ROWS: u8, comptime COLS: u8) type {
                 },
                 else => {},
             }
-            try self.drawMenuItems();
+            self.drawMenuItems();
         }
 
-        pub fn show(self: *Self) !void {
+        pub fn show(self: *Self) void {
             log.debug("Show menu with {d} items", .{self.items_count});
             self.is_shown = true;
             self.buffer.cleanAndWrap();
-            try self.drawMenuItems();
+            self.drawMenuItems();
         }
 
-        fn drawMenuItems(self: Self) !void {
+        fn drawMenuItems(self: Self) void {
             for (0..self.items_count) |i| {
-                try self.drawMenuItem(@intCast(i), i == self.selected_item);
+                self.drawMenuItem(@intCast(i), i == self.selected_item);
             }
         }
 
-        fn drawMenuItem(self: Self, item_idx: u4, is_selected: bool) !void {
+        fn drawMenuItem(self: Self, item_idx: u4, is_selected: bool) void {
             if (item_idx >= self.items_count) return;
 
             const mode: g.DrawingMode = if (is_selected) .inverted else .normal;

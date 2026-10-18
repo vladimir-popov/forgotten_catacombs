@@ -53,7 +53,7 @@ pub fn init(
     session: *g.GameSession,
     inventory: *c.Inventory,
     wallet: *c.Wallet,
-) !void {
+) g.SystemError!void {
     self.* = .{
         .session = session,
         .main_window = .empty,
@@ -61,17 +61,17 @@ pub fn init(
         .inventory = inventory,
         .wallet = wallet,
     };
-    _ = try self.main_window.addTab(
+    _ = self.main_window.addTab(
         "Recognize",
         w.OptionsArea(g.Entity).initEmpty(self.allocator(), self, .left),
     );
 
-    _ = try self.main_window.addTab(
+    _ = self.main_window.addTab(
         "Modify",
         w.OptionsArea(g.Entity).initEmpty(self.allocator(), self, .left),
     );
 
-    _ = try self.main_window.addTab(
+    _ = self.main_window.addTab(
         "Repair",
         w.OptionsArea(g.Entity).initEmpty(self.allocator(), self, .left),
     );
@@ -90,7 +90,7 @@ fn allocator(self: *Self) std.mem.Allocator {
 
 // Keep mode-specific temporaries out of GameSession.tick's shared stack frame
 // to reduce stack usage in other modes on Playdate.
-pub noinline fn tick(self: *Self) !void {
+pub noinline fn tick(self: *Self) g.AllErrors!void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (try self.compositor.handleButton(btn) == .closed_main_window) {
             // the  deinit method will be invoked here:
@@ -107,7 +107,7 @@ fn optionFromTab(self: *Self, tab_idx: usize) *w.OptionsArea(g.Entity) {
 
 /// Recalculates the content of all tabs.
 /// It should be done after every action.
-pub fn updateTabs(self: *Self) !void {
+pub fn updateTabs(self: *Self) g.SystemError!void {
     self.optionFromTab(TAB_RECOGNIZE).clearRetainingCapacity();
     self.optionFromTab(TAB_MODIFY).clearRetainingCapacity();
     self.optionFromTab(TAB_REPAIR).clearRetainingCapacity();
@@ -161,14 +161,14 @@ const line_with_price_fmt = std.fmt.comptimePrint(
     .{g.DISPLAY_COLS - 10}, // ("{u} ".len == 2) + ("0000$ ".len == 6) + 2 for borders
 );
 
-fn formatLineWithPrice(self: *Self, buffer: []u8, item: g.Entity, price: u16) ![]const u8 {
+fn formatLineWithPrice(self: *Self, buffer: []u8, item: g.Entity, price: u16) std.fmt.BufPrintError![]const u8 {
     const sprite = self.session.registry.getUnsafe(item, c.Sprite);
     var name_buf: [24]u8 = undefined;
     const name = try g.Description.printActualName(&name_buf, self.session.journal, item);
     return try std.fmt.bufPrint(buffer, line_with_price_fmt, .{ sprite.codepoint, name, price });
 }
 
-fn formatLine(self: *Self, buffer: []u8, item: g.Entity) ![]const u8 {
+fn formatLine(self: *Self, buffer: []u8, item: g.Entity) std.fmt.BufPrintError![]const u8 {
     const sprite = self.session.registry.getUnsafe(item, c.Sprite);
     return try std.fmt.bufPrint(
         buffer,
@@ -181,7 +181,7 @@ inline fn isWeaponOrArmor(self: *Self, item: g.Entity) bool {
     return self.session.registry.has(item, c.Weapon) or self.session.registry.has(item, c.Armor);
 }
 
-fn recognizeDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn recognizeDescribe(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const window = try self.compositor.showModalWindowWithOptions(self.allocator(), &.{}, g.Entity, self, .center);
     const area = &window.panel.area;
@@ -192,7 +192,7 @@ fn recognizeDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonR
     return .keep_open;
 }
 
-fn recognizeItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn recognizeItem(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const wallet = self.session.registry.getUnsafe(self.session.player, c.Wallet);
     const price = self.calculateIdentificationPrice(item);
@@ -216,7 +216,7 @@ fn recognizeItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResul
     return .close_window;
 }
 
-fn repairDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn repairDescribe(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const window = try self.compositor.showModalWindowWithOptions(self.allocator(), &.{}, g.Entity, self, .center);
     const area = &window.panel.area;
@@ -227,7 +227,7 @@ fn repairDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResu
     return .keep_open;
 }
 
-fn repairItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn repairItem(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const wallet = self.session.registry.getUnsafe(self.session.player, c.Wallet);
     const price = self.calculateRepairingPrice(item);
@@ -252,7 +252,7 @@ fn repairItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
     return .close_window;
 }
 
-fn modifyDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn modifyDescribe(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const window = try self.compositor.showModalWindowWithOptions(self.allocator(), &.{}, g.Entity, self, .center);
     const area = &window.panel.area;
@@ -263,7 +263,7 @@ fn modifyDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResu
     return .keep_open;
 }
 
-fn modificationMode(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn modificationMode(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const window = try self.compositor.showModalWindowWithOptions(self.allocator(), &.{}, g.Entity, self, .center);
     const area = &window.panel.area;
@@ -291,19 +291,19 @@ fn modificationMode(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonRe
     return .close_window;
 }
 
-fn modifySomehow(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn modifySomehow(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     try self.modify(item, CHANCE_TO_BREAK_ON_SOMEHOW, null, self.calculateModificationPrice(item, MOD_SOMEHOW_PRICE));
     return .close_window;
 }
 
-fn modifyCarefully(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn modifyCarefully(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     try self.modify(item, CHANCE_TO_BREAK_ON_CAREFUL, null, self.calculateModificationPrice(item, MOD_CAREFUL_PRICE));
     return .close_window;
 }
 
-fn modifyManually(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn modifyManually(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const window = try self.compositor.showModalWindowWithOptions(self.allocator(), &.{}, g.Entity, self, .center);
     const area = &window.panel.area;
@@ -319,14 +319,14 @@ fn modifyManually(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResu
     return .close_window;
 }
 
-fn modifyManuallyEffect(ptr: *anyopaque, idx: usize, item: g.Entity) !w.HandleButtonResult {
+fn modifyManuallyEffect(ptr: *anyopaque, idx: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const modification: c.Modification = @enumFromInt(idx);
     try self.modify(item, 0, modification, self.calculateModificationPrice(item, MOD_MANUAL_PRICE));
     return .close_window;
 }
 
-fn modify(self: *Self, item: g.Entity, breakage_chance: u8, manual_modification: ?c.Modification, price: u16) !void {
+fn modify(self: *Self, item: g.Entity, breakage_chance: u8, manual_modification: ?c.Modification, price: u16) g.SystemError!void {
     const wallet = self.session.registry.getUnsafe(self.session.player, c.Wallet);
     if (wallet.money < price) {
         try self.compositor.showNotification(
@@ -356,15 +356,15 @@ fn modify(self: *Self, item: g.Entity, breakage_chance: u8, manual_modification:
     }
 
     if (self.session.registry.has(item, c.Weapon)) {
-        try self.session.journal.forgetWeapon(item);
+        self.session.journal.forgetWeapon(item);
     } else if (self.session.registry.has(item, c.Armor)) {
-        try self.session.journal.forgetArmor(item);
+        self.session.journal.forgetArmor(item);
     }
     wallet.money -= price;
     try self.updateTabs();
 }
 
-fn showHelp(ptr: *anyopaque, _: usize, _: g.Entity) !w.HandleButtonResult {
+fn showHelp(ptr: *anyopaque, _: usize, _: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     try self.compositor.showNotification(self.allocator(), "Help",
         \\An arbitrary  modification  has a 
@@ -381,14 +381,14 @@ fn showHelp(ptr: *anyopaque, _: usize, _: g.Entity) !w.HandleButtonResult {
     return .keep_open;
 }
 
-fn describeItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn describeItem(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     try self.compositor.showEntityDescription(self.allocator(), self.session, item);
     // Do not close the previous window
     return .keep_open;
 }
 
-fn draw(self: *Self) !void {
+fn draw(self: *Self) g.SystemError!void {
     var buf: [20]u8 = undefined;
     const money = self.session.registry.getUnsafe(self.session.player, c.Wallet).money;
     try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "Your money: {d:4}$", .{money}));

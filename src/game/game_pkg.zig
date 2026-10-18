@@ -57,11 +57,46 @@ pub const GameStateArena = std.heap.ArenaAllocator;
 pub const SessionModeArena = std.heap.ArenaAllocator;
 pub const LevelArena = std.heap.ArenaAllocator;
 
-pub const SystemError = Runtime.Error || persistance.Error ||
-    std.mem.Allocator.Error ||
+/// Errors raised while validating or converting UTF-8 codepoints.
+pub const Utf8Error = error{
+    CodepointTooLarge,
+    InvalidUtf8,
+    TruncatedInput,
+    Utf8CannotEncodeSurrogateHalf,
+    Utf8CodepointTooLarge,
+    Utf8EncodesSurrogateHalf,
+    Utf8ExpectedContinuation,
+    Utf8InvalidStartByte,
+    Utf8OverlongEncoding,
+};
+
+/// Errors returned by allocator operations, primarily `OutOfMemory`.
+pub const AllocatorError = std.mem.Allocator.Error;
+
+/// Indicates that a dungeon could not be generated for the requested seed.
+/// Algorithm-specific generation errors are translated to this error at the
+/// public dungeon-generation boundary.
+pub const DungeonGenerationError = error{DungeonGenerationFailed};
+
+/// Operational errors that can occur across game systems, including runtime,
+/// persistence, formatting, allocation, and dungeon generation failures.
+pub const SystemError = Runtime.Error || persistance.Error || Utf8Error ||
+    DungeonGenerationError ||
+    AllocatorError ||
     std.Io.Reader.Error ||
     std.Io.Writer.Error ||
     std.fmt.BufPrintError;
+
+/// Control-flow signal requesting that the game return to its main menu.
+pub const GoToMainMenuError = error{GoToMainMenu};
+
+/// Control-flow signal indicating that the player has died and the game-over
+/// flow should begin.
+pub const GameOverError = error{GameOver};
+
+/// Union of errors that may escape the top-level game flow. Use narrower sets
+/// for functions that only need to expose a subset of these outcomes.
+pub const AllErrors = SystemError || GameOverError || GoToMainMenuError;
 
 pub const MAX_DEPTH = 9;
 

@@ -3,6 +3,7 @@ const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
 const cp = g.codepoints;
+const AllocatorError = std.mem.Allocator.Error;
 
 const log = std.log.scoped(.meta);
 
@@ -23,7 +24,7 @@ pub inline fn isLevelUp(registry: *g.Registry, player: g.Entity) bool {
 /// Adds exp to the player's Experience. If it leads to level up,
 /// increases the player level, recovers its hp and return `true`.
 /// Otherwise returns `false`.
-pub fn addExperience(registry: *g.Registry, player: g.Entity, exp: u16) !bool {
+pub fn addExperience(registry: *g.Registry, player: g.Entity, exp: u16) bool {
     const experience = registry.getUnsafe(player, c.Experience);
     experience.experience +|= exp;
     if (experience.actualLevel() > experience.level) {
@@ -246,7 +247,7 @@ pub fn initialHealth(constitution: i4) c.Health {
     // const constitution_factor = (@as(f32, @floatFromInt(constitution)) * 0.6 + 4.4) / 4.0;
     // return .init(@intFromFloat(@round(constitution_factor * 30)));
     // For test only:
-    return .init(199);
+    return .init(99);
 }
 
 pub fn movePointsForAction(registry: *const g.Registry, actor: g.Entity, action: g.Action.Tag) g.MovePoints {
@@ -283,7 +284,7 @@ pub fn breakItem(
     rand: std.Random,
     item: g.Entity,
     custom_modification: ?c.Modification,
-) !bool {
+) AllocatorError!bool {
     // a weapon should not have an elemental breakage
     const is_weapon = registry.has(item, c.Weapon);
     const breakages = try registry.getOrSet(item, c.Breakages, .{ .modifications = .initEmpty() });
@@ -313,7 +314,7 @@ pub fn improveItem(
     rand: std.Random,
     item: g.Entity,
     custom_modification: ?c.Modification,
-) !bool {
+) AllocatorError!bool {
     const improvements = try registry.getOrSet(item, c.Improvements, .{ .modifications = .initEmpty() });
     const maybe_modification = custom_modification orelse improvements.chooseRandomNew(rand);
     const was_added = if (maybe_modification) |modification|

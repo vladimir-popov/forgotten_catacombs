@@ -4,6 +4,8 @@ const d = @import("dungeon_pkg.zig");
 const p = g.primitives;
 const u = g.utils;
 
+const AllocatorError = std.mem.Allocator.Error;
+
 const log = std.log.scoped(.cave);
 
 pub const rows = 2 * g.DISPLAY_ROWS;
@@ -23,14 +25,18 @@ entrance: ?p.Point = null,
 exit: ?p.Point = null,
 
 /// Uses arena to create a self instance and trying to generate a dungeon with passed seed.
-pub fn generateDungeon(arena: *std.heap.ArenaAllocator, cellural_automata: d.CelluralAutomata, seed: u64) !?d.Dungeon {
+pub fn generateDungeon(
+    arena: *std.heap.ArenaAllocator,
+    cellural_automata: d.CelluralAutomata,
+    seed: u64,
+) (AllocatorError || g.DungeonGenerationError)!d.Dungeon {
     const alloc = arena.allocator();
     const self = try alloc.create(Self);
     self.* = try init(alloc, cellural_automata);
-    return try self.dungeon(seed);
+    return (try self.dungeon(seed)) orelse return error.DungeonGenerationFailed;
 }
 
-pub fn init(alloc: std.mem.Allocator, cellural_automata: d.CelluralAutomata) !Self {
+pub fn init(alloc: std.mem.Allocator, cellural_automata: d.CelluralAutomata) AllocatorError!Self {
     return .{
         .alloc = alloc,
         .cellural_automata = cellural_automata,
@@ -39,7 +45,7 @@ pub fn init(alloc: std.mem.Allocator, cellural_automata: d.CelluralAutomata) !Se
     };
 }
 
-pub fn dungeon(self: *Self, seed: u64) !?d.Dungeon {
+fn dungeon(self: *Self, seed: u64) AllocatorError!?d.Dungeon {
     var prng = std.Random.DefaultPrng.init(seed);
     const rand = prng.random();
 
@@ -90,7 +96,7 @@ pub fn dungeon(self: *Self, seed: u64) !?d.Dungeon {
 fn biggestOpenArea(
     tmp_arena_alloc: std.mem.Allocator,
     map: *const u.BitMap(rows, cols),
-) !struct { usize, p.Point } {
+) AllocatorError!struct { usize, p.Point } {
     var max_area: usize = 0;
     var max_area_point: p.Point = undefined;
     for (0..rows) |i| {
@@ -113,7 +119,7 @@ fn calculateArea(
     alloc: std.mem.Allocator,
     original_map: *const u.BitMap(rows, cols),
     init_point: p.Point,
-) !usize {
+) AllocatorError!usize {
     var map = try u.BitMap(rows, cols).initEmpty(alloc);
     defer map.deinit(alloc);
     map.copyFrom(original_map);
@@ -184,14 +190,20 @@ test "For same seed should return same dungeon" {
 }
 
 // for tests only
-fn generateAndWriteDungeon(arena: *std.heap.ArenaAllocator, buf: []u8, seed: ?u64) !struct { u64, []const u8 } {
+fn generateAndWriteDungeon(
+    arena: *std.heap.ArenaAllocator,
+    buf: []u8,
+    seed: ?u64,
+) (AllocatorError || g.DungeonGenerationError || std.Io.Writer.Error)!struct { u64, []const u8 } {
     var rnd = std.Random.DefaultPrng.init(100500);
     var bfw = std.Io.Writer.fixed(buf);
     while (true) {
         const s: u64 = seed orelse rnd.next();
-        if (try Self.generateDungeon(arena, .{}, s)) |dunge| {
-            const len = try dunge.write(&bfw);
-            return .{ dunge.seed, buf[0..len] };
-        }
+        const dunge = Self.generateDungeon(arena, .{}, s) catch |err| switch (err) {
+            error.DungeonGenerationFailed => continue,
+            else => return err,
+        };
+        const len = try dunge.write(&bfw);
+        return .{ dunge.seed, buf[0..len] };
     }
 }

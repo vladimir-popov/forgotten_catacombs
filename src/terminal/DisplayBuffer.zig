@@ -1,4 +1,5 @@
 const std = @import("std");
+const AllocatorError = std.mem.Allocator.Error;
 const tty = @import("tty.zig");
 const g = @import("game");
 
@@ -19,7 +20,7 @@ pub fn DisplayBuffer(comptime ROWS: u8, comptime COLS: u8) type {
         rows: u8 = ROWS,
         cols: u8 = COLS,
 
-        pub fn init(alloc: std.mem.Allocator) !Self {
+        pub fn init(alloc: std.mem.Allocator) AllocatorError!Self {
             return .{ .alloc = alloc, .lines = try alloc.alloc(DisplayLine, ROWS) };
         }
 
@@ -75,7 +76,7 @@ pub fn DisplayBuffer(comptime ROWS: u8, comptime COLS: u8) type {
         }
 
         /// Flashes the buffer to the `writer`.
-        pub fn writeBuffer(self: Self, writer: *std.Io.Writer, rows_pad: u8, cols_pad: u8) !void {
+        pub fn writeBuffer(self: Self, writer: *std.Io.Writer, rows_pad: u8, cols_pad: u8) (std.Io.Writer.Error || error{ CodepointTooLarge, Utf8CannotEncodeSurrogateHalf })!void {
             var buf: [4]u8 = undefined;
             for (self.lines, rows_pad..) |line, i| {
                 var mode: g.DrawingMode = .normal;

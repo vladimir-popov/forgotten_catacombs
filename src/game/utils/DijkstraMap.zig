@@ -2,6 +2,7 @@
 const std = @import("std");
 const g = @import("../game_pkg.zig");
 const p = g.primitives;
+const AllocatorError = std.mem.Allocator.Error;
 
 pub const Vector = struct { direction: p.Direction, distance: u8 };
 pub const VectorsMap = std.AutoHashMapUnmanaged(p.Point, Vector);
@@ -25,7 +26,7 @@ pub fn calculate(
     region: p.Region,
     obstacles: Obstacles,
     target: p.Point,
-) std.mem.Allocator.Error!void {
+) AllocatorError!void {
     var openned: std.ArrayList(struct { p.Point, u8 }) = .empty;
     defer openned.deinit(alloc);
 
@@ -59,7 +60,7 @@ pub fn dumpToLog(map: VectorsMap, region: p.Region) void {
 /// Iterates over all points inside the passed region and writes a content for them
 /// from the map of vectors. The passed region may differ from the region used to fill the map of
 /// vectors. If the map doesn't contain some point, same result as for unreachable place will be written.
-fn write(map: VectorsMap, writer: *std.Io.Writer, region: p.Region) !void {
+fn write(map: VectorsMap, writer: *std.Io.Writer, region: p.Region) std.Io.Writer.Error!void {
     try writer.print("   |", .{});
     for (0..region.cols) |col_idx| {
         try writer.print("{d:3}|", .{col_idx + 1});

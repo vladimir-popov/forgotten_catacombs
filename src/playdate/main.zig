@@ -107,8 +107,7 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
             playdate_log_to_console = playdate.system.logToConsole;
 
             global_state = @ptrCast(@alignCast(playdate.system.realloc(null, @sizeOf(GlobalState))));
-            global_state.playdate_runtime = PlaydateRuntime.init(playdate) catch
-                @panic("Error on creating Runtime");
+            global_state.playdate_runtime = PlaydateRuntime.init(playdate);
             playdate.system.setButtonCallback(LastButton.handleEvent, &global_state.playdate_runtime.last_button, 5);
             global_state.game = g.Game.init(
                 global_state.playdate_runtime.alloc,

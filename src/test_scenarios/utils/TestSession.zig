@@ -11,6 +11,7 @@ const TestLocation = @import("TestLocation.zig");
 pub const log = std.log.scoped(.test_session);
 
 const Self = @This();
+const InitError = g.AllErrors || std.Io.Dir.RealPathFileAllocError;
 
 arena: g.GameStateArena,
 runtime: TestRuntime,
@@ -21,7 +22,7 @@ tmp_dir: std.testing.TmpDir,
 
 /// Creates a new game session with TestRuntime and a player on the first level.
 /// The player has zero stats & skills, default equipment and 30 HP.
-pub fn initOnFirstLevel(self: *Self, gpa: std.mem.Allocator, io: std.Io) !void {
+pub fn initOnFirstLevel(self: *Self, gpa: std.mem.Allocator, io: std.Io) InitError!void {
     self.tmp_dir = std.testing.tmpDir(.{});
     self.arena = std.heap.ArenaAllocator.init(gpa);
     const arena_alloc = self.arena.allocator();
@@ -57,7 +58,7 @@ pub fn initOnFirstLevel(self: *Self, gpa: std.mem.Allocator, io: std.Io) !void {
 ///════════════════════════════════════════
 ///                    ⇧Explore     Wait  ⇧
 /// ```
-pub fn initWithTestArea(self: *Self, gpa: std.mem.Allocator, io: std.Io) !void {
+pub fn initWithTestArea(self: *Self, gpa: std.mem.Allocator, io: std.Io) InitError!void {
     // TODO: Refactor to not create a first level here
     try self.initOnFirstLevel(gpa, io);
     for (self.session.level.entities_on_level.items) |entity| {
@@ -76,7 +77,7 @@ pub fn initWithTestArea(self: *Self, gpa: std.mem.Allocator, io: std.Io) !void {
     self.session.viewport.region.top_left = .point(1, 1);
 }
 
-pub fn load(self: *Self, gpa: std.mem.Allocator, io: std.Io, working_dir: std.testing.TmpDir) !void {
+pub fn load(self: *Self, gpa: std.mem.Allocator, io: std.Io, working_dir: std.testing.TmpDir) g.AllErrors!void {
     self.tmp_dir = working_dir;
     self.arena = std.heap.ArenaAllocator.init(gpa);
     const arena_alloc = self.arena.allocator();
@@ -99,7 +100,7 @@ pub fn deinit(self: *Self) void {
 /// increase a clock on 1 second,
 /// runs the method `session.tick(.{})`,
 /// and merges the last_frame into the display buffer.
-pub fn tick(self: *Self, opts: TickOptions) !void {
+pub fn tick(self: *Self, opts: TickOptions) g.AllErrors!void {
     for (0..opts.count) |_| {
         self.runtime.last_frame = .empty;
         self.runtime.current_millis += opts.duration_ms;
@@ -117,7 +118,7 @@ pub fn printDisplay(self: Self) void {
 /// Note, this method does not tick until the next player's turn.
 /// If you need to skip all rest parts of the turn, invoke explicitly `completeRound`
 /// after this method.
-pub fn pressButton(self: *Self, button: g.Button.GameButton) !void {
+pub fn pressButton(self: *Self, button: g.Button.GameButton) g.AllErrors!void {
     log.debug("Emulate pressing button {any}", .{button});
     if (self.session.mode == .play) {
         // complete unfinished turns of enemies
@@ -129,14 +130,14 @@ pub fn pressButton(self: *Self, button: g.Button.GameButton) !void {
     try self.tick(.{ .duration_ms = 100 });
 }
 
-pub fn completeRound(self: *Self) !void {
+pub fn completeRound(self: *Self) g.AllErrors!void {
     std.debug.assert(self.session.mode == .play);
     while (!self.session.mode.play.is_players_turn) {
         try self.tick(.{});
     }
 }
 
-pub fn openInventory(self: *Self) !Inventory {
+pub fn openInventory(self: *Self) g.AllErrors!Inventory {
     std.debug.assert(self.session.mode != .inventory);
     try self.session.manageInventory();
     try self.tick(.{});
@@ -144,7 +145,7 @@ pub fn openInventory(self: *Self) !Inventory {
     return .{ .test_session = self };
 }
 
-pub fn exploreMode(self: *Self) !void {
+pub fn exploreMode(self: *Self) g.AllErrors!void {
     try self.session.lookAround();
     try self.tick(.{});
     std.debug.assert(self.session.mode == .explore);

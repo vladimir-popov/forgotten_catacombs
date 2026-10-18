@@ -4,9 +4,19 @@ const c = g.components;
 const p = g.primitives;
 const ecs = g.ecs;
 
+const AllocatorError = std.mem.Allocator.Error;
+
 const log = std.log.scoped(.damage);
 
 const Self = @This();
+
+pub const AttackResult = enum {
+    no_ammo,
+    wrong_ammo,
+    miss,
+    hit,
+    target_killed,
+};
 
 inline fn session(self: *Self) *g.GameSession {
     return @alignCast(@fieldParentPtr("damage", self));
@@ -17,7 +27,7 @@ pub fn heal(
     value: u8,
     target: g.Entity,
     target_health: *c.Health,
-) !void {
+) AllocatorError!void {
     target_health.current_hp += value;
     target_health.current_hp = @min(target_health.max, target_health.current_hp);
     const is_blocked_animation = target.eql(self.session().player);
@@ -29,62 +39,20 @@ pub fn heal(
     log.debug("Entity {d} recovered up to {d} hp", .{ target.id, value });
 }
 
-/// Applies precalculated damage. Adds a blocked animation if needed, and invokes `onEntityDied`
-/// if the target health becomes 0.
+/// Attempts an attack and returns its outcome:
+/// `.no_ammo` or `.wrong_ammo` if a ranged attack cannot be fired,
+/// `.miss` if the attack misses, `.hit` if the target survives, or
+/// `.target_killed` if the attack kills a non-player target.
 ///
-/// `false` means that the target is dead
-pub fn applyDamage(
+/// Returns `error.GameOver` if the attack kills the player.
+///
+/// Consumes ammunition for ranged attacks and applies damage, notifications,
+/// rewards, and experience as appropriate.
+pub fn tryToHit(
     self: *Self,
     actor: g.Entity,
     target: g.Entity,
-    target_health: *c.Health,
-    damage_value: u8,
-) !bool {
-    if (damage_value == 0) return true;
-    target_health.current_hp -|= damage_value;
-    if (self.session().registry.get(target, c.EnemyState)) |_| {
-        try self.session().registry.set(target, c.EnemyState.aggressive);
-    }
-
-    if (target_health.current_hp > 0) {
-        // a special case to give to the player a chance to notice what happened
-        const is_blocked_animation = actor.eql(self.session().player) or target.eql(self.session().player);
-        if (self.session().registry.get(target, c.Animation)) |animation| {
-            animation.addHitAnimation(is_blocked_animation);
-        } else {
-            try self.session().registry.set(target, c.Animation.initStatic(.hit, is_blocked_animation));
-        }
-        return true;
-    } else {
-        // handle the death
-
-        // If the enemy was killed by the player...
-        if (actor.eql(self.session().player)) {
-            // ... we should mark it as known
-            if (g.meta.getEnemyType(&self.session().registry, target)) |enemy_type|
-                try self.session().journal.markEnemyAsKnown(enemy_type);
-            // ...and try to generate a reward
-            const rand = self.session().prng.random();
-            if (rand.uintAtMost(u8, 100) < 30) {
-                const reward = try g.entities.generators.generateReward(
-                    &self.session().registry,
-                    self.session().prng.random(),
-                    self.session().level.depth,
-                );
-                const place = self.session().registry.getUnsafe(target, c.Position).place;
-                const is_dropped = try self.session().level.tryToPutItem(reward, place);
-                if (is_dropped)
-                    log.debug("Dropped reward {d} at {any}", .{ reward.id, place });
-            }
-        }
-
-        try self.session().removeDeadEntity(target);
-        return false;
-    }
-}
-
-/// Returns `false` if the target is dead.
-pub fn tryToHit(self: *Self, actor: g.Entity, target: g.Entity) !bool {
+) (g.SystemError || g.GameOverError)!AttackResult {
     const registry = &self.session().registry;
     const rand = self.session().prng.random();
 
@@ -95,12 +63,12 @@ pub fn tryToHit(self: *Self, actor: g.Entity, target: g.Entity) !bool {
         const ammo_id, const ammo = g.meta.getAmmunition(registry, actor) orelse {
             if (actor.eql(self.session().player))
                 try self.session().showPopUpNotification(.no_ammo);
-            return true;
+            return .no_ammo;
         };
         if (ammo.ammunition_type != expected_ammo) {
             if (actor.eql(self.session().player))
                 try self.session().showPopUpNotification(.wrong_ammo);
-            return true;
+            return .wrong_ammo;
         }
         const actor_position = registry.getUnsafe(actor, c.Position);
         const target_position = registry.getUnsafe(target, c.Position);
@@ -134,7 +102,7 @@ pub fn tryToHit(self: *Self, actor: g.Entity, target: g.Entity) !bool {
             try self.session().showPopUpNotification(.{ .miss = .{ .target = target } })
         else if (target.eql(self.session().player))
             try self.session().showPopUpNotification(.{ .dodge = .{ .actor = actor } });
-        return true;
+        return .miss;
     }
 
     // Calculate the damage
@@ -161,19 +129,39 @@ pub fn tryToHit(self: *Self, actor: g.Entity, target: g.Entity) !bool {
     // we have to copy the whole component, because the enemy can be removed,
     // and the pointer becomes invalid:
     const enemy_experience: c.Experience = self.session().registry.getUnsafe(target, c.Experience).*;
+    const mmaybe_enemy_type = g.meta.getEnemyType(registry, target);
+    const target_place = registry.getUnsafe(target, c.Position).place;
 
     const is_target_alive =
         try self.applyDamage(actor, target, target_health, damage);
 
-    // Give an experience to player
-    if (!is_target_alive and actor.eql(self.session().player)) {
-        try self.session().showPopUpNotification(.{ .exp = enemy_experience.asReward() });
-        if (try g.meta.addExperience(registry, self.session().player, enemy_experience.asReward())) {
-            try self.session().showPopUpNotification(.level_up);
+    if (actor.eql(self.session().player)) {
+        // If the enemy was killed by the player...
+        if (!is_target_alive) {
+            // ... we should mark it as known
+            if (mmaybe_enemy_type) |known_enemy_type|
+                try self.session().journal.markEnemyAsKnown(known_enemy_type);
+
+            // ...and try to generate a reward
+            if (rand.uintAtMost(u8, 100) < 30) {
+                const reward = try g.entities.generators.generateReward(
+                    &self.session().registry,
+                    self.session().prng.random(),
+                    self.session().level.depth,
+                );
+                const is_dropped = try self.session().level.tryToPutItem(reward, target_place);
+                if (is_dropped)
+                    log.debug("Dropped reward {d} at {any}", .{ reward.id, target_place });
+            }
+            // finally, let's give an experience to the player
+            try self.session().showPopUpNotification(.{ .exp = enemy_experience.asReward() });
+            if (g.meta.addExperience(registry, self.session().player, enemy_experience.asReward())) {
+                try self.session().showPopUpNotification(.level_up);
+            }
         }
     }
 
-    if (!is_target_alive) return false;
+    if (!is_target_alive) return .target_killed;
 
     // Show pop-up notifications about hit/damage
     if (actor.eql(self.session().player))
@@ -184,7 +172,47 @@ pub fn tryToHit(self: *Self, actor: g.Entity, target: g.Entity) !bool {
         try self.session().showPopUpNotification(
             .{ .damage = .{ .actor = actor, .damage = target_health_before - target_health.current_hp } },
         );
-    return is_target_alive;
+    return .hit;
+}
+
+/// Applies `damage_value` to `target` on behalf of `actor`.
+///
+/// Updates the target's health and combat state, triggers hit animations, or
+/// handles the target's death. Removes a killed entity.
+///
+/// Returns `false` if the target is killed; otherwise returns `true`.
+/// If the target is the player, and it is killed, return `error.GameOver`.
+pub fn applyDamage(
+    self: *Self,
+    actor: g.Entity,
+    target: g.Entity,
+    target_health: *c.Health,
+    damage_value: u8,
+) (g.SystemError || g.GameOverError)!bool {
+    if (damage_value == 0)
+        return true;
+
+    target_health.current_hp -|= damage_value;
+    if (self.session().registry.get(target, c.EnemyState)) |_| {
+        try self.session().registry.set(target, c.EnemyState.aggressive);
+    }
+
+    if (target_health.current_hp > 0) {
+        // a special case to give to the player a chance to notice what happened
+        const is_blocked_animation = actor.eql(self.session().player) or target.eql(self.session().player);
+        if (self.session().registry.get(target, c.Animation)) |animation| {
+            animation.addHitAnimation(is_blocked_animation);
+        } else {
+            try self.session().registry.set(target, c.Animation.initStatic(.hit, is_blocked_animation));
+        }
+        return true;
+    } else if (target.eql(self.session().player)) {
+        return error.GameOver;
+    } else {
+        // handle the death
+        try self.session().removeDeadEntity(target);
+        return false;
+    }
 }
 
 fn calculateDamage(

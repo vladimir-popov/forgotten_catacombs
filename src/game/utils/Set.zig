@@ -1,6 +1,7 @@
 //! A wrapper around `std.AutoHashMapUnmanaged(T, void)` with an allocator.
 const std = @import("std");
 const g = @import("../game_pkg.zig");
+const AllocatorError = std.mem.Allocator.Error;
 
 pub fn Set(comptime T: type) type {
     return struct {
@@ -12,7 +13,7 @@ pub fn Set(comptime T: type) type {
         alloc: std.mem.Allocator,
         underlying_map: *UnderlyingMap,
 
-        pub fn init(alloc: std.mem.Allocator) std.mem.Allocator.Error!Self {
+        pub fn init(alloc: std.mem.Allocator) AllocatorError!Self {
             const self: Self = .{ .alloc = alloc, .underlying_map = try alloc.create(UnderlyingMap) };
             self.underlying_map.* = .empty;
             return self;
@@ -23,7 +24,7 @@ pub fn Set(comptime T: type) type {
             self.alloc.destroy(self.underlying_map);
         }
 
-        pub fn clone(self: Self, alloc: std.mem.Allocator) std.mem.Allocator.Error!Self {
+        pub fn clone(self: Self, alloc: std.mem.Allocator) AllocatorError!Self {
             return .{ .alloc = alloc, .underlying_map = try self.underlying_map.clone(alloc) };
         }
 
@@ -56,7 +57,7 @@ pub fn Set(comptime T: type) type {
             return self.underlying_map.keyIterator();
         }
 
-        pub fn add(self: Self, item: T) std.mem.Allocator.Error!void {
+        pub fn add(self: Self, item: T) AllocatorError!void {
             try self.underlying_map.put(self.alloc, item, {});
         }
 

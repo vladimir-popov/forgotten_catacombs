@@ -5,6 +5,7 @@ const g = @import("../game_pkg.zig");
 const Type = std.builtin.Type;
 const Entity = @import("Entity.zig");
 const ArraySet = @import("ArraySet.zig").ArraySet;
+const AllocatorError = std.mem.Allocator.Error;
 
 const log = std.log.scoped(.registry);
 
@@ -26,7 +27,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
         next_entity: Entity,
 
         /// Initializes every field of the inner components map.
-        pub fn init(arena: *g.GameStateArena) !Self {
+        pub fn init(arena: *g.GameStateArena) AllocatorError!Self {
             var cm = try arena.allocator().create(ComponentsMap);
             const ArraySets = @typeInfo(ComponentsMap).@"struct".fields;
             inline for (ArraySets) |array_set| {
@@ -45,7 +46,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
         }
 
         /// Adds the component of the type `C` to the entity, or replace existed.
-        pub fn set(self: *Self, entity: Entity, component: anytype) !void {
+        pub fn set(self: *Self, entity: Entity, component: anytype) AllocatorError!void {
             const C = @TypeOf(component);
             try @field(self.components_map, @typeName(C)).setToEntity(self.allocator(), entity, component);
         }
@@ -54,7 +55,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
         ///
         /// **Note:** for every component should be used the same allocator that was used to initialize
         /// this EntityManager. That allocator will be used to deinit components on removing.
-        pub fn setComponentsToEntity(self: *Self, entity: Entity, components: ComponentsStruct) !void {
+        pub fn setComponentsToEntity(self: *Self, entity: Entity, components: ComponentsStruct) AllocatorError!void {
             inline for (@typeInfo(ComponentsStruct).@"struct".fields) |field| {
                 if (@field(components, field.name)) |component| {
                     try self.set(entity, component);
@@ -68,7 +69,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
             return entity;
         }
 
-        pub fn addNewEntity(self: *Self, components: ComponentsStruct) !Entity {
+        pub fn addNewEntity(self: *Self, components: ComponentsStruct) AllocatorError!Entity {
             const entity = self.newEntity();
             try self.setComponentsToEntity(entity, components);
             log.debug("New entity {d} added: {any}", .{ entity.id, components });
@@ -107,7 +108,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
 
         /// Returns a pointer to an already existed component, or sets the passed default value and
         /// returns a pointer to it.
-        pub fn getOrSet(self: *Self, entity: Entity, comptime C: type, default: C) !*C {
+        pub fn getOrSet(self: *Self, entity: Entity, comptime C: type, default: C) AllocatorError!*C {
             return try @field(self.components_map, @typeName(C)).getOrSetForEntity(self.allocator(), entity, default);
         }
 
@@ -292,7 +293,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
         }
 
         /// Removes the component of the type `C` from the entity if it was added before, or does nothing.
-        pub fn remove(self: *Self, entity: Entity, comptime C: type) !void {
+        pub fn remove(self: *Self, entity: Entity, comptime C: type) AllocatorError!void {
             try @field(self.components_map, @typeName(C)).removeFromEntity(self.allocator(), entity);
         }
 
@@ -302,7 +303,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
         }
 
         /// Removes all components from all stores which belong to the entity.
-        pub fn removeEntity(self: *Self, entity: Entity) !void {
+        pub fn removeEntity(self: *Self, entity: Entity) AllocatorError!void {
             inline for (@typeInfo(ComponentsMap).@"struct".fields) |field| {
                 try @field(self.components_map, field.name).removeFromEntity(self.allocator(), entity);
             }
@@ -310,7 +311,7 @@ pub fn Registry(comptime ComponentsStruct: type) type {
 
         /// Takes all components for the entity and set them to the appropriate
         /// fields of the `ComponentsStruct`.
-        pub fn entityToStruct(self: *const Self, entity: Entity) !ComponentsStruct {
+        pub fn entityToStruct(self: *const Self, entity: Entity) AllocatorError!ComponentsStruct {
             var has_at_least_one_component: bool = false;
             var structure: ComponentsStruct = undefined;
             inline for (@typeInfo(ComponentsStruct).@"struct".fields) |field| {

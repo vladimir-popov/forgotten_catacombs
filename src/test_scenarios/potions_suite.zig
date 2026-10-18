@@ -109,7 +109,7 @@ test "Drink an spoiled bouillon" {
     try std.testing.expect(hunger.turns_after_eating > hunger_before);
 }
 
-fn drinkPotion(test_session: *TestSession, potion: g.entities.presets.Potions.Tag) !void {
+fn drinkPotion(test_session: *TestSession, potion: g.entities.presets.Potions.Tag) (g.AllErrors || error{ NotFoundOptionById, NotFoundOptionByName, TestUnexpectedResult })!void {
     const inventory = try test_session.openInventory();
     const potion_id = try inventory.add(g.entities.presets.Potions.get(potion));
     const modal_windows = try inventory.chooseItemById(potion_id);

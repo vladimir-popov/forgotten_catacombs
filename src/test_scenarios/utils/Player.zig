@@ -46,7 +46,7 @@ pub fn target(self: Self) ?g.Entity {
 
 /// Moves the player emulating pressing a button appropriated to the passed direction `count` times.
 /// After every pressing it runs tick until player's turn happened.
-pub fn move(self: Self, direction: p.Direction, count: u8) !void {
+pub fn move(self: Self, direction: p.Direction, count: u8) g.AllErrors!void {
     std.debug.assert(self.test_session.session.mode == .play);
     const btn: g.Button.GameButton = switch (direction) {
         .up => .up,
@@ -65,12 +65,12 @@ pub fn move(self: Self, direction: p.Direction, count: u8) !void {
     try self.test_session.tick(.{});
 }
 
-pub fn moveOnScreenTo(self: Self, place: p.Point) !void {
+pub fn moveOnScreenTo(self: Self, place: p.Point) g.AllErrors!void {
     try self.doCheat(.{ .goto = place });
     try self.test_session.completeRound();
 }
 
-fn doCheat(self: Self, cheat: g.Cheat) !void {
+fn doCheat(self: Self, cheat: g.Cheat) g.AllErrors!void {
     std.debug.assert(self.test_session.session.mode == .play);
     // complete unfinished turns of enemies
     while (!self.test_session.session.mode.play.is_players_turn) {

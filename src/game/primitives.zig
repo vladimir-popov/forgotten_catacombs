@@ -63,7 +63,7 @@ pub const Point = struct {
         comptime _: []const u8,
         _: std.fmt.FormatOptions,
         writer: anytype,
-    ) !void {
+    ) std.Io.Writer.Error!void {
         try writer.print("Point(r:{d}, c:{d})", .{ self.row, self.col });
     }
 
@@ -206,7 +206,7 @@ pub const Region = struct {
         return .{ .top_left = .{ .row = top_left_row, .col = top_left_col }, .rows = rows, .cols = cols };
     }
 
-    pub fn format(self: Region, writer: *std.Io.Writer) !void {
+    pub fn format(self: Region, writer: *std.Io.Writer) std.Io.Writer.Error!void {
         try writer.print(
             "Region(r:{d}, c:{d}, rows:{d}, cols:{d})",
             .{ self.top_left.row, self.top_left.col, self.rows, self.cols },

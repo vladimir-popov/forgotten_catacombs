@@ -8,6 +8,8 @@ const d = g.dungeon;
 const p = g.primitives;
 const u = g.utils;
 
+const AllocatorError = std.mem.Allocator.Error;
+
 const log = std.log.scoped(.visibility);
 
 /// This global flag is used for cheating.
@@ -27,7 +29,7 @@ pub fn isEntityVisibile(
     place_visibility: g.Render.Visibility,
     player: g.Entity,
     current_cycle: u32,
-) !bool {
+) AllocatorError!bool {
     if (turn_light_on) return true;
 
     switch (place_visibility) {

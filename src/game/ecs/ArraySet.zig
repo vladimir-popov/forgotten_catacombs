@@ -1,6 +1,7 @@
 const std = @import("std");
 const Type = std.builtin.Type;
 const Entity = @import("Entity.zig");
+const AllocatorError = std.mem.Allocator.Error;
 
 /// The container of the components of the type `C`.
 /// The life circle of the components should be equal to the life circle of this container.
@@ -77,7 +78,7 @@ pub fn ArraySet(comptime C: anytype) type {
         }
 
         /// Adds the component of the type `C` for the entity, or replaces existed.
-        pub fn setToEntity(self: *Self, alloc: std.mem.Allocator, entity: Entity, component: C) !void {
+        pub fn setToEntity(self: *Self, alloc: std.mem.Allocator, entity: Entity, component: C) AllocatorError!void {
             if (self.entity_index.get(entity)) |idx| {
                 self.deinitComponent(alloc, idx);
                 self.components.items[idx] = .{ entity, component };
@@ -88,7 +89,7 @@ pub fn ArraySet(comptime C: anytype) type {
         }
 
         /// Returns the component if it exists, or set the passed.
-        pub fn getOrSetForEntity(self: *Self, alloc: std.mem.Allocator, entity: Entity, component: C) !*C {
+        pub fn getOrSetForEntity(self: *Self, alloc: std.mem.Allocator, entity: Entity, component: C) AllocatorError!*C {
             if (self.entity_index.get(entity)) |idx| {
                 return &self.components.items[idx][1];
             } else {
@@ -101,7 +102,7 @@ pub fn ArraySet(comptime C: anytype) type {
 
         /// Deletes the components of the entity from the all inner stores
         /// if they was added before, or does nothing.
-        pub fn removeFromEntity(self: *Self, alloc: std.mem.Allocator, entity: Entity) !void {
+        pub fn removeFromEntity(self: *Self, alloc: std.mem.Allocator, entity: Entity) AllocatorError!void {
             if (self.entity_index.get(entity)) |idx| {
                 _ = self.entity_index.remove(entity);
 

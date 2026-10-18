@@ -112,7 +112,7 @@ test "Trying to sell when the trader doesn't have enough money" {
     , .whole_display);
 }
 
-fn initNearShopWithMoney(test_session: *TestSession, money: u16) !Shop {
+fn initNearShopWithMoney(test_session: *TestSession, money: u16) (g.AllErrors || std.Io.Dir.RealPathFileAllocError)!Shop {
     std.testing.random_seed = 100500;
     try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
     test_session.player.position().place = g.dungeon.FirstLocation.trader_place.movedTo(.right);

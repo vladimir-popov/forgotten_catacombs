@@ -119,7 +119,7 @@ test "Loading a game session" {
 // This is a temp solution to avoid manual recreation of the files during the developing process.
 // This method must be removed after the first release, and versioning of the saves must be
 // implemented and controlled.
-fn generateSaveFiles(test_dir: std.testing.TmpDir) !void {
+fn generateSaveFiles(test_dir: std.testing.TmpDir) (g.AllErrors || std.Io.Dir.RealPathFileAllocError)!void {
     var test_session: TestSession = undefined;
     try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
     test_session.tmp_dir = test_dir;

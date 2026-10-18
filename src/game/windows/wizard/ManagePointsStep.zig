@@ -3,6 +3,7 @@ const g = @import("../../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 const w = g.windows;
+const AllocatorError = std.mem.Allocator.Error;
 
 /// Creates a wizard window for distributing points between character skills.
 ///
@@ -58,7 +59,11 @@ fn ManagePointsStep(
         description_window: ?w.ModalWindow(w.TextArea),
 
         /// Initializes editable values and creates one option per stat or skill.
-        pub fn init(self: *Self, alloc: std.mem.Allocator, context: *Context) !void {
+        pub fn init(
+            self: *Self,
+            alloc: std.mem.Allocator,
+            context: *Context,
+        ) (AllocatorError || std.fmt.BufPrintError)!void {
             self.* = .{
                 .alloc = alloc,
                 .context = context,
@@ -95,12 +100,12 @@ fn ManagePointsStep(
         }
 
         /// Writes the edited values back to the shared context.
-        pub fn commit(self: *Self) !void {
+        pub fn commit(self: *Self) void {
             @field(self.context, field_name).values = self.values;
         }
 
         /// Restores the values that existed when the step was initialized.
-        pub fn rollback(self: *Self) !void {
+        pub fn rollback(self: *Self) void {
             @field(self.context, field_name).values = self.original_values;
         }
 
@@ -113,7 +118,7 @@ fn ManagePointsStep(
         }
 
         /// Handles point allocation, navigation, and descriptions.
-        pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
+        pub fn handleButton(self: *Self, btn: g.Button) g.AllErrors!w.HandleButtonResult {
             if (self.description_window) |*win| {
                 if (try win.handleButton(btn) == .close_window) {
                     win.deinit();
@@ -149,7 +154,7 @@ fn ManagePointsStep(
         }
 
         /// Draws the editable values or the nested description.
-        pub fn drawContent(self: *Self, render: g.Render) !void {
+        pub fn drawContent(self: *Self, render: g.Render) g.SystemError!void {
             if (self.description_window) |*win| {
                 try win.draw(render);
             } else {
@@ -188,7 +193,7 @@ fn ManagePointsStep(
             ptr: *anyopaque,
             _: usize,
             value: Value,
-        ) anyerror!w.HandleButtonResult {
+        ) (AllocatorError || std.fmt.BufPrintError)!w.HandleButtonResult {
             const self: *Self = @ptrCast(@alignCast(ptr));
             std.debug.assert(self.description_window == null);
             self.description_window = try w.modal_window.showDescription(

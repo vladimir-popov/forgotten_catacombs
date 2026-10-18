@@ -79,7 +79,7 @@ test "The arrows entity should be removed when the last arrow was issued" {
     try std.testing.expect(!test_session.player.inventory().items.contains(bow_and_arrows[1]));
 }
 
-fn initFirstLevelWithRat(test_session: *TestSession) !g.Entity {
+fn initFirstLevelWithRat(test_session: *TestSession) (g.AllErrors || error{TestExpectedEqual})!g.Entity {
     // Prepare a game session:
     const pp = test_session.player.position().place.movedToNTimes(.up, 3);
     const rat = try test_session.session.level.addEnemy(.sleeping, g.entities.enemyAtPlace(.cave_rat, pp));
@@ -104,7 +104,7 @@ fn initFirstLevelWithRat(test_session: *TestSession) !g.Entity {
     return rat;
 }
 
-fn equipBowAndArrows(test_session: *TestSession) !struct { g.Entity, g.Entity } {
+fn equipBowAndArrows(test_session: *TestSession) (g.AllErrors || error{ NotFoundOptionById, NotFoundOptionByName, TestExpectedEqual })!struct { g.Entity, g.Entity } {
     const inventory = try test_session.openInventory();
     const arrows_id = try inventory.add(g.entities.presets.Ammo.get(.arrows));
     const bow_id = try inventory.add(g.entities.presets.Weapons.get(.short_bow));

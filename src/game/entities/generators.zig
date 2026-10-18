@@ -4,6 +4,8 @@ const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
+const AllocatorError = std.mem.Allocator.Error;
+
 const enemies_sorted_by_tier = blk: {
     var xs = g.entities.presets.Enemies.fields.values;
     std.mem.sort(*const g.components.Components, &xs, {}, lessThanTier);
@@ -68,7 +70,7 @@ fn allowedEnemyTiers(depth: u4) p.Range(u4) {
 /// Chooses a random enemy from the preset according to the specified depth,
 /// and adds that enemy to the registry as a new entity.
 /// Returns an id of the generated enemy.
-pub fn generateEnemy(registry: *g.Registry, rand: std.Random, depth: u8) !g.Entity {
+pub fn generateEnemy(registry: *g.Registry, rand: std.Random, depth: u8) AllocatorError!g.Entity {
     const range = enemy_ranges_by_depth[depth];
     const enemies = enemies_sorted_by_tier[range.min..range.max];
     const idx = rand.uintLessThan(usize, enemies.len);
@@ -77,19 +79,19 @@ pub fn generateEnemy(registry: *g.Registry, rand: std.Random, depth: u8) !g.Enti
     return try registry.addNewEntity(enemy);
 }
 
-pub fn generateTrap(registry: *g.Registry, rand: std.Random, place: p.Point) !g.Entity {
+pub fn generateTrap(registry: *g.Registry, rand: std.Random, place: p.Point) AllocatorError!g.Entity {
     return try registry.addNewEntity(g.entities.trap(place, rand.int(u2)));
 }
 
-pub fn generateItem(registry: *g.Registry, rand: std.Random, depth: u8) !g.Entity {
+pub fn generateItem(registry: *g.Registry, rand: std.Random, depth: u8) AllocatorError!g.Entity {
     return generateRandomItem(registry, rand, depth, &general_proportions.values);
 }
 
-pub fn generateReward(registry: *g.Registry, rand: std.Random, depth: u8) !g.Entity {
+pub fn generateReward(registry: *g.Registry, rand: std.Random, depth: u8) AllocatorError!g.Entity {
     return generateRandomItem(registry, rand, depth, &general_proportions.values);
 }
 
-pub fn fillShop(registry: *g.Registry, rand: std.Random, shop: *c.Shop, depth: u8) !void {
+pub fn fillShop(registry: *g.Registry, rand: std.Random, shop: *c.Shop, depth: u8) AllocatorError!void {
     const count = rand.uintAtMost(usize, 5) + 10;
     var proportions = general_proportions.values;
     // we don't need gold here
@@ -137,7 +139,7 @@ const general_proportions: std.enums.EnumMap(GeneratedItems, u8) = .init(.{
 /// as a new entity to the registry.
 ///
 /// Returns the id of the generated item.
-fn generateRandomItem(registry: *g.Registry, rand: std.Random, depth: u8, proportions: []const u8) !g.Entity {
+fn generateRandomItem(registry: *g.Registry, rand: std.Random, depth: u8, proportions: []const u8) AllocatorError!g.Entity {
     const item_type: GeneratedItems =
         @enumFromInt(rand.weightedIndex(u8, proportions));
 
@@ -187,7 +189,7 @@ const gold_piles = [_]p.Range(u16){
     .range(107, 281),
 };
 
-fn generateGoldPile(registry: *g.Registry, rand: std.Random, depth: u8) !g.Entity {
+fn generateGoldPile(registry: *g.Registry, rand: std.Random, depth: u8) AllocatorError!g.Entity {
     const gold_pile = gold_piles[depth];
     const coins = gold_pile.choose(rand);
     return try registry.addNewEntity(g.entities.goldPile(coins));
@@ -268,7 +270,7 @@ fn armorOrWeaponWeight(range: p.Range(u8), depth: u8, ops: GenerateArmorAndWeapo
     return @max(ops.tail_weight, ops.base_weight - penalty);
 }
 
-fn generateArmor(registry: *g.Registry, rand: std.Random, depth: u8) !g.Entity {
+fn generateArmor(registry: *g.Registry, rand: std.Random, depth: u8) AllocatorError!g.Entity {
     var proportions: [g.entities.presets.Armor.count]u16 = undefined;
     for (g.entities.presets.Armor.fields.values, 0..) |components, i| {
         const protection = components.armor.?.protection;
@@ -279,7 +281,7 @@ fn generateArmor(registry: *g.Registry, rand: std.Random, depth: u8) !g.Entity {
     return try registry.addNewEntity(g.entities.presets.Armor.fields.values[idx].*);
 }
 
-fn generateWeapon(registry: *g.Registry, rand: std.Random, depth: u8) !g.Entity {
+fn generateWeapon(registry: *g.Registry, rand: std.Random, depth: u8) AllocatorError!g.Entity {
     var proportions: [g.entities.presets.Weapons.count]u16 = undefined;
     for (g.entities.presets.Weapons.fields.values, 0..) |components, i| {
         const damage = components.weapon.?.damage;
@@ -316,7 +318,7 @@ const food_proportions: [g.entities.presets.Food.count]u16 = blk: {
     break :blk proportions;
 };
 
-fn generateFood(registry: *g.Registry, rand: std.Random) !g.Entity {
+fn generateFood(registry: *g.Registry, rand: std.Random) AllocatorError!g.Entity {
     const idx = rand.weightedIndex(u16, &food_proportions);
     return try registry.addNewEntity(g.entities.presets.Food.get(@enumFromInt(idx)));
 }
@@ -340,7 +342,7 @@ const potions_proportions: [g.entities.presets.Potions.count]u16 = blk: {
     break :blk proportions;
 };
 
-fn generatePotion(registry: *g.Registry, rand: std.Random) !g.Entity {
+fn generatePotion(registry: *g.Registry, rand: std.Random) AllocatorError!g.Entity {
     const idx = rand.weightedIndex(u16, &potions_proportions);
     return try registry.addNewEntity(g.entities.presets.Potions.get(@enumFromInt(idx)));
 }
@@ -358,7 +360,7 @@ const ammo_proportions: [g.entities.presets.Ammo.count]u8 = blk: {
     break :blk proportions;
 };
 
-fn generateAmmo(registry: *g.Registry, rand: std.Random) !g.Entity {
+fn generateAmmo(registry: *g.Registry, rand: std.Random) AllocatorError!g.Entity {
     const idx = rand.weightedIndex(u8, &ammo_proportions);
     return try registry.addNewEntity(g.entities.presets.Ammo.get(@enumFromInt(idx)));
 }

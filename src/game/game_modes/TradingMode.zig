@@ -58,7 +58,7 @@ pub fn init(
     self: *Self,
     session: *g.GameSession,
     shop: g.Entity,
-) !void {
+) g.SystemError!void {
     session.runtime.printStackSize(2, "TM.init");
     self.* = .{
         .session = session,
@@ -76,13 +76,13 @@ pub fn init(
         self.shop,
         session.max_depth,
     );
-    _ = try self.main_window.addTab(
+    _ = self.main_window.addTab(
         "Buy",
         w.OptionsArea(g.Entity).initEmpty(self.allocator(), self, .left),
     );
     try self.updateBuyingTab();
 
-    _ = try self.main_window.addTab(
+    _ = self.main_window.addTab(
         "Sell",
         w.OptionsArea(g.Entity).initEmpty(self.allocator(), self, .left),
     );
@@ -113,7 +113,7 @@ inline fn sellingTab(self: *Self) *w.OptionsArea(g.Entity) {
 
 // Keep mode-specific temporaries out of GameSession.tick's shared stack frame
 // to reduce stack usage in other modes on Playdate.
-pub noinline fn tick(self: *Self) !void {
+pub noinline fn tick(self: *Self) g.AllErrors!void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (try self.compositor.handleButton(btn) == .closed_main_window) {
             try self.session.continuePlay(null, null);
@@ -139,12 +139,12 @@ pub noinline fn tick(self: *Self) !void {
     }
 }
 
-fn draw(self: *Self) !void {
+fn draw(self: *Self) g.SystemError!void {
     try self.compositor.draw(self.session.render);
     try self.drawBalance();
 }
 
-fn drawBalance(self: Self) !void {
+fn drawBalance(self: Self) g.SystemError!void {
     var buf: [30]u8 = undefined;
     if (self.main_window.active_tab_idx == 1) {
         try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "Traider's:  {d:4}$", .{self.shop_wallet.money}));
@@ -158,7 +158,7 @@ const product_fmt = std.fmt.comptimePrint(
     .{g.DISPLAY_COLS - 10}, // "{u} ".len == 2 + "0000$".len == 5 + 2 for pads
 );
 
-fn formatProduct(self: *Self, line: *w.TextArea.Line, item: g.Entity, for_buying: bool) ![]const u8 {
+fn formatProduct(self: *Self, line: *w.TextArea.Line, item: g.Entity, for_buying: bool) std.fmt.BufPrintError![]const u8 {
     if (self.session.registry.get2(item, c.Price, c.Sprite)) |tuple| {
         const price, const sprite = tuple;
         var buf: [16]u8 = undefined;
@@ -174,15 +174,15 @@ fn formatProduct(self: *Self, line: *w.TextArea.Line, item: g.Entity, for_buying
     }
 }
 
-fn formatItemForBuying(line: *w.TextArea.Line, ptr: *anyopaque, item: g.Entity) ![]const u8 {
+fn formatItemForBuying(line: *w.TextArea.Line, ptr: *anyopaque, item: g.Entity) std.fmt.BufPrintError![]const u8 {
     return try formatProduct(@ptrCast(@alignCast(ptr)), line, item, true);
 }
 
-fn formatItemForSelling(line: *w.TextArea.Line, ptr: *anyopaque, item: g.Entity) ![]const u8 {
+fn formatItemForSelling(line: *w.TextArea.Line, ptr: *anyopaque, item: g.Entity) std.fmt.BufPrintError![]const u8 {
     return try formatProduct(@ptrCast(@alignCast(ptr)), line, item, false);
 }
 
-fn updateBuyingTab(self: *Self) !void {
+fn updateBuyingTab(self: *Self) g.SystemError!void {
     try w.updateAreaWithItems(
         self.buyingTab(),
         self,
@@ -192,7 +192,7 @@ fn updateBuyingTab(self: *Self) !void {
     );
 }
 
-fn updateSellingTab(self: *Self) !void {
+fn updateSellingTab(self: *Self) g.SystemError!void {
     try w.updateAreaWithItems(
         self.sellingTab(),
         self,
@@ -202,7 +202,7 @@ fn updateSellingTab(self: *Self) !void {
     );
 }
 
-fn buyOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn buyOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const window = try self.compositor.showModalWindowWithOptions(
         self.allocator(),
@@ -219,7 +219,7 @@ fn buyOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResul
     return .keep_open;
 }
 
-fn sellOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn sellOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const window = try self.compositor.showModalWindowWithOptions(self.allocator(), &.{}, g.Entity, self, .center);
     const area = &window.panel.area;
@@ -230,7 +230,7 @@ fn sellOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResu
     return .keep_open;
 }
 
-fn buySelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn buySelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const price = self.session.registry.getUnsafe(item, c.Price).value;
     log.debug("Buying item {d}", .{item.id});
@@ -253,7 +253,7 @@ fn buySelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonRes
     return .close_window;
 }
 
-fn sellSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn sellSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const price = g.meta.sellingPrice(self.session.journal, item, self.session.registry.getUnsafe(item, c.Price));
     log.debug("Selling {d}", .{item.id});
@@ -276,7 +276,7 @@ fn sellSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonRe
     return .close_window;
 }
 
-fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Show info about item {d}", .{item.id});
     try self.compositor.showEntityDescription(self.allocator(), self.session, item);

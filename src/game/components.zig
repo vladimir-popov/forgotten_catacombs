@@ -3,6 +3,8 @@ const g = @import("game_pkg.zig");
 const p = g.primitives;
 const u = g.utils;
 
+const AllocatorError = std.mem.Allocator.Error;
+
 pub const Ammunition = struct {
     pub const Type = enum { arrows, bolts, bullets };
     amount: u8,
@@ -331,7 +333,7 @@ pub const Inventory = struct {
 
     items: u.EntitiesSet,
 
-    pub fn empty(alloc: std.mem.Allocator) !Inventory {
+    pub fn empty(alloc: std.mem.Allocator) AllocatorError!Inventory {
         return .{ .items = try u.EntitiesSet.init(alloc) };
     }
 
@@ -440,7 +442,7 @@ pub const Modifications = struct {
 pub const Pile = struct {
     items: u.EntitiesSet,
 
-    pub fn empty(alloc: std.mem.Allocator) !Pile {
+    pub fn empty(alloc: std.mem.Allocator) AllocatorError!Pile {
         return .{ .items = try u.EntitiesSet.init(alloc) };
     }
 
@@ -509,7 +511,7 @@ pub const Regeneration = struct {
 pub const Shop = struct {
     items: u.EntitiesSet,
 
-    pub fn empty(alloc: std.mem.Allocator) !Shop {
+    pub fn empty(alloc: std.mem.Allocator) AllocatorError!Shop {
         return .{ .items = try u.EntitiesSet.init(alloc) };
     }
 

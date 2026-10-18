@@ -18,6 +18,8 @@ const g = @import("../game_pkg.zig");
 const p = g.primitives;
 const d = @import("dungeon_pkg.zig");
 
+const AllocatorError = std.mem.Allocator.Error;
+
 const Self = @This();
 
 const pad = 10;
@@ -50,7 +52,7 @@ area: d.Area,
 doorways: std.AutoHashMapUnmanaged(p.Point, d.Doorway),
 
 /// Uses arena to create a self instance and trying to generate a dungeon with passed seed.
-pub fn generateDungeon(arena: *std.heap.ArenaAllocator) !d.Dungeon {
+pub fn generateDungeon(arena: *std.heap.ArenaAllocator) AllocatorError!d.Dungeon {
     const alloc = arena.allocator();
     const self = try alloc.create(Self);
     self.* = init(alloc);
@@ -70,7 +72,7 @@ pub fn deinit(self: *Self) void {
     self.doorways.deinit(self.alloc);
 }
 
-pub fn dungeon(self: *Self) !d.Dungeon {
+pub fn dungeon(self: *Self) AllocatorError!d.Dungeon {
     try self.createRoom(ladder_room, ladder.movedTo(.down));
     try self.createRoom(traider_tent, traider_tent.bottomRight().movedTo(.up));
     try self.createRoom(scientist_tent, scientist_tent.bottomRight().movedTo(.up));
@@ -92,7 +94,7 @@ pub fn dungeon(self: *Self) !d.Dungeon {
     };
 }
 
-fn createRoom(self: *Self, region: p.Region, door: p.Point) !void {
+fn createRoom(self: *Self, region: p.Region, door: p.Point) AllocatorError!void {
     const doorway = d.Doorway{
         .placement_from = .{ .area = &self.area },
         .placement_to = .{ .room = try self.area.addRoom(self.alloc, region, door) },

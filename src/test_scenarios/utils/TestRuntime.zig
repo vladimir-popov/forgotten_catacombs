@@ -9,6 +9,7 @@ const Menu = terminal.TtyRuntime.Menu;
 const log = std.log.scoped(.test_runtime);
 
 const Self = @This();
+const AllocatorError = std.mem.Allocator.Error;
 
 const Error = g.Runtime.Error;
 
@@ -35,7 +36,7 @@ is_dev_mode: bool = false,
 cheat: ?g.Cheat = null,
 stack_start: usize = 0,
 
-pub fn init(alloc: std.mem.Allocator, io: std.Io, working_dir: std.Io.Dir) !Self {
+pub fn init(alloc: std.mem.Allocator, io: std.Io, working_dir: std.Io.Dir) AllocatorError!Self {
     return .{
         .alloc = alloc,
         .io = io,

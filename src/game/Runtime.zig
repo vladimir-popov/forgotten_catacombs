@@ -9,6 +9,7 @@ const stack_log = std.log.scoped(.stack);
 
 const Self = @This();
 
+/// Errors returned by platform-facing input, drawing, and file I/O operations.
 pub const Error = error{
     InputError,
     DrawingError,
@@ -105,7 +106,7 @@ pub fn cleanInputBuffer(self: *const Self) Error!void {
     try self.vtable.cleanInputBuffer(self.context);
 }
 
-pub fn clearDisplay(self: *const Self) !void {
+pub fn clearDisplay(self: *const Self) Error!void {
     try self.vtable.clearDisplay(self.context);
 }
 

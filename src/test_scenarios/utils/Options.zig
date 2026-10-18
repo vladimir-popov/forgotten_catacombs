@@ -11,7 +11,7 @@ test_session: *TestSession,
 /// Selects an option with the passed name or throws `OptionWasNotFound` error.
 /// If the options was found, a button is pressed to choose that option.
 /// To find an option this function checks the label of every item for containing the passed name.
-pub fn choose(self: Self, option_name: []const u8) !void {
+pub fn choose(self: Self, option_name: []const u8) (g.AllErrors || error{NotFoundOptionByName})!void {
     for (self.options_area.options.items, 0..) |*option, idx| {
         if (std.mem.containsAtLeast(u8, option.label(), 1, option_name)) {
             self.options_area.selectLine(idx);
@@ -23,7 +23,7 @@ pub fn choose(self: Self, option_name: []const u8) !void {
     return error.NotFoundOptionByName;
 }
 
-pub fn chooseById(self: Self, item_id: g.Entity) !void {
+pub fn chooseById(self: Self, item_id: g.Entity) (g.AllErrors || error{NotFoundOptionById})!void {
     for (self.options_area.options.items, 0..) |*option, idx| {
         if (option.item.eql(item_id)) {
             self.options_area.selectLine(idx);
@@ -35,7 +35,7 @@ pub fn chooseById(self: Self, item_id: g.Entity) !void {
     return error.NotFoundOptionById;
 }
 
-pub fn chooseByIndex(self: Self, idx: usize) !void {
+pub fn chooseByIndex(self: Self, idx: usize) g.AllErrors!void {
     self.options_area.selectLine(idx);
     try self.test_session.pressButton(.a);
 }

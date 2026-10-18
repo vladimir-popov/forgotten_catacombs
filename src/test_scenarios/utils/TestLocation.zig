@@ -18,6 +18,7 @@ const p = g.primitives;
 const d = g.dungeon;
 
 const Self = @This();
+const AllocatorError = std.mem.Allocator.Error;
 
 const dungeon_region: p.Region = p.Region{
     .top_left = .{ .row = 1, .col = 1 },
@@ -28,14 +29,14 @@ const dungeon_region: p.Region = p.Region{
 area: d.Area,
 
 /// Uses arena to create a self instance and trying to generate a dungeon with passed seed.
-pub fn generateDungeon(arena: *std.heap.ArenaAllocator) !d.Dungeon {
+pub fn generateDungeon(arena: *std.heap.ArenaAllocator) AllocatorError!d.Dungeon {
     const alloc = arena.allocator();
     const self = try alloc.create(Self);
     self.area = .init(dungeon_region);
     return try self.dungeon();
 }
 
-pub fn dungeon(self: *Self) !d.Dungeon {
+pub fn dungeon(self: *Self) AllocatorError!d.Dungeon {
     return .{
         .seed = 0,
         .type = .test_location,

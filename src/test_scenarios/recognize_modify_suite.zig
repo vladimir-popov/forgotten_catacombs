@@ -267,7 +267,7 @@ test "A broken unknown item can't be repaired" {
 /// Initializes a test session with a player on the start level near the scientist.
 /// Sets the money to the player's wallet, and adds a healing potion as unknown to the player's inventory.
 /// Returns the new test session, id of the healing potion, and id of the player's weapon.
-fn initNearScientistWithMoney(test_session: *TestSession, money: u16) !struct { RecognizeModify, g.Entity, g.Entity } {
+fn initNearScientistWithMoney(test_session: *TestSession, money: u16) (g.AllErrors || std.Io.Dir.RealPathFileAllocError)!struct { RecognizeModify, g.Entity, g.Entity } {
     std.testing.random_seed = 100500;
     try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
     const known_weapon_id = test_session.player.equipment().weapon.?;

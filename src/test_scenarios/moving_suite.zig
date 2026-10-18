@@ -3,7 +3,7 @@ const g = @import("game");
 const c = g.components;
 const TestSession = @import("utils/TestSession.zig");
 
-fn setup(test_session: *TestSession) !void {
+fn setup(test_session: *TestSession) (g.AllErrors || std.Io.Dir.RealPathFileAllocError || error{ TestExpectedEqual, TestUnexpectedResult })!void {
     try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
     try test_session.tick(.{});
     try test_session.runtime.display.expectLooksLike(

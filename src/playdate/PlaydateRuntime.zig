@@ -30,7 +30,7 @@ stack_start: usize = 0,
 // right after closing menu. But we have to ignore that events.
 is_menu_shown: bool = false,
 
-pub fn init(playdate: *api.PlaydateAPI) !Self {
+pub fn init(playdate: *api.PlaydateAPI) Self {
     const err: ?*[*c]const u8 = null;
 
     const bitmap_table: *api.LCDBitmapTable = playdate.graphics.loadBitmapTable("sprites", err) orelse {
@@ -138,7 +138,7 @@ fn cleanInputBuffer(ptr: *anyopaque) RuntimeError!void {
     self.last_button = .reset;
 }
 
-fn clearDisplay(ptr: *anyopaque) !void {
+fn clearDisplay(ptr: *anyopaque) RuntimeError!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     self.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
 }

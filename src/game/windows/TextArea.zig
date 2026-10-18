@@ -5,6 +5,7 @@ const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 const w = g.windows;
+const AllocatorError = std.mem.Allocator.Error;
 
 const log = std.log.scoped(.windows);
 
@@ -55,7 +56,7 @@ pub fn getButtons(_: *Self) w.Buttons {
 ///
 /// Pressing `a` requests that the parent window be closed. Other buttons do
 /// not change the text area and keep the parent window open.
-pub fn handleButton(_: *Self, btn: g.Button) !w.HandleButtonResult {
+pub fn handleButton(_: *Self, btn: g.Button) w.HandleButtonResult {
     switch (btn.game_button) {
         .a => return .close_window,
         else => {},
@@ -68,7 +69,7 @@ pub fn handleButton(_: *Self, btn: g.Button) !w.HandleButtonResult {
 /// The area is cleared first. `scrolled` specifies the index of the first line
 /// to draw, and at most `region.rows` lines are rendered. Text that exceeds the
 /// available width is cropped by the renderer.
-pub fn drawContent(self: *const Self, render: g.Render, region: p.Region, scrolled: usize) !void {
+pub fn drawContent(self: *const Self, render: g.Render, region: p.Region, scrolled: usize) (g.Runtime.Error || g.Utf8Error)!void {
     // Clear the region
     try render.fillRegion(g.Render.default_filler, .normal, region);
     // Draw the text
@@ -87,7 +88,7 @@ pub fn clearRetainingCapacity(self: *Self) void {
 }
 
 /// Appends a blank line and returns a pointer to its writable buffer.
-pub fn addEmptyLine(self: *Self) !*Line {
+pub fn addEmptyLine(self: *Self) AllocatorError!*Line {
     const line = try self.lines.addOne(self.alloc);
     line.* = @splat(' ');
     return line;
@@ -96,14 +97,14 @@ pub fn addEmptyLine(self: *Self) !*Line {
 /// Appends a new line containing a copy of `text`.
 ///
 /// The caller must ensure that `text` fits in a single line buffer.
-pub fn printLine(self: *Self, text: []const u8) !void {
+pub fn printLine(self: *Self, text: []const u8) AllocatorError!void {
     const line = try self.lines.addOne(self.alloc);
     line.* = @splat(' ');
     @memcpy(line[0..text.len], text);
 }
 
 /// Formats and appends a new line using `fmt` and `args`.
-pub fn printLineFmt(self: *Self, comptime fmt: []const u8, args: anytype) !void {
+pub fn printLineFmt(self: *Self, comptime fmt: []const u8, args: anytype) (AllocatorError || std.fmt.BufPrintError)!void {
     const line = try self.lines.addOne(self.alloc);
     line.* = @splat(' ');
     _ = try std.fmt.bufPrint(line, fmt, args);

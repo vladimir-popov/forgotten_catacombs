@@ -9,6 +9,8 @@ const ecs = g.ecs;
 const p = g.primitives;
 const u = g.utils;
 
+const AllocatorError = std.mem.Allocator.Error;
+
 const log = std.log.scoped(.level);
 
 const Self = @This();
@@ -82,11 +84,8 @@ pub fn initWithEmptyDungeon(
     player: g.Entity,
     depth: u8,
     seed: u64,
-) !void {
-    const dungeon = try generateDungeon(&self.arena, depth, seed) orelse {
-        log.err("A dungeon was not generate from the saved seed {d}", .{seed});
-        return error.BrokenSeed;
-    };
+) (AllocatorError || g.DungeonGenerationError)!void {
+    const dungeon = try generateDungeon(&self.arena, depth, seed);
     try self.setupDungeon(depth, dungeon, player);
 }
 
@@ -97,7 +96,7 @@ pub fn setupDungeon(
     depth: u8,
     dungeon: d.Dungeon,
     player: g.Entity,
-) !void {
+) AllocatorError!void {
     log.debug(
         "Setting up a dungeon with type {s} to the level on depth {d}. Player id is {d}",
         .{ @tagName(dungeon.type), depth, player.id },
@@ -129,7 +128,7 @@ pub fn setupDungeon(
 pub fn initAsFirstLevel(
     self: *Self,
     player: g.Entity,
-) !void {
+) (AllocatorError || g.DungeonGenerationError)!void {
     log.debug("Start creating the first level.", .{});
 
     try self.initWithEmptyDungeon(player, 0, 0);
@@ -205,12 +204,16 @@ pub fn generateNew(
     depth: u8,
     from_ladder: c.Ladder,
     progress: GeneratingProgress,
-) !GeneratingProgress {
+) (AllocatorError || g.DungeonGenerationError)!GeneratingProgress {
     switch (progress) {
         .start, .generate_dungeon => {
-            const dungeon: d.Dungeon = (try generateDungeon(&self.arena, depth, rand.int(u64))) orelse {
-                self.reset();
-                return .generate_dungeon;
+            const dungeon = generateDungeon(&self.arena, depth, rand.int(u64)) catch |err| switch (err) {
+                error.DungeonGenerationFailed => {
+                    self.reset();
+                    // Try one more time with another seed
+                    return .generate_dungeon;
+                },
+                else => return err,
             };
             log.debug("A {s} has been generated on depth {d}.", .{ @tagName(dungeon.type), depth });
             try self.setupDungeon(depth, dungeon, player);
@@ -300,7 +303,7 @@ pub fn bindDoorsWithDoorways(self: *Self) void {
 
 /// Sets up a position for the player if the direction is provided, and remembers the placement with the player.
 /// This is the final step of the initialization process.
-pub fn completeInitialization(self: *Self, moving_direction: ?c.Ladder.Direction) !void {
+pub fn completeInitialization(self: *Self, moving_direction: ?c.Ladder.Direction) AllocatorError!void {
     if (moving_direction) |direction| {
         const init_place = switch (direction) {
             .down => self.dungeon.entrance,
@@ -317,7 +320,11 @@ pub fn completeInitialization(self: *Self, moving_direction: ?c.Ladder.Direction
     );
 }
 
-fn generateDungeon(arena: *std.heap.ArenaAllocator, depth: u8, seed: u64) !?d.Dungeon {
+fn generateDungeon(
+    arena: *std.heap.ArenaAllocator,
+    depth: u8,
+    seed: u64,
+) (AllocatorError || g.DungeonGenerationError)!d.Dungeon {
     return if (depth == 0)
         try d.FirstLocation.generateDungeon(arena)
     else if (depth < 3)
@@ -333,23 +340,23 @@ pub inline fn isVisited(self: *const Self, place: p.Point) bool {
         self.visited_places[place.row - 1].isSet(place.col - 1);
 }
 
-pub fn addVisitedPlace(self: *Self, visited_place: p.Point) !void {
+pub fn addVisitedPlace(self: *Self, visited_place: p.Point) void {
     if (visited_place.row > self.dungeon.rows or visited_place.col > self.dungeon.cols) return;
     self.visited_places[visited_place.row - 1].set(visited_place.col - 1);
 }
 
-pub fn rememberObject(self: *Self, entity: g.Entity, place: p.Point) !void {
+pub fn rememberObject(self: *Self, entity: g.Entity, place: p.Point) AllocatorError!void {
     log.debug("Remember object {any} at {any}", .{ entity, place });
-    self.remembered_objects.put(self.arena.allocator(), place, entity);
+    try self.remembered_objects.put(self.arena.allocator(), place, entity);
 }
 
-pub fn forgetObject(self: *Self, place: p.Point) !void {
+pub fn forgetObject(self: *Self, place: p.Point) void {
     log.debug("Forget object at {any}", .{place});
-    _ = try self.remembered_objects.remove(place);
+    _ = self.remembered_objects.remove(place);
 }
 
 /// Removes if exists the entity from inner index, or do nothing.
-pub fn removeEntity(self: *Self, entity: g.Entity) !void {
+pub fn removeEntity(self: *Self, entity: g.Entity) void {
     for (0..self.entities_on_level.items.len) |idx| {
         if (entity.eql(self.entities_on_level.items[idx])) {
             _ = self.entities_on_level.swapRemove(idx);
@@ -368,7 +375,7 @@ pub fn removeEntity(self: *Self, entity: g.Entity) !void {
 ///   - If a pile is on the place, the item will be added to this pile;
 ///
 /// Returns entity id for the pile if it was created;
-pub fn addItemAtPlace(self: *Self, item: g.Entity, place: p.Point) !?g.Entity {
+pub fn addItemAtPlace(self: *Self, item: g.Entity, place: p.Point) AllocatorError!?g.Entity {
     switch (self.cellAt(place)) {
         .entities => |entities| {
             // if some item already exists on the place
@@ -484,8 +491,8 @@ pub fn cellAt(self: *const Self, place: p.Point) Cell {
             found_entity = true;
             // only one entity with the same order can be at the same place
             if (result[order]) |existed_item| {
-                const existed_item_name = try g.Description.rawName(self.registry, existed_item);
-                const entity_name = try g.Description.rawName(self.registry, entity);
+                const existed_item_name = g.Description.rawName(self.registry, existed_item);
+                const entity_name = g.Description.rawName(self.registry, entity);
                 std.debug.panic(
                     "Both items {any} '{s}' and {any} '{s}' with order {s} at same place {any}",
                     .{ existed_item, existed_item_name, entity, entity_name, @tagName(position.zorder), place },
@@ -499,7 +506,7 @@ pub fn cellAt(self: *const Self, place: p.Point) Cell {
 
 /// Puts an item on the place in the level if no other item, trap, or obstacle on that place.
 /// Otherwise do nothing and returns `false`.
-pub fn tryToPutItem(self: *Self, item: g.Entity, place: p.Point) !bool {
+pub fn tryToPutItem(self: *Self, item: g.Entity, place: p.Point) AllocatorError!bool {
     switch (self.cellAt(place)) {
         .landscape => |landscape| if (landscape == .doorway) return false,
         .entities => |entities| if (entities[@intFromEnum(c.Position.ZOrder.item)] != null)
@@ -530,7 +537,7 @@ pub fn itemAt(self: *const Self, place: p.Point) ?g.Entity {
 
 // The level doesn't subscribe to event directly to avoid unsubscription.
 // Instead, the PlayMode delegates events to the actual level.
-pub fn onPlayerMoved(self: *Self, player_moved: g.events.EntityMoved) !void {
+pub fn onPlayerMoved(self: *Self, player_moved: g.events.EntityMoved) AllocatorError!void {
     std.debug.assert(player_moved.is_player);
     self.updatePlacement(player_moved.moved_from, player_moved.targetPlace());
     const player_place = self.playerPosition().place;
@@ -564,33 +571,33 @@ fn updatePlacement(self: *Self, player_moved_from: p.Point, player_moved_to: p.P
 
 // Note: next methods are public for test
 
-fn addLadder(self: *g.Level, ladder: c.Ladder, place: p.Point) !void {
+fn addLadder(self: *g.Level, ladder: c.Ladder, place: p.Point) AllocatorError!void {
     try self.registry.setComponentsToEntity(ladder.id, g.entities.ladder(ladder, place));
     try self.entities_on_level.append(self.arena.allocator(), ladder.id);
 }
 
-pub fn addEnemy(self: *g.Level, state: c.EnemyState, enemy: c.Components) !g.Entity {
+pub fn addEnemy(self: *g.Level, state: c.EnemyState, enemy: c.Components) AllocatorError!g.Entity {
     const id = try self.registry.addNewEntity(enemy);
     try self.entities_on_level.append(self.arena.allocator(), id);
     try self.registry.set(id, state);
     return id;
 }
 
-pub fn addRandomEnemy(self: *g.Level, rand: std.Random, place: p.Point) !g.Entity {
+pub fn addRandomEnemy(self: *g.Level, rand: std.Random, place: p.Point) AllocatorError!g.Entity {
     const entity = try g.entities.generators.generateEnemy(self.registry, rand, self.depth);
     try self.registry.set(entity, c.Position{ .place = place, .zorder = .obstacle });
     try self.entities_on_level.append(self.arena.allocator(), entity);
     return entity;
 }
 
-fn addRandomItem(self: *g.Level, rand: std.Random, place: p.Point) !g.Entity {
+fn addRandomItem(self: *g.Level, rand: std.Random, place: p.Point) AllocatorError!g.Entity {
     const entity = try g.entities.generators.generateItem(self.registry, rand, self.depth);
     try self.registry.set(entity, c.Position{ .place = place, .zorder = .item });
     try self.entities_on_level.append(self.arena.allocator(), entity);
     return entity;
 }
 
-pub fn addRandomTrap(self: *g.Level, rand: std.Random, place: p.Point) !g.Entity {
+pub fn addRandomTrap(self: *g.Level, rand: std.Random, place: p.Point) AllocatorError!g.Entity {
     const entity = try g.entities.generators.generateTrap(self.registry, rand, place);
     try self.entities_on_level.append(self.arena.allocator(), entity);
     return entity;

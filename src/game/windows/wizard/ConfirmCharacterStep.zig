@@ -21,6 +21,7 @@ const g = @import("../../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 const w = g.windows;
+const AllocatorError = std.mem.Allocator.Error;
 
 const PANEL_REGION: p.Region = .{
     .top_left = .{ .row = 3, .col = 2 },
@@ -37,7 +38,11 @@ pub fn ConfirmCharacterStep(comptime Context: type) type {
         panel: w.ScrollablePanel(w.TextArea),
 
         /// Builds the character summary from the shared context.
-        pub fn init(self: *Self, alloc: std.mem.Allocator, context: *Context) !void {
+        pub fn init(
+            self: *Self,
+            alloc: std.mem.Allocator,
+            context: *Context,
+        ) (AllocatorError || std.fmt.BufPrintError)!void {
             self.context = context;
             self.panel = .{ .area = .initEmpty(alloc), .region = PANEL_REGION };
             self.context.health = g.meta.initialHealth(self.context.stats.get(.constitution));
@@ -57,10 +62,10 @@ pub fn ConfirmCharacterStep(comptime Context: type) type {
         }
 
         /// No additional work is required when the summary is accepted.
-        pub fn commit(_: *Self) !void {}
+        pub fn commit(_: *Self) void {}
 
         /// No changes are made by this read-only step.
-        pub fn rollback(_: *Self) !void {}
+        pub fn rollback(_: *Self) void {}
 
         /// Returns the final `Play` button.
         pub fn getButtons(_: *Self) w.Buttons {
@@ -70,7 +75,7 @@ pub fn ConfirmCharacterStep(comptime Context: type) type {
         }
 
         /// Handles scrolling and completion of the summary.
-        pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
+        pub fn handleButton(self: *Self, btn: g.Button) g.AllErrors!w.HandleButtonResult {
             switch (btn.game_button) {
                 .a => {
                     return .close_window;
@@ -84,7 +89,7 @@ pub fn ConfirmCharacterStep(comptime Context: type) type {
         }
 
         /// Draws the character summary.
-        pub fn drawContent(self: Self, render: g.Render) !void {
+        pub fn drawContent(self: Self, render: g.Render) g.SystemError!void {
             try render.drawTextWithAlign(
                 PANEL_REGION.cols,
                 "Continue with this character?",

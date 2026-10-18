@@ -1,4 +1,5 @@
 const std = @import("std");
+const AllocatorError = std.mem.Allocator.Error;
 const g = @import("game_pkg.zig");
 const c = g.components;
 const cp = g.codepoints;
@@ -17,11 +18,13 @@ description: []const []const u8 = &.{},
 
 alt_description: []const []const u8 = &.{},
 
+const DescriptionError = AllocatorError || std.fmt.BufPrintError;
+
 pub fn get(preset: g.descriptions.Preset.Tag) *const Self {
     return g.descriptions.Preset.fields.get(preset);
 }
 
-pub fn rawName(registry: *g.Registry, entity: g.Entity) ![]const u8 {
+pub fn rawName(registry: *g.Registry, entity: g.Entity) []const u8 {
     if (registry.get(entity, c.Description)) |description| {
         return get(description.preset).name;
     } else {
@@ -41,7 +44,7 @@ pub const ActualNameFormatter = struct {
         if (self.journal.registry.get(self.entity, c.Ammunition)) |ammo| {
             return try writer.print(
                 "{s} {d}",
-                .{ try g.Description.rawName(self.journal.registry, self.entity), ammo.amount },
+                .{ g.Description.rawName(self.journal.registry, self.entity), ammo.amount },
             );
         }
         if (self.journal.registry.get(self.entity, c.Description)) |description| {
@@ -54,7 +57,7 @@ pub const ActualNameFormatter = struct {
                     },
                 );
         }
-        return try writer.writeAll(try g.Description.rawName(self.journal.registry, self.entity));
+        return try writer.writeAll(g.Description.rawName(self.journal.registry, self.entity));
     }
 };
 
@@ -64,7 +67,7 @@ pub fn actualNameFormatter(journal: g.Journal, entity: g.Entity) ActualNameForma
 
 /// Writes an actual name of the entity according to its "known" status in the journal
 /// to the `dest` buffer and returns a slice with result.
-pub fn printActualName(dest: []u8, journal: g.Journal, entity: g.Entity) ![]u8 {
+pub fn printActualName(dest: []u8, journal: g.Journal, entity: g.Entity) std.fmt.BufPrintError![]u8 {
     return try std.fmt.bufPrint(dest, "{f}", .{actualNameFormatter(journal, entity)});
 }
 
@@ -72,7 +75,7 @@ pub fn describePlayer(
     journal: g.Journal,
     player: g.Entity,
     text_area: *g.windows.TextArea,
-) !void {
+) DescriptionError!void {
     if (journal.registry.get6(player, c.Experience, c.Health, c.Hunger, c.Stats, c.Skills, c.Equipment)) |tuple| {
         const experience, const health, const hunger, const stats, const skills, const equipment = tuple;
         try describeProgression(experience.level, experience.experience, text_area);
@@ -101,7 +104,7 @@ pub fn describeProgression(
     level: u4,
     experience: u16,
     text_area: *g.windows.TextArea,
-) !void {
+) DescriptionError!void {
     try text_area.printLineFmt("Level: {d}", .{level});
     try text_area.printLineFmt(
         "Experience: {d}/{d}",
@@ -113,7 +116,7 @@ pub fn describeProgression(
 /// ```
 /// HP: {d}/{d}
 /// ```
-pub fn describeHealth(health: *const c.Health, text_area: *g.windows.TextArea) !void {
+pub fn describeHealth(health: *const c.Health, text_area: *g.windows.TextArea) DescriptionError!void {
     try text_area.printLineFmt("Health: {d}/{d}", .{ health.current_hp, health.max });
 }
 
@@ -128,7 +131,7 @@ pub fn describeHealth(health: *const c.Health, text_area: *g.windows.TextArea) !
 pub fn describeSkills(
     skills: *const c.Skills,
     text_area: *g.windows.TextArea,
-) !void {
+) DescriptionError!void {
     var line = try text_area.addEmptyLine();
     _ = try std.fmt.bufPrint(line, "Skills:", .{});
     line = try text_area.addEmptyLine();
@@ -153,7 +156,7 @@ pub fn describeSkills(
 pub fn describeStats(
     stats: *const c.Stats,
     text_area: *g.windows.TextArea,
-) !void {
+) DescriptionError!void {
     var line = try text_area.addEmptyLine();
     _ = try std.fmt.bufPrint(line, "Stats:", .{});
     line = try text_area.addEmptyLine();
@@ -172,7 +175,7 @@ pub fn describeEnemy(
     journal: g.Journal,
     enemy: g.Entity,
     text_area: *g.windows.TextArea,
-) !void {
+) DescriptionError!void {
     const enemy_type = g.meta.getEnemyType(journal.registry, enemy) orelse @panic("Unknown enemy");
     if (journal.known_enemies.contains(enemy_type)) {
         try writeAltDescription(journal, enemy, text_area);
@@ -214,7 +217,7 @@ pub fn describeItem(
     item: g.Entity,
     is_equipped: bool,
     text_area: *g.windows.TextArea,
-) !void {
+) DescriptionError!void {
     if (journal.registry.get(item, c.Potion)) |potion| {
         if (journal.unknownPotionColor(potion.*)) |color| {
             try text_area.printLineFmt("A swirling liquid of {t} color", .{color});
@@ -253,7 +256,7 @@ fn writeDescription(
     journal: g.Journal,
     entity: g.Entity,
     text_area: *g.windows.TextArea,
-) !void {
+) DescriptionError!void {
     if (journal.registry.get(entity, c.Description)) |descr| {
         const description = g.descriptions.Preset.fields.get(descr.preset).description;
         for (description) |str|
@@ -265,7 +268,7 @@ fn writeAltDescription(
     journal: g.Journal,
     entity: g.Entity,
     text_area: *g.windows.TextArea,
-) !void {
+) DescriptionError!void {
     if (journal.registry.get(entity, c.Description)) |descr| {
         const description = g.descriptions.Preset.fields.get(descr.preset).alt_description;
         for (description) |str|
@@ -323,7 +326,7 @@ fn describeWeapon(
     weapon: *const c.Weapon,
     is_equipped: bool,
     text_area: *g.windows.TextArea,
-) !void {
+) DescriptionError!void {
     log.debug("Describe a weapon {d} {any}", .{ entity.id, weapon });
 
     if (weapon.class != .native) {
@@ -400,7 +403,7 @@ fn describeArmor(
     armor: *const c.Armor,
     is_equipped: bool,
     text_area: *g.windows.TextArea,
-) !void {
+) DescriptionError!void {
     log.debug("Describe an armor {d} {any}", .{ entity.id, armor });
 
     try text_area.printLineFmt("Protection: {d}-{d}", .{ armor.protection.min, armor.protection.max });
@@ -431,7 +434,7 @@ fn describeModificationsAndTraits(
     registry: *const g.Registry,
     entity: g.Entity,
     text_area: *g.windows.TextArea,
-) !void {
+) DescriptionError!void {
     if (registry.get(entity, c.Improvements)) |improvements| {
         var itr = improvements.modifications.iterator();
         while (itr.next()) |eff| {
@@ -460,7 +463,7 @@ pub fn describeEquipedItems(
     journal: g.Journal,
     equipment: *const c.Equipment,
     text_area: *g.windows.TextArea,
-) !void {
+) DescriptionError!void {
     if (equipment.weapon) |weapon_id| {
         try text_area.printLineFmt("Equiped weapon: {f}", .{actualNameFormatter(journal, weapon_id)});
         const weapon = journal.registry.getUnsafe(weapon_id, c.Weapon);
@@ -490,7 +493,7 @@ pub fn describeEquipedItems(
 pub fn describeTrap(
     trap: *const c.Trap,
     text_area: *g.windows.TextArea,
-) !void {
+) DescriptionError!void {
     const label = switch (trap.power) {
         0 => "easy to disarm",
         1 => "have to tinker",
@@ -506,10 +509,10 @@ test ActualNameFormatter {
     defer arena.deinit();
     var buffer: [64]u8 = undefined;
     var registry = try g.Registry.init(&arena);
-    const journal = try g.Journal.init(&registry, std.enums.values(g.Color));
+    const journal = g.Journal.init(&registry, std.enums.values(g.Color));
 
     const entity = try registry.addNewEntity(g.entities.presets.Items.get(.torch));
-    const raw_name = try g.Description.rawName(&registry, entity);
+    const raw_name = g.Description.rawName(&registry, entity);
 
     // when:
     const actual_name = try std.fmt.bufPrint(&buffer, "{f}", .{g.Description.actualNameFormatter(journal, entity)});
@@ -525,7 +528,7 @@ test "Describe a player" {
     const alloc = arena.allocator();
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
     var registry = try g.Registry.init(&arena);
-    const journal = try g.Journal.init(&registry, std.enums.values(g.Color));
+    const journal = g.Journal.init(&registry, std.enums.values(g.Color));
     var text_area: g.windows.TextArea = .initEmpty(alloc);
 
     const player = try registry.addNewEntity(try g.entities.player(alloc, prng.random(), .zeros, .zeros, .init(30)));
@@ -567,7 +570,7 @@ test "Describe an unknown rat" {
     defer game_state_arena.deinit();
 
     var registry = try g.Registry.init(&game_state_arena);
-    const journal = try g.Journal.init(&registry, std.enums.values(g.Color));
+    const journal = g.Journal.init(&registry, std.enums.values(g.Color));
 
     const id = try registry.addNewEntity(g.entities.presets.Enemies.get(.cave_rat));
     var text_area: g.windows.TextArea = .initEmpty(std.testing.allocator);
@@ -595,7 +598,7 @@ test "Describe a known rat" {
     defer game_state_arena.deinit();
 
     var registry = try g.Registry.init(&game_state_arena);
-    var journal = try g.Journal.init(&registry, std.enums.values(g.Color));
+    var journal = g.Journal.init(&registry, std.enums.values(g.Color));
 
     const id = try registry.addNewEntity(g.entities.presets.Enemies.get(.cave_rat));
     try journal.markEnemyAsKnown(g.meta.getEnemyType(&registry, id) orelse unreachable);
@@ -626,7 +629,7 @@ test "Describe a melee weapon" {
     defer game_state_arena.deinit();
 
     var registry = try g.Registry.init(&game_state_arena);
-    const journal = try g.Journal.init(&registry, std.enums.values(g.Color));
+    const journal = g.Journal.init(&registry, std.enums.values(g.Color));
 
     const id = try registry.addNewEntity(g.entities.presets.Items.fields.get(.torch).*);
     var text_area: g.windows.TextArea = .initEmpty(std.testing.allocator);
@@ -659,7 +662,7 @@ test "Describe a bow" {
     defer game_state_arena.deinit();
 
     var registry = try g.Registry.init(&game_state_arena);
-    const journal = try g.Journal.init(&registry, std.enums.values(g.Color));
+    const journal = g.Journal.init(&registry, std.enums.values(g.Color));
 
     const id = try registry.addNewEntity(g.entities.presets.Weapons.get(.short_bow));
     var text_area: g.windows.TextArea = .initEmpty(std.testing.allocator);
@@ -688,7 +691,7 @@ test "Describe an armor" {
     defer game_state_arena.deinit();
 
     var registry = try g.Registry.init(&game_state_arena);
-    const journal = try g.Journal.init(&registry, std.enums.values(g.Color));
+    const journal = g.Journal.init(&registry, std.enums.values(g.Color));
 
     const id = try registry.addNewEntity(g.entities.presets.Armor.get(.riveted_leather_jacket));
     var text_area: g.windows.TextArea = .initEmpty(std.testing.allocator);

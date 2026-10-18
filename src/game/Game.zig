@@ -6,6 +6,7 @@ const g = @import("game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 const w = g.windows;
+const AllocatorError = std.mem.Allocator.Error;
 
 const log = std.log.scoped(.game);
 
@@ -53,7 +54,7 @@ custom_seed: ?u64,
 /// The current state of the game
 state: State,
 
-pub fn init(gpa: std.mem.Allocator, runtime: g.Runtime, seed: ?u64) !Self {
+pub fn init(gpa: std.mem.Allocator, runtime: g.Runtime, seed: ?u64) AllocatorError!Self {
     return .{
         .state_arena = .init(gpa),
         .runtime = runtime,
@@ -68,7 +69,7 @@ pub fn deinit(self: *Self) void {
     self.state_arena.deinit();
 }
 
-pub fn tick(self: *Self) !void {
+pub fn tick(self: *Self) g.AllErrors!void {
     switch (self.state) {
         .inited => try self.welcome(),
         .welcome => if (try self.runtime.readPushedButtons()) |btn| {
@@ -102,7 +103,7 @@ pub fn tick(self: *Self) !void {
 
 // Isolate wizard temporaries so other game states do not reserve their stack
 // space on every frame. This matters on Playdate's limited stack.
-noinline fn tickCharacterCreation(self: *Self) !void {
+noinline fn tickCharacterCreation(self: *Self) g.AllErrors!void {
     if (try self.runtime.readPushedButtons()) |btn| {
         if (try self.state.create_character.wizard.handleButton(btn) == .close_window) {
             try self.startGameSession(
@@ -118,7 +119,7 @@ noinline fn tickCharacterCreation(self: *Self) !void {
 
 /// Changes the current state to the `welcome`,
 /// removes all items from the global menu, and draws the Welcome screen.
-noinline fn welcome(self: *Self) !void {
+noinline fn welcome(self: *Self) g.SystemError!void {
     log.debug("Welcome screen. The game state is {t}", .{self.state});
     const from_state: std.meta.Tag(State) = self.state;
     _ = self.state_arena.reset(.retain_capacity);
@@ -147,7 +148,7 @@ noinline fn welcome(self: *Self) !void {
     try self.drawWelcomeScreen();
 }
 
-fn newGame(ptr: *anyopaque, _: usize, _: void) !w.HandleButtonResult {
+fn newGame(ptr: *anyopaque, _: usize, _: void) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     std.debug.assert(self.state == .welcome);
     try self.render.clearDisplay();
@@ -158,12 +159,12 @@ fn newGame(ptr: *anyopaque, _: usize, _: void) !w.HandleButtonResult {
     return .keep_open;
 }
 
-pub fn startWithPreset(self: *Self, archetype: g.PlayerArchetype, skills: c.Skills) !void {
+pub fn startWithPreset(self: *Self, archetype: g.PlayerArchetype, skills: c.Skills) g.SystemError!void {
     const stats = g.meta.statsFromArchetype(archetype);
     try self.startGameSession(stats, skills, g.meta.initialHealth(stats.get(.constitution)));
 }
 
-fn startGameSession(self: *Self, stats: c.Stats, skills: c.Skills, health: c.Health) !void {
+fn startGameSession(self: *Self, stats: c.Stats, skills: c.Skills, health: c.Health) g.SystemError!void {
     const seed: u64 = self.custom_seed orelse self.runtime.currentMillis();
     // custom seed should be used only once
     self.custom_seed = null;
@@ -190,7 +191,7 @@ fn startGameSession(self: *Self, stats: c.Stats, skills: c.Skills, health: c.Hea
     log.debug("New session inited", .{});
 }
 
-fn continueGame(ptr: *anyopaque, _: usize, _: void) !w.HandleButtonResult {
+fn continueGame(ptr: *anyopaque, _: usize, _: void) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     std.debug.assert(self.state == .welcome);
     self.initSideMenu();
@@ -205,7 +206,7 @@ fn continueGame(ptr: *anyopaque, _: usize, _: void) !w.HandleButtonResult {
     return .keep_open;
 }
 
-fn showManual(ptr: *anyopaque, _: usize, _: void) !w.HandleButtonResult {
+fn showManual(ptr: *anyopaque, _: usize, _: void) g.Runtime.Error!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     std.debug.assert(self.state == .welcome);
     self.state = .manual;
@@ -213,7 +214,7 @@ fn showManual(ptr: *anyopaque, _: usize, _: void) !w.HandleButtonResult {
     return .keep_open;
 }
 
-fn showAbout(ptr: *anyopaque, _: usize, _: void) !w.HandleButtonResult {
+fn showAbout(ptr: *anyopaque, _: usize, _: void) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     std.debug.assert(self.state == .welcome);
     self.state = .about;
@@ -241,12 +242,12 @@ fn openInventory(ptr: ?*anyopaque) callconv(.c) void {
 }
 
 /// Checks that save file for a session exists.
-fn isSessionFileExists(self: Self) !bool {
+fn isSessionFileExists(self: Self) g.Runtime.Error!bool {
     return self.runtime.isFileExists(g.persistance.SESSION_FILE_NAME);
 }
 
 /// Remove the save file with a game session if it exists.
-fn deleteSessionFileIfExists(self: Self) !void {
+fn deleteSessionFileIfExists(self: Self) g.Runtime.Error!void {
     try self.runtime.deleteFileIfExists(g.persistance.SESSION_FILE_NAME);
 }
 
@@ -266,7 +267,7 @@ fn deleteSessionFileIfExists(self: Self) !void {
 ///║                                        ║
 ///╚════════════════════════════════════════╝
 ///```
-fn drawWelcomeScreen(self: Self) !void {
+fn drawWelcomeScreen(self: Self) g.SystemError!void {
     try self.render.drawTextWithAlign(
         g.DISPLAY_COLS,
         "Welcome ",
@@ -307,7 +308,7 @@ fn drawWelcomeScreen(self: Self) !void {
 ///║                                   Back ║
 ///╚════════════════════════════════════════╝
 ///```
-fn drawAboutScreen(self: Self) !void {
+fn drawAboutScreen(self: Self) g.SystemError!void {
     try self.render.clearDisplay();
     try self.render.drawTextWithAlign(g.DISPLAY_COLS, "Forgotten Catacombs", .point(2, 1), .normal, .center);
 
@@ -321,7 +322,7 @@ fn drawAboutScreen(self: Self) !void {
     try self.render.drawText(" Back ", .point(12, 35), .inverted);
 }
 
-fn drawGameOverScreen(self: Self) !void {
+fn drawGameOverScreen(self: Self) g.SystemError!void {
     try self.render.clearDisplay();
     try self.render.drawTextWithAlign(
         g.DISPLAY_COLS,

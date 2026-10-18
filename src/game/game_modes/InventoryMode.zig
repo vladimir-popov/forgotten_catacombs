@@ -38,6 +38,7 @@ const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 const w = g.windows;
+const AllocatorError = std.mem.Allocator.Error;
 
 const ResolvedCombination = g.systems.CombinationSystem.ResolvedCombination;
 
@@ -65,7 +66,7 @@ pub fn init(
     equipment: *c.Equipment,
     inventory: *c.Inventory,
     drop: ?g.Entity,
-) !void {
+) g.SystemError!void {
     log.debug("Init inventory with drop {any}", .{drop});
     self.* = .{
         .session = session,
@@ -89,7 +90,7 @@ fn allocator(self: *Self) std.mem.Allocator {
 
 // Keep mode-specific temporaries out of GameSession.tick's shared stack frame
 // to reduce stack usage in other modes on Playdate.
-pub noinline fn tick(self: *Self) !void {
+pub noinline fn tick(self: *Self) g.AllErrors!void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         switch (try self.compositor.handleButton(btn)) {
             .closed_main_window => {
@@ -106,7 +107,7 @@ pub noinline fn tick(self: *Self) !void {
     }
 }
 
-fn draw(self: *Self) !void {
+fn draw(self: *Self) g.SystemError!void {
     var buf: [10]u8 = undefined;
     const money = self.session.registry.getUnsafe(self.session.player, c.Wallet).money;
     try self.session.render.drawInfo(try std.fmt.bufPrint(&buf, "{d}$", .{money}));
@@ -121,8 +122,8 @@ fn dropArea(self: *Self) ?*w.OptionsArea(g.Entity) {
     return self.main_window.getArea(w.OptionsArea(g.Entity), 1);
 }
 
-fn addInventoryTab(self: *Self) !void {
-    _ = try self.main_window.addTab(
+fn addInventoryTab(self: *Self) g.SystemError!void {
+    _ = self.main_window.addTab(
         "Inventory",
         w.OptionsArea(g.Entity).initEmpty(
             self.allocator(),
@@ -134,7 +135,7 @@ fn addInventoryTab(self: *Self) !void {
 }
 
 /// Rebuilds a list of items
-pub fn updateInventoryTab(self: *Self) !void {
+pub fn updateInventoryTab(self: *Self) g.SystemError!void {
     try w.updateAreaWithItems(
         self.inventoryArea(),
         self,
@@ -148,7 +149,7 @@ fn formatInventoryLine(
     line: *w.TextArea.Line,
     context: *anyopaque,
     item: g.Entity,
-) ![]const u8 {
+) std.fmt.BufPrintError![]const u8 {
     const self: *Self = @ptrCast(@alignCast(context));
     const sprite = self.session.journal.registry.getUnsafe(item, c.Sprite);
     var buf: [32]u8 = undefined;
@@ -171,7 +172,7 @@ const inventory_line_fmt = std.fmt.comptimePrint(
     .{g.DISPLAY_COLS - 11}, // 12 == ("{u} ".len == 2) + ("weapon ".len == 7) + (2 for borders)
 );
 
-fn useCombineDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn useCombineDropDescribe(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Buttons is helt. Show modal window for {any}", .{item});
     const window = try self.compositor.showModalWindowWithOptions(self.allocator(), &.{}, g.Entity, self, .center);
@@ -214,7 +215,7 @@ inline fn isEquipped(self: Self, item: g.Entity) bool {
         item.eql(self.equipment.ammunition);
 }
 
-fn unequipItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn unequipItem(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Unequip the item {d}. (current equipment: {any})", .{ item.id, self.equipment });
     if (item.eql(self.equipment.light))
@@ -239,14 +240,14 @@ fn unequipItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult 
     return .close_window;
 }
 
-fn useAsLight(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn useAsLight(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     self.equipment.light = item;
     try self.updateInventoryTab();
     return .close_window;
 }
 
-fn useAsWeapon(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn useAsWeapon(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     self.equipment.weapon = item;
     if (self.equipment.light == null) {
@@ -259,21 +260,21 @@ fn useAsWeapon(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult 
     return .close_window;
 }
 
-fn useAsArmor(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn useAsArmor(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     self.equipment.armor = item;
     try self.updateInventoryTab();
     return .close_window;
 }
 
-fn putToQuiver(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn putToQuiver(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     self.equipment.ammunition = item;
     try self.updateInventoryTab();
     return .close_window;
 }
 
-fn consumeFood(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn consumeFood(ptr: *anyopaque, _: usize, item: g.Entity) g.AllErrors!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     if (self.session.registry.get(item, c.Consumable)) |food| {
         log.debug("Consume the item {d} {any}. (current equipment: {any})", .{ item.id, food, self.equipment });
@@ -284,7 +285,7 @@ fn consumeFood(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult 
     return .close_window;
 }
 
-fn drinkPotion(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn drinkPotion(ptr: *anyopaque, _: usize, item: g.Entity) g.AllErrors!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     if (self.session.registry.get(item, c.Potion)) |potion| {
         log.debug("Drink the item {d} {any}. (current equipment: {any})", .{ item.id, potion, self.equipment });
@@ -295,7 +296,7 @@ fn drinkPotion(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult 
     return .close_window;
 }
 
-fn takeFromPileOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn takeFromPileOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const window = try self.compositor.showModalWindowWithOptions(
         self.allocator(),
@@ -311,10 +312,10 @@ fn takeFromPileOrDescribe(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleBu
     return .keep_open;
 }
 
-fn addDropTab(self: *Self, drop: g.Entity) !void {
+fn addDropTab(self: *Self, drop: g.Entity) (AllocatorError || std.fmt.BufPrintError)!void {
     if (self.main_window.tabs.len < 2) {
         log.debug("Add drop tab for {any}", .{drop});
-        _ = try self.main_window.addTab(
+        _ = self.main_window.addTab(
             "Drop",
             w.OptionsArea(g.Entity).initEmpty(self.allocator(), self, .left),
         );
@@ -323,7 +324,7 @@ fn addDropTab(self: *Self, drop: g.Entity) !void {
     try self.updateDropTab(drop);
 }
 
-fn updateDropTab(self: *Self, drop: g.Entity) !void {
+fn updateDropTab(self: *Self, drop: g.Entity) (AllocatorError || std.fmt.BufPrintError)!void {
     self.drop = drop;
     const options_area: *w.OptionsArea(g.Entity) = self.main_window.getArea(
         w.OptionsArea(g.Entity),
@@ -351,7 +352,7 @@ fn addDropOption(
     self: Self,
     options_area: *w.OptionsArea(g.Entity),
     item: g.Entity,
-) !void {
+) (AllocatorError || std.fmt.BufPrintError)!void {
     _ = try options_area.addOptionFmt(
         "{u} {f}",
         .{
@@ -363,7 +364,7 @@ fn addDropOption(
     );
 }
 
-fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     log.debug("Show info about item {d}", .{item.id});
     try self.compositor.showEntityDescription(self.allocator(), self.session, item);
@@ -372,7 +373,7 @@ fn describeSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButt
 }
 
 /// Shows a window with inventory items that can be combined with the selected item.
-fn combineSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn combineSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const window = try self.compositor.showModalWindowWithOptions(
         self.allocator(),
@@ -398,19 +399,19 @@ fn combineSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButto
     return .close_window;
 }
 
-fn combineItems(ptr: *anyopaque, _: usize, resolved_combination: ResolvedCombination) !w.HandleButtonResult {
+fn combineItems(ptr: *anyopaque, _: usize, resolved_combination: ResolvedCombination) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    try self.session.combinations.combine(resolved_combination);
+    self.session.combinations.combine(resolved_combination);
     return .close_window;
 }
 
-fn describeTargetForCombination(ptr: *anyopaque, line: usize, combination: ResolvedCombination) !w.HandleButtonResult {
+fn describeTargetForCombination(ptr: *anyopaque, line: usize, combination: ResolvedCombination) g.SystemError!w.HandleButtonResult {
     return try describeSelectedItem(ptr, line, combination.subject);
 }
 
 /// Moves an item from the inventory to the player's position on the level.
 /// Add the Drop tab
-fn dropSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonResult {
+fn dropSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const place = self.session.level.playerPosition().place;
     log.debug("Drop item {d} at {any}", .{ item.id, place });
@@ -433,7 +434,7 @@ fn dropSelectedItem(ptr: *anyopaque, _: usize, item: g.Entity) !w.HandleButtonRe
 
 /// Moves a selected entity from the drop or a pile to the inventory.
 /// Removes the Pile tab if the item was the last in the pile.
-fn takeSelectedItem(ptr: *anyopaque, _: usize, selected_item: g.Entity) !w.HandleButtonResult {
+fn takeSelectedItem(ptr: *anyopaque, _: usize, selected_item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const dropped_entity = self.drop orelse @panic("Attempt to take an undefined item");
     if (self.session.registry.get(selected_item, c.Wallet)) |gold_pile| {
@@ -464,7 +465,7 @@ fn takeSelectedItem(ptr: *anyopaque, _: usize, selected_item: g.Entity) !w.Handl
     } else {
         std.debug.assert(dropped_entity.eql(selected_item));
         try self.session.registry.remove(selected_item, c.Position);
-        try self.session.level.removeEntity(selected_item);
+        self.session.level.removeEntity(selected_item);
         self.main_window.removeLastTab();
     }
     try self.updateInventoryTab();

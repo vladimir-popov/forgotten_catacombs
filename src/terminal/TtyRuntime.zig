@@ -1,4 +1,5 @@
 const std = @import("std");
+const AllocatorError = std.mem.Allocator.Error;
 const g = @import("game");
 const p = g.primitives;
 const tty = @import("tty.zig");
@@ -19,14 +20,14 @@ var rows_pad: u8 = 1;
 /// The global variable contains horizontal pad within terminal to start drawing the game.
 var cols_pad: u8 = 1;
 
-pub fn enableGameMode(use_mouse: bool) !void {
+pub fn enableGameMode(use_mouse: bool) tty.TtyError!void {
     try tty.Display.enterAlternateScreen();
     try tty.Display.hideCursor();
     tty.Display.handleWindowResize(&act, handleWindowResize);
     if (use_mouse) try tty.KeyboardAndMouse.enableMouseEvents();
 }
 
-pub fn disableGameMode() !void {
+pub fn disableGameMode() tty.TtyError!void {
     try tty.KeyboardAndMouse.disableMouseEvents();
     try tty.Display.leaveAlternateScreen();
     tty.Display.exitFromRawMode();
@@ -50,6 +51,9 @@ pub const FileWrapper = union(enum) {
 pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
     return struct {
         const Self = @This();
+        const InitError = AllocatorError ||
+            std.Io.Dir.CreateDirPathOpenError ||
+            tty.TtyError;
 
         const menu_cols = (display_cols - 2) / 2;
 
@@ -79,7 +83,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             render_in_center: bool,
             is_dev_mode: bool,
             use_mouse: bool,
-        ) !Self {
+        ) InitError!Self {
             const instance = Self{
                 .alloc = alloc,
                 .io = io,
@@ -143,9 +147,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                         return logIoError("writing menu to terminal", err);
                     };
                     if (readPushedButtons(self) catch |err| return err) |btn| {
-                        self.menu.handleKeyboardButton(btn) catch |err| {
-                            return logInputError("handling menu button", err);
-                        };
+                        self.menu.handleKeyboardButton(btn);
                     }
                 } else if (self.cmd.cursor_idx > 0) {
                     self.cheat = self.cmd.readCheat();
@@ -197,9 +199,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                         if (self.menu.is_shown)
                             self.menu.close()
                         else
-                            self.menu.show() catch |err| {
-                                return logInputError("showing menu", err);
-                            };
+                            self.menu.show();
                     } else if (self.is_dev_mode and ch.char == ':') {
                         self.cmd.cleanCmd();
                     },

@@ -107,7 +107,7 @@ const ToString = struct {
 
             values: []const T,
 
-            pub fn format(self: Self, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+            pub fn format(self: Self, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) std.Io.Writer.Error!void {
                 for (self.values) |value| {
                     try writer.print("\t{any}\n", .{value});
                 }

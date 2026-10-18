@@ -82,6 +82,8 @@ events: std.ArrayList(g.events.Event),
 /// A pop up notifications to show.
 notifications: std.Deque(g.notifications.Notification),
 
+const AllocatorError = std.mem.Allocator.Error;
+
 /// Two cases of initialization exists:
 ///  1. Creating a new Game Session;
 ///  2. Loading an existing Game Session;
@@ -100,7 +102,7 @@ pub fn preInit(
     game_session_arena: *g.GameStateArena,
     runtime: g.Runtime,
     render: g.Render,
-) !void {
+) AllocatorError!void {
     self.* = .{
         .inner_arena = game_session_arena,
         .mode_arena = std.heap.ArenaAllocator.init(game_session_arena.allocator()),
@@ -134,7 +136,7 @@ pub fn initNew(
     stats: c.Stats,
     skills: c.Skills,
     health: c.Health,
-) !void {
+) g.SystemError!void {
     log.debug("Begin a new game session with seed {d}", .{seed});
     try self.preInit(game_session_arena, runtime, render);
     self.seed = seed;
@@ -170,8 +172,8 @@ pub fn initNew(
 ///  - subscribes event handlers;
 ///  - puts the viewport around the player;
 ///  - switches the game session to the `play` mode.
-pub fn completeInitialization(self: *Self) !void {
-    self.journal = try g.Journal.init(&self.registry, &self.colors);
+pub fn completeInitialization(self: *Self) AllocatorError!void {
+    self.journal = g.Journal.init(&self.registry, &self.colors);
     self.viewport.centeredAround(self.level.playerPosition().place);
     log.debug(
         "The game session is completely initialized. Seed {d}; Max depth {d}; Player id {d}",
@@ -179,7 +181,7 @@ pub fn completeInitialization(self: *Self) !void {
     );
 }
 
-pub fn switchModeToLoadingSession(self: *Self, game_session_arena: *g.GameStateArena) !void {
+pub fn switchModeToLoadingSession(self: *Self, game_session_arena: *g.GameStateArena) AllocatorError!void {
     log.debug("Start loading a game session", .{});
     _ = self.mode_arena.reset(.retain_capacity);
     self.mode = .{ .save_load = try self.mode_arena.allocator().create(SaveLoadMode) };
@@ -189,7 +191,7 @@ pub fn switchModeToLoadingSession(self: *Self, game_session_arena: *g.GameStateA
 /// Changes the mode to the SaveLoadMode.
 /// The next process after saving the session will be `.go_to_welcome_screen`.
 /// This means that the `error.GoToMainMenu` will be returned on the next tick.
-pub fn switchModeToSavingSession(self: *Self) !void {
+pub fn switchModeToSavingSession(self: *Self) AllocatorError!void {
     _ = self.mode_arena.reset(.retain_capacity);
     self.mode = .{ .save_load = try self.mode_arena.allocator().create(SaveLoadMode) };
     self.mode.save_load.* = SaveLoadMode.saveSession(self);
@@ -201,7 +203,7 @@ pub fn switchModeToSavingSession(self: *Self) !void {
 ///    target or a new target from the `Explore` mode.
 ///  - `action` - an action to perform; Usually an action initiated during managing the inventory
 ///  (eat or drink as example).
-pub fn continuePlay(self: *Self, entity_in_focus: ?g.Entity, action: ?g.actions.Action) !void {
+pub fn continuePlay(self: *Self, entity_in_focus: ?g.Entity, action: ?g.actions.Action) AllocatorError!void {
     log.debug("Continue playing with entity_in_focus {any}, action {any}", .{ entity_in_focus, action });
     try self.sendEvent(
         .{ .mode_changed = .{ .to_play = .{ .entity_in_focus = entity_in_focus, .action = action } } },
@@ -209,61 +211,55 @@ pub fn continuePlay(self: *Self, entity_in_focus: ?g.Entity, action: ?g.actions.
 }
 
 // should not be invoked outside. `continuePlay` should be used instead
-fn switchModeToPlay(self: *Self, entity_in_focus: ?g.Entity) !void {
+fn switchModeToPlay(self: *Self, entity_in_focus: ?g.Entity) g.SystemError!void {
     try self.render.redrawFromSceneBuffer();
     _ = self.mode_arena.reset(.retain_capacity);
     self.mode = .{ .play = try self.mode_arena.allocator().create(PlayMode) };
     try self.mode.play.init(self, entity_in_focus);
 }
 
-pub inline fn explore(self: *Self) !void {
+pub inline fn explore(self: *Self) AllocatorError!void {
     try self.sendEvent(.{ .mode_changed = .to_explore });
 }
 
-pub inline fn lookAround(self: *Self) !void {
+pub inline fn lookAround(self: *Self) AllocatorError!void {
     try self.sendEvent(.{ .mode_changed = .to_looking_around });
 }
 
-pub inline fn levelUp(self: *Self) !void {
+pub inline fn levelUp(self: *Self) AllocatorError!void {
     try self.sendEvent(.{ .mode_changed = .to_level_up });
 }
 
-pub inline fn manageInventory(self: *Self) !void {
+pub inline fn manageInventory(self: *Self) AllocatorError!void {
     try self.sendEvent(.{ .mode_changed = .to_inventory });
 }
 
-pub inline fn modifyRecognize(self: *Self) !void {
+pub inline fn modifyRecognize(self: *Self) AllocatorError!void {
     try self.sendEvent(.{ .mode_changed = .to_modify_recognize });
 }
 
-pub inline fn trade(self: *Self, shop: g.Entity) !void {
+pub inline fn trade(self: *Self, shop: g.Entity) AllocatorError!void {
     try self.sendEvent(.{ .mode_changed = .{ .to_trading = shop } });
 }
 
-pub inline fn movePlayerToLevel(self: *Self, by_ladder: c.Ladder) !void {
+pub inline fn movePlayerToLevel(self: *Self, by_ladder: c.Ladder) AllocatorError!void {
     try self.sendEvent(.{ .level_changed = .{ .by_ladder = by_ladder } });
 }
 
-pub inline fn removeEntity(self: *Self, entity: g.Entity) !void {
+pub inline fn removeEntity(self: *Self, entity: g.Entity) g.SystemError!void {
     try self.registry.removeEntity(entity);
-    try self.level.removeEntity(entity);
+    self.level.removeEntity(entity);
 }
 
 /// Removes the entity or returns `error.GameOver`.
-pub fn removeDeadEntity(self: *Self, entity: g.Entity) !void {
-    if (entity.eql(self.player)) {
-        log.info("Player is dead. Game is over.", .{});
-        // return error to break the game loop:
-        return error.GameOver;
-    } else {
-        log.debug("NPC {d} is dead", .{entity.id});
-        // Handle death and remove the entity here, within the current tick
-        try self.removeEntity(entity);
-        try self.sendEvent(.{ .entity_died = entity });
-    }
+pub fn removeDeadEntity(self: *Self, entity: g.Entity) g.SystemError!void {
+    log.debug("NPC {d} is dead", .{entity.id});
+    // Handle death and remove the entity here, within the current tick
+    try self.removeEntity(entity);
+    try self.sendEvent(.{ .entity_died = entity });
 }
 
-pub fn playerMovedToLevel(self: *Self) !void {
+pub fn playerMovedToLevel(self: *Self) g.SystemError!void {
     self.max_depth = @max(self.max_depth, self.level.depth);
     self.viewport.centeredAround(self.level.playerPosition().place);
     try self.switchModeToPlay(null);
@@ -278,12 +274,12 @@ pub fn playerMovedToLevel(self: *Self) !void {
     try self.sendEvent(event);
 }
 
-pub fn showPopUpNotification(self: *Self, notification: g.notifications.Notification) !void {
+pub fn showPopUpNotification(self: *Self, notification: g.notifications.Notification) AllocatorError!void {
     log.debug("Notification: {any}", .{notification});
     try self.notifications.pushBack(self.inner_arena.allocator(), notification);
 }
 
-pub fn tick(self: *Self) !void {
+pub fn tick(self: *Self) g.AllErrors!void {
     switch (self.mode) {
         .explore => try self.mode.explore.tick(),
         .explore_level => try self.mode.explore_level.tick(),
@@ -302,12 +298,12 @@ pub fn tick(self: *Self) !void {
     }
 }
 
-pub inline fn sendEvent(self: *Self, event: g.events.Event) !void {
+pub inline fn sendEvent(self: *Self, event: g.events.Event) AllocatorError!void {
     try self.events.append(self.inner_arena.allocator(), event);
 }
 
 /// Handles events on the end of the `tick`
-noinline fn handleEvent(self: *Self, event_idx: usize) !void {
+noinline fn handleEvent(self: *Self, event_idx: usize) g.AllErrors!void {
     switch (self.events.items[event_idx]) {
         .mode_changed => |new_mode| switch (new_mode) {
             .to_play => |args| {
@@ -359,12 +355,12 @@ noinline fn handleEvent(self: *Self, event_idx: usize) !void {
         .level_changed => |lvl| {
             _ = self.mode_arena.reset(.retain_capacity);
             self.mode = .{ .save_load = try self.mode_arena.allocator().create(SaveLoadMode) };
-            self.mode.save_load.* = try SaveLoadMode.loadOrGenerateLevel(self, lvl.by_ladder);
+            self.mode.save_load.* = SaveLoadMode.loadOrGenerateLevel(self, lvl.by_ladder);
         },
         .entity_moved => |entity_moved| {
             if (entity_moved.entity.id == self.player.id) {
                 try self.level.onPlayerMoved(entity_moved);
-                try self.viewport.onPlayerMoved(entity_moved);
+                self.viewport.onPlayerMoved(entity_moved);
             }
         },
         .entity_died => |entity| {

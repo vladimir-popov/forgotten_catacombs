@@ -82,12 +82,12 @@ pub fn TabbedWindow(comptime Areas: anytype) type {
         }
 
         /// Appends a tab and returns a pointer to its stored area.
-        pub fn addTab(self: *Self, title: []const u8, area: anytype) !*@TypeOf(area) {
+        pub fn addTab(self: *Self, title: []const u8, area: anytype) *@TypeOf(area) {
             const new_tab = self.tabs.append(Tab(@TypeOf(area)){ .title = title, .panel = .{
                 .area = area,
                 .region = TAB_REGION.innerRegion(1, 1, 1, 1),
             } }) orelse
-                return error.TooManyTabs;
+                @panic("TabbedWindow capacity exceeded");
             return &new_tab.panel.area;
         }
 
@@ -98,7 +98,7 @@ pub fn TabbedWindow(comptime Areas: anytype) type {
         }
 
         /// Delegates input to the active tab and handles tab navigation.
-        pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
+        pub fn handleButton(self: *Self, btn: g.Button) g.AllErrors!w.HandleButtonResult {
             var buttons: w.Buttons = undefined;
             inline for (@typeInfo(Tabs).@"struct".fields, 0..) |field, idx| {
                 const TabType = field.type;
@@ -126,7 +126,7 @@ pub fn TabbedWindow(comptime Areas: anytype) type {
         }
 
         /// Draws tab headers, the active tab, its panel, and its buttons.
-        pub fn draw(self: *Self, render: g.Render) !void {
+        pub fn draw(self: *Self, render: g.Render) g.SystemError!void {
             if (self.tabs.len == 0) return;
 
             // Draw the tab titles

@@ -16,7 +16,7 @@ pub const VTable = struct {
     /// A method to handle a pressed button
     /// Should return `true` if the 'close' button was pressed, or the content requires closing after
     /// handling the button.
-    handleButtonFn: *const fn (ptr: *anyopaque, btn: g.Button) anyerror!w.HandleButtonResult,
+    handleButtonFn: *const fn (ptr: *anyopaque, btn: g.Button) g.SystemError!w.HandleButtonResult,
 
     /// Uses the render to draw the area directly to the screen.
     ///
@@ -26,7 +26,7 @@ pub const VTable = struct {
     ///  of a line outside the region will be cropped.
     ///
     /// - `scrolled` - How many scrolled lines should be skipped.
-    drawFn: *const fn (ptr: *anyopaque, render: g.Render, region: p.Region, scrolled: usize) anyerror!void,
+    drawFn: *const fn (ptr: *anyopaque, render: g.Render, region: p.Region, scrolled: usize) g.SystemError!void,
 
     clearRetainingCapacityFn: *const fn (ptr: *anyopaque) void,
 
@@ -64,12 +64,12 @@ pub fn rightButton(self: *const Self) ?w.Button {
 }
 
 /// Forwards a button to the wrapped area.
-pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
+pub fn handleButton(self: *Self, btn: g.Button) g.SystemError!w.HandleButtonResult {
     return self.vtable.handleButtonFn(self.underlying, btn);
 }
 
 /// Draws the wrapped area in `region` at the supplied scroll offset.
-pub fn draw(self: *const Self, render: g.Render, region: p.Region, scrolled: usize) !void {
+pub fn draw(self: *const Self, render: g.Render, region: p.Region, scrolled: usize) g.SystemError!void {
     return self.vtable.drawFn(self.underlying, render, region, scrolled);
 }
 
@@ -88,11 +88,11 @@ pub fn vtableFor(comptime T: type) *const VTable {
             const self: *T = @ptrCast(@alignCast(ptr));
             self.clearRetainingCapacity();
         }
-        fn handleButtonFn(ptr: *anyopaque, btn: g.Button) anyerror!w.HandleButtonResult {
+        fn handleButtonFn(ptr: *anyopaque, btn: g.Button) g.SystemError!w.HandleButtonResult {
             const self: *T = @ptrCast(@alignCast(ptr));
             return try self.handleButton(btn);
         }
-        fn drawFn(ptr: *anyopaque, render: g.Render, region: p.Region, scrolled: usize) anyerror!void {
+        fn drawFn(ptr: *anyopaque, render: g.Render, region: p.Region, scrolled: usize) g.SystemError!void {
             const self: *T = @ptrCast(@alignCast(ptr));
             try self.draw(render, region, scrolled);
         }
@@ -140,11 +140,11 @@ pub const Empty = struct {
         return null;
     }
 
-    fn handleButton(_: *anyopaque, _: g.Button) !w.HandleButtonResult {
+    fn handleButton(_: *anyopaque, _: g.Button) w.HandleButtonResult {
         return .keep_open;
     }
 
-    fn draw(_: *const anyopaque, render: g.Render, region: p.Region, _: usize) !void {
+    fn draw(_: *const anyopaque, render: g.Render, region: p.Region, _: usize) g.Runtime.Error!void {
         try render.fillRegion(g.Render.default_filler, .normal, region);
     }
 

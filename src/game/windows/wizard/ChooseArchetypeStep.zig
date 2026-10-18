@@ -21,6 +21,7 @@ const g = @import("../../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 const w = g.windows;
+const AllocatorError = std.mem.Allocator.Error;
 
 const title = "Choose your archetype:";
 
@@ -41,7 +42,11 @@ pub fn ChooseArchetypeStep(comptime Context: type) type {
         description_window: ?w.ModalWindow(w.TextArea) = null,
 
         /// Initializes the archetype list and restores the current selection.
-        pub fn init(self: *Self, alloc: std.mem.Allocator, context: *Context) !void {
+        pub fn init(
+            self: *Self,
+            alloc: std.mem.Allocator,
+            context: *Context,
+        ) (AllocatorError || std.fmt.BufPrintError)!void {
             self.* = .{
                 .alloc = alloc,
                 .context = context,
@@ -69,12 +74,12 @@ pub fn ChooseArchetypeStep(comptime Context: type) type {
         }
 
         /// Stores the selected archetype in the shared context.
-        pub fn commit(self: *Self) !void {
+        pub fn commit(self: *Self) void {
             self.context.archetype = self.area.selectedItem().?;
             self.context.stats = g.meta.statsFromArchetype(self.context.archetype);
         }
         /// Leaves the shared context unchanged.
-        pub fn rollback(_: *Self) !void {}
+        pub fn rollback(_: *Self) void {}
 
         /// Returns buttons for the list or the nested description.
         pub fn getButtons(self: *Self) w.Buttons {
@@ -88,7 +93,7 @@ pub fn ChooseArchetypeStep(comptime Context: type) type {
         }
 
         /// Handles archetype navigation, selection, and description display.
-        pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
+        pub fn handleButton(self: *Self, btn: g.Button) g.AllErrors!w.HandleButtonResult {
             if (self.description_window) |*win| {
                 if (try win.handleButton(btn) == .close_window) {
                     win.deinit();
@@ -119,7 +124,7 @@ pub fn ChooseArchetypeStep(comptime Context: type) type {
         }
 
         /// Draws the archetype list or its nested description.
-        pub fn drawContent(self: *Self, render: g.Render) !void {
+        pub fn drawContent(self: *Self, render: g.Render) g.SystemError!void {
             try render.clearDisplay();
             if (self.description_window) |*win| {
                 try win.draw(render);

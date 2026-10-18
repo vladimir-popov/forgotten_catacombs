@@ -55,7 +55,7 @@ pub fn saveSession(session: *g.GameSession) Self {
     return .{ .process = .{ .saving = .{ .session = session, .next_process = .go_to_welcome_screen } } };
 }
 
-pub fn loadOrGenerateLevel(session: *g.GameSession, from_ladder: c.Ladder) !Self {
+pub fn loadOrGenerateLevel(session: *g.GameSession, from_ladder: c.Ladder) Self {
     const new_depth = switch (from_ladder.direction) {
         .up => session.level.depth - 1,
         .down => session.level.depth + 1,
@@ -90,7 +90,7 @@ pub fn deinit(self: *Self) void {
 
 // Keep mode-specific temporaries out of GameSession.tick's shared stack frame
 // to reduce stack usage in other modes on Playdate.
-pub noinline fn tick(self: *Self) !void {
+pub noinline fn tick(self: *Self) (g.SystemError || g.GoToMainMenuError)!void {
     switch (self.process) {
         .saving => |*saving| {
             const is_done = saving.tick() catch |err| {
@@ -177,7 +177,7 @@ const Generating = struct {
     }
 
     /// Returns `true` when the generating is completed.
-    fn tick(self: *Generating) !bool {
+    fn tick(self: *Generating) g.SystemError!bool {
         try self.draw();
         self.generating_progress = try self.session.level.generateNew(
             self.prng.random(),
@@ -199,7 +199,7 @@ const Generating = struct {
         return percent_multiplier * (@intFromEnum(self.generating_progress) + 1) + self.generate_level_attempt;
     }
 
-    fn draw(self: *Generating) !void {
+    fn draw(self: *Generating) g.SystemError!void {
         //        |
         // Generat|ing XXX%
         //        |
@@ -280,7 +280,7 @@ const Loading = struct {
     }
 
     /// Returns `true` when the loading is completed.
-    pub fn tick(self: *Loading) !bool {
+    pub fn tick(self: *Loading) g.SystemError!bool {
         self.session.runtime.printStackSize(0, "loading");
         log.debug("Continue loading: {t}", .{self.progress});
         try self.draw();
@@ -296,7 +296,7 @@ const Loading = struct {
         return false;
     }
 
-    noinline fn loadingSession(self: *Loading) !void {
+    noinline fn loadingSession(self: *Loading) g.SystemError!void {
         self.session.runtime.printStackSize(1, "loading session");
         self.file = try self.session.runtime.openFile(
             g.persistance.SESSION_FILE_NAME,
@@ -335,7 +335,7 @@ const Loading = struct {
         self.progress = .session_loaded;
     }
 
-    noinline fn initLevel(self: *Loading) !void {
+    noinline fn initLevel(self: *Loading) g.SystemError!void {
         self.session.runtime.printStackSize(1, "init level");
         var path_buf: [32]u8 = undefined;
         self.file =
@@ -359,7 +359,7 @@ const Loading = struct {
         self.progress = .level_inited;
     }
 
-    noinline fn loadingEntities(self: *Loading) !void {
+    noinline fn loadingEntities(self: *Loading) g.SystemError!void {
         self.session.runtime.printStackSize(1, "loading entities");
         _ = try self.state.reading.readKey("entities");
         const alloc = self.session.level.arena.allocator();
@@ -375,7 +375,7 @@ const Loading = struct {
         self.progress = .entities_loaded;
     }
 
-    noinline fn loadingVisitedPlaces(self: *Loading) !void {
+    noinline fn loadingVisitedPlaces(self: *Loading) g.SystemError!void {
         self.session.runtime.printStackSize(1, "loading visited places");
         _ = try self.state.reading.readKey("visited_places");
         try self.state.reading.beginCollection();
@@ -389,7 +389,7 @@ const Loading = struct {
         self.progress = .visited_places_loaded;
     }
 
-    noinline fn loadingRememberedObjects(self: *Loading) !void {
+    noinline fn loadingRememberedObjects(self: *Loading) g.SystemError!void {
         self.session.runtime.printStackSize(1, "loading remembered objects");
         var buf: [32]u8 = undefined;
         _ = try self.state.reading.readKey("remembered_objects");
@@ -406,7 +406,7 @@ const Loading = struct {
         self.progress = .remembered_objects_loaded;
     }
 
-    noinline fn completeLevelInitialization(self: *Loading) !void {
+    noinline fn completeLevelInitialization(self: *Loading) g.SystemError!void {
         try self.state.reading.endObject();
         try self.session.level.completeInitialization(self.moving_direction);
         if (self.moving_direction == null)
@@ -418,7 +418,7 @@ const Loading = struct {
         self.progress = .completed;
     }
 
-    fn draw(self: Loading) !void {
+    fn draw(self: Loading) g.SystemError!void {
         //       |
         // Loadin|g XXX%
         //       |
@@ -478,7 +478,7 @@ const Saving = struct {
     }
 
     /// Returns `true` when saving is completed.
-    pub fn tick(self: *Saving) !bool {
+    pub fn tick(self: *Saving) g.SystemError!bool {
         self.session.runtime.printStackSize(0, "saving");
         log.debug("Continue saving: {t}", .{self.progress});
         try self.draw();
@@ -494,7 +494,7 @@ const Saving = struct {
         return false;
     }
 
-    noinline fn savingSession(self: *Saving) !void {
+    noinline fn savingSession(self: *Saving) g.SystemError!void {
         self.session.runtime.printStackSize(1, "saving session");
         self.file = try self.session.runtime.openFile(
             g.persistance.SESSION_FILE_NAME,
@@ -522,7 +522,7 @@ const Saving = struct {
         self.progress = .session_saved;
     }
 
-    noinline fn savingLevelSeed(self: *Saving) !void {
+    noinline fn savingLevelSeed(self: *Saving) g.SystemError!void {
         var buf: [16]u8 = undefined;
         self.file = try self.session.runtime.openFile(
             try g.persistance.pathToLevelFile(&buf, self.session.level.depth),
@@ -539,7 +539,7 @@ const Saving = struct {
         self.progress = .level_seed_saved;
     }
 
-    noinline fn savingEntities(self: *Saving) !void {
+    noinline fn savingEntities(self: *Saving) g.SystemError!void {
         self.session.runtime.printStackSize(1, "saving entities");
         try self.state.writing.writeStringKey("entities");
         try self.state.writing.beginCollection();
@@ -550,7 +550,7 @@ const Saving = struct {
         self.progress = .entities_saved;
     }
 
-    noinline fn savingVisitedPlaces(self: *Saving) !void {
+    noinline fn savingVisitedPlaces(self: *Saving) g.SystemError!void {
         self.session.runtime.printStackSize(1, "saving visited places");
         try self.state.writing.writeStringKey("visited_places");
         try self.state.writing.beginCollection();
@@ -566,7 +566,7 @@ const Saving = struct {
         self.progress = .visited_places_saved;
     }
 
-    noinline fn savingRememberedObjects(self: *Saving) !void {
+    noinline fn savingRememberedObjects(self: *Saving) g.SystemError!void {
         self.session.runtime.printStackSize(1, "saving remembered objects");
         try self.state.writing.writeStringKey("remembered_objects");
         var itr = self.session.level.remembered_objects.iterator();
@@ -581,7 +581,7 @@ const Saving = struct {
         self.progress = .remembered_objects_saved;
     }
 
-    noinline fn completeSaving(self: *Saving) !void {
+    noinline fn completeSaving(self: *Saving) g.SystemError!void {
         try self.state.writing.endObject();
         for (self.session.level.entities_on_level.items) |entity| {
             if (!entity.eql(self.session.player))
@@ -592,7 +592,7 @@ const Saving = struct {
         self.progress = .completed;
     }
 
-    fn draw(self: *Saving) !void {
+    fn draw(self: *Saving) g.SystemError!void {
         //       |
         // Saving| XXX%
         //       |

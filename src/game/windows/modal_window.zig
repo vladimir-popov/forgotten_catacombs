@@ -2,6 +2,7 @@ const std = @import("std");
 const g = @import("../game_pkg.zig");
 const p = g.primitives;
 const w = g.windows;
+const AllocatorError = std.mem.Allocator.Error;
 
 /// Common configuration for a modal window constructor.
 pub const Params = struct {
@@ -10,7 +11,7 @@ pub const Params = struct {
 };
 
 /// Creates a modal window containing a scrollable text area.
-pub fn withText(alloc: std.mem.Allocator, params: Params) !ModalWindow(w.TextArea) {
+pub fn withText(alloc: std.mem.Allocator, params: Params) std.fmt.BufPrintError!ModalWindow(w.TextArea) {
     var self = ModalWindow(w.TextArea){
         .region = params.max_region,
         .panel = .{
@@ -40,7 +41,7 @@ pub fn withOptions(
     context: *anyopaque,
     text_align: g.TextAlign,
     params: Params,
-) !ModalWindow(w.OptionsArea(Item)) {
+) std.fmt.BufPrintError!ModalWindow(w.OptionsArea(Item)) {
     var self = ModalWindow(w.OptionsArea(Item)){
         .region = params.max_region,
         .panel = .{
@@ -51,7 +52,7 @@ pub fn withOptions(
                     .button = .{ .label = "Close" },
                     .context = &.{},
                     .handler = struct {
-                        fn close(_: *anyopaque, _: *anyopaque, _: bool) !g.windows.HandleButtonResult {
+                        fn close(_: *anyopaque, _: *anyopaque, _: bool) g.AllErrors!g.windows.HandleButtonResult {
                             return .close_window;
                         }
                     }.close,
@@ -76,7 +77,7 @@ pub fn notification(
     alloc: std.mem.Allocator,
     message: []const u8,
     params: Params,
-) !ModalWindow(w.TextArea) {
+) (AllocatorError || std.fmt.BufPrintError)!ModalWindow(w.TextArea) {
     var self = try withText(alloc, params);
     var itr = std.mem.splitScalar(u8, message, '\n');
     while (itr.next()) |msg_line| {
@@ -95,7 +96,7 @@ pub fn showDescription(
     alloc: std.mem.Allocator,
     description: *const g.Description,
     max_region: p.Region,
-) !ModalWindow(w.TextArea) {
+) (AllocatorError || std.fmt.BufPrintError)!ModalWindow(w.TextArea) {
     var self = try withText(alloc, .{ .max_region = max_region, .title = description.name });
     const text_area = &self.panel.area;
     for (description.description) |line| {
@@ -125,7 +126,7 @@ pub fn entityDescription(
     session: *g.GameSession,
     entity: g.Entity,
     max_region: p.Region,
-) !ModalWindow(w.TextArea) {
+) g.SystemError!ModalWindow(w.TextArea) {
     var self = try withText(alloc, .{ .max_region = max_region });
     try self.formatTitle("{f}", .{g.Description.actualNameFormatter(session.journal, entity)});
     const text_area = &self.panel.area;
@@ -136,7 +137,7 @@ pub fn entityDescription(
                     .button = .{ .label = "Lvl up!" },
                     .context = session,
                     .handler = struct {
-                        fn upLevel(ptr: *anyopaque, _: *anyopaque, _: bool) !g.windows.HandleButtonResult {
+                        fn upLevel(ptr: *anyopaque, _: *anyopaque, _: bool) AllocatorError!g.windows.HandleButtonResult {
                             const ss: *g.GameSession = @ptrCast(@alignCast(ptr));
                             try ss.levelUp();
                             return .close_window;
@@ -178,7 +179,7 @@ pub fn ModalWindow(comptime Area: type) type {
         }
 
         /// Formats and stores the window title.
-        pub fn formatTitle(self: *Self, comptime fmt: []const u8, args: anytype) !void {
+        pub fn formatTitle(self: *Self, comptime fmt: []const u8, args: anytype) std.fmt.BufPrintError!void {
             self.title_len = (try std.fmt.bufPrint(&self.title_buffer, fmt, args)).len;
         }
 
@@ -206,12 +207,12 @@ pub fn ModalWindow(comptime Area: type) type {
         }
 
         /// Delegates input to the scrollable panel.
-        pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
+        pub fn handleButton(self: *Self, btn: g.Button) g.AllErrors!w.HandleButtonResult {
             return try self.panel.handleButton(btn);
         }
 
         /// Draws the window with a scrollbar and buttons if they are required.
-        pub fn draw(self: *Self, render: g.Render) !void {
+        pub fn draw(self: *Self, render: g.Render) g.SystemError!void {
             try render.drawBorder(self.region);
             try self.drawTitle(render);
             try self.panel.drawContent(render);
@@ -219,7 +220,7 @@ pub fn ModalWindow(comptime Area: type) type {
         }
 
         /// Draws the title
-        fn drawTitle(self: *const Self, render: g.Render) !void {
+        fn drawTitle(self: *const Self, render: g.Render) (g.Runtime.Error || g.Utf8Error)!void {
             const padding: u8 = @intCast(self.region.cols - self.title_len);
             const point = self.region.top_left.movedToNTimes(.right, padding / 2);
             const ttl = self.title();

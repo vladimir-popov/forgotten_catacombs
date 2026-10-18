@@ -5,6 +5,8 @@ const std = @import("std");
 const g = @import("game_pkg.zig");
 const c = g.components;
 
+const AllocatorError = std.mem.Allocator.Error;
+
 const log = std.log.scoped(.journal);
 
 const Self = @This();
@@ -24,7 +26,7 @@ known_potions: std.AutoHashMapUnmanaged(c.Potion, void) = .empty,
 /// A set of known class of enemies.
 known_enemies: std.AutoHashMapUnmanaged(g.Enemy, void) = .empty,
 
-pub fn init(registry: *g.Registry, colors: []const g.Color) !Self {
+pub fn init(registry: *g.Registry, colors: []const g.Color) Self {
     return .{ .registry = registry, .colors = colors };
 }
 
@@ -45,7 +47,7 @@ pub fn isKnown(self: *const Self, entity: g.Entity) bool {
     return true;
 }
 
-pub fn addUnknownEquipment(self: *Self, entity: g.Entity) !void {
+pub fn addUnknownEquipment(self: *Self, entity: g.Entity) AllocatorError!void {
     if (!self.known_entities.contains(entity))
         try self.unknown_equipment.put(self.registry.allocator(), entity, TURNS_TO_KNOW);
 }
@@ -57,28 +59,28 @@ pub fn unknownPotionColor(self: *const Self, potion: c.Potion) ?g.Color {
     return null;
 }
 
-pub fn markEnemyAsKnown(self: *Self, enemy_type: g.Enemy) !void {
+pub fn markEnemyAsKnown(self: *Self, enemy_type: g.Enemy) AllocatorError!void {
     log.debug("Mark the creature {t} as known", .{enemy_type});
     try self.known_enemies.put(self.registry.allocator(), enemy_type, {});
 }
 
-pub fn markPotionAsKnown(self: *Self, potion: c.Potion) !void {
+pub fn markPotionAsKnown(self: *Self, potion: c.Potion) AllocatorError!void {
     log.debug("Mark the potion {t} as known", .{potion});
     try self.known_potions.put(self.registry.allocator(), potion, {});
 }
 
-pub fn markArmorAsKnown(self: *Self, armor: g.Entity) !void {
+pub fn markArmorAsKnown(self: *Self, armor: g.Entity) AllocatorError!void {
     log.debug("Mark the armor {d} as known", .{armor.id});
     try self.known_entities.put(self.registry.allocator(), armor, {});
     try self.registry.set(armor, c.Sprite{ .codepoint = g.codepoints.armor });
 }
 
-pub fn markTrapAsKnown(self: *Self, trap: g.Entity) !void {
+pub fn markTrapAsKnown(self: *Self, trap: g.Entity) AllocatorError!void {
     log.debug("Mark the trap {d} as known", .{trap.id});
     try self.known_entities.put(self.registry.allocator(), trap, {});
 }
 
-pub fn markWeaponAsKnown(self: *Self, weapon: g.Entity) !void {
+pub fn markWeaponAsKnown(self: *Self, weapon: g.Entity) AllocatorError!void {
     log.debug("Mark the weapon {d} as known", .{weapon.id});
     try self.known_entities.put(self.registry.allocator(), weapon, {});
     const sprite = self.registry.getUnsafe(weapon, c.Sprite);
@@ -88,21 +90,21 @@ pub fn markWeaponAsKnown(self: *Self, weapon: g.Entity) !void {
         g.codepoints.weapon_ranged;
 }
 
-pub fn forgetWeapon(self: *Self, entity: g.Entity) !void {
+pub fn forgetWeapon(self: *Self, entity: g.Entity) void {
     log.debug("Mark the weapon {d} as unknown", .{entity.id});
     _ = self.known_entities.remove(entity);
     if (self.registry.get(entity, c.Weapon)) |weapon|
         g.meta.setCodepointOfUnknownWeapon(self.registry, entity, weapon);
 }
 
-pub fn forgetArmor(self: *Self, armor: g.Entity) !void {
+pub fn forgetArmor(self: *Self, armor: g.Entity) void {
     log.debug("Mark the armor {d} as unknown", .{armor.id});
     _ = self.known_entities.remove(armor);
     g.meta.setCodepointOfUnknownArmor(self.registry, armor);
 }
 
 /// Increase a number of cycles when an unknown item is used
-pub fn increaseUsageCounters(self: *Self) !void {
+pub fn increaseUsageCounters(self: *Self) AllocatorError!void {
     var not_all_unknown_counters_updated: bool = true;
     while (not_all_unknown_counters_updated) {
         var itr = self.unknown_equipment.iterator();
@@ -128,7 +130,7 @@ test "Move unknown equipment to known after N turns" {
     defer game_state_arena.deinit();
 
     var registry = try g.Registry.init(&game_state_arena);
-    var journal = try init(&registry, std.enums.values(g.Color));
+    var journal = init(&registry, std.enums.values(g.Color));
     const equipment = try registry.addNewEntity(g.entities.presets.Weapons.get(.pickaxe));
     try journal.addUnknownEquipment(equipment);
 

@@ -13,7 +13,7 @@ horizontal_step: u8,
 vertical_step: u8,
 orig_viewport_top_left: p.Point,
 
-pub fn init(session: *g.GameSession) !ExploreLevelMode {
+pub fn init(session: *g.GameSession) g.SystemError!ExploreLevelMode {
     log.debug("Init ExploreLevelMode", .{});
     try draw(session);
     return .{
@@ -24,7 +24,7 @@ pub fn init(session: *g.GameSession) !ExploreLevelMode {
     };
 }
 
-fn draw(session: *g.GameSession) !void {
+fn draw(session: *g.GameSession) g.SystemError!void {
     try session.render.hideLeftButton();
     try session.render.drawInfo("Explore the level");
     try session.render.drawRightButton("Cancel", false);
@@ -45,7 +45,7 @@ fn draw(session: *g.GameSession) !void {
 
 // Keep mode-specific temporaries out of GameSession.tick's shared stack frame
 // to reduce stack usage in other modes on Playdate.
-pub noinline fn tick(self: *ExploreLevelMode) anyerror!void {
+pub noinline fn tick(self: *ExploreLevelMode) g.SystemError!void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         switch (btn.game_button) {
             .a => {

@@ -12,7 +12,11 @@ pub const ButtonOverrides = struct {
     pub const Override = struct {
         button: w.Button,
         context: *anyopaque,
-        handler: *const fn (context: *anyopaque, area: *anyopaque, is_helt: bool) anyerror!w.HandleButtonResult,
+        handler: *const fn (
+            context: *anyopaque,
+            area: *anyopaque,
+            is_helt: bool,
+        ) g.AllErrors!w.HandleButtonResult,
     };
 
     left: ?Override = null,
@@ -54,8 +58,12 @@ pub fn ScrollablePanel(comptime Area: type) type {
         }
 
         /// Handles scrolling, overrides, and finally the wrapped area.
-        pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
-            if (try self.area.handleButton(btn) == .close_window) {
+        pub fn handleButton(self: *Self, btn: g.Button) g.AllErrors!w.HandleButtonResult {
+            const closes = if (comptime @typeInfo(@TypeOf(self.area.handleButton(btn))) == .error_union)
+                (try self.area.handleButton(btn)) == .close_window
+            else
+                self.area.handleButton(btn) == .close_window;
+            if (closes) {
                 return .close_window;
             }
             switch (btn.game_button) {
@@ -92,7 +100,7 @@ pub fn ScrollablePanel(comptime Area: type) type {
         }
 
         /// Draws the scrollbar and the visible portion of the wrapped area.
-        pub fn drawContent(self: *const Self, render: g.Render) !void {
+        pub fn drawContent(self: *const Self, render: g.Render) g.SystemError!void {
             const region = self.region;
             const max_scroll_count = self.maxScrollingLines();
             const scroll = @min(self.scrolled_lines, max_scroll_count);

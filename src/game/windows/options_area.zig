@@ -3,6 +3,7 @@ const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 const w = g.windows;
+const AllocatorError = std.mem.Allocator.Error;
 
 const log = std.log.scoped(.windows);
 
@@ -29,18 +30,18 @@ pub fn OptionsArea(comptime Item: type) type {
                 context: *anyopaque,
                 selected_line: usize,
                 item: Item,
-            ) anyerror!w.HandleButtonResult,
+            ) g.AllErrors!w.HandleButtonResult,
 
             handle_hold_button: ?*const fn (
                 context: *anyopaque,
                 selected_line: usize,
                 item: Item,
-            ) anyerror!w.HandleButtonResult = null,
+            ) g.AllErrors!w.HandleButtonResult = null,
 
             /// A handler that leaves the area open without performing an action.
             pub const do_nothing: ButtonHandler = .{ .handle_release_button = doNothing };
 
-            fn doNothing(_: *anyopaque, _: usize, _: Item) anyerror!w.HandleButtonResult {
+            fn doNothing(_: *anyopaque, _: usize, _: Item) g.AllErrors!w.HandleButtonResult {
                 return .keep_open;
             }
         };
@@ -95,7 +96,7 @@ pub fn OptionsArea(comptime Item: type) type {
         }
 
         /// Handles selection movement and option activation.
-        pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
+        pub fn handleButton(self: *Self, btn: g.Button) g.AllErrors!w.HandleButtonResult {
             switch (btn.game_button) {
                 .up => self.selectPreviousLine(),
                 .down => self.selectNextLine(),
@@ -123,7 +124,7 @@ pub fn OptionsArea(comptime Item: type) type {
         ///
         /// - `scrolled` - How many scrolled lines should be skipped.
         /// Draws the visible options and highlights the selected line.
-        pub fn drawContent(self: *const Self, render: g.Render, region: p.Region, scrolled: usize) !void {
+        pub fn drawContent(self: *const Self, render: g.Render, region: p.Region, scrolled: usize) (g.Runtime.Error || g.Utf8Error)!void {
             // Clear the region
             try render.fillRegion(g.Render.default_filler, .normal, region);
             // Draw the options
@@ -158,7 +159,7 @@ pub fn OptionsArea(comptime Item: type) type {
             label: []const u8,
             item: Item,
             handler: ButtonHandler,
-        ) !*Option {
+        ) AllocatorError!*Option {
             std.debug.assert(label.len < LINE_BUFFER_SIZE);
 
             const option = try self.options.addOne(self.alloc);
@@ -179,7 +180,7 @@ pub fn OptionsArea(comptime Item: type) type {
             args: anytype,
             item: Item,
             handler: ButtonHandler,
-        ) !*Option {
+        ) (AllocatorError || std.fmt.BufPrintError)!*Option {
             const option = try self.options.addOne(self.alloc);
             option.* = .{
                 .item = item,
@@ -195,7 +196,7 @@ pub fn OptionsArea(comptime Item: type) type {
         pub fn addEmptyOption(
             self: *Self,
             item: Item,
-        ) !*Option {
+        ) AllocatorError!*Option {
             const option = try self.options.addOne(self.alloc);
             option.* = .{
                 .item = item,

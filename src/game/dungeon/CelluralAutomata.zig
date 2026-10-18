@@ -4,6 +4,8 @@ const d = g.dungeon;
 const p = g.primitives;
 const u = g.utils;
 
+const AllocatorError = std.mem.Allocator.Error;
+
 const log = std.log.scoped(.cellural_automata);
 
 const CelluralAutomata = @This();
@@ -27,7 +29,7 @@ pub fn generate(
     comptime cols: u8,
     arena: *std.heap.ArenaAllocator,
     seed: u64,
-) !*u.BitMap(rows, cols) {
+) AllocatorError!*u.BitMap(rows, cols) {
     var prng = std.Random.DefaultPrng.init(seed);
     const rand = prng.random();
 
@@ -62,7 +64,7 @@ pub fn generate(
         }
         if (std.log.logEnabled(.debug, .cellural_automata_generator)) {
             log.debug("Generation {d}", .{gen});
-            try dumpToLog(rows, cols, generations[i]);
+            dumpToLog(rows, cols, generations[i]) catch |err| log.err("Failed to log generation: {t}", .{err});
         }
         i +%= 1;
     }
@@ -92,7 +94,7 @@ fn dumpToLog(
     comptime rows: usize,
     comptime cols: usize,
     bitmap: *const u.BitMap(rows, cols),
-) !void {
+) std.Io.Writer.Error!void {
     var buf: [rows * (cols + 1)]u8 = undefined;
     var writer: std.Io.Writer = std.Io.Writer.fixed(&buf);
     try write(rows, cols, bitmap, &writer);
@@ -105,7 +107,7 @@ fn write(
     comptime cols: u8,
     bitmap: *const u.BitMap(rows, cols),
     writer: *std.Io.Writer,
-) !void {
+) std.Io.Writer.Error!void {
     for (1..rows + 1) |r| {
         for (1..cols + 1) |c| {
             try writer.writeByte(if (bitmap.isSet(@intCast(r), @intCast(c))) '#' else ' ');

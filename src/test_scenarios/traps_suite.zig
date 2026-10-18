@@ -104,7 +104,7 @@ test "Should notice the trap moving around" {
     try test_session.runtime.display.expectLooksLike("•••••••••••••••••••^••••••••••••••••••••", .{ .line = 4 });
 }
 
-fn addTrapInFrontOfPlayer(test_session: *TestSession) !g.Entity {
+fn addTrapInFrontOfPlayer(test_session: *TestSession) (g.AllErrors || error{TestExpectedEqual})!g.Entity {
     // Prepare a game session:
     const pp = test_session.player.position().place.movedTo(.up);
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);

@@ -3,6 +3,7 @@ const g = @import("game");
 
 const Args = @import("Args.zig");
 const Logger = @import("Logger.zig");
+const AllocatorError = std.mem.Allocator.Error;
 // exported for tests
 pub const tty = @import("tty.zig");
 pub const TtyRuntime = @import("TtyRuntime.zig");
@@ -54,7 +55,7 @@ pub fn handlePanic(
     std.debug.defaultPanic(msg, first_trace_addr);
 }
 
-pub fn main(init: std.process.Init) !void {
+pub fn main(init: std.process.Init) (AllocatorError || std.Io.Dir.CreateDirPathOpenError || tty.TtyError || std.fmt.ParseIntError || g.SystemError)!void {
     const alloc = init.gpa;
     const io = init.io;
     const args: Args = .{ .args = init.minimal.args };

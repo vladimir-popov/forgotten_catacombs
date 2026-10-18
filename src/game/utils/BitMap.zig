@@ -1,6 +1,7 @@
 const std = @import("std");
 const g = @import("../game_pkg.zig");
 const p = g.primitives;
+const AllocatorError = std.mem.Allocator.Error;
 
 const log = std.log.scoped(.bit_map);
 
@@ -17,13 +18,13 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
 
         bitsets: []std.StaticBitSet(cols),
 
-        pub fn initEmpty(alloc: std.mem.Allocator) std.mem.Allocator.Error!Self {
+        pub fn initEmpty(alloc: std.mem.Allocator) AllocatorError!Self {
             var self: Self = .{ .bitsets = try alloc.alloc(std.StaticBitSet(cols), rows) };
             self.clear();
             return self;
         }
 
-        pub fn initFull(alloc: std.mem.Allocator) std.mem.Allocator.Error!Self {
+        pub fn initFull(alloc: std.mem.Allocator) AllocatorError!Self {
             var self: Self = .{ .bitsets = try alloc.alloc(std.StaticBitSet(cols), rows) };
             for (0..rows) |idx| {
                 self.bitsets[idx] = std.StaticBitSet(cols).initFull();

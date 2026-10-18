@@ -1,6 +1,7 @@
 const std = @import("std");
 const g = @import("../game_pkg.zig");
 const p = g.primitives;
+const AllocatorError = std.mem.Allocator.Error;
 
 const log = std.log.scoped(.bsp_tree);
 
@@ -40,7 +41,7 @@ pub fn build(
     rows: u8,
     cols: u8,
     opts: MinRegionSettings,
-) !*Node {
+) AllocatorError!*Node {
     const region = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = rows, .cols = cols };
     opts.validateRegion(region);
 
@@ -59,7 +60,7 @@ const Splitter = struct {
         return .{ .ptr = self, .split = split };
     }
 
-    fn split(ptr: *anyopaque, node: *GenericNode(p.Region)) anyerror!?struct { p.Region, p.Region } {
+    fn split(ptr: *anyopaque, node: *GenericNode(p.Region)) ?struct { p.Region, p.Region } {
         const self: *Splitter = @ptrCast(@alignCast(ptr));
 
         const split_vertical = node.value.ratio() < self.opts.square_ratio;
@@ -129,7 +130,7 @@ fn GenericNode(comptime V: type) type {
         pub fn root(
             arena: *std.heap.ArenaAllocator,
             value: V,
-        ) !*NodeV {
+        ) AllocatorError!*NodeV {
             const node = try arena.allocator().create(NodeV);
             node.* = .{ .value = value };
             return node;
@@ -160,14 +161,14 @@ fn GenericNode(comptime V: type) type {
             self: *NodeV,
             arena: *std.heap.ArenaAllocator,
             splitter: SplitHandler,
-        ) !void {
+        ) AllocatorError!void {
             std.debug.assert(self.left == null);
             std.debug.assert(self.right == null);
             const alloc = arena.allocator();
             var stack: std.ArrayList(*NodeV) = .empty;
             try stack.append(alloc, self);
             while (stack.pop()) |node| {
-                const maybe_values = try splitter.split(splitter.ptr, node);
+                const maybe_values = splitter.split(splitter.ptr, node);
                 if (maybe_values) |values| {
                     log.debug("Splitted into regions: {any}", .{values});
                     node.left = try alloc.create(NodeV);
@@ -191,7 +192,7 @@ fn GenericNode(comptime V: type) type {
             arena: *std.heap.ArenaAllocator,
             value: V,
             lessThan: *const fn (x: V, y: V) bool,
-        ) !void {
+        ) AllocatorError!void {
             if (lessThan(self.value, value)) {
                 if (self.right) |right| {
                     try right.add(arena, value, lessThan);
@@ -216,7 +217,7 @@ fn GenericNode(comptime V: type) type {
         }
 
         /// Traverse all nodes of this tree in depth, and pass them to the callback.
-        pub fn traverse(self: *NodeV, arena: *std.heap.ArenaAllocator, handler: TraverseHandler) !void {
+        pub fn traverse(self: *NodeV, comptime Errors: type, arena: *std.heap.ArenaAllocator, handler: TraverseHandler(Errors)) Errors!void {
             const alloc = arena.allocator();
             var stack: std.ArrayList(*NodeV) = .empty;
             try stack.append(alloc, self);
@@ -235,7 +236,7 @@ fn GenericNode(comptime V: type) type {
         /// and modifies the parent of the leafs setting the value returned from the handler.
         /// Note, that only values from paired leafs are used.  Values of all other nodes are ignored,
         /// and replaces by the handler result.
-        pub fn foldModify(self: *NodeV, arena: *std.heap.ArenaAllocator, handler: FoldHandler) !V {
+        pub fn foldModify(self: *NodeV, comptime Errors: type, arena: *std.heap.ArenaAllocator, handler: FoldHandler(Errors)) Errors!V {
             const alloc = arena.allocator();
             var stack: std.ArrayList(struct { *NodeV, *NodeV }) = .empty;
             var stack_prev_size: usize = 0;
@@ -275,23 +276,27 @@ fn GenericNode(comptime V: type) type {
             ptr: *anyopaque,
             /// ptr - pointer to the context of the handler
             /// node - the current node of the tree, which should be split
-            split: *const fn (ptr: *anyopaque, node: *NodeV) anyerror!?struct { V, V },
+            split: *const fn (ptr: *anyopaque, node: *NodeV) ?struct { V, V },
         };
 
-        pub const TraverseHandler = struct {
-            ptr: *anyopaque,
-            /// ptr - pointer to the context of the handler
-            /// node - the current node of the tree
-            handle: *const fn (ptr: *anyopaque, node: *NodeV) anyerror!void,
-        };
+        pub fn TraverseHandler(comptime Errors: type) type {
+            return struct {
+                ptr: *anyopaque,
+                /// ptr - pointer to the context of the handler
+                /// node - the current node of the tree
+                handle: *const fn (ptr: *anyopaque, node: *NodeV) Errors!void,
+            };
+        }
 
-        pub const FoldHandler = struct {
-            ptr: *anyopaque,
-            /// ptr - pointer to the context of the handler
-            /// left_value - the value of the left node
-            /// right_value - the value of the right node
-            combine: *const fn (ptr: *anyopaque, left: V, right: V) anyerror!V,
-        };
+        pub fn FoldHandler(comptime Errors: type) type {
+            return struct {
+                ptr: *anyopaque,
+                /// ptr - pointer to the context of the handler
+                /// left_value - the value of the left node
+                /// right_value - the value of the right node
+                combine: *const fn (ptr: *anyopaque, left: V, right: V) Errors!V,
+            };
+        }
     };
 }
 
@@ -307,7 +312,7 @@ test "build tree" {
 
     // then:
     var validate = ValidateNodes{ .opts = opts };
-    try root.traverse(&arena, validate.bspNodeHandler());
+    try root.traverse(anyerror, &arena, validate.bspNodeHandler());
 }
 
 /// Utility for test
@@ -315,7 +320,7 @@ const ValidateNodes = struct {
     opts: MinRegionSettings,
     min_ratio: f32 = 0.2,
 
-    fn bspNodeHandler(self: *ValidateNodes) Node.TraverseHandler {
+    fn bspNodeHandler(self: *ValidateNodes) Node.TraverseHandler(anyerror) {
         return .{ .ptr = self, .handle = validate };
     }
 
@@ -380,12 +385,12 @@ test "split/fold" {
     defer arena.deinit();
 
     const divider = GenericNode(u8).SplitHandler{ .ptr = undefined, .split = divide };
-    const summator = GenericNode(u8).FoldHandler{ .ptr = undefined, .combine = sum };
+    const summator = GenericNode(u8).FoldHandler(anyerror){ .ptr = undefined, .combine = sum };
     var tree = try GenericNode(u8).root(&arena, 8);
 
     // when:
     try tree.split(&arena, divider);
-    const result = try tree.foldModify(&arena, summator);
+    const result = try tree.foldModify(anyerror, &arena, summator);
 
     // then:
     try std.testing.expectEqual(8, result);
@@ -399,7 +404,7 @@ test "add/traverse" {
         actual_values: []u8,
         idx: u8,
 
-        fn handler(self: *Self) GenericNode(u8).TraverseHandler {
+        fn handler(self: *Self) GenericNode(u8).TraverseHandler(anyerror) {
             return .{ .ptr = self, .handle = accumulate_actual };
         }
 
@@ -433,7 +438,7 @@ test "add/traverse" {
     };
 
     // when:
-    try tree.traverse(&arena, validation.handler());
+    try tree.traverse(anyerror, &arena, validation.handler());
 
     // then:
     std.mem.sort(u8, &actual_values, {}, lessThanU8);
@@ -450,7 +455,7 @@ fn compareU8(x: u8, y: u8) bool {
     return x < y;
 }
 
-fn divide(_: *anyopaque, node: *GenericNode(u8)) anyerror!?struct { u8, u8 } {
+fn divide(_: *anyopaque, node: *GenericNode(u8)) ?struct { u8, u8 } {
     const half: u8 = node.value / 2;
     return if (half > 0) .{ half, half } else null;
 }

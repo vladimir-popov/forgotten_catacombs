@@ -4,6 +4,7 @@ const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 const w = g.windows;
+const AllocatorError = std.mem.Allocator.Error;
 
 const ActionResult = g.systems.ActionSystem.ActionResult;
 
@@ -30,7 +31,7 @@ pub fn init(
     self: *Self,
     session: *g.GameSession,
     target: ?g.Entity,
-) !void {
+) g.SystemError!void {
     log.debug("Init PlayMode. Target is {any}", .{target});
     self.* = .{
         .session = session,
@@ -55,7 +56,7 @@ fn setTarget(self: *Self, target: ?g.Entity) void {
 
 // Keep mode-specific temporaries out of GameSession.tick's shared stack frame
 // to reduce stack usage in other modes on Playdate.
-pub noinline fn tick(self: *Self) !void {
+pub noinline fn tick(self: *Self) (g.SystemError || g.GameOverError || g.GoToMainMenuError)!void {
     // TODO draw only after changes and return 1, else 0.
     if (try self.draw()) {
         try self.session.runtime.cleanInputBuffer();
@@ -79,7 +80,7 @@ pub noinline fn tick(self: *Self) !void {
 }
 
 /// Can be invoked from the `tick` or as continue of the playing after switching the game mode.
-pub fn playerTurn(self: *Self) !void {
+pub fn playerTurn(self: *Self) (g.SystemError || g.GameOverError)!void {
     const initiative = self.session.registry.getUnsafe(self.session.player, c.Initiative);
     const speed = self.session.registry.getUnsafe(self.session.player, c.Speed);
     const action = &self.action_buffer;
@@ -116,7 +117,7 @@ pub fn playerTurn(self: *Self) !void {
     }
 }
 
-fn enemiesTurn(self: *Self) !void {
+fn enemiesTurn(self: *Self) (g.SystemError || g.GameOverError)!void {
     var itr = self.session.registry.query2(c.Initiative, c.Speed);
     while (itr.next()) |tuple| {
         const npc, const initiative, const speed = tuple;
@@ -142,7 +143,7 @@ fn doTurn(
     action: *const g.actions.Action,
     speed: *const c.Speed,
     initiative: *c.Initiative,
-) !ActionResult {
+) (g.SystemError || g.GameOverError)!ActionResult {
     log.info("The turn of the entity {d}.", .{actor.id});
     defer log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
 
@@ -165,7 +166,7 @@ fn doTurn(
     }
 }
 
-fn onCycleCompleted(self: *Self, actor: g.Entity) !void {
+fn onCycleCompleted(self: *Self, actor: g.Entity) (g.SystemError || g.GameOverError)!void {
     const registry = &self.session.registry;
 
     if (actor.eql(self.session.player)) {
@@ -234,7 +235,7 @@ fn onCycleCompleted(self: *Self, actor: g.Entity) !void {
 /// Draws the whole screen.
 ///
 /// Returns `true` if the drawing is not completed, and the input should be ignored.
-fn draw(self: *Self) !bool {
+fn draw(self: *Self) g.SystemError!bool {
     // the quick_actions_window is drawn during handleInput
     if (self.quick_actions_window != null) return false;
 
@@ -270,7 +271,7 @@ fn draw(self: *Self) !bool {
 /// Draws a single frame from every animation.
 /// Removes the animation if the last frame was drawn.
 /// Returns `true` if any animation is blocked.
-pub fn drawAnimationsFramesToBuffer(self: *const Self, now: u64) !bool {
+pub fn drawAnimationsFramesToBuffer(self: *const Self, now: u64) g.SystemError!bool {
     var was_blocked_animation: bool = false;
     var itr = self.session.level.registry.query2(c.Position, c.Animation);
     while (itr.next()) |components| {
@@ -284,7 +285,7 @@ pub fn drawAnimationsFramesToBuffer(self: *const Self, now: u64) !bool {
                     .inverted
                 else
                     .normal;
-                try self.session.render.drawSpriteToBuffer(
+                self.session.render.drawSpriteToBuffer(
                     self.session.viewport,
                     codepoint,
                     place,
@@ -305,7 +306,7 @@ pub fn drawAnimationsFramesToBuffer(self: *const Self, now: u64) !bool {
 /// and tries to get a next notification from the global queue.
 ///
 /// Returns `true` if a notification should be keep showed.
-fn showNotifications(self: *Self, now: u64) !bool {
+fn showNotifications(self: *Self, now: u64) g.SystemError!bool {
     if (self.notification_to_show) |notification| {
         if (now - notification.start_showing_at < SHOW_NOTIFICATION_MS) {
             // Show the notification
@@ -331,7 +332,7 @@ fn showNotifications(self: *Self, now: u64) !bool {
     return false;
 }
 
-fn drawInfoBar(self: *const Self) !void {
+fn drawInfoBar(self: *const Self) g.SystemError!void {
     try self.session.render.drawLeftButton("Explore", true);
     const qa = self.quickAction();
     const action_label = qa.toString();
@@ -364,7 +365,7 @@ fn drawInfoBar(self: *const Self) !void {
 }
 
 /// Returns `true` if the input leads to an action
-fn handleInput(self: *Self) !bool {
+fn handleInput(self: *Self) g.AllErrors!bool {
     // NOTE: the quick_actions_window can be drawn during this method
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (self.quick_actions_window) |*window| {
@@ -456,11 +457,11 @@ fn handleInput(self: *Self) !bool {
                 const level_before = self.session.registry.getUnsafe(self.session.player, c.Experience).level;
                 if (new_level > level_before) {
                     const exp = g.meta.Levels[new_level - 1];
-                    _ = try g.meta.addExperience(&self.session.registry, self.session.player, exp);
+                    _ = g.meta.addExperience(&self.session.registry, self.session.player, exp);
                 }
             },
             .set_experience => |exp| {
-                _ = try g.meta.addExperience(&self.session.registry, self.session.player, exp);
+                _ = g.meta.addExperience(&self.session.registry, self.session.player, exp);
             },
             .set_health => |hp| {
                 if (self.session.registry.get(self.session.player, c.Health)) |health| {
@@ -481,7 +482,7 @@ fn handleInput(self: *Self) !bool {
                     try self.session.journal.markArmorAsKnown(entity);
                 }
             },
-            else => if (try cheat.toAction(self.session, &self.action_buffer)) {
+            else => if (cheat.toAction(self.session, &self.action_buffer)) {
                 return true;
             },
         }
@@ -555,7 +556,7 @@ fn quickAction(self: *const Self) g.actions.Action {
 
 /// Checks that the target exists, or finds another.
 /// Recalculates the list of available quick actions applicable to the target.
-pub fn updateQuickActions(self: *Self) anyerror!void {
+pub fn updateQuickActions(self: *Self) AllocatorError!void {
     defer {
         if (g.utils.isDebug())
             log.debug(
@@ -681,7 +682,7 @@ const TargetsIterator = struct {
 };
 
 /// Builds a window with quick actions list
-fn initWindowWithQuickActions(self: *Self) !void {
+fn initWindowWithQuickActions(self: *Self) (AllocatorError || std.fmt.BufPrintError)!void {
     std.debug.assert(self.quick_actions_window == null);
 
     self.quick_actions_window = try w.modal_window.withOptions(
@@ -705,7 +706,7 @@ fn initWindowWithQuickActions(self: *Self) !void {
 }
 
 /// Sets the index of the current quick action to the currently selected item in the window
-fn chooseQuickAction(ptr: *anyopaque, line_idx: usize, _: void) anyerror!w.HandleButtonResult {
+fn chooseQuickAction(ptr: *anyopaque, line_idx: usize, _: void) g.AllErrors!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     self.quick_actions.selected_idx = line_idx;
     log.debug("Chosen option {d}: {t}", .{ line_idx, self.quickAction().tag });
@@ -742,7 +743,7 @@ const NotificationMessage = struct {
 
     /// Precalculates a notification message from a notification.
     /// Text, position and mode will be calculated once to show the message every tick for the whole delay.
-    pub fn init(notification: g.notifications.Notification, session: *const g.GameSession) !NotificationMessage {
+    pub fn init(notification: g.notifications.Notification, session: *const g.GameSession) std.fmt.BufPrintError!NotificationMessage {
         var msg: NotificationMessage = .{
             // Start calculation of the place to show from the player place on the screen
             .pp = session.viewport.relative(session.level.playerPosition().place) orelse unreachable,

@@ -7,6 +7,7 @@ const p = g.primitives;
 const w = g.windows;
 
 const log = std.log.scoped(.explore_mode);
+const AllocatorError = std.mem.Allocator.Error;
 
 const Self = @This();
 const EntitiesOnScreen = std.AutoHashMapUnmanaged(p.Point, [c.Position.ZOrder.count]?g.Entity);
@@ -19,7 +20,7 @@ entity_in_focus: g.Entity,
 place_in_focus: p.Point,
 compositor: w.WindowCompositor,
 
-pub fn init(self: *Self, session: *g.GameSession) !void {
+pub fn init(self: *Self, session: *g.GameSession) g.SystemError!void {
     self.* = .{
         .session = session,
         .entity_in_focus = session.player,
@@ -42,7 +43,7 @@ pub fn deinit(self: *Self) void {
 
 // Keep mode-specific temporaries out of GameSession.tick's shared stack frame
 // to reduce stack usage in other modes on Playdate.
-pub noinline fn tick(self: *Self) anyerror!void {
+pub noinline fn tick(self: *Self) g.AllErrors!void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         switch (try self.compositor.handleButton(btn)) {
             .closed_main_window => {
@@ -60,7 +61,7 @@ pub noinline fn tick(self: *Self) anyerror!void {
     }
 }
 
-pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
+pub fn handleButton(self: *Self, btn: g.Button) g.SystemError!w.HandleButtonResult {
     switch (btn.game_button) {
         .b => {
             if (btn.state == .hold and self.countOfEntitiesInFocus() > 1) {
@@ -81,7 +82,7 @@ pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
     return .keep_open;
 }
 
-pub fn draw(self: *Self, render: g.Render) !void {
+pub fn draw(self: *Self, render: g.Render) g.SystemError!void {
     try render.drawScene(self.session, self.entity_in_focus);
     try render.drawLeftButton("Describe", self.countOfEntitiesInFocus() > 1);
     if (self.canBeATarget()) {
@@ -119,7 +120,7 @@ fn canBeATarget(self: *const Self) bool {
     ) != null;
 }
 
-fn statusLine(self: Self, entity: g.Entity, line: []u8) !usize {
+fn statusLine(self: Self, entity: g.Entity, line: []u8) std.fmt.BufPrintError!usize {
     var len: usize = 0;
     if (self.session.runtime.isDevMode()) {
         len += (try std.fmt.bufPrint(line[len..], "{d}:", .{entity.id})).len;
@@ -131,7 +132,7 @@ fn statusLine(self: Self, entity: g.Entity, line: []u8) !usize {
     return len;
 }
 
-fn updateEntitiesOnScreen(self: *Self) !void {
+fn updateEntitiesOnScreen(self: *Self) AllocatorError!void {
     const alloc = self.session.mode_arena.allocator();
     self.entities_on_screen.clearRetainingCapacity();
     const level = &self.session.level;
@@ -230,7 +231,7 @@ inline fn sub(x: u8, y: u8) u8 {
 fn showWindowWithEntities(
     self: *Self,
     variants: [c.Position.ZOrder.count]?g.Entity,
-) !void {
+) g.SystemError!void {
     const window = try self.compositor.showModalWindowWithOptions(
         self.session.mode_arena.allocator(),
         &.{},
@@ -254,14 +255,14 @@ fn showWindowWithEntities(
     window.shrinkToContent();
 }
 
-fn showEntityDescription(ptr: *anyopaque, _: usize, entity: g.Entity) anyerror!w.HandleButtonResult {
+fn showEntityDescription(ptr: *anyopaque, _: usize, entity: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
     self.entity_in_focus = entity;
     try self.showWindowWithEntityDescription();
     return .keep_open;
 }
 
-fn showWindowWithEntityDescription(self: *Self) !void {
+fn showWindowWithEntityDescription(self: *Self) g.SystemError!void {
     try self.compositor.showEntityDescription(
         self.session.mode_arena.allocator(),
         self.session,

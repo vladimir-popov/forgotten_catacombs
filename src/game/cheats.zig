@@ -223,7 +223,7 @@ pub const Cheat = union(enum) {
     }
 
     /// Some cheats can be interpreted as game actions.
-    pub fn toAction(self: Cheat, session: *g.GameSession, action: *g.Action) !bool {
+    pub fn toAction(self: Cheat, session: *g.GameSession, action: *g.Action) bool {
         switch (self) {
             .move_player_to_ladder_up => {
                 var itr = session.registry.query2(c.Ladder, c.Position);

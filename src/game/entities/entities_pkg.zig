@@ -5,6 +5,7 @@ const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
+const AllocatorError = std.mem.Allocator.Error;
 const entities = @This();
 
 const ammo = @import("ammo.zig");
@@ -36,7 +37,7 @@ pub fn player(
     stats: c.Stats,
     skills: c.Skills,
     health: c.Health,
-) !c.Components {
+) AllocatorError!c.Components {
     return .{
         .description = .{ .preset = .player },
         .equipment = .nothing,
@@ -106,7 +107,7 @@ pub fn teleport(place: p.Point) c.Components {
     };
 }
 
-pub fn pile(alloc: std.mem.Allocator, place: p.Point) !c.Components {
+pub fn pile(alloc: std.mem.Allocator, place: p.Point) AllocatorError!c.Components {
     return .{
         .position = .{ .zorder = .item, .place = place },
         .sprite = .{ .codepoint = cp.pile },
@@ -136,7 +137,7 @@ pub fn trader(
     registry: *g.Registry,
     place: p.Point,
     balance: u16,
-) !c.Components {
+) AllocatorError!c.Components {
     return .{
         .position = .{ .place = place, .zorder = .obstacle },
         .sprite = .{ .codepoint = cp.human },

@@ -22,7 +22,7 @@ pub fn WizardWindow(comptime Steps: type, Context: type) type {
         current_step: usize = 0,
 
         /// Initializes the first step and stores the shared wizard context.
-        pub fn init(self: *Self, alloc: std.mem.Allocator, context: *Context) !void {
+        pub fn init(self: *Self, alloc: std.mem.Allocator, context: *Context) g.SystemError!void {
             self.* = .{
                 .step_arena = .init(alloc),
                 .context = context,
@@ -36,7 +36,7 @@ pub fn WizardWindow(comptime Steps: type, Context: type) type {
         }
 
         /// Handles the current step and performs forward/backward navigation.
-        pub fn handleButton(self: *Self, btn: g.Button) !w.HandleButtonResult {
+        pub fn handleButton(self: *Self, btn: g.Button) g.AllErrors!w.HandleButtonResult {
             const current_step = self.current_step;
             inline for (0..steps_fields.len) |idx| {
                 // handle the button by the current step
@@ -44,7 +44,7 @@ pub fn WizardWindow(comptime Steps: type, Context: type) type {
                     const field = steps_fields[idx];
                     // switch back
                     if (btn.game_button == .b and idx > 0) {
-                        try @field(self.steps, field.name).rollback();
+                        @field(self.steps, field.name).rollback();
                         try self.switchToStep(idx - 1);
                     } else
                     // switch to the next step
@@ -52,7 +52,7 @@ pub fn WizardWindow(comptime Steps: type, Context: type) type {
                         if (btn.game_button == .a) {
                             if (idx + 1 < steps_fields.len) {
                                 // commit changes and switch to the next step
-                                try @field(self.steps, field.name).commit();
+                                @field(self.steps, field.name).commit();
                                 try self.switchToStep(idx + 1);
                             } else {
                                 return .close_window;
@@ -65,7 +65,7 @@ pub fn WizardWindow(comptime Steps: type, Context: type) type {
         }
 
         /// Commits or rolls back the current step storage and initializes `idx`.
-        pub fn switchToStep(self: *Self, comptime idx: comptime_int) !void {
+        pub fn switchToStep(self: *Self, comptime idx: comptime_int) g.SystemError!void {
             std.debug.assert(self.step_arena.reset(.retain_capacity));
             const field = steps_fields[idx];
             self.steps = @unionInit(Steps, field.name, undefined);
@@ -74,7 +74,7 @@ pub fn WizardWindow(comptime Steps: type, Context: type) type {
         }
 
         /// Draws the current step and its navigation buttons.
-        pub fn draw(self: *Self, render: g.Render) !void {
+        pub fn draw(self: *Self, render: g.Render) g.SystemError!void {
             try render.clearDisplay();
 
             var buttons: w.Buttons = undefined;

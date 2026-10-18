@@ -20,30 +20,30 @@ pub fn isClosed(self: Self) bool {
     return self.test_session.session.mode != .modify_recognize;
 }
 
-pub fn close(self: Self) !void {
+pub fn close(self: Self) g.AllErrors!void {
     std.debug.assert(self.modifyMode().actions_window == null);
     std.debug.assert(self.modifyMode().description_window == null);
     try self.test_session.pressButton(.b);
 }
 
-pub fn chooseRecognizeTab(self: Self) !void {
+pub fn chooseRecognizeTab(self: Self) g.AllErrors!void {
     self.modifyMode().main_window.active_tab_idx = 0;
     try self.test_session.pressButton(.up);
 }
 
-pub fn chooseModifyTab(self: Self) !void {
+pub fn chooseModifyTab(self: Self) g.AllErrors!void {
     self.modifyMode().main_window.active_tab_idx = 1;
     try self.test_session.pressButton(.up);
 }
 
-pub fn chooseRepairTab(self: Self) !void {
+pub fn chooseRepairTab(self: Self) g.AllErrors!void {
     self.modifyMode().main_window.active_tab_idx = 2;
     try self.test_session.pressButton(.up);
 }
 
 /// Selects an item with the passed name in an active tab, or throws an error.
 /// If the item was found, the button is pressed and ModalWindows returns.
-pub fn chooseItemByName(self: Self, name: []const u8) !ModalWindows {
+pub fn chooseItemByName(self: Self, name: []const u8) (g.AllErrors || error{NotFoundOptionByName})!ModalWindows {
     const options = Options{
         .options_area = self.modifyMode().main_window.activeTab(w.OptionsArea(g.Entity)).?,
         .test_session = self.test_session,
@@ -52,7 +52,7 @@ pub fn chooseItemByName(self: Self, name: []const u8) !ModalWindows {
     return .{ .test_session = self.test_session, .compositor = &self.modifyMode().compositor };
 }
 
-pub fn chooseItemById(self: Self, item: g.Entity) !ModalWindows {
+pub fn chooseItemById(self: Self, item: g.Entity) (g.AllErrors || error{NotFoundOptionById})!ModalWindows {
     const options = Options{
         .options_area = self.modifyMode().main_window.activeTab(w.OptionsArea(g.Entity)).?,
         .test_session = self.test_session,
@@ -61,7 +61,7 @@ pub fn chooseItemById(self: Self, item: g.Entity) !ModalWindows {
     return .{ .test_session = self.test_session, .compositor = &self.modifyMode().compositor };
 }
 
-pub fn chooseItemByIndex(self: Self, idx: usize) !ModalWindows {
+pub fn chooseItemByIndex(self: Self, idx: usize) g.AllErrors!ModalWindows {
     const options = Options{
         .options_area = self.modifyMode().main_window.activeTab(w.OptionsArea(g.Entity)).?,
         .test_session = self.test_session,

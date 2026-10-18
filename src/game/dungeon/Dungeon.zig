@@ -141,7 +141,7 @@ pub fn dumpToLog(self: *const Self) void {
 pub fn write(
     self: *const Self,
     writer: *std.Io.Writer,
-) !usize {
+) std.Io.Writer.Error!usize {
     var itr = self.cellsInRegion(.{ .top_left = .{ .row = 1, .col = 1 }, .rows = self.rows, .cols = self.cols });
     var row: usize = 1;
     var col: usize = 1;

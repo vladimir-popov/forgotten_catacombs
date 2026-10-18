@@ -22,6 +22,7 @@ const log = std.log.scoped(.persistence);
 
 pub const SESSION_FILE_NAME = "session.json";
 
+/// Errors raised while encoding, decoding, or accessing persisted game data.
 pub const Error = error{
     OutOfMemory,
     InvalidData,

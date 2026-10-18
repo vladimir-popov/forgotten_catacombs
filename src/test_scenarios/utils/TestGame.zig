@@ -14,7 +14,7 @@ runtime: TestRuntime,
 tmp_dir: std.testing.TmpDir,
 game: g.Game,
 
-pub fn initWelcomeScreen(self: *Self, gpa: std.mem.Allocator, io: std.Io) !void {
+pub fn initWelcomeScreen(self: *Self, gpa: std.mem.Allocator, io: std.Io) g.AllErrors!void {
     self.gpa = gpa;
     self.tmp_dir = std.testing.tmpDir(.{});
     self.runtime = try TestRuntime.init(gpa, io, self.tmp_dir.dir);
@@ -22,7 +22,7 @@ pub fn initWelcomeScreen(self: *Self, gpa: std.mem.Allocator, io: std.Io) !void 
     try self.tick(.{});
 }
 
-pub fn initNewCharacter(self: *Self, gpa: std.mem.Allocator, io: std.Io) !void {
+pub fn initNewCharacter(self: *Self, gpa: std.mem.Allocator, io: std.Io) g.AllErrors!void {
     try self.initWelcomeScreen(gpa, io);
     try self.pressButton(.a);
 }
@@ -37,7 +37,7 @@ pub fn deinit(self: *Self) void {
 /// increase a clock on 1 second,
 /// runs the method `session.tick(.{})`,
 /// and merges the last_frame into the display buffer.
-pub fn tick(self: *Self, opts: TickOptions) !void {
+pub fn tick(self: *Self, opts: TickOptions) g.AllErrors!void {
     for (0..opts.count) |_| {
         self.runtime.last_frame = .empty;
         self.runtime.current_millis += opts.duration_ms;
@@ -46,7 +46,7 @@ pub fn tick(self: *Self, opts: TickOptions) !void {
     }
 }
 
-pub fn pressButton(self: *Self, button: g.Button.GameButton) !void {
+pub fn pressButton(self: *Self, button: g.Button.GameButton) g.AllErrors!void {
     log.debug("Emulate pressing button {any}", .{button});
     try self.runtime.pushed_buttons.append(self.gpa, .{ .game_button = button, .state = .released });
     try self.tick(.{ .duration_ms = 100 });

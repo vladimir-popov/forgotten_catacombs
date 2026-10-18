@@ -34,7 +34,7 @@ pub fn str(self: Self, name: []const u8) ?[]const u8 {
 /// Iterates over args, and looking for the '--{name}=<value>' argument. If the arg with the {name} is found,
 /// it takes the string after the '=' as the value, parse it as a number, and returns result (including error).
 /// Note, that spaces around the '=' are not expected.
-pub fn int(self: Self, comptime T: type, name: []const u8) !?T {
+pub fn int(self: Self, comptime T: type, name: []const u8) std.fmt.ParseIntError!?T {
     if (self.str(name)) |arg_value| {
         return try std.fmt.parseInt(T, arg_value, 10);
     }

@@ -33,6 +33,7 @@ const std = @import("std");
 const g = @import("../game_pkg.zig");
 const p = g.primitives;
 const w = g.windows;
+const AllocatorError = std.mem.Allocator.Error;
 
 /// Describes whether input closed the main window, a modal window, or neither.
 /// Reports whether input closed the main window, a modal window, or neither.
@@ -40,8 +41,8 @@ pub const ClosedWindow = enum { closed_main_window, closed_modal_window, keep_wi
 
 const GenericWindow = struct {
     const VTable = struct {
-        handleButtonFn: *const fn (underlying: *anyopaque, btn: g.Button) anyerror!w.HandleButtonResult,
-        drawFn: *const fn (underlying: *anyopaque, render: g.Render) anyerror!void,
+        handleButtonFn: *const fn (underlying: *anyopaque, btn: g.Button) g.AllErrors!w.HandleButtonResult,
+        drawFn: *const fn (underlying: *anyopaque, render: g.Render) g.SystemError!void,
         deinitFn: *const fn (underlying: *anyopaque) void,
     };
 
@@ -53,11 +54,11 @@ const GenericWindow = struct {
         return .{
             .ptr = @ptrCast(window),
             .vtable = struct {
-                fn handleButtonFn(ptr: *anyopaque, btn: g.Button) !w.HandleButtonResult {
+                fn handleButtonFn(ptr: *anyopaque, btn: g.Button) g.AllErrors!w.HandleButtonResult {
                     const win: *W = @ptrCast(@alignCast(ptr));
                     return try win.handleButton(btn);
                 }
-                fn drawFn(ptr: *anyopaque, render: g.Render) !void {
+                fn drawFn(ptr: *anyopaque, render: g.Render) g.SystemError!void {
                     const win: *W = @ptrCast(@alignCast(ptr));
                     try win.draw(render);
                 }
@@ -74,11 +75,11 @@ const GenericWindow = struct {
         };
     }
 
-    pub fn handleButton(self: *@This(), btn: g.Button) !w.HandleButtonResult {
+    pub fn handleButton(self: *@This(), btn: g.Button) g.AllErrors!w.HandleButtonResult {
         return try self.vtable.handleButtonFn(self.ptr, btn);
     }
 
-    pub fn draw(self: *@This(), render: g.Render) !void {
+    pub fn draw(self: *@This(), render: g.Render) g.SystemError!void {
         try self.vtable.drawFn(self.ptr, render);
     }
 
@@ -92,7 +93,7 @@ const GenericModalWindow = struct {
     underlying: ?GenericWindow,
 
     /// Creates an empty reusable slot for a single modal window.
-    pub fn init(alloc: std.mem.Allocator) !GenericModalWindow {
+    pub fn init(alloc: std.mem.Allocator) AllocatorError!GenericModalWindow {
         const self = GenericModalWindow{ .arena = try alloc.create(std.heap.ArenaAllocator), .underlying = null };
         self.arena.* = .init(alloc);
         return self;
@@ -107,7 +108,7 @@ const GenericModalWindow = struct {
 
     /// Replaces the slot's current window and stores `prototype_window` in the
     /// slot arena. On success, the returned pointer is borrowed from the slot.
-    pub fn wrap(self: *@This(), prototype_window: anytype) !*@TypeOf(prototype_window) {
+    pub fn wrap(self: *@This(), prototype_window: anytype) AllocatorError!*@TypeOf(prototype_window) {
         const W = @TypeOf(prototype_window);
         self.unwrap();
         const window = try self.arena.allocator().create(W);
@@ -144,7 +145,7 @@ is_redrawing_required: bool = true,
 /// `alloc` is used for the compositor's reusable modal slots. Allocators passed
 /// later to `show*` functions are used by the concrete modal window contents.
 /// `max_modal_region` constrains modal windows created by the compositor.
-pub fn init(alloc: std.mem.Allocator, main_window: anytype, max_modal_region: p.Region) !Self {
+pub fn init(alloc: std.mem.Allocator, main_window: anytype, max_modal_region: p.Region) AllocatorError!Self {
     const MW = @TypeOf(main_window);
     const pointer_type_info = @typeInfo(MW).pointer;
     return .{
@@ -178,7 +179,7 @@ pub fn showModalWindowWithText(
     self: *Self,
     alloc: std.mem.Allocator,
     title: []const u8,
-) !*w.ModalWindow(w.TextArea) {
+) g.SystemError!*w.ModalWindow(w.TextArea) {
     std.debug.assert(self.modal_windows_count < self.modal_windows.len);
     const window = try self.modal_windows[self.modal_windows_count].wrap(
         try w.modal_window.withText(alloc, .{ .title = title, .max_region = self.max_modal_region }),
@@ -201,7 +202,7 @@ pub fn showModalWindowWithOptions(
     comptime Item: type,
     context: *anyopaque,
     text_align: g.TextAlign,
-) !*w.ModalWindow(w.OptionsArea(Item)) {
+) g.SystemError!*w.ModalWindow(w.OptionsArea(Item)) {
     std.debug.assert(self.modal_windows_count < self.modal_windows.len);
     const window = try self.modal_windows[self.modal_windows_count].wrap(try w.modal_window.withOptions(
         alloc,
@@ -224,7 +225,7 @@ pub fn showNotification(
     alloc: std.mem.Allocator,
     title: []const u8,
     message: []const u8,
-) !void {
+) g.SystemError!void {
     std.debug.assert(self.modal_windows_count < self.modal_windows.len);
     _ = try self.modal_windows[self.modal_windows_count].wrap(
         try w.modal_window.notification(alloc, message, .{ .title = title, .max_region = self.max_modal_region }),
@@ -243,7 +244,7 @@ pub fn showEntityDescription(
     alloc: std.mem.Allocator,
     session: *g.GameSession,
     entity: g.Entity,
-) !void {
+) g.SystemError!void {
     std.debug.assert(self.modal_windows_count < self.modal_windows.len);
     _ = try self.modal_windows[self.modal_windows_count].wrap(
         try w.modal_window.entityDescription(alloc, session, entity, w.FULL_SCREEN_REGION),
@@ -280,7 +281,7 @@ fn topModalWindow(self: *Self) ?*GenericModalWindow {
 /// A modal that requests closing is deinitialized and removed before this
 /// function returns `.closed_modal_window`. Closing the borrowed main window
 /// is only reported; its owner remains responsible for deinitializing it.
-pub fn handleButton(self: *Self, btn: g.Button) !ClosedWindow {
+pub fn handleButton(self: *Self, btn: g.Button) g.AllErrors!ClosedWindow {
     self.is_redrawing_required = true;
     if (self.modal_windows_count > 0) {
         const current_idx = self.modal_windows_count - 1;
@@ -308,7 +309,7 @@ pub fn handleButton(self: *Self, btn: g.Button) !ClosedWindow {
 
 /// Draws the borrowed main window followed by owned modal windows from bottom
 /// to top. Does nothing when no redraw has been requested.
-pub fn draw(self: *Self, render: g.Render) !void {
+pub fn draw(self: *Self, render: g.Render) g.SystemError!void {
     if (!self.is_redrawing_required) return;
     defer self.is_redrawing_required = false;
 

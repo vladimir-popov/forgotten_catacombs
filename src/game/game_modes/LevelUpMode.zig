@@ -46,7 +46,7 @@ skills: *c.Skills,
 health: *c.Health,
 wizard: union(enum) { stats_and_skills: StatsAndSkillsWizard, only_skills: OnlySkillsWizard },
 
-pub fn init(self: *Self, session: *g.GameSession) !void {
+pub fn init(self: *Self, session: *g.GameSession) g.SystemError!void {
     log.debug("Init LevelUp mode", .{});
     const exp = session.registry.getUnsafe(session.player, c.Experience);
     const stats = session.registry.getUnsafe(session.player, c.Stats);
@@ -80,7 +80,7 @@ pub fn deinit(self: *Self) void {
 
 // Keep mode-specific temporaries out of GameSession.tick's shared stack frame
 // to reduce stack usage in other modes on Playdate.
-pub noinline fn tick(self: *Self) !void {
+pub noinline fn tick(self: *Self) g.AllErrors!void {
     // Nothing should happened until the player push a button
     if (try self.session.runtime.readPushedButtons()) |btn| {
         const result = switch (self.wizard) {
@@ -108,7 +108,7 @@ pub noinline fn tick(self: *Self) !void {
     }
 }
 
-pub fn draw(self: *Self, render: g.Render) !void {
+pub fn draw(self: *Self, render: g.Render) g.SystemError!void {
     switch (self.wizard) {
         .stats_and_skills => |*wz| try wz.draw(render),
         .only_skills => |*wz| try wz.draw(render),

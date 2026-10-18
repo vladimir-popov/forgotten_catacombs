@@ -7,6 +7,7 @@ const std = @import("std");
 const g = @import("../game_pkg.zig");
 const d = g.dungeon;
 const p = g.primitives;
+const AllocatorError = std.mem.Allocator.Error;
 
 /// Contains pointers to bind placements
 pub const Doorway = struct {
@@ -20,7 +21,7 @@ pub const Doorway = struct {
         comptime _: []const u8,
         _: std.fmt.FormatOptions,
         writer: anytype,
-    ) !void {
+    ) std.Io.Writer.Error!void {
         try writer.print(
             "Doorway(id: {d}; from {any}; to: {any})",
             .{ self.door_id.id, self.placement_from, self.placement_to },
@@ -47,19 +48,19 @@ pub const Placement = union(enum) {
     passage: *Passage,
     room: *Room,
 
-    pub fn createArea(arena: *std.heap.ArenaAllocator, region: p.Region) !*Area {
+    pub fn createArea(arena: *std.heap.ArenaAllocator, region: p.Region) AllocatorError!*Area {
         const area = try arena.allocator().create(Area);
         area.* = Area.init(region);
         return area;
     }
 
-    pub fn createRoom(arena: *std.heap.ArenaAllocator, region: p.Region) !*Room {
+    pub fn createRoom(arena: *std.heap.ArenaAllocator, region: p.Region) AllocatorError!*Room {
         const room = try arena.allocator().create(Room);
         room.* = Room.init(region);
         return room;
     }
 
-    pub fn createPassage(arena: *std.heap.ArenaAllocator) !*Passage {
+    pub fn createPassage(arena: *std.heap.ArenaAllocator) AllocatorError!*Passage {
         const passage = try arena.allocator().create(Passage);
         passage.* = .{ .turns = .empty, .doorways = .empty };
         return passage;
@@ -92,7 +93,7 @@ pub const Placement = union(enum) {
         };
     }
 
-    pub fn addDoor(self: Placement, arena: *std.heap.ArenaAllocator, place: p.Point) !void {
+    pub fn addDoor(self: Placement, arena: *std.heap.ArenaAllocator, place: p.Point) AllocatorError!void {
         switch (self) {
             .area => try self.area.addDoorway(arena.allocator(), place),
             .room => try self.room.addDoorway(arena.allocator(), place),
@@ -133,7 +134,7 @@ pub const Area = struct {
         comptime _: []const u8,
         _: std.fmt.FormatOptions,
         writer: anytype,
-    ) !void {
+    ) std.Io.Writer.Error!void {
         try writer.print("Area({any}; inner rooms: [", .{self.region});
         var itr = self.inner_rooms.constIterator(0);
         while (itr.next()) |ir| {
@@ -142,7 +143,7 @@ pub const Area = struct {
         try writer.print("])", .{});
     }
 
-    pub fn addDoorway(self: *Area, alloc: std.mem.Allocator, place: p.Point) !void {
+    pub fn addDoorway(self: *Area, alloc: std.mem.Allocator, place: p.Point) AllocatorError!void {
         try self.doorways.put(alloc, place, {});
     }
 
@@ -174,7 +175,7 @@ pub const Area = struct {
         };
     }
 
-    pub fn addRoom(self: *Area, alloc: std.mem.Allocator, region: p.Region, door: p.Point) !*Room {
+    pub fn addRoom(self: *Area, alloc: std.mem.Allocator, region: p.Region, door: p.Point) AllocatorError!*Room {
         const room = try self.inner_rooms.addOne(alloc);
         room.* = Room.initAsInner(region, self);
         try room.addDoorway(alloc, door);
@@ -213,7 +214,7 @@ pub const Room = struct {
         comptime _: []const u8,
         _: std.fmt.FormatOptions,
         writer: anytype,
-    ) !void {
+    ) std.Io.Writer.Error!void {
         try writer.print("Room({any}; doorways: [", .{self.region});
         var itr = self.doorways.keyIterator();
         while (itr.next()) |doorway|
@@ -221,7 +222,7 @@ pub const Room = struct {
         try writer.print("])", .{});
     }
 
-    pub fn addDoorway(self: *Room, alloc: std.mem.Allocator, place: p.Point) !void {
+    pub fn addDoorway(self: *Room, alloc: std.mem.Allocator, place: p.Point) AllocatorError!void {
         try self.doorways.put(alloc, place, {});
     }
 
@@ -251,7 +252,7 @@ pub const Passage = struct {
             comptime _: []const u8,
             _: std.fmt.FormatOptions,
             writer: anytype,
-        ) !void {
+        ) std.Io.Writer.Error!void {
             try writer.print("Turn(at {any} to {s})", .{ self.place, @tagName(self.to_direction) });
         }
 
@@ -269,7 +270,7 @@ pub const Passage = struct {
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
         writer: anytype,
-    ) !void {
+    ) std.Io.Writer.Error!void {
         _ = fmt;
         _ = options;
 
@@ -280,7 +281,7 @@ pub const Passage = struct {
         try writer.print(")", .{});
     }
 
-    pub fn addDoorway(self: *Passage, alloc: std.mem.Allocator, place: p.Point) !void {
+    pub fn addDoorway(self: *Passage, alloc: std.mem.Allocator, place: p.Point) AllocatorError!void {
         try self.doorways.put(alloc, place, {});
     }
 
@@ -320,13 +321,13 @@ pub const Passage = struct {
         return @min(x, y) <= value and value <= @max(x, y);
     }
 
-    pub fn turnAt(self: *Passage, alloc: std.mem.Allocator, place: p.Point, direction: p.Direction) !Turn {
+    pub fn turnAt(self: *Passage, alloc: std.mem.Allocator, place: p.Point, direction: p.Direction) AllocatorError!Turn {
         const turn: Turn = .{ .place = place, .to_direction = direction };
         try self.turns.append(alloc, turn);
         return turn;
     }
 
-    pub fn turnToPoint(self: *Passage, alloc: std.mem.Allocator, at: p.Point, to: p.Point) !Turn {
+    pub fn turnToPoint(self: *Passage, alloc: std.mem.Allocator, at: p.Point, to: p.Point) AllocatorError!Turn {
         const direction: p.Direction = if (at.row == to.row)
             if (at.col < to.col) .right else .left
         else if (at.row < to.row) .down else .up;

@@ -10,6 +10,8 @@ const log = std.log.scoped(.explore_level_mode);
 
 const Self = @This();
 
+const AllocatorError = std.mem.Allocator.Error;
+
 archetype: g.PlayerArchetype = .adventurer,
 stats: c.Stats = undefined,
 skills: c.Skills = .zeros,
@@ -21,7 +23,7 @@ wizard: w.wizard.WizardWindow(union {
     confirm: w.wizard.ConfirmCharacterStep(Self),
 }, Self) = undefined,
 
-pub fn init(self: *Self, alloc: std.mem.Allocator) !void {
+pub fn init(self: *Self, alloc: std.mem.Allocator) g.SystemError!void {
     self.* = .{};
     try self.wizard.init(alloc, self);
 }
