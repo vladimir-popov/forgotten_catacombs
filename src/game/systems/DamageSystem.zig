@@ -40,7 +40,7 @@ pub fn applyDamage(
     target_health: *c.Health,
     damage_value: u8,
 ) !bool {
-    if (damage_value == 0) return false;
+    if (damage_value == 0) return true;
     target_health.current_hp -|= damage_value;
     if (self.session().registry.get(target, c.EnemyState)) |_| {
         try self.session().registry.set(target, c.EnemyState.aggressive);

@@ -5,6 +5,7 @@ const max_columns = 32;
 const EnemyRow = struct {
     symbol: []const u8,
     name: []const u8,
+    tier: []const u8,
     traits: []const u8,
     damage: []const u8,
     armor: []const u8,
@@ -18,6 +19,7 @@ pub fn generate(csv: []const u8, writer: *std.Io.Writer, diagnostic_writer: *std
     var header_fields: [max_columns][]const u8 = undefined;
     const header_count = try splitRow(header, &header_fields);
     const name_col = findColumn(header_fields[0..header_count], "Name") orelse return error.MissingNameColumn;
+    const tier_col = findColumn(header_fields[0..header_count], "Tier") orelse return error.MissingTierColumn;
     const symbol_col = findColumn(header_fields[0..header_count], "Symbol") orelse return error.MissingSymbolColumn;
     const trait_col = findColumn(header_fields[0..header_count], "Trait") orelse return error.MissingTraitColumn;
     const damage_col = findColumn(header_fields[0..header_count], "Damage") orelse return error.MissingDamageColumn;
@@ -35,9 +37,10 @@ pub fn generate(csv: []const u8, writer: *std.Io.Writer, diagnostic_writer: *std
         if (line.len == 0) continue;
         var fields: [max_columns][]const u8 = undefined;
         const count = try splitRow(line, &fields);
-        const required = [_]usize{ symbol_col, name_col, trait_col, damage_col, armor_col, hp_col, xp_col };
+        const required = [_]usize{ symbol_col, name_col, tier_col, trait_col, damage_col, armor_col, hp_col, xp_col };
         if (count <= std.mem.max(usize, &required)) return error.MissingField;
-        const row = EnemyRow{ .symbol = fields[symbol_col], .name = fields[name_col], .traits = fields[trait_col], .damage = fields[damage_col], .armor = fields[armor_col], .hp = fields[hp_col], .xp = fields[xp_col] };
+        _ = std.fmt.parseInt(u4, std.mem.trim(u8, fields[tier_col], " \t"), 10) catch return error.InvalidTier;
+        const row = EnemyRow{ .symbol = fields[symbol_col], .name = fields[name_col], .tier = fields[tier_col], .traits = fields[trait_col], .damage = fields[damage_col], .armor = fields[armor_col], .hp = fields[hp_col], .xp = fields[xp_col] };
         try rows.append(allocator, row);
         var iter = std.mem.splitScalar(u8, row.traits, ',');
         while (iter.next()) |raw_trait| {
@@ -77,6 +80,8 @@ pub fn generate(csv: []const u8, writer: *std.Io.Writer, diagnostic_writer: *std
         try writeSnakeCase(writer, row.name);
         try writer.writeAll(": c.Components = archetype.enemy(.{\n    .description = .{ .preset = .");
         try writeSnakeCase(writer, row.name);
+        try writer.writeAll(" },\n    .tier = .{ .tier = ");
+        try writer.writeAll(std.mem.trim(u8, row.tier, " \t"));
         try writer.writeAll(" },\n    .experience = .reward(");
         try writer.writeAll(std.mem.trim(u8, row.xp, " \t"));
         try writer.writeAll("),\n    .health = .init(");

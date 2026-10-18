@@ -613,6 +613,10 @@ pub const Stats = struct {
     }
 };
 
+pub const Tier = struct {
+    tier: u4,
+};
+
 pub const Trap = struct {
     /// The likelihood of detecting and disarming the trap depend on how powerful the trap is.
     power: u2,
@@ -724,6 +728,7 @@ pub const Components = struct {
     sprite: ?Sprite, // must be provided for every entity
     state: ?EnemyState = null,
     stats: ?Stats = null,
+    tier: ?Tier = null,
     trap: ?Trap = null,
     wallet: ?Wallet = null,
     weapon: ?Weapon = null,

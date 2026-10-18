@@ -46,8 +46,9 @@ zig run misc/tools/main.zig -- enemies misc/entities/Enemies.csv \
   > /tmp/enemies.zig
 ```
 
-The CSV must contain the `Symbol`, `Name`, `Trait`, `Damage`, `Armor`, `HP`,
-and `XP` columns. `Damage` accepts a range such as `1–2`; a numeric `Armor`
+The CSV must contain the `Symbol`, `Name`, `Tier`, `Trait`, `Damage`, `Armor`,
+`HP`, and `XP` columns. `Tier` is parsed as an integer and emitted as the
+required enemy `.tier` component. `Damage` accepts a range such as `1–2`; a numeric `Armor`
 value is emitted as a fixed protection range. `Name` is converted to
 `snake_case` for the entity and description preset names.
 

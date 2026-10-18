@@ -154,3 +154,7 @@ pub fn trap(place: p.Point, power: u2) c.Components {
         .position = .{ .place = place, .zorder = .item },
     };
 }
+
+test {
+    std.testing.refAllDecls(@This());
+}

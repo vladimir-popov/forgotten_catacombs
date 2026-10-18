@@ -57,6 +57,8 @@ pub const GameStateArena = std.heap.ArenaAllocator;
 pub const SessionModeArena = std.heap.ArenaAllocator;
 pub const LevelArena = std.heap.ArenaAllocator;
 
+pub const MAX_DEPTH = 9;
+
 /// How many move points should spent player to increase a turns counter
 pub const MOVE_POINTS_IN_TURN = 10;
 

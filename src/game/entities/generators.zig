@@ -4,13 +4,75 @@ const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
+const enemies_sorted_by_tier = blk: {
+    var xs = g.entities.presets.Enemies.fields.values;
+    std.mem.sort(*const g.components.Components, &xs, {}, lessThanTier);
+    break :blk xs;
+};
+
+fn lessThanTier(_: void, x: *const g.components.Components, y: *const g.components.Components) bool {
+    return x.tier.?.tier < y.tier.?.tier;
+}
+
+/// Maps each dungeon depth to the half-open index range of eligible enemies
+/// in `presets.Enemies.fields.values`, sorted by tier.
+///
+/// For example, `enemy_ranges_by_depth[3]` returns `.range(start, end)`,
+/// where `start` is the index of the first enemy eligible at depth 3, and
+/// `end` is the index immediately after the last eligible enemy. The range
+/// can be used as `enemies[start..end]`.
+const enemy_ranges_by_depth: [g.MAX_DEPTH]p.Range(u8) = blk: {
+    const es = &g.entities.presets.Enemies.fields.values;
+    var ranges: [g.MAX_DEPTH]p.Range(u8) = undefined;
+
+    for (0..ranges.len) |depth| {
+        const tiers = allowedEnemyTiers(@intCast(depth));
+
+        ranges[depth] = .{
+            .min = @intCast(std.sort.lowerBound(
+                *const g.components.Components,
+                es,
+                tiers.min,
+                compareTier,
+            )),
+            .max = @intCast(std.sort.upperBound(
+                *const g.components.Components,
+                es,
+                tiers.max,
+                compareTier,
+            )),
+        };
+    }
+
+    break :blk ranges;
+};
+
+fn compareTier(context: u4, components: *const c.Components) std.math.Order {
+    return std.math.order(context, components.tier.?.tier);
+}
+
+fn allowedEnemyTiers(depth: u4) p.Range(u4) {
+    return switch (depth) {
+        1 => .{ .min = 1, .max = 1 },
+        2 => .{ .min = 1, .max = 2 },
+        3 => .{ .min = 2, .max = 3 },
+        4 => .{ .min = 3, .max = 4 },
+        5 => .{ .min = 5, .max = 5 },
+        6 => .{ .min = 5, .max = 6 },
+        7 => .{ .min = 6, .max = 7 },
+        8 => .{ .min = 7, .max = 8 },
+        else => .{ .min = depth, .max = depth },
+    };
+}
+
 /// Chooses a random enemy from the preset according to the specified depth,
 /// and adds that enemy to the registry as a new entity.
-/// Return the id of the generated enemy.
+/// Returns an id of the generated enemy.
 pub fn generateEnemy(registry: *g.Registry, rand: std.Random, depth: u8) !g.Entity {
-    _ = depth;
-    const idx = rand.uintLessThan(usize, g.entities.presets.Enemies.fields.values.len);
-    var enemy = g.entities.presets.Enemies.fields.values[idx].*;
+    const range = enemy_ranges_by_depth[depth];
+    const enemies = enemies_sorted_by_tier[range.min..range.max];
+    const idx = rand.uintLessThan(usize, enemies.len);
+    var enemy = enemies[idx].*;
     enemy.state = if (rand.uintLessThan(u8, 5) == 0) .sleeping else .walking;
     return try registry.addNewEntity(enemy);
 }
@@ -299,4 +361,25 @@ const ammo_proportions: [g.entities.presets.Ammo.count]u8 = blk: {
 fn generateAmmo(registry: *g.Registry, rand: std.Random) !g.Entity {
     const idx = rand.weightedIndex(u8, &ammo_proportions);
     return try registry.addNewEntity(g.entities.presets.Ammo.get(@enumFromInt(idx)));
+}
+
+test "generateEnemy only chooses enemies allowed on the depth" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    var registry: g.Registry = try .init(&arena);
+    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
+    const rand = prng.random();
+
+    for (1..g.MAX_DEPTH) |depth| {
+        const expected_tiers = allowedEnemyTiers(@intCast(depth));
+        for (0..32) |_| {
+            const enemy = try generateEnemy(&registry, rand, @intCast(depth));
+            const tier = registry.getUnsafe(enemy, c.Tier).tier;
+
+            try std.testing.expect(
+                tier >= expected_tiers.min and tier <= expected_tiers.max,
+            );
+        }
+    }
 }

@@ -39,6 +39,7 @@ pub fn enemy(components: c.Components) c.Components {
         defined(components, "sprite");
         defined(components, "state");
         defined(components, "stats");
+        defined(components, "tier");
         defined(components, "weapon");
         hasType(g.Enemy, components);
         return components;

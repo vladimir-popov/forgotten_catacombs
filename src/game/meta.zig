@@ -242,8 +242,11 @@ pub fn getAmmunition(registry: *const g.Registry, actor: g.Entity) ?struct { g.E
 }
 
 pub fn initialHealth(constitution: i4) c.Health {
-    const constitution_factor = (@as(f32, @floatFromInt(constitution)) * 0.6 + 4.4) / 4.0;
-    return .init(@intFromFloat(@round(constitution_factor * 30)));
+    _ = constitution;
+    // const constitution_factor = (@as(f32, @floatFromInt(constitution)) * 0.6 + 4.4) / 4.0;
+    // return .init(@intFromFloat(@round(constitution_factor * 30)));
+    // For test only:
+    return .init(199);
 }
 
 pub fn movePointsForAction(registry: *const g.Registry, actor: g.Entity, action: g.Action.Tag) g.MovePoints {

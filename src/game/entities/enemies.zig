@@ -23,6 +23,7 @@ const c = g.components;
 
 cave_snake: c.Components = archetype.enemy(.{
     .description = .{ .preset = .cave_snake },
+    .tier = .{ .tier = 1 },
     .experience = .reward(2),
     .health = .init(11),
     .initiative = .empty,
@@ -37,6 +38,7 @@ cave_snake: c.Components = archetype.enemy(.{
 
 cave_rat: c.Components = archetype.enemy(.{
     .description = .{ .preset = .cave_rat },
+    .tier = .{ .tier = 1 },
     .experience = .reward(3),
     .health = .init(12),
     .initiative = .empty,
@@ -51,6 +53,7 @@ cave_rat: c.Components = archetype.enemy(.{
 
 bat: c.Components = archetype.enemy(.{
     .description = .{ .preset = .bat },
+    .tier = .{ .tier = 1 },
     .experience = .reward(2),
     .health = .init(10),
     .initiative = .empty,
@@ -65,6 +68,7 @@ bat: c.Components = archetype.enemy(.{
 
 cave_hound: c.Components = archetype.enemy(.{
     .description = .{ .preset = .cave_hound },
+    .tier = .{ .tier = 2 },
     .experience = .reward(6),
     .health = .init(16),
     .initiative = .empty,
@@ -79,6 +83,7 @@ cave_hound: c.Components = archetype.enemy(.{
 
 worm: c.Components = archetype.enemy(.{
     .description = .{ .preset = .worm },
+    .tier = .{ .tier = 2 },
     .experience = .reward(8),
     .health = .init(17),
     .initiative = .empty,
@@ -96,6 +101,7 @@ worm: c.Components = archetype.enemy(.{
 
 carrion_feeder: c.Components = archetype.enemy(.{
     .description = .{ .preset = .carrion_feeder },
+    .tier = .{ .tier = 3 },
     .experience = .reward(10),
     .health = .init(27),
     .initiative = .empty,
@@ -110,6 +116,7 @@ carrion_feeder: c.Components = archetype.enemy(.{
 
 armadillo_beast: c.Components = archetype.enemy(.{
     .description = .{ .preset = .armadillo_beast },
+    .tier = .{ .tier = 4 },
     .experience = .reward(13),
     .health = .init(40),
     .initiative = .empty,
@@ -127,6 +134,7 @@ armadillo_beast: c.Components = archetype.enemy(.{
 
 venom_centipede: c.Components = archetype.enemy(.{
     .description = .{ .preset = .venom_centipede },
+    .tier = .{ .tier = 3 },
     .experience = .reward(10),
     .health = .init(27),
     .initiative = .empty,
@@ -141,6 +149,7 @@ venom_centipede: c.Components = archetype.enemy(.{
 
 acid_centipede: c.Components = archetype.enemy(.{
     .description = .{ .preset = .acid_centipede },
+    .tier = .{ .tier = 3 },
     .experience = .reward(10),
     .health = .init(27),
     .initiative = .empty,
@@ -155,6 +164,7 @@ acid_centipede: c.Components = archetype.enemy(.{
 
 fire_centipede: c.Components = archetype.enemy(.{
     .description = .{ .preset = .fire_centipede },
+    .tier = .{ .tier = 4 },
     .experience = .reward(18),
     .health = .init(41),
     .initiative = .empty,
@@ -169,6 +179,7 @@ fire_centipede: c.Components = archetype.enemy(.{
 
 giant_venom_ant: c.Components = archetype.enemy(.{
     .description = .{ .preset = .giant_venom_ant },
+    .tier = .{ .tier = 4 },
     .experience = .reward(13),
     .health = .init(36),
     .initiative = .empty,
@@ -183,6 +194,7 @@ giant_venom_ant: c.Components = archetype.enemy(.{
 
 giant_acid_ant: c.Components = archetype.enemy(.{
     .description = .{ .preset = .giant_acid_ant },
+    .tier = .{ .tier = 4 },
     .experience = .reward(15),
     .health = .init(36),
     .initiative = .empty,
@@ -197,6 +209,7 @@ giant_acid_ant: c.Components = archetype.enemy(.{
 
 giant_fire_ant: c.Components = archetype.enemy(.{
     .description = .{ .preset = .giant_fire_ant },
+    .tier = .{ .tier = 4 },
     .experience = .reward(18),
     .health = .init(36),
     .initiative = .empty,
@@ -211,6 +224,7 @@ giant_fire_ant: c.Components = archetype.enemy(.{
 
 cave_spider: c.Components = archetype.enemy(.{
     .description = .{ .preset = .cave_spider },
+    .tier = .{ .tier = 5 },
     .experience = .reward(22),
     .health = .init(67),
     .initiative = .empty,
@@ -228,6 +242,7 @@ cave_spider: c.Components = archetype.enemy(.{
 
 repair_drone: c.Components = archetype.enemy(.{
     .description = .{ .preset = .repair_drone },
+    .tier = .{ .tier = 5 },
     .experience = .reward(20),
     .health = .init(49),
     .initiative = .empty,
@@ -246,6 +261,7 @@ repair_drone: c.Components = archetype.enemy(.{
 
 mechatron: c.Components = archetype.enemy(.{
     .description = .{ .preset = .mechatron },
+    .tier = .{ .tier = 5 },
     .experience = .reward(24),
     .health = .init(67),
     .initiative = .empty,
@@ -264,6 +280,7 @@ mechatron: c.Components = archetype.enemy(.{
 
 turret: c.Components = archetype.enemy(.{
     .description = .{ .preset = .turret },
+    .tier = .{ .tier = 6 },
     .experience = .reward(26),
     .health = .init(82),
     .initiative = .empty,
@@ -282,6 +299,7 @@ turret: c.Components = archetype.enemy(.{
 
 robot: c.Components = archetype.enemy(.{
     .description = .{ .preset = .robot },
+    .tier = .{ .tier = 6 },
     .experience = .reward(28),
     .health = .init(82),
     .initiative = .empty,
@@ -300,6 +318,7 @@ robot: c.Components = archetype.enemy(.{
 
 cyborg: c.Components = archetype.enemy(.{
     .description = .{ .preset = .cyborg },
+    .tier = .{ .tier = 7 },
     .experience = .reward(47),
     .health = .init(98),
     .initiative = .empty,
@@ -318,6 +337,7 @@ cyborg: c.Components = archetype.enemy(.{
 
 terminator: c.Components = archetype.enemy(.{
     .description = .{ .preset = .terminator },
+    .tier = .{ .tier = 8 },
     .experience = .reward(70),
     .health = .init(146),
     .initiative = .empty,
