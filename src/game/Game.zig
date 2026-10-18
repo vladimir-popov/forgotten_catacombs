@@ -82,17 +82,7 @@ pub fn tick(self: *Self) !void {
                 else => {},
             }
         },
-        .create_character => if (try self.runtime.readPushedButtons()) |btn| {
-            if (try self.state.create_character.wizard.handleButton(btn) == .close_window) {
-                try self.startGameSession(
-                    self.state.create_character.stats,
-                    self.state.create_character.skills,
-                    self.state.create_character.health,
-                );
-            } else {
-                try self.state.create_character.wizard.draw(self.render);
-            }
-        },
+        .create_character => try self.tickCharacterCreation(),
         .game_session => |session| {
             session.tick() catch |err| switch (err) {
                 error.GameOver => {
@@ -107,6 +97,22 @@ pub fn tick(self: *Self) !void {
                 else => return err,
             };
         },
+    }
+}
+
+// Isolate wizard temporaries so other game states do not reserve their stack
+// space on every frame. This matters on Playdate's limited stack.
+noinline fn tickCharacterCreation(self: *Self) !void {
+    if (try self.runtime.readPushedButtons()) |btn| {
+        if (try self.state.create_character.wizard.handleButton(btn) == .close_window) {
+            try self.startGameSession(
+                self.state.create_character.stats,
+                self.state.create_character.skills,
+                self.state.create_character.health,
+            );
+        } else {
+            try self.state.create_character.wizard.draw(self.render);
+        }
     }
 }
 

@@ -65,7 +65,7 @@ fn writeLog(
         };
     const end = @min(msg.len, log_buffer.len - 1);
     log_buffer[end] = 0;
-    playdate_log_to_console(msg.ptr);
+    playdate_log_to_console("%s", msg.ptr);
 }
 
 pub fn panic(
@@ -82,7 +82,7 @@ pub fn panic(
         };
     const end = @min(msg0.len, log_buffer.len - 1);
     log_buffer[end] = 0;
-    playdate_error_to_console(msg0.ptr);
+    playdate_error_to_console("%s", msg0.ptr);
     @breakpoint();
     @trap();
 }
@@ -131,13 +131,17 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
 
 fn updateAndRender(userdata: ?*anyopaque) callconv(.c) c_int {
     const state: *GlobalState = @ptrCast(@alignCast(userdata.?));
+    // Keep the frame body out of this wrapper so its stack allocation happens
+    // after the baseline is recorded. The wrapper and OS frames are excluded.
+    state.playdate_runtime.stack_start = PlaydateRuntime.currentStackPointer();
+    return runFrame(state);
+}
 
+noinline fn runFrame(state: *GlobalState) c_int {
     // If this callback is invoked then the menu is closed.
     // We have skip one button handler to ignore buttons pressed when the menu was opened.
     state.playdate_runtime.is_menu_shown = false;
 
-    // we get the first address on the stack here, this is why take the point on the pointer here
-    state.playdate_runtime.stack_start = @intFromPtr(&state);
     state.game.tick() catch |err|
         std.debug.panic("Error {any} on game tick", .{err});
 

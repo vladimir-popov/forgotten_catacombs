@@ -53,7 +53,9 @@ fn setTarget(self: *Self, target: ?g.Entity) void {
     self.quick_actions.reset();
 }
 
-pub fn tick(self: *Self) !void {
+// Keep mode-specific temporaries out of GameSession.tick's shared stack frame
+// to reduce stack usage in other modes on Playdate.
+pub noinline fn tick(self: *Self) !void {
     // TODO draw only after changes and return 1, else 0.
     if (try self.draw()) {
         try self.session.runtime.cleanInputBuffer();

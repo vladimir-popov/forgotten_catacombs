@@ -88,7 +88,9 @@ pub fn deinit(self: *Self) void {
     }
 }
 
-pub fn tick(self: *Self) !void {
+// Keep mode-specific temporaries out of GameSession.tick's shared stack frame
+// to reduce stack usage in other modes on Playdate.
+pub noinline fn tick(self: *Self) !void {
     switch (self.process) {
         .saving => |*saving| {
             const is_done = saving.tick() catch |err| {
@@ -590,7 +592,7 @@ const Saving = struct {
         self.progress = .completed;
     }
 
-    fn draw(self: Saving) !void {
+    fn draw(self: *Saving) !void {
         //       |
         // Saving| XXX%
         //       |

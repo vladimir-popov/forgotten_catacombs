@@ -43,7 +43,9 @@ fn draw(session: *g.GameSession) !void {
     try session.render.drawScene(session, null);
 }
 
-pub fn tick(self: *ExploreLevelMode) anyerror!void {
+// Keep mode-specific temporaries out of GameSession.tick's shared stack frame
+// to reduce stack usage in other modes on Playdate.
+pub noinline fn tick(self: *ExploreLevelMode) anyerror!void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         switch (btn.game_button) {
             .a => {

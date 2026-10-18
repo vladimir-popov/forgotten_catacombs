@@ -279,10 +279,22 @@ fn deleteFileIfExists(ptr: *anyopaque, file_path: [:0]const u8) !void {
     }
 }
 
+pub inline fn currentStackPointer() usize {
+    return switch (@import("builtin").cpu.arch) {
+        .arm, .armeb, .thumb, .thumbeb, .aarch64, .aarch64_be => asm volatile ("mov %[result], sp"
+            : [result] "=r" (-> usize),
+        ),
+        .x86_64 => asm volatile ("mov %%rsp, %[result]"
+            : [result] "=r" (-> usize),
+        ),
+        else => @compileError("Stack pointer measurement is not implemented for this architecture"),
+    };
+}
+
 fn stackSize(ptr: *anyopaque) usize {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    // we get the first address on the stack here, this is why take the point on the pointer here
-    const stack: usize = @intFromPtr(&self);
+    // Sampled depth from the frame baseline, not free stack or peak SDK usage.
+    const stack = currentStackPointer();
     return if (stack > self.stack_start) stack - self.stack_start else self.stack_start - stack;
 }
 

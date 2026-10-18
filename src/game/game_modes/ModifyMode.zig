@@ -88,7 +88,9 @@ fn allocator(self: *Self) std.mem.Allocator {
     return self.session.mode_arena.allocator();
 }
 
-pub fn tick(self: *Self) !void {
+// Keep mode-specific temporaries out of GameSession.tick's shared stack frame
+// to reduce stack usage in other modes on Playdate.
+pub noinline fn tick(self: *Self) !void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (try self.compositor.handleButton(btn) == .closed_main_window) {
             // the  deinit method will be invoked here:

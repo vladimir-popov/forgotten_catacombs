@@ -59,6 +59,7 @@ pub fn init(
     session: *g.GameSession,
     shop: g.Entity,
 ) !void {
+    session.runtime.printStackSize(2, "TM.init");
     self.* = .{
         .session = session,
         .player_wallet = session.registry.getUnsafe(session.player, c.Wallet),
@@ -110,7 +111,9 @@ inline fn sellingTab(self: *Self) *w.OptionsArea(g.Entity) {
     return self.main_window.getArea(w.OptionsArea(g.Entity), 1).?;
 }
 
-pub fn tick(self: *Self) !void {
+// Keep mode-specific temporaries out of GameSession.tick's shared stack frame
+// to reduce stack usage in other modes on Playdate.
+pub noinline fn tick(self: *Self) !void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         if (try self.compositor.handleButton(btn) == .closed_main_window) {
             try self.session.continuePlay(null, null);

@@ -78,7 +78,9 @@ pub fn deinit(self: *Self) void {
     }
 }
 
-pub fn tick(self: *Self) !void {
+// Keep mode-specific temporaries out of GameSession.tick's shared stack frame
+// to reduce stack usage in other modes on Playdate.
+pub noinline fn tick(self: *Self) !void {
     // Nothing should happened until the player push a button
     if (try self.session.runtime.readPushedButtons()) |btn| {
         const result = switch (self.wizard) {

@@ -40,7 +40,9 @@ pub fn deinit(self: *Self) void {
     self.compositor.deinit();
 }
 
-pub fn tick(self: *Self) anyerror!void {
+// Keep mode-specific temporaries out of GameSession.tick's shared stack frame
+// to reduce stack usage in other modes on Playdate.
+pub noinline fn tick(self: *Self) anyerror!void {
     if (try self.session.runtime.readPushedButtons()) |btn| {
         switch (try self.compositor.handleButton(btn)) {
             .closed_main_window => {
