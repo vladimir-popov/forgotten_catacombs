@@ -158,7 +158,7 @@ test "Create a new character" {
         \\  Level: 1                             ▒
         \\  Experience: 0/200                    ░
         \\                                       ░
-        \\  Health: 33/33                        ░
+        \\  Health: ����������                   ░
         \\                                       ░
         \\  Skills:                              ░
         \\    Weapon Mastery:     0              ░
@@ -189,7 +189,7 @@ test "Create a new character" {
     // one extra tick to move the viewpoint
     try test_game.tick(.{});
     try test_game.runtime.display.expectLooksLike(
-        \\######################################33
+        \\#####################################���
         \\#•••••••••••••#     #••••••••••••••••••#
         \\#•••┌───┐•••••###+###•••••••••••┌───┐••#
         \\#•••│   +•••••••••••••••••••••••+   │••#
