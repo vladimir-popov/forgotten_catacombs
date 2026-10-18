@@ -16,8 +16,8 @@ pub const OpaqueFile = *anyopaque;
 pub const FileMode = enum { read, write };
 
 const VTable = struct {
-    readPushedButtons: *const fn (context: *anyopaque) anyerror!?g.Button,
-    cleanInputBuffer: *const fn (context: *anyopaque) anyerror!void,
+    readPushedButtons: *const fn (context: *anyopaque) g.SystemError!?g.Button,
+    cleanInputBuffer: *const fn (context: *anyopaque) g.SystemError!void,
     addMenuItem: *const fn (
         context: *anyopaque,
         title: [:0]const u8,
@@ -25,28 +25,28 @@ const VTable = struct {
         callback: MenuItemCallback,
     ) ?*anyopaque,
     removeAllMenuItems: *const fn (context: *anyopaque) void,
-    clearDisplay: *const fn (context: *anyopaque) anyerror!void,
+    clearDisplay: *const fn (context: *anyopaque) g.SystemError!void,
     drawSprite: *const fn (
         context: *anyopaque,
         codepoint: g.Codepoint,
         position_on_display: p.Point,
         mode: DrawingMode,
-    ) anyerror!void,
+    ) g.SystemError!void,
     currentMillis: *const fn (context: *anyopaque) u64,
     isDevMode: *const fn (context: *anyopaque) bool,
     popCheat: *const fn (context: *anyopaque) ?g.Cheat,
     // --------- FS operations ---------
-    openFile: *const fn (context: *anyopaque, file_path: [:0]const u8, mode: FileMode, buffer: []u8) anyerror!OpaqueFile,
+    openFile: *const fn (context: *anyopaque, file_path: [:0]const u8, mode: FileMode, buffer: []u8) g.SystemError!OpaqueFile,
     closeFile: *const fn (context: *anyopaque, file: OpaqueFile) void,
     readFile: *const fn (context: *anyopaque, file: OpaqueFile) *std.Io.Reader,
     writeToFile: *const fn (context: *anyopaque, file: OpaqueFile) *std.Io.Writer,
-    isFileExists: *const fn (context: *anyopaque, path: [:0]const u8) anyerror!bool,
-    deleteFileIfExists: *const fn (context: *anyopaque, path: [:0]const u8) anyerror!void,
+    isFileExists: *const fn (context: *anyopaque, path: [:0]const u8) g.SystemError!bool,
+    deleteFileIfExists: *const fn (context: *anyopaque, path: [:0]const u8) g.SystemError!void,
     //  ----------------------------------
     stackSize: *const fn (context: *anyopaque) usize,
     // different platforms have different ways to show URLs.
     // For the Playdate it can be a QR code, for TTY OSC8 sequence or open URL in browser...
-    showManual: *const fn (context: *anyopaque) anyerror!void,
+    showManual: *const fn (context: *anyopaque) g.SystemError!void,
 };
 
 context: *anyopaque,
@@ -86,11 +86,11 @@ pub inline fn removeAllMenuItems(self: *const Self) void {
     self.vtable.removeAllMenuItems(self.context);
 }
 
-pub fn readPushedButtons(self: *const Self) !?g.Button {
+pub fn readPushedButtons(self: *const Self) g.SystemError!?g.Button {
     return try self.vtable.readPushedButtons(self.context);
 }
 
-pub fn cleanInputBuffer(self: *const Self) !void {
+pub fn cleanInputBuffer(self: *const Self) g.SystemError!void {
     try self.vtable.cleanInputBuffer(self.context);
 }
 
@@ -98,11 +98,11 @@ pub fn clearDisplay(self: *const Self) !void {
     try self.vtable.clearDisplay(self.context);
 }
 
-pub fn drawSprite(self: *const Self, codepoint: u21, position_on_display: p.Point, mode: DrawingMode) !void {
+pub fn drawSprite(self: *const Self, codepoint: u21, position_on_display: p.Point, mode: DrawingMode) g.SystemError!void {
     try self.vtable.drawSprite(self.context, codepoint, position_on_display, mode);
 }
 
-pub fn openFile(self: *const Self, file_path: [:0]const u8, mode: FileMode, buffer: []u8) anyerror!OpaqueFile {
+pub fn openFile(self: *const Self, file_path: [:0]const u8, mode: FileMode, buffer: []u8) g.SystemError!OpaqueFile {
     return try self.vtable.openFile(self.context, file_path, mode, buffer);
 }
 
@@ -118,14 +118,14 @@ pub fn writeToFile(self: *const Self, file: OpaqueFile) *std.Io.Writer {
     return self.vtable.writeToFile(self.context, file);
 }
 
-pub fn isFileExists(self: *const Self, path: [:0]const u8) anyerror!bool {
+pub fn isFileExists(self: *const Self, path: [:0]const u8) g.SystemError!bool {
     return try self.vtable.isFileExists(self.context, path);
 }
 
-pub fn deleteFileIfExists(self: *const Self, path: [:0]const u8) anyerror!void {
+pub fn deleteFileIfExists(self: *const Self, path: [:0]const u8) g.SystemError!void {
     try self.vtable.deleteFileIfExists(self.context, path);
 }
 
-pub fn showManual(self: *const Self) anyerror!void {
+pub fn showManual(self: *const Self) g.SystemError!void {
     try self.vtable.showManual(self.context);
 }

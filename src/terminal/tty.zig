@@ -5,6 +5,8 @@ const c = std.c;
 
 pub var original_termios: c.termios = undefined;
 
+pub const TtyError = error{ GettingCursoreError, WritenNotAllBytes } || std.fmt.ParseIntError || std.fmt.BufPrintError;
+
 /// Functions and constants for format text and produce special sequences.
 pub const Text = struct {
     const ESC = '\x1b';
@@ -102,7 +104,7 @@ pub const Text = struct {
         }
     }
 
-    pub fn writeSetCursorPosition(wr: *std.Io.Writer, row: usize, col: usize) !void {
+    pub fn writeSetCursorPosition(wr: *std.Io.Writer, row: usize, col: usize) std.Io.Writer.Error!void {
         try wr.print("\x1b[{d};{d}H", .{ row, col });
     }
 
@@ -119,8 +121,6 @@ pub const Text = struct {
 };
 
 pub const Display = struct {
-    pub const Error = error{ GettingCursoreError, WritenNotAllBytes };
-
     pub const RowsCols = struct {
         rows: u16,
         cols: u16,
@@ -182,35 +182,35 @@ pub const Display = struct {
         return original_termios;
     }
 
-    pub fn exitFromRawMode() !void {
+    pub fn exitFromRawMode() void {
         _ = c.tcsetattr(c.STDIN_FILENO, .FLUSH, &original_termios);
     }
 
-    pub fn enterAlternateScreen() !void {
+    pub fn enterAlternateScreen() TtyError!void {
         try write(Text.SM_ALT_SCREEN);
     }
 
-    pub fn leaveAlternateScreen() !void {
+    pub fn leaveAlternateScreen() TtyError!void {
         try write(Text.RM_ALT_SCREEN);
     }
 
-    pub fn clearScreen() !void {
+    pub fn clearScreen() TtyError!void {
         // Put cursor to the left upper corner
         try write(Text.CUP);
         // Erase all lines on the screen
         try write(Text.ED_FROM_START);
     }
 
-    pub fn hideCursor() !void {
+    pub fn hideCursor() TtyError!void {
         try write(Text.RM_HIDE_CU);
     }
 
-    pub fn showCursor() !void {
+    pub fn showCursor() TtyError!void {
         try write(Text.SM_SHOW_CU);
     }
 
     /// Returns position of the cursor
-    pub fn getCursorPosition() !RowsCols {
+    pub fn getCursorPosition() TtyError!RowsCols {
         try write(Text.DSR_GET_POSISION);
         var buf: [32]u8 = undefined;
         var i: u8 = 0;
@@ -234,13 +234,13 @@ pub const Display = struct {
         }
     }
 
-    pub fn setCursorPosition(row: u16, col: u16) !void {
+    pub fn setCursorPosition(row: u16, col: u16) TtyError!void {
         var buf: [20]u8 = undefined;
         try write(try std.fmt.bufPrint(&buf, "\x1b[{d};{d}H", .{ row, col }));
     }
 
     /// Returns count of rows and cols of the current window
-    pub fn getWindowSize() !RowsCols {
+    pub fn getWindowSize() TtyError!RowsCols {
         var ws: c.winsize = std.mem.zeroes(c.winsize);
         if (c.ioctl(c.STDOUT_FILENO, std.posix.system.T.IOCGWINSZ, &ws) == 1 or ws.col == 0) {
             try write(Text.cursorDown(999) ++ Text.cursorRight(999));
@@ -389,16 +389,16 @@ pub const KeyboardAndMouse = struct {
         }
     }
 
-    pub inline fn enableMouseEvents() !void {
+    pub inline fn enableMouseEvents() TtyError!void {
         try write(Text.MOUSE_TRACK_ON);
     }
 
-    pub inline fn disableMouseEvents() !void {
+    pub inline fn disableMouseEvents() TtyError!void {
         try write(Text.MOUSE_TRACK_OFF);
     }
 };
 
-pub inline fn write(str: []const u8) !void {
+pub inline fn write(str: []const u8) TtyError!void {
     if (c.write(c.STDOUT_FILENO, str.ptr, str.len) != str.len)
         return error.WritenNotAllBytes;
 }

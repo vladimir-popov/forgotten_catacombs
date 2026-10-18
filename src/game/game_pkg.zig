@@ -57,6 +57,12 @@ pub const GameStateArena = std.heap.ArenaAllocator;
 pub const SessionModeArena = std.heap.ArenaAllocator;
 pub const LevelArena = std.heap.ArenaAllocator;
 
+pub const SystemError = error{
+    OutOfMemory,
+    /// Any unexpected error within a Runtime implementation
+    RuntimeError,
+};
+
 pub const MAX_DEPTH = 9;
 
 /// How many move points should spent player to increase a turns counter
