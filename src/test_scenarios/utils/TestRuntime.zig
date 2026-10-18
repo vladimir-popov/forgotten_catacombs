@@ -6,12 +6,20 @@ const terminal = @import("terminal");
 const Frame = @import("Frame.zig");
 const Menu = terminal.TtyRuntime.Menu;
 
-const Self = @This();
 const log = std.log.scoped(.test_runtime);
 
-fn logRuntimeError(context: []const u8, err: anyerror) g.SystemError {
+const Self = @This();
+
+const Error = g.Runtime.Error;
+
+fn logDrawingError(context: []const u8, err: anyerror) Error {
     log.err("Error {t} happened while {s}", .{ err, context });
-    return g.SystemError.RuntimeError;
+    return Error.DrawingError;
+}
+
+fn logIoError(context: []const u8, err: anyerror) Error {
+    log.err("Error {t} happened while {s}", .{ err, context });
+    return Error.IOError;
 }
 
 alloc: std.mem.Allocator,
@@ -92,12 +100,12 @@ fn removeAllMenuItems(ptr: *anyopaque) void {
     self.menu.removeAllItems();
 }
 
-fn readPushedButtons(ptr: *anyopaque) g.SystemError!?g.Button {
+fn readPushedButtons(ptr: *anyopaque) Error!?g.Button {
     const self: *Self = @ptrCast(@alignCast(ptr));
     return if (self.pushed_buttons.pop()) |maybe_button| maybe_button else null;
 }
 
-fn cleanInputBuffer(ptr: *anyopaque) g.SystemError!void {
+fn cleanInputBuffer(ptr: *anyopaque) Error!void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     self.pushed_buttons.clearRetainingCapacity();
 }
@@ -112,35 +120,35 @@ fn popCheat(ptr: *anyopaque) ?g.Cheat {
     return self.cheat;
 }
 
-fn clearDisplay(ptr: *anyopaque) g.SystemError!void {
+fn clearDisplay(ptr: *anyopaque) Error!void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     self.display = .empty;
 }
 
-fn drawSprite(ptr: *anyopaque, codepoint: u21, position_on_display: p.Point, mode: g.DrawingMode) g.SystemError!void {
+fn drawSprite(ptr: *anyopaque, codepoint: u21, position_on_display: p.Point, mode: g.DrawingMode) Error!void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const i = position_on_display.row - 1;
     const j = position_on_display.col - 1;
     self.last_frame.sprites[i][j] = .{ .codepoint = codepoint, .mode = mode };
 }
 
-fn openFile(ptr: *anyopaque, file_path: [:0]const u8, mode: g.Runtime.FileMode, buffer: []u8) g.SystemError!*anyopaque {
+fn openFile(ptr: *anyopaque, file_path: [:0]const u8, mode: g.Runtime.FileMode, buffer: []u8) Error!*anyopaque {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const file_wrapper = self.alloc.create(terminal.TtyRuntime.FileWrapper) catch |err| {
-        return logRuntimeError("allocating file wrapper", err);
+        return logIoError("allocating file wrapper", err);
     };
     file_wrapper.* = switch (mode) {
         .read => .{
             .reader = (self.test_dir.openFile(self.io, file_path, .{ .mode = .read_only }) catch |err| {
                 self.alloc.destroy(file_wrapper);
-                return logRuntimeError("opening file for reading", err);
+                return logIoError("opening file for reading", err);
             })
                 .reader(self.io, buffer),
         },
         .write => .{
             .writer = (self.test_dir.createFile(self.io, file_path, .{}) catch |err| {
                 self.alloc.destroy(file_wrapper);
-                return logRuntimeError("creating file", err);
+                return logIoError("creating file", err);
             }).writer(self.io, buffer),
         },
     };
@@ -171,22 +179,22 @@ fn writeToFile(_: *anyopaque, file_ptr: *anyopaque) *std.Io.Writer {
     return &file.writer.interface;
 }
 
-fn isFileExists(ptr: *anyopaque, file_path: [:0]const u8) g.SystemError!bool {
+fn isFileExists(ptr: *anyopaque, file_path: [:0]const u8) Error!bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     if (self.test_dir.access(self.io, file_path, .{})) |_| {
         return true;
     } else |err| switch (err) {
         error.FileNotFound => return false,
-        else => return logRuntimeError("checking whether file exists", err),
+        else => return logIoError("checking whether file exists", err),
     }
 }
 
-fn deleteFileIfExists(ptr: *anyopaque, file_path: [:0]const u8) g.SystemError!void {
+fn deleteFileIfExists(ptr: *anyopaque, file_path: [:0]const u8) Error!void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     self.test_dir.deleteFile(self.io, file_path) catch |err| {
         switch (err) {
             error.FileNotFound => {},
-            else => return logRuntimeError("deleting file", err),
+            else => return logIoError("deleting file", err),
         }
     };
 }
@@ -197,4 +205,4 @@ fn stackSize(ptr: *anyopaque) usize {
     return if (stack > self.stack_start) stack - self.stack_start else self.stack_start - stack;
 }
 
-fn showManual(_: *anyopaque) g.SystemError!void {}
+fn showManual(_: *anyopaque) Error!void {}

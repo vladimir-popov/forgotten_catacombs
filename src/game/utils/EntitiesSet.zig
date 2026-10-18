@@ -11,7 +11,7 @@ pub const Iterator = UnderlyingMap.KeyIterator;
 alloc: std.mem.Allocator,
 underlying_map: *UnderlyingMap,
 
-pub fn init(alloc: std.mem.Allocator) !Self {
+pub fn init(alloc: std.mem.Allocator) std.mem.Allocator.Error!Self {
     const self: Self = .{ .alloc = alloc, .underlying_map = try alloc.create(UnderlyingMap) };
     self.underlying_map.* = .empty;
     return self;
@@ -22,7 +22,7 @@ pub fn deinit(self: *Self) void {
     self.alloc.destroy(self.underlying_map);
 }
 
-pub fn clone(self: Self, alloc: std.mem.Allocator) !Self {
+pub fn clone(self: Self, alloc: std.mem.Allocator) std.mem.Allocator.Error!Self {
     return .{ .alloc = alloc, .underlying_map = try self.underlying_map.clone(alloc) };
 }
 
@@ -31,7 +31,7 @@ pub fn contains(self: Self, item: g.Entity) bool {
 }
 
 /// - `writer` - as example: `*persistance.Writer(Runtime.FileWriter.Writer)`
-pub fn save(self: Self, writer: anytype) !void {
+pub fn save(self: Self, writer: anytype) g.persistance.Error!void {
     try writer.beginCollection();
     var itr = self.iterator();
     while (itr.next()) |entity| {
@@ -41,7 +41,7 @@ pub fn save(self: Self, writer: anytype) !void {
 }
 
 /// - `reader` - as example: `*persistance.Reader(Runtime.FileReader.Reader)`
-pub fn load(reader: anytype) !Self {
+pub fn load(reader: anytype) g.persistance.Error!Self {
     const set = try init(reader.registry.allocator());
     try reader.beginCollection();
     while (!try reader.isCollectionEnd()) {
@@ -59,7 +59,7 @@ pub fn iterator(self: Self) Iterator {
     return self.underlying_map.keyIterator();
 }
 
-pub fn add(self: Self, item: g.Entity) !void {
+pub fn add(self: Self, item: g.Entity) std.mem.Allocator.Error!void {
     try self.underlying_map.put(self.alloc, item, {});
 }
 

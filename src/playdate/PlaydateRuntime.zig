@@ -12,6 +12,8 @@ const log = std.log.scoped(.playdate);
 
 const Self = @This();
 
+const RuntimeError = g.Runtime.Error;
+
 // This is a global var because the
 // serialMessageCallback doesn't receive custom data
 var cheat: ?g.Cheat = null;
@@ -114,7 +116,7 @@ fn removeAllMenuItems(ptr: *anyopaque) void {
     self.playdate.system.removeAllMenuItems();
 }
 
-fn readPushedButtons(ptr: *anyopaque) g.SystemError!?g.Button {
+fn readPushedButtons(ptr: *anyopaque) RuntimeError!?g.Button {
     const self: *Self = @ptrCast(@alignCast(ptr));
 
     if (self.playdate.system.isCrankDocked() == 0) {
@@ -131,17 +133,17 @@ fn readPushedButtons(ptr: *anyopaque) g.SystemError!?g.Button {
     return self.last_button.pop(currentMillis(ptr));
 }
 
-fn cleanInputBuffer(ptr: *anyopaque) g.SystemError!void {
+fn cleanInputBuffer(ptr: *anyopaque) RuntimeError!void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     self.last_button = .reset;
 }
 
-fn clearDisplay(ptr: *anyopaque) g.SystemError!void {
+fn clearDisplay(ptr: *anyopaque) !void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     self.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
 }
 
-fn drawSprite(ptr: *anyopaque, codepoint: g.Codepoint, position_on_display: p.Point, mode: g.DrawingMode) g.SystemError!void {
+fn drawSprite(ptr: *anyopaque, codepoint: g.Codepoint, position_on_display: p.Point, mode: g.DrawingMode) RuntimeError!void {
     var self: *Self = @ptrCast(@alignCast(ptr));
     const x = @as(c_int, position_on_display.col - 1) * g.SPRITE_WIDTH;
     const y = @as(c_int, position_on_display.row - 1) * g.SPRITE_HEIGHT;
@@ -149,7 +151,7 @@ fn drawSprite(ptr: *anyopaque, codepoint: g.Codepoint, position_on_display: p.Po
         self.playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeInverted)
     else
         self.playdate.graphics.setDrawMode(api.LCDBitmapDrawMode.DrawModeCopy);
-    const bitmap = self.getBitmap(codepoint) orelse return logRuntimeError("looking up sprite bitmap", error.InvalidSpriteIndex);
+    const bitmap = self.getBitmap(codepoint) orelse return logDrawingError("looking up sprite bitmap", error.InvalidSpriteIndex);
     self.playdate.graphics.drawBitmap(bitmap, x, y, .BitmapUnflipped);
 }
 
@@ -200,9 +202,14 @@ fn popCheat(_: *anyopaque) ?g.Cheat {
     return result;
 }
 
-fn logRuntimeError(context: []const u8, err: anyerror) g.SystemError {
+fn logIoError(context: []const u8, err: anytype) RuntimeError {
     log.err("Error {t} happened while {s}", .{ err, context });
-    return g.SystemError.RuntimeError;
+    return error.IOError;
+}
+
+fn logDrawingError(context: []const u8, err: anytype) RuntimeError {
+    log.err("Error {t} happened while {s}", .{ err, context });
+    return error.DrawingError;
 }
 
 fn serialMessageCallback(data: [*c]const u8) callconv(.c) void {
@@ -212,7 +219,7 @@ fn serialMessageCallback(data: [*c]const u8) callconv(.c) void {
     }
 }
 
-fn openFile(ptr: *anyopaque, file_path: [:0]const u8, mode: g.Runtime.FileMode, buffer: []u8) g.SystemError!*anyopaque {
+fn openFile(ptr: *anyopaque, file_path: [:0]const u8, mode: g.Runtime.FileMode, buffer: []u8) RuntimeError!*anyopaque {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const file_options: api.FileOptions = switch (mode) {
         .read => api.FILE_READ_DATA,
@@ -224,11 +231,11 @@ fn openFile(ptr: *anyopaque, file_path: [:0]const u8, mode: g.Runtime.FileMode, 
             "Error on opening file {s} in mode {t}: {s}",
             .{ file_path, mode, self.playdate.file.geterr() orelse "" },
         );
-        return logRuntimeError("opening file", error.IOError);
+        return error.IOError;
     };
     const file_wrapper = self.alloc.create(io.FileWrapper) catch |err| {
         _ = self.playdate.file.close(file_ptr);
-        return logRuntimeError("allocating file wrapper", err);
+        return logIoError("allocating file wrapper", err);
     };
     file_wrapper.* = switch (mode) {
         .read => .{ .reader = .init(self.playdate, file_ptr, buffer) },
@@ -264,25 +271,25 @@ fn writeToFile(_: *anyopaque, file: *anyopaque) *std.Io.Writer {
     return &file_wrapper.writer.interface;
 }
 
-fn isFileExists(ptr: *anyopaque, file_path: [:0]const u8) g.SystemError!bool {
+fn isFileExists(ptr: *anyopaque, file_path: [:0]const u8) RuntimeError!bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
     var result = ExpectedFile{ .file_name = file_path };
     if (self.playdate.file.listfiles("./", validateFile, &result, 0) < 0) {
         log.err("Error on listing files: {s}", .{self.playdate.file.geterr() orelse ""});
-        return logRuntimeError("listing files", error.IOError);
+        return error.IOError;
     }
     log.debug("Is '{s}' exists: {}", .{ file_path, result.is_found });
     return result.is_found;
 }
 
-fn deleteFileIfExists(ptr: *anyopaque, file_path: [:0]const u8) g.SystemError!void {
+fn deleteFileIfExists(ptr: *anyopaque, file_path: [:0]const u8) RuntimeError!void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     if (!try isFileExists(ptr, file_path)) return;
 
     log.debug("Delete file {s}", .{file_path});
     if (self.playdate.file.unlink(file_path, 0) < 0) {
         log.err("Error on deleting file '{s}': {s}", .{ file_path, self.playdate.file.geterr() orelse "" });
-        return logRuntimeError("deleting file", error.IOError);
+        return error.IOError;
     }
 }
 
@@ -305,14 +312,14 @@ fn stackSize(ptr: *anyopaque) usize {
     return if (stack > self.stack_start) stack - self.stack_start else self.stack_start - stack;
 }
 
-fn showManualQrCode(ptr: *anyopaque) g.SystemError!void {
+fn showManualQrCode(ptr: *anyopaque) RuntimeError!void {
     const self: *Self = @ptrCast(@alignCast(ptr));
     const render = g.Render.init(self.alloc, self.runtime()) catch |err| {
-        return logRuntimeError("initializing manual renderer", err);
+        return logIoError("initializing manual renderer", err);
     };
     self.playdate.graphics.drawBitmap(self.manual_qrcode, 100, 18, .BitmapUnflipped);
     render.drawText(" Back ", .point(12, 35), .inverted) catch |err| {
-        return logRuntimeError("drawing manual back button", err);
+        return logDrawingError("drawing manual back button", err);
     };
 }
 

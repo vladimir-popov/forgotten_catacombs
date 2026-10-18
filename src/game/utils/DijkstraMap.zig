@@ -25,7 +25,7 @@ pub fn calculate(
     region: p.Region,
     obstacles: Obstacles,
     target: p.Point,
-) !void {
+) std.mem.Allocator.Error!void {
     var openned: std.ArrayList(struct { p.Point, u8 }) = .empty;
     defer openned.deinit(alloc);
 

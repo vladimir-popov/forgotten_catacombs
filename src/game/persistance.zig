@@ -6,10 +6,10 @@
 //! custom type persistable two methods should be implemented:
 //! ```
 //! /// - `writer` - as example: `*persistance.Writer(Runtime.FileWriter.Writer)`
-//! pub fn save(self: Self, writer: anytype) !void
+//! pub fn save(self: Self, writer: anytype) PersistenceError!void
 //!
 //! /// - `reader` - as example: `*persistance.Reader(Runtime.FileReader.Reader)`
-//! pub fn load(reader: anytype) !Self
+//! pub fn load(reader: anytype) PersistenceError!Self
 //! ```
 const std = @import("std");
 const g = @import("game_pkg.zig");
@@ -22,14 +22,20 @@ const log = std.log.scoped(.persistence);
 
 pub const SESSION_FILE_NAME = "session.json";
 
-pub fn pathToLevelFile(buf: []u8, depth: u8) ![:0]const u8 {
-    return try std.fmt.bufPrintSentinel(buf, "level_{d}.json", .{depth}, 0);
+pub const Error = error{
+    OutOfMemory,
+    InvalidData,
+    IoError,
+    SerializationFailed,
+    UnsupportedType,
+};
+
+pub fn pathToLevelFile(buf: []u8, depth: u8) Error![:0]const u8 {
+    return std.fmt.bufPrintSentinel(buf, "level_{d}.json", .{depth}, 0) catch return error.SerializationFailed;
 }
 
 pub const Writer = struct {
     const Self = @This();
-
-    pub const Error = anyerror;
 
     // used to get components of entities inside containers such as pile or inventory
     registry: *const g.Registry,
@@ -43,11 +49,11 @@ pub const Writer = struct {
     }
 
     pub fn beginObject(self: *Self) Error!void {
-        try self.writer.beginObject();
+        self.writer.beginObject() catch return error.IoError;
     }
 
     pub fn endObject(self: *Self) Error!void {
-        try self.writer.endObject();
+        self.writer.endObject() catch return error.IoError;
     }
 
     pub fn writeEntity(self: *Self, entity: g.Entity) Error!void {
@@ -65,7 +71,7 @@ pub const Writer = struct {
         }
         switch (@typeInfo(T)) {
             .bool, .int, .float, .comptime_int, .comptime_float, .@"enum", .enum_literal => {
-                try self.writer.write(value);
+                self.writer.write(value) catch return error.IoError;
             },
             .optional => if (value == null) {
                 log.err("null is not supported value.", .{});
@@ -130,22 +136,22 @@ pub const Writer = struct {
     }
 
     pub fn beginCollection(self: *Self) Error!void {
-        try self.writer.beginArray();
+        self.writer.beginArray() catch return error.IoError;
     }
 
     pub fn endCollection(self: *Self) Error!void {
-        try self.writer.endArray();
+        self.writer.endArray() catch return error.IoError;
     }
 
     pub fn writeStringKey(self: *Self, name: []const u8) Error!void {
-        try self.writer.objectField(name);
+        self.writer.objectField(name) catch return error.IoError;
     }
 
     pub fn writeNumericKey(self: *Self, key: anytype) Error!void {
         const type_info = @typeInfo(@TypeOf(key));
-        var buf: [@divExact(type_info.int.bits, 8)]u8 = undefined;
+        var buf: [@divTrunc(type_info.int.bits * 3, 8) + 2]u8 = undefined;
         switch (type_info) {
-            .int => try self.writeStringKey(try std.fmt.bufPrint(&buf, "{d}", .{key})),
+            .int => try self.writeStringKey(std.fmt.bufPrint(&buf, "{d}", .{key}) catch return error.SerializationFailed),
             else => {
                 log.err("Unsupported type for key {any}", .{@typeName(type_info)});
                 return error.UnsupportedType;
@@ -156,7 +162,6 @@ pub const Writer = struct {
 
 pub const Reader = struct {
     const Self = @This();
-    pub const Error = anyerror;
 
     registry: *g.Registry,
     json_reader: std.json.Reader,
@@ -172,15 +177,30 @@ pub const Reader = struct {
         self.json_reader.deinit();
     }
 
+    fn nextToken(self: *Self) Error!std.json.Token {
+        return self.json_reader.next() catch |err| switch (err) {
+            error.OutOfMemory => Error.OutOfMemory,
+            error.ReadFailed => Error.IoError,
+            error.EndOfStream, error.SyntaxError, error.UnexpectedEndOfInput => Error.InvalidData,
+        };
+    }
+
+    fn peekTokenType(self: *Self) Error!std.json.TokenType {
+        return self.json_reader.peekNextTokenType() catch |err| switch (err) {
+            error.ReadFailed => Error.IoError,
+            error.EndOfStream, error.SyntaxError, error.UnexpectedEndOfInput => Error.InvalidData,
+        };
+    }
+
     pub fn beginObject(self: *Self) Error!void {
-        try assertEql(self.json_reader.next(), .object_begin);
+        try assertEql(self.nextToken(), .object_begin);
     }
 
     pub fn endObject(self: *Self) Error!void {
-        try assertEql(self.json_reader.next(), .object_end);
+        try assertEql(self.nextToken(), .object_end);
     }
 
-    pub fn readEntityStruct(self: *Self, registry: *g.Registry) anyerror!g.Entity {
+    pub fn readEntityStruct(self: *Self, registry: *g.Registry) Error!g.Entity {
         var buf: [128]u8 = undefined;
         try self.beginObject();
         const entity = g.Entity{ .id = try self.readKeyAsNumber(g.Entity.IdType, &buf) };
@@ -216,26 +236,26 @@ pub const Reader = struct {
                 return {};
             },
             .bool => {
-                const next = try self.json_reader.next();
+                const next = try self.nextToken();
                 return if (next == .true) true else if (next == .false) false else {
                     log.err("Wrong input. Expected bool, but was {any}", .{next});
-                    return error.WrongInput;
+                    return error.InvalidData;
                 };
             },
             .int, .comptime_int => {
                 var buf: [32]u8 = undefined;
-                return try std.fmt.parseInt(T, try self.readBytes(&buf), 10);
+                return std.fmt.parseInt(T, try self.readBytes(&buf), 10) catch return error.InvalidData;
             },
             .float, .comptime_float => {
                 var buf: [32]u8 = undefined;
-                return try std.fmt.parseFloat(T, try self.readBytes(&buf));
+                return std.fmt.parseFloat(T, try self.readBytes(&buf)) catch return error.InvalidData;
             },
             .@"enum", .enum_literal => {
                 var buf: [32]u8 = undefined;
                 const str = try self.readBytes(&buf);
                 return std.meta.stringToEnum(T, str) orelse {
                     log.err("Wrong value {s} for the enum {s}", .{ str, @typeName(T) });
-                    return error.WrongInput;
+                    return error.InvalidData;
                 };
             },
             .optional => |op| {
@@ -256,11 +276,11 @@ pub const Reader = struct {
 
                 try self.beginCollection();
                 while (!try self.isCollectionEnd()) {
-                    const item = buf.addOne(self.registry.allocator());
+                    const item = try buf.addOne(self.registry.allocator());
                     item.* = try self.read(ptr.child);
                 }
                 try self.endCollection();
-                return buf.toOwnedSlice();
+                return try buf.toOwnedSlice(self.registry.allocator());
             },
             .@"struct" => |s| {
                 try self.beginObject();
@@ -284,7 +304,7 @@ pub const Reader = struct {
                             "Error on reading {s}. Expected a key for the field {s}, but was read {s}",
                             .{ @typeName(T), field.name, key.? },
                         );
-                        return error.WrongInput;
+                        return error.InvalidData;
                     }
                 }
                 try self.endObject();
@@ -292,7 +312,8 @@ pub const Reader = struct {
             },
             .@"union" => |un| {
                 try self.beginObject();
-                const key = try self.readKeyAsString();
+                var key_buf: [128]u8 = undefined;
+                const key = try self.readKeyAsString(&key_buf);
                 inline for (un.fields) |u_field| {
                     if (std.mem.eql(u8, u_field.name, key)) {
                         const value = try self.read(u_field.type);
@@ -308,19 +329,19 @@ pub const Reader = struct {
     }
 
     pub fn isObjectEnd(self: *Self) Error!bool {
-        return try self.json_reader.peekNextTokenType() == .object_end;
+        return (try self.peekTokenType()) == .object_end;
     }
 
     pub noinline fn beginCollection(self: *Self) Error!void {
-        try assertEql(self.json_reader.next(), .array_begin);
+        try assertEql(self.nextToken(), .array_begin);
     }
 
     pub noinline fn endCollection(self: *Self) Error!void {
-        try assertEql(self.json_reader.next(), .array_end);
+        try assertEql(self.nextToken(), .array_end);
     }
 
     pub noinline fn isCollectionEnd(self: *Self) Error!bool {
-        return try self.json_reader.peekNextTokenType() == .array_end;
+        return (try self.peekTokenType()) == .array_end;
     }
 
     pub noinline fn readKey(self: *Self, expected: []const u8) Error![]const u8 {
@@ -336,13 +357,13 @@ pub const Reader = struct {
     }
 
     pub fn readKeyAsNumber(self: *Self, comptime N: type, buffer: []u8) Error!N {
-        return try std.fmt.parseInt(N, try self.readKeyAsString(buffer), 10);
+        return std.fmt.parseInt(N, try self.readKeyAsString(buffer), 10) catch return error.InvalidData;
     }
 
     pub noinline fn readBytes(self: *Self, buffer: []u8) Error![]const u8 {
         var capacity: usize = 0;
         while (true) {
-            switch (try self.json_reader.next()) {
+            switch (try self.nextToken()) {
                 // Accumulate partial values.
                 .partial_number, .partial_string => |slice| {
                     @memmove(buffer[capacity .. capacity + slice.len], slice);
@@ -373,28 +394,28 @@ pub const Reader = struct {
                 },
                 else => |unexpected| {
                     log.err("Unexpected input during reading symbols: {any}", .{unexpected});
-                    return error.WrongInput;
+                    return error.InvalidData;
                 },
             }
         }
     }
 };
 
-fn assertEql(actual: anytype, expected: anytype) !void {
+fn assertEql(actual: anytype, expected: anytype) Error!void {
     if (comptime !u.isDebug()) return;
 
     const act = switch (@typeInfo(@TypeOf(actual))) {
-        .error_set, .error_union => try actual,
+        .error_union => try actual,
         else => actual,
     };
     switch (@typeInfo(@TypeOf(expected))) {
         .enum_literal => if (act != expected) {
             log.err("Expected {any}, but was {any}", .{ expected, act });
-            return error.WrongInput;
+            return error.InvalidData;
         },
         else => if (!std.mem.eql(u8, act, expected)) {
             log.err("Expected {s}, but was {s}", .{ expected, act });
-            return error.WrongInput;
+            return error.InvalidData;
         },
     }
 }

@@ -57,11 +57,11 @@ pub const GameStateArena = std.heap.ArenaAllocator;
 pub const SessionModeArena = std.heap.ArenaAllocator;
 pub const LevelArena = std.heap.ArenaAllocator;
 
-pub const SystemError = error{
-    OutOfMemory,
-    /// Any unexpected error within a Runtime implementation
-    RuntimeError,
-};
+pub const SystemError = Runtime.Error || persistance.Error ||
+    std.mem.Allocator.Error ||
+    std.Io.Reader.Error ||
+    std.Io.Writer.Error ||
+    std.fmt.BufPrintError;
 
 pub const MAX_DEPTH = 9;
 

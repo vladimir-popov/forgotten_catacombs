@@ -12,7 +12,7 @@ pub fn Set(comptime T: type) type {
         alloc: std.mem.Allocator,
         underlying_map: *UnderlyingMap,
 
-        pub fn init(alloc: std.mem.Allocator) !Self {
+        pub fn init(alloc: std.mem.Allocator) std.mem.Allocator.Error!Self {
             const self: Self = .{ .alloc = alloc, .underlying_map = try alloc.create(UnderlyingMap) };
             self.underlying_map.* = .empty;
             return self;
@@ -23,12 +23,12 @@ pub fn Set(comptime T: type) type {
             self.alloc.destroy(self.underlying_map);
         }
 
-        pub fn clone(self: Self, alloc: std.mem.Allocator) !Self {
+        pub fn clone(self: Self, alloc: std.mem.Allocator) std.mem.Allocator.Error!Self {
             return .{ .alloc = alloc, .underlying_map = try self.underlying_map.clone(alloc) };
         }
 
         /// - `writer` - as example: `*persistance.Writer(Runtime.FileWriter.Writer)`
-        pub fn save(self: Self, writer: anytype) !void {
+        pub fn save(self: Self, writer: anytype) g.PersistenceError!void {
             try writer.beginCollection();
             var itr = self.iterator();
             while (itr.next()) |item| {
@@ -38,7 +38,7 @@ pub fn Set(comptime T: type) type {
         }
 
         /// - `reader` - as example: `*persistance.Reader(Runtime.FileReader.Reader)`
-        pub fn load(reader: anytype) !Self {
+        pub fn load(reader: anytype) g.PersistenceError!Self {
             const set = try init(reader.registry.allocator());
             try reader.beginCollection();
             while (!try reader.isCollectionEnd()) {
@@ -56,7 +56,7 @@ pub fn Set(comptime T: type) type {
             return self.underlying_map.keyIterator();
         }
 
-        pub fn add(self: Self, item: T) !void {
+        pub fn add(self: Self, item: T) std.mem.Allocator.Error!void {
             try self.underlying_map.put(self.alloc, item, {});
         }
 

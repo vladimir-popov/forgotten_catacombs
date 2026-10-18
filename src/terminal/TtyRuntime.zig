@@ -4,6 +4,7 @@ const p = g.primitives;
 const tty = @import("tty.zig");
 
 const log = std.log.scoped(.tty_runtime);
+const RuntimeError = g.Runtime.Error;
 
 pub const Menu = @import("Menu.zig").Menu;
 const Cmd = @import("Cmd.zig").Cmd;
@@ -128,7 +129,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
         }
 
         /// Run the main loop of the game
-        pub fn run(self: *Self, game: anytype) g.SystemError!void {
+        pub fn run(self: *Self, game: anytype) RuntimeError!void {
             var buffer: [2048]u8 = undefined;
             var stdout = std.Io.File.stdout().writer(self.io, &buffer);
             handleWindowResize(std.c.SIG.WINCH);
@@ -139,11 +140,11 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                         rows_pad,
                         cols_pad + (display_cols - menu_cols),
                     ) catch |err| {
-                        return logRuntimeError("writing menu to terminal", err);
+                        return logIoError("writing menu to terminal", err);
                     };
                     if (readPushedButtons(self) catch |err| return err) |btn| {
                         self.menu.handleKeyboardButton(btn) catch |err| {
-                            return logRuntimeError("handling menu button", err);
+                            return logInputError("handling menu button", err);
                         };
                     }
                 } else if (self.cmd.cursor_idx > 0) {
@@ -156,28 +157,34 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                         rows_pad + display_rows - 2,
                         cols_pad + 1,
                     ) catch |err| {
-                        return logRuntimeError("writing command buffer to terminal", err);
+                        return logIoError("writing command buffer to terminal", err);
                     };
                 } else {
                     game.tick() catch |err| {
-                        return logRuntimeError("updating game", err);
+                        log.err("Error {t} happened while updating game", .{err});
+                        return error.IOError;
                     };
                     self.buffer.writeBuffer(&stdout.interface, rows_pad, cols_pad) catch |err| {
-                        return logRuntimeError("writing display buffer to terminal", err);
+                        return logIoError("writing display buffer to terminal", err);
                     };
                 }
                 stdout.interface.flush() catch |err| {
-                    return logRuntimeError("flushing terminal output", err);
+                    return logIoError("flushing terminal output", err);
                 };
             }
         }
 
-        inline fn logRuntimeError(context: []const u8, err: anyerror) g.SystemError {
+        inline fn logIoError(context: []const u8, err: anytype) RuntimeError {
             log.err("Error {t} happened while {s}", .{ err, context });
-            return g.SystemError.RuntimeError;
+            return error.IOError;
         }
 
-        fn readKeyboardInput(self: *Self) g.SystemError!?tty.KeyboardAndMouse.Button {
+        inline fn logInputError(context: []const u8, err: anytype) RuntimeError {
+            log.err("Error {t} happened while {s}", .{ err, context });
+            return error.InputError;
+        }
+
+        fn readKeyboardInput(self: *Self) RuntimeError!?tty.KeyboardAndMouse.Button {
             if (tty.KeyboardAndMouse.readPressedButton()) |btn| {
                 self.keyboard_buffer = btn;
                 switch (btn) {
@@ -191,7 +198,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                             self.menu.close()
                         else
                             self.menu.show() catch |err| {
-                                return logRuntimeError("showing menu", err);
+                                return logInputError("showing menu", err);
                             };
                     } else if (self.is_dev_mode and ch.char == ':') {
                         self.cmd.cleanCmd();
@@ -202,7 +209,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             return self.keyboard_buffer;
         }
 
-        fn cleanInputBuffer(ptr: *anyopaque) g.SystemError!void {
+        fn cleanInputBuffer(ptr: *anyopaque) RuntimeError!void {
             const self: *Self = @ptrCast(@alignCast(ptr));
             self.keyboard_buffer = null;
         }
@@ -228,7 +235,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             self.menu.removeAllItems();
         }
 
-        fn readPushedButtons(ptr: *anyopaque) g.SystemError!?g.Button {
+        fn readPushedButtons(ptr: *anyopaque) RuntimeError!?g.Button {
             var self: *Self = @ptrCast(@alignCast(ptr));
             if (self.readKeyboardInput() catch |err| return err) |key| {
                 const button: ?g.Button = switch (key) {
@@ -291,9 +298,9 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             return cheat;
         }
 
-        fn clearDisplay(ptr: *anyopaque) g.SystemError!void {
+        fn clearDisplay(ptr: *anyopaque) RuntimeError!void {
             tty.Display.clearScreen() catch |err| {
-                return logRuntimeError("clearing screen", err);
+                return logIoError("clearing screen", err);
             };
             const self: *Self = @ptrCast(@alignCast(ptr));
             self.buffer.cleanAndWrap();
@@ -304,30 +311,35 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             symbol: u21,
             position_on_display: p.Point,
             mode: g.DrawingMode,
-        ) g.SystemError!void {
+        ) RuntimeError!void {
             const self: *Self = @ptrCast(@alignCast(ptr));
             // the buffer used indexes begun from 0, but the position coordinates begun from 1
             // we do not convert them here because we need a margin for border
             self.buffer.setSymbol(symbol, position_on_display.row, position_on_display.col, mode);
         }
 
-        fn openFile(ptr: *anyopaque, file_path: [:0]const u8, mode: g.Runtime.FileMode, buffer: []u8) g.SystemError!*anyopaque {
+        fn openFile(
+            ptr: *anyopaque,
+            file_path: [:0]const u8,
+            mode: g.Runtime.FileMode,
+            buffer: []u8,
+        ) RuntimeError!*anyopaque {
             const self: *Self = @ptrCast(@alignCast(ptr));
             const file_wrapper = self.alloc.create(FileWrapper) catch |err| {
-                return logRuntimeError("allocating file wrapper", err);
+                return logIoError("allocating file wrapper", err);
             };
             file_wrapper.* = switch (mode) {
                 .read => .{
                     .reader = (self.saves_dir.openFile(self.io, file_path, .{ .mode = std.Io.File.OpenMode.read_only }) catch |err| {
                         self.alloc.destroy(file_wrapper);
-                        return logRuntimeError("opening save file for reading", err);
+                        return logIoError("opening save file for reading", err);
                     })
                         .reader(self.io, buffer),
                 },
                 .write => .{
                     .writer = (self.saves_dir.createFile(self.io, file_path, .{}) catch |err| {
                         self.alloc.destroy(file_wrapper);
-                        return logRuntimeError("creating save file", err);
+                        return logIoError("creating save file", err);
                     }).writer(self.io, buffer),
                 },
             };
@@ -358,22 +370,22 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             return &file.writer.interface;
         }
 
-        fn isFileExists(ptr: *anyopaque, file_path: [:0]const u8) g.SystemError!bool {
+        fn isFileExists(ptr: *anyopaque, file_path: [:0]const u8) RuntimeError!bool {
             const self: *Self = @ptrCast(@alignCast(ptr));
             if (self.saves_dir.access(self.io, file_path, .{})) |_| {
                 return true;
             } else |err| switch (err) {
                 error.FileNotFound => return false,
-                else => return logRuntimeError("checking whether save file exists", err),
+                else => return logIoError("checking whether save file exists", err),
             }
         }
 
-        fn deleteFileIfExists(ptr: *anyopaque, file_path: [:0]const u8) g.SystemError!void {
+        fn deleteFileIfExists(ptr: *anyopaque, file_path: [:0]const u8) RuntimeError!void {
             const self: *Self = @ptrCast(@alignCast(ptr));
             self.saves_dir.deleteFile(self.io, file_path) catch |err| {
                 switch (err) {
                     error.FileNotFound => {},
-                    else => return logRuntimeError("deleting save file", err),
+                    else => return logIoError("deleting save file", err),
                 }
             };
         }
@@ -383,7 +395,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             return 0;
         }
 
-        fn openManualLink(ptr: *anyopaque) g.SystemError!void {
+        fn openManualLink(ptr: *anyopaque) RuntimeError!void {
             const self: *Self = @ptrCast(@alignCast(ptr));
             const url = "https://github.com/dokwork/forgotten_catacombs/blob/main/manual/manual.ru.pdf";
             const argv = switch (@import("builtin").os.tag) {
@@ -397,10 +409,10 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                 self.io,
                 .{ .argv = argv, .stdin = .ignore, .stdout = .ignore, .stderr = .ignore },
             ) catch |err| {
-                return logRuntimeError("opening manual link", err);
+                return logIoError("opening manual link", err);
             };
             _ = child.wait(self.io) catch |err| {
-                return logRuntimeError("waiting for manual link process", err);
+                return logIoError("waiting for manual link process", err);
             };
             // we have to emulate pressing 'A' button to return to the main screen
             self.keyboard_buffer = .{ .char = .{ .char = 'i' } };

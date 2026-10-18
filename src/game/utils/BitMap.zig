@@ -10,11 +10,6 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
         std.debug.assert(cols_count > 0);
     }
     return struct {
-        pub const Error = error{
-            WrongColumnsCountInString,
-            WrongRowsCountInString,
-        };
-
         const Self = @This();
 
         pub const rows: u8 = rows_count;
@@ -22,13 +17,13 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
 
         bitsets: []std.StaticBitSet(cols),
 
-        pub fn initEmpty(alloc: std.mem.Allocator) !Self {
+        pub fn initEmpty(alloc: std.mem.Allocator) std.mem.Allocator.Error!Self {
             var self: Self = .{ .bitsets = try alloc.alloc(std.StaticBitSet(cols), rows) };
             self.clear();
             return self;
         }
 
-        pub fn initFull(alloc: std.mem.Allocator) !Self {
+        pub fn initFull(alloc: std.mem.Allocator) std.mem.Allocator.Error!Self {
             var self: Self = .{ .bitsets = try alloc.alloc(std.StaticBitSet(cols), rows) };
             for (0..rows) |idx| {
                 self.bitsets[idx] = std.StaticBitSet(cols).initFull();
@@ -59,7 +54,7 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
             return row_idx >= rows or col_idx >= cols;
         }
 
-        pub fn parse(self: *Self, comptime symbol: u8, str: []const u8) !void {
+        pub fn parse(self: *Self, comptime symbol: u8, str: []const u8) void {
             if (!@import("builtin").is_test) {
                 @compileError("The function `parse` is for test purpose only");
             }
@@ -73,7 +68,10 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
                                 "Total columns count is {d}, but found {d} char '{c}' in the parsed string\n{s}\n",
                                 .{ cols, c, char, str },
                             );
-                            return Error.WrongColumnsCountInString;
+                            std.debug.panic(
+                                "Expected at most {d} columns, but found {d} in bitmap string:\n{s}",
+                                .{ cols, c - 1, str },
+                            );
                         }
                         r += 1;
                         c = 0;
@@ -168,7 +166,7 @@ test "parse BitMap" {
     // when:
     var bitmap = try BitMap(3, 3).initEmpty(std.testing.allocator);
     defer bitmap.deinit(std.testing.allocator);
-    try bitmap.parse('#', str);
+    bitmap.parse('#', str);
 
     // then:
     for (0..3) |r| {

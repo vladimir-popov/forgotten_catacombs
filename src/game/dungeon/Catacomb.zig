@@ -290,8 +290,8 @@ pub fn parse(arena: *std.heap.ArenaAllocator, str: []const u8) !Catacomb {
     }
     var catacomb: Catacomb = undefined;
     try catacomb.init(arena.allocator(), .{});
-    try catacomb.floor.parse('.', str);
-    try catacomb.walls.parse('#', str);
+    catacomb.floor.parse('.', str);
+    catacomb.walls.parse('#', str);
     return catacomb;
 }
 
