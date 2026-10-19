@@ -185,14 +185,14 @@ noinline fn doMove(
     from_position: *c.Position,
     target: g.actions.Action.Payload.Move.Target,
 ) AllocatorError!void {
-    try self.session().sendEvent(.{
-        .entity_moved = .{
-            .entity = entity,
-            .is_player = (entity.eql(self.session().player)),
-            .moved_from = from_position.place,
-            .target = target,
-        },
-    });
+    if (entity.eql(self.session().player)) {
+        try self.session().sendEvent(.{
+            .player_moved = .{
+                .moved_from = from_position.place,
+                .target = target,
+            },
+        });
+    }
     from_position.place = switch (target) {
         .direction => |direction| from_position.place.movedTo(direction),
         .new_place => |place| place,

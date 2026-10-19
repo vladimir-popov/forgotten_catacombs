@@ -256,22 +256,18 @@ pub fn removeDeadEntity(self: *Self, entity: g.Entity) g.SystemError!void {
     log.debug("NPC {d} is dead", .{entity.id});
     // Handle death and remove the entity here, within the current tick
     try self.removeEntity(entity);
-    try self.sendEvent(.{ .entity_died = entity });
 }
 
 pub fn playerMovedToLevel(self: *Self) g.SystemError!void {
     self.max_depth = @max(self.max_depth, self.level.depth);
     self.viewport.centeredAround(self.level.playerPosition().place);
     try self.switchModeToPlay(null);
-    const event = g.events.Event{
-        .entity_moved = .{
-            .entity = self.player,
-            .is_player = true,
+    try self.sendEvent(.{
+        .player_moved = .{
             .moved_from = .point(0, 0),
             .target = .{ .new_place = self.level.playerPosition().place },
         },
-    };
-    try self.sendEvent(event);
+    });
 }
 
 pub fn showPopUpNotification(self: *Self, notification: g.notifications.Notification) AllocatorError!void {
@@ -357,14 +353,9 @@ noinline fn handleEvent(self: *Self, event_idx: usize) g.AllErrors!void {
             self.mode = .{ .save_load = try self.mode_arena.allocator().create(SaveLoadMode) };
             self.mode.save_load.* = SaveLoadMode.loadOrGenerateLevel(self, lvl.by_ladder);
         },
-        .entity_moved => |entity_moved| {
-            if (entity_moved.entity.id == self.player.id) {
-                try self.level.onPlayerMoved(entity_moved);
-                self.viewport.onPlayerMoved(entity_moved);
-            }
-        },
-        .entity_died => |entity| {
-            log.debug("The enemy {d} has died", .{entity.id});
+        .player_moved => |player_moved| {
+            try self.level.onPlayerMoved(player_moved);
+            self.viewport.onPlayerMoved(player_moved);
         },
     }
 }

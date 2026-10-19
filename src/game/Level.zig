@@ -537,8 +537,7 @@ pub fn itemAt(self: *const Self, place: p.Point) ?g.Entity {
 
 // The level doesn't subscribe to event directly to avoid unsubscription.
 // Instead, the PlayMode delegates events to the actual level.
-pub fn onPlayerMoved(self: *Self, player_moved: g.events.EntityMoved) AllocatorError!void {
-    std.debug.assert(player_moved.is_player);
+pub fn onPlayerMoved(self: *Self, player_moved: g.events.PlayerMoved) AllocatorError!void {
     self.updatePlacement(player_moved.moved_from, player_moved.targetPlace());
     const player_place = self.playerPosition().place;
     try u.DijkstraMap.calculate(

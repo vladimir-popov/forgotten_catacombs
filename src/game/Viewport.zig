@@ -23,9 +23,7 @@ pub fn init(rows: u8, cols: u8) Viewport {
     };
 }
 
-pub fn onPlayerMoved(self: *Viewport, entity_moved: g.events.EntityMoved) void {
-    if (!entity_moved.is_player) return;
-
+pub fn onPlayerMoved(self: *Viewport, entity_moved: g.events.PlayerMoved) void {
     // keep player on the screen:
     switch (entity_moved.target) {
         .new_place => |place| self.centeredAround(place),
