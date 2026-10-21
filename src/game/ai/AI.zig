@@ -10,8 +10,6 @@ const log = std.log.scoped(.ai);
 
 const Self = @This();
 
-rand: std.Random,
-
 inline fn session(self: *Self) *g.GameSession {
     return @alignCast(@fieldParentPtr("ai", self));
 }
@@ -25,11 +23,13 @@ pub fn chooseAction(
     initiative: *const c.Initiative,
 ) ?g.Action {
     const context = DecisionContext{
-        .rand = self.rand,
+        .rand = self.session().prng.random(),
         .enemy = npc,
         .enemy_place = self.session().registry.getUnsafe(npc, c.Position).place,
+        .enemy_stats = self.session().registry.getUnsafe(npc, c.Stats),
         .player = self.session().player,
         .player_place = self.session().level.playerPosition().place,
+        .player_stats = self.session().registry.getUnsafe(self.session().player, c.Stats),
         .speed = speed,
         .max_move_points = initiative.move_points,
         .environment = Environment.fromSession(self.session()),
@@ -48,8 +48,13 @@ fn actionForSleepingEnemy(context: DecisionContext) ?g.Action {
         return null;
 
     if (context.distanceToPlayer()) |distance| {
-        // TODO Probability of waking up should depends on player's skills + penalty for sleeping
-        if (context.rand.uintLessThan(u8, 10) > distance) return .action(.get_angry, context.enemy);
+        const chance = noticePlayerChance(
+            .sleeping,
+            context.enemy_stats.get(.perception),
+            distance,
+            context.player_stats.get(.dexterity),
+        );
+        if (context.passesChance(chance)) return .action(.get_angry, context.enemy);
     }
     return .action(.wait, {});
 }
@@ -60,8 +65,13 @@ fn actionForWalkingEnemy(context: DecisionContext) ?g.Action {
         return null;
 
     if (context.distanceToPlayer()) |distance| {
-        // TODO Probability of waking up should depends on player's skills
-        if (context.rand.uintLessThan(u8, 10) > distance) return .action(.get_angry, context.enemy);
+        const chance = noticePlayerChance(
+            .walking,
+            context.enemy_stats.get(.perception),
+            distance,
+            context.player_stats.get(.dexterity),
+        );
+        if (context.passesChance(chance)) return .action(.get_angry, context.enemy);
     }
 
     var directions = [4]p.Direction{ .left, .up, .right, .down };
@@ -100,4 +110,44 @@ fn actionForAggressiveEnemy(context: DecisionContext) ?g.Action {
         return .action(.chill, context.enemy);
     }
     return null;
+}
+
+fn noticePlayerChance(enemy_state: c.EnemyState, enemy_perception: i4, distance_to_player: u8, player_dexterity: i4) u8 {
+    const base: i16 = 110 - 20 * @as(i16, distance_to_player);
+    const perception: i16 = 10 * @as(i16, enemy_perception);
+    const dexterity: i16 = 10 * @as(i16, player_dexterity);
+
+    var chance = base + perception - dexterity;
+    if (enemy_state == .sleeping)
+        chance = @divTrunc(chance, 2);
+
+    return @intCast(std.math.clamp(chance, 0, 100));
+}
+
+const TestEnvironment = @import("TestEnvironment.zig");
+
+pub fn decisionContextForTest(rand: std.Random, environment: Environment) DecisionContext {
+    return .{
+        .rand = rand,
+        .player = .{ .id = 1 },
+        .player_place = .point(3, 3),
+        .player_stats = &c.Stats.zeros,
+        .enemy = .{ .id = 2 },
+        .enemy_place = .point(3, 3),
+        .enemy_stats = &c.Stats.zeros,
+        .speed = &c.Speed.default,
+        .max_move_points = g.MOVE_POINTS_IN_TURN,
+        .environment = environment,
+    };
+}
+
+test "sleeping enemy next to the player can become aggressive" {
+    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
+    var env = TestEnvironment{ .distance_to_player = 1, .minimal_percent_to_chance = 0 };
+    const context = decisionContextForTest(prng.random(), env.environment());
+
+    const action = actionForSleepingEnemy(context).?;
+
+    try std.testing.expectEqual(g.actions.Action.Tag.get_angry, action.tag);
+    try std.testing.expect(action.payload.get_angry.eql(context.enemy));
 }

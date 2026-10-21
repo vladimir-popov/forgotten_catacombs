@@ -11,14 +11,16 @@ directionToPlayerFn: *const fn (context: *anyopaque, from: p.Point) ?p.Direction
 distanceToPlayerFn: *const fn (context: *anyopaque, from: p.Point) ?u8,
 isObstacleFn: *const fn (context: *anyopaque, place: p.Point) bool,
 tryToMoveFn: *const fn (context: *anyopaque, from: p.Point, target: g.Action.Payload.Move.Target) ?g.Action,
+passesChanceFn: *const fn (context: *anyopaque, percent: u8) bool,
 
 pub fn fromSession(session: *g.GameSession) Self {
     return .{
         .context = session,
-        .tryToMoveFn = tryToMove,
-        .isObstacleFn = isObstacle,
         .distanceToPlayerFn = distanceToPlayer,
         .directionToPlayerFn = directionToPlayer,
+        .isObstacleFn = isObstacle,
+        .tryToMoveFn = tryToMove,
+        .passesChanceFn = passesChance,
     };
 }
 
@@ -88,4 +90,9 @@ fn tryToMove(
         },
     }
     return null;
+}
+
+pub fn passesChance(ptr: *anyopaque, chance_percent: u8) bool {
+    const session: *g.GameSession = @ptrCast(@alignCast(ptr));
+    return session.prng.random().uintLessThan(u8, 100) < chance_percent;
 }
