@@ -18,7 +18,7 @@ pub const visibility = @import("visibility.zig");
 pub const windows = @import("windows/windows_pkg.zig");
 
 pub const Action = actions.Action;
-pub const AI = @import("AI.zig");
+pub const AI = @import("ai/AI.zig");
 pub const Button = @import("Button.zig");
 pub const CharacterBuilder = @import("CharacterBuilder.zig");
 pub const Cheat = @import("cheats.zig").Cheat;

@@ -115,7 +115,7 @@ pub fn preInit(
         .max_depth = 0,
         .spent_cycles = 0,
         .prng = std.Random.DefaultPrng.init(runtime.currentMillis()),
-        .ai = g.AI{ .session = self, .rand = self.prng.random() },
+        .ai = g.AI{ .rand = self.prng.random() },
         .notifications = .empty,
         .colors = undefined,
         .journal = undefined,
