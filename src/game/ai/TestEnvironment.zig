@@ -1,3 +1,8 @@
+//! Configurable `Environment` substitute for testing AI without a game session.
+//! Returns fixed path and movement responses and checks a supplied obstacle list.
+//! Chance checks succeed only when the percentage exceeds
+//! `minimal_percent_to_chance`, making their outcomes deterministic.
+//! The returned interface borrows this instance, which must remain alive in place.
 const std = @import("std");
 const g = @import("../game_pkg.zig");
 const c = g.components;
@@ -5,19 +10,18 @@ const p = g.primitives;
 
 const Environment = @import("Environment.zig");
 
-distance_to_player: ?u8 = null,
+moves_to_player: ?u8 = null,
 direction_to_player: ?p.Direction = null,
-moving_action: ?g.Action = null,
-obstacles: []p.Point = &.{},
+collisions: std.AutoHashMapUnmanaged(p.Point, Environment.Collision) = .empty,
+/// 0 makes every positive chance succeed; 100 makes every valid chance fail.
 minimal_percent_to_chance: u8 = 100,
 
 pub fn environment(self: *@This()) Environment {
     return .{
         .context = self,
         .directionToPlayerFn = directionToPlayer,
-        .distanceToPlayerFn = distanceToPlayer,
-        .isObstacleFn = isObstacle,
-        .tryToMoveFn = tryToMove,
+        .movesToPlayerFn = movesToPlayer,
+        .checkCollisionFn = checkCollision,
         .passesChanceFn = passesChance,
     };
 }
@@ -27,23 +31,15 @@ fn directionToPlayer(ptr: *anyopaque, _: p.Point) ?p.Direction {
     return self.direction_to_player;
 }
 
-fn distanceToPlayer(ptr: *anyopaque, _: p.Point) ?u8 {
+fn movesToPlayer(ptr: *anyopaque, _: p.Point) ?u8 {
     const self: *@This() = @ptrCast(@alignCast(ptr));
-    return self.distance_to_player;
+    return self.moves_to_player;
 }
 
-fn isObstacle(ptr: *anyopaque, place: p.Point) bool {
+fn checkCollision(ptr: *anyopaque, from: p.Point, target: g.Action.Payload.Move.Target) Environment.Collision {
     const self: *@This() = @ptrCast(@alignCast(ptr));
-    for (self.obstacles) |obstacle| {
-        if (obstacle.eql(place))
-            return true;
-    }
-    return false;
-}
-
-fn tryToMove(ptr: *anyopaque, _: p.Point, _: g.Action.Payload.Move.Target) ?g.Action {
-    const self: *@This() = @ptrCast(@alignCast(ptr));
-    return self.moving_action;
+    const destination = target.asPlace(from);
+    return self.collisions.get(destination) orelse .nothing;
 }
 
 fn passesChance(ptr: *anyopaque, percent: u8) bool {
