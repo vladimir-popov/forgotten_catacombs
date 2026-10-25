@@ -7,8 +7,8 @@ const g = @import("../game_pkg.zig");
 const c = g.components;
 const p = g.primitives;
 
-const DecisionContext = @import("DecisionContext.zig");
-const Environment = @import("Environment.zig");
+const DecisionContext = @import("DecisionContext.zig").DecisionContext;
+const GameSessionEnvironment = @import("GameSessionEnvironment.zig");
 
 const log = std.log.scoped(.ai);
 
@@ -26,7 +26,7 @@ pub fn chooseAction(
     speed: *const c.Speed,
     initiative: *const c.Initiative,
 ) ?g.Action {
-    const context = DecisionContext{
+    const context = DecisionContext(GameSessionEnvironment){
         .rand = self.session().prng.random(),
         .enemy = npc,
         .enemy_place = self.session().registry.getUnsafe(npc, c.Position).place,
@@ -37,7 +37,7 @@ pub fn chooseAction(
         .player_stats = self.session().registry.getUnsafe(self.session().player, c.Stats),
         .speed = speed,
         .max_move_points = initiative.move_points,
-        .environment = Environment.fromSession(self.session()),
+        .environment = GameSessionEnvironment{ .session = self.session() },
     };
     const npc_state = self.session().registry.getUnsafe(npc, c.EnemyState);
 
@@ -48,7 +48,7 @@ pub fn chooseAction(
     };
 }
 
-fn actionForSleepingEnemy(context: DecisionContext) ?g.Action {
+fn actionForSleepingEnemy(context: anytype) ?g.Action {
     if (context.speed.moving_speed > context.max_move_points)
         return null;
 
@@ -65,7 +65,7 @@ fn actionForSleepingEnemy(context: DecisionContext) ?g.Action {
 }
 
 /// Returns an action or null if not enough move points.
-fn actionForWalkingEnemy(context: DecisionContext) ?g.Action {
+fn actionForWalkingEnemy(context: anytype) ?g.Action {
     // In the walking state npc can move only
     if (context.speed.moving_speed > context.max_move_points)
         return null;
@@ -95,7 +95,7 @@ fn actionForWalkingEnemy(context: DecisionContext) ?g.Action {
 }
 
 /// Returns an action or null if not enough move points.
-fn actionForAggressiveEnemy(context: DecisionContext) ?g.Action {
+fn actionForAggressiveEnemy(context: anytype) ?g.Action {
     const distance = context.player_place.distanceTo(context.enemy_place);
     if (context.weapon_range >= distance and context.speed.atack_speed <= context.max_move_points) {
         if (context.weapon_range == 1) {
@@ -140,7 +140,7 @@ fn noticePlayerChance(enemy_state: c.EnemyState, enemy_perception: i4, moves_to_
 /// Returns the action required to move from `from_place` toward `target`,
 /// or `null` if no action is possible.
 fn tryToMove(
-    context: DecisionContext,
+    context: anytype,
     target: g.Action.Payload.Move.Target,
 ) ?g.Action {
     return switch (context.checkCollision(target)) {
@@ -157,7 +157,7 @@ fn tryToMove(
 
 const TestEnvironment = @import("TestEnvironment.zig");
 
-pub fn decisionContextForTest(rand: std.Random, environment: Environment) DecisionContext {
+pub fn decisionContextForTest(rand: std.Random, environment: TestEnvironment) DecisionContext(TestEnvironment) {
     return .{
         .rand = rand,
         .player = .{ .id = 1 },
@@ -177,12 +177,11 @@ test "aggressive enemy uses attack cost rather than movement cost to attack" {
     // given:
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
     const direction_to_player = .right;
-    var env = TestEnvironment{
+    var context = decisionContextForTest(prng.random(), .{
         .direction_to_player = direction_to_player,
-    };
-    var context = decisionContextForTest(prng.random(), env.environment());
+    });
     context.player_place = context.enemy_place.movedTo(direction_to_player);
-    try env.collisions.put(std.testing.allocator, context.player_place, .player);
+    try context.environment.collisions.put(std.testing.allocator, context.player_place, .player);
     const speed = c.Speed{ .moving_speed = 10, .atack_speed = 8 };
     context.speed = &speed;
     // Exactly enough for an attack, but not enough for a step.
@@ -199,11 +198,10 @@ test "aggressive enemy uses attack cost rather than movement cost to attack" {
 test "aggressive enemy with a ranged weapon attacks a player in range" {
     // given:
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
-    var env = TestEnvironment{
+    var context = decisionContextForTest(prng.random(), .{
         .direction_to_player = .right,
         .is_obstacle_in_the_line_of_fire = false,
-    };
-    var context = decisionContextForTest(prng.random(), env.environment());
+    });
     // The player is three cells to the right of the NPC, within weapon range.
     context.player_place = .point(3, 6);
     context.weapon_range = 4;
@@ -219,11 +217,10 @@ test "aggressive enemy with a ranged weapon attacks a player in range" {
 test "aggressive enemy with a ranged weapon does not fire through an obstacle" {
     // given:
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
-    var env = TestEnvironment{
+    var context = decisionContextForTest(prng.random(), .{
         .direction_to_player = .right,
         .is_obstacle_in_the_line_of_fire = true,
-    };
-    var context = decisionContextForTest(prng.random(), env.environment());
+    });
     // The player is three cells to the right of the NPC, within weapon range.
     context.player_place = .point(3, 6);
     context.weapon_range = 4;
@@ -239,10 +236,9 @@ test "aggressive enemy with a ranged weapon does not fire through an obstacle" {
 test "aggressive enemy cannot attack the player diagonally and moves closer" {
     // given:
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
-    var env = TestEnvironment{
+    var context = decisionContextForTest(prng.random(), .{
         .direction_to_player = .right,
-    };
-    var context = decisionContextForTest(prng.random(), env.environment());
+    });
     // The player is one cell down and one cell right of the NPC.
     // Both actions are affordable, but diagonal melee attacks are not allowed.
     context.player_place = .point(4, 4);
@@ -258,11 +254,10 @@ test "aggressive enemy cannot attack the player diagonally and moves closer" {
 test "aggressive enemy pursues the player with enough points to move but not attack" {
     // given:
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
-    var env = TestEnvironment{
+    var context = decisionContextForTest(prng.random(), .{
         .direction_to_player = .right,
-    };
+    });
     const speed = c.Speed{ .moving_speed = 8, .atack_speed = 10 };
-    var context = decisionContextForTest(prng.random(), env.environment());
     // The player is three cells to the right of the NPC, outside melee reach.
     context.player_place = .point(3, 6);
     context.speed = &speed;
@@ -280,10 +275,9 @@ test "aggressive enemy pursues the player with enough points to move but not att
 test "aggressive enemy postpones pursuit without enough move points" {
     // given:
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
-    var env = TestEnvironment{
+    var context = decisionContextForTest(prng.random(), .{
         .direction_to_player = .right,
-    };
-    var context = decisionContextForTest(prng.random(), env.environment());
+    });
     // The player is three cells to the right of the NPC, outside melee reach.
     context.player_place = .point(3, 6);
     // One point short checks the boundary below the cost of pursuit.
@@ -299,15 +293,18 @@ test "aggressive enemy postpones pursuit without enough move points" {
 test "aggressive enemy waits when it cannot take a step toward the player (it can be another enemy on the way)" {
     // given:
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
-    var env = TestEnvironment{
+    var context = decisionContextForTest(prng.random(), .{
         .direction_to_player = .right,
-    };
-    var context = decisionContextForTest(prng.random(), env.environment());
+    });
     // The player is three cells to the right of the NPC, outside melee reach.
     context.player_place = .point(3, 6);
     // But an obstacle is on the nearest cell
-    try env.collisions.put(std.testing.allocator, context.enemy_place.movedTo(env.direction_to_player.?), .obstacle);
-    defer env.collisions.deinit(std.testing.allocator);
+    try context.environment.collisions.put(
+        std.testing.allocator,
+        context.enemy_place.movedTo(context.environment.direction_to_player.?),
+        .obstacle,
+    );
+    defer context.environment.collisions.deinit(std.testing.allocator);
 
     // when:
     const action = actionForAggressiveEnemy(context).?;
@@ -319,11 +316,10 @@ test "aggressive enemy waits when it cannot take a step toward the player (it ca
 test "aggressive enemy calms down when the player is out of reach" {
     // given:
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
-    var env = TestEnvironment{
+    var context = decisionContextForTest(prng.random(), .{
         .direction_to_player = null,
         .moves_to_player = null,
-    };
-    var context = decisionContextForTest(prng.random(), env.environment());
+    });
     // The player is three cells to the right of the NPC, with no route to them.
     context.player_place = .point(3, 6);
 
@@ -338,11 +334,10 @@ test "aggressive enemy calms down when the player is out of reach" {
 test "aggressive enemy postpones calming down without enough move points" {
     // given:
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
-    var env = TestEnvironment{
+    var context = decisionContextForTest(prng.random(), .{
         .direction_to_player = null,
         .moves_to_player = null,
-    };
-    var context = decisionContextForTest(prng.random(), env.environment());
+    });
     // The player is three cells to the right of the NPC, with no route to them.
     context.player_place = .point(3, 6);
     // Calming down costs movement points too; one point short must defer it.
@@ -358,13 +353,12 @@ test "aggressive enemy postpones calming down without enough move points" {
 test "walking enemy does not act without enough move points" {
     // given:
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
-    var env = TestEnvironment{
+    var context = decisionContextForTest(prng.random(), .{
         .moves_to_player = 1,
         // 0 guarantees a positive detection chance succeeds, but the NPC
         // lacks move points and should not select any action yet.
         .minimal_percent_to_chance = 0,
-    };
-    var context = decisionContextForTest(prng.random(), env.environment());
+    });
     // One point short checks the boundary just below the action's cost.
     context.max_move_points = context.speed.moving_speed - 1;
 
@@ -378,13 +372,12 @@ test "walking enemy does not act without enough move points" {
 test "walking enemy becomes aggressive instead of moving when it notices the player" {
     // given:
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
-    var env = TestEnvironment{
+    const context = decisionContextForTest(prng.random(), .{
         .moves_to_player = 1,
         // 0 guarantees success for the positive detection chance here.
         // Noticing the player should take priority over continuing the walk.
         .minimal_percent_to_chance = 0,
-    };
-    const context = decisionContextForTest(prng.random(), env.environment());
+    });
 
     // when:
     const action = actionForWalkingEnemy(context).?;
@@ -397,13 +390,12 @@ test "walking enemy becomes aggressive instead of moving when it notices the pla
 test "walking enemy continues walking when the player is not noticed" {
     // given:
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
-    var env = TestEnvironment{
+    const context = decisionContextForTest(prng.random(), .{
         .moves_to_player = 1,
         // 100 guarantees detection fails despite the player being nearby.
         // The NPC should continue walking through the available passage.
         .minimal_percent_to_chance = 100,
-    };
-    const context = decisionContextForTest(prng.random(), env.environment());
+    });
 
     // when:
     const action = actionForWalkingEnemy(context).?;
@@ -415,13 +407,12 @@ test "walking enemy continues walking when the player is not noticed" {
 test "walking enemy continues walking when the player is out of reach" {
     // given:
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
-    var env = TestEnvironment{
+    const context = decisionContextForTest(prng.random(), .{
         .moves_to_player = null,
         // 0 makes any positive detection chance succeed, but the player is
         // out of reach. The NPC should continue walking rather than get angry.
         .minimal_percent_to_chance = 0,
-    };
-    const context = decisionContextForTest(prng.random(), env.environment());
+    });
 
     // when:
     const action = actionForWalkingEnemy(context).?;
@@ -433,15 +424,14 @@ test "walking enemy continues walking when the player is out of reach" {
 test "walking enemy waits when it cannot take a step" {
     // given:
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
-    var env = TestEnvironment{
+    var context = decisionContextForTest(prng.random(), .{
         .moves_to_player = null,
-    };
-    const context = decisionContextForTest(prng.random(), env.environment());
-    defer env.collisions.deinit(std.testing.allocator);
-    try env.collisions.put(std.testing.allocator, context.enemy_place.movedTo(.right), .obstacle);
-    try env.collisions.put(std.testing.allocator, context.enemy_place.movedTo(.left), .obstacle);
-    try env.collisions.put(std.testing.allocator, context.enemy_place.movedTo(.up), .obstacle);
-    try env.collisions.put(std.testing.allocator, context.enemy_place.movedTo(.down), .obstacle);
+    });
+    defer context.environment.collisions.deinit(std.testing.allocator);
+    try context.environment.collisions.put(std.testing.allocator, context.enemy_place.movedTo(.right), .obstacle);
+    try context.environment.collisions.put(std.testing.allocator, context.enemy_place.movedTo(.left), .obstacle);
+    try context.environment.collisions.put(std.testing.allocator, context.enemy_place.movedTo(.up), .obstacle);
+    try context.environment.collisions.put(std.testing.allocator, context.enemy_place.movedTo(.down), .obstacle);
 
     // when:
     const action = actionForWalkingEnemy(context).?;
@@ -453,8 +443,7 @@ test "walking enemy waits when it cannot take a step" {
 test "sleeping enemy does not act without enough move points" {
     // given:
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
-    var env = TestEnvironment{};
-    var context = decisionContextForTest(prng.random(), env.environment());
+    var context = decisionContextForTest(prng.random(), .{});
     context.max_move_points = context.speed.moving_speed - 1;
 
     // when:
@@ -467,13 +456,12 @@ test "sleeping enemy does not act without enough move points" {
 test "sleeping enemy next to the player can become aggressive" {
     // given:
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
-    var env = TestEnvironment{
+    const context = decisionContextForTest(prng.random(), .{
         .moves_to_player = 1,
         // 0 guarantees success for the positive detection chance here.
         // The NPC notices the nearby player, so it should choose get_angry.
         .minimal_percent_to_chance = 0,
-    };
-    const context = decisionContextForTest(prng.random(), env.environment());
+    });
 
     // when:
     const action = actionForSleepingEnemy(context).?;
@@ -486,13 +474,12 @@ test "sleeping enemy next to the player can become aggressive" {
 test "sleeping enemy stays asleep when the player is not noticed" {
     // given:
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
-    var env = TestEnvironment{
+    const context = decisionContextForTest(prng.random(), .{
         .moves_to_player = 1,
         // 100 guarantees detection fails even though the player is nearby.
         // The NPC should stay asleep and choose wait.
         .minimal_percent_to_chance = 100,
-    };
-    const context = decisionContextForTest(prng.random(), env.environment());
+    });
 
     // when:
     const action = actionForSleepingEnemy(context).?;
@@ -504,13 +491,12 @@ test "sleeping enemy stays asleep when the player is not noticed" {
 test "sleeping enemy stays asleep when the player is out of reach" {
     // given:
     var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
-    var env = TestEnvironment{
+    const context = decisionContextForTest(prng.random(), .{
         .moves_to_player = null,
         // 0 makes any positive detection chance succeed, but the player is
         // out of reach. The NPC should still stay asleep and choose wait.
         .minimal_percent_to_chance = 0,
-    };
-    const context = decisionContextForTest(prng.random(), env.environment());
+    });
 
     // when:
     const action = actionForSleepingEnemy(context).?;
