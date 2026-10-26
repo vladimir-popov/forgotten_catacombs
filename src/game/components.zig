@@ -355,24 +355,11 @@ pub const Ladder = struct {
     pub const Direction = enum { up, down };
     /// Direction of the ladder
     direction: Direction,
-    /// The id of the ladder on this level.
-    id: g.Entity,
-    /// The id of the ladder on that level.
-    target_ladder: g.Entity,
 
     pub fn inverted(self: Ladder) Ladder {
         return .{
             .direction = if (self.direction == .up) .down else .up,
-            .id = self.target_ladder,
-            .target_ladder = self.id,
         };
-    }
-
-    pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
-        try writer.print(
-            "Ladder(id: {d}; direction: {s}; target: {d})",
-            .{ self.id.id, @tagName(self.direction), self.target_ladder.id },
-        );
     }
 };
 
@@ -615,6 +602,10 @@ pub const Stats = struct {
     }
 };
 
+pub const Teleport = struct {
+    is_active: bool,
+};
+
 pub const Tier = struct {
     tier: u4,
 };
@@ -730,6 +721,7 @@ pub const Components = struct {
     sprite: ?Sprite, // must be provided for every entity
     state: ?EnemyState = null,
     stats: ?Stats = null,
+    teleport: ?Teleport = null,
     tier: ?Tier = null,
     trap: ?Trap = null,
     wallet: ?Wallet = null,

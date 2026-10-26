@@ -31,10 +31,6 @@ pub const Cheat = union(enum) {
     /// Moves the player to the point on the screen (1-based).
     goto: p.Point,
 
-    /// Sets up the player's level to the value, and add the `LevelUp` component with the current
-    /// player's level
-    level_up: u4,
-
     /// Moves the player to a ladder lead to an upper level.
     move_player_to_ladder_up,
 
@@ -44,10 +40,13 @@ pub const Cheat = union(enum) {
     /// Adds entity id to the journal
     recognize: g.Entity,
 
-    set_experience: u16,
+    add_experience: u16,
 
     /// Sets up a passed count of health point to the player.
     set_health: u8,
+
+    /// Sets up the player's level to the value
+    set_level: u4,
 
     /// This cheat works only in trading mode, and sets up the amount of money depending on
     /// the active tab:
@@ -110,9 +109,6 @@ pub const Cheat = union(enum) {
                     .{args},
                 );
             },
-            .level_up => if (tryParseDecimal(u4, args)) |new_level| {
-                return .{ .level_up = new_level };
-            },
             .recognize => if (tryParseDecimal(u32, args)) |entity_id| {
                 return .{ .recognize = .{ .id = entity_id } };
             } else {
@@ -121,8 +117,8 @@ pub const Cheat = union(enum) {
                     .{args},
                 );
             },
-            .set_experience => if (tryParseDecimal(u16, args)) |exp| {
-                return .{ .set_experience = exp };
+            .add_experience => if (tryParseDecimal(u16, args)) |exp| {
+                return .{ .add_experience = exp };
             } else {
                 log.warn(
                     "Wrong arguments '{s}' for 'set experience' command. It expects a number value to set.",
@@ -136,6 +132,9 @@ pub const Cheat = union(enum) {
                     "Wrong arguments '{s}' for 'set health' command. It expects a number value to set.",
                     .{args},
                 );
+            },
+            .set_level => if (tryParseDecimal(u4, args)) |new_level| {
+                return .{ .set_level = new_level };
             },
             .set_money => if (tryParseDecimal(u16, args)) |money| {
                 return .{ .set_money = money };
@@ -177,6 +176,7 @@ pub const Cheat = union(enum) {
             const tag: Tag = @enumFromInt(f.value);
             strings[i] = toString(tag);
         }
+        @setEvalBranchQuota(10_000);
         std.mem.sort([]const u8, &strings, {}, strLessThan);
         return strings;
     }
@@ -186,6 +186,7 @@ pub const Cheat = union(enum) {
 
     pub inline fn toString(self: Cheat.Tag) []const u8 {
         return switch (self) {
+            .add_experience => "add experience",
             .dump_entity => "dump entity",
             .dump_vector_field => "dump vectors",
             .get_item => "get item",
@@ -195,12 +196,11 @@ pub const Cheat = union(enum) {
             .get_potion => "get potion",
             .get_weapon => "get weapon",
             .goto => "goto",
-            .level_up => "level up",
             .move_player_to_ladder_down => "down ladder",
             .move_player_to_ladder_up => "up ladder",
             .recognize => "recognize",
-            .set_experience => "set experience",
             .set_health => "set health",
+            .set_level => "set level",
             .set_money => "set money",
             .turn_light_off => "light off",
             .turn_light_on => "light on",
@@ -281,8 +281,10 @@ pub const Cheat = union(enum) {
 };
 
 test "list of all cheats in string form" {
-    for (Cheat.allAsStrings()) |cheat_str| {
-        std.debug.print("{s}\n", .{cheat_str});
+    const strings = Cheat.allAsStrings();
+    for (strings, 0..) |cheat_str, i| {
+        if (i > 0)
+            try std.testing.expect(std.mem.order(u8, strings[i - 1], cheat_str) != .gt);
     }
 }
 

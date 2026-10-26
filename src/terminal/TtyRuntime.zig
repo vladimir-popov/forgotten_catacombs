@@ -186,7 +186,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
             return error.InputError;
         }
 
-        fn readKeyboardInput(self: *Self) RuntimeError!?tty.KeyboardAndMouse.Button {
+        fn readInput(self: *Self) RuntimeError!?tty.KeyboardAndMouse.Button {
             if (tty.KeyboardAndMouse.readPressedButton()) |btn| {
                 self.keyboard_buffer = btn;
                 switch (btn) {
@@ -237,7 +237,7 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
 
         fn readPushedButtons(ptr: *anyopaque) RuntimeError!?g.Button {
             var self: *Self = @ptrCast(@alignCast(ptr));
-            if (self.readKeyboardInput() catch |err| return err) |key| {
+            if (self.readInput() catch |err| return err) |key| {
                 const button: ?g.Button = switch (key) {
                     .char => switch (key.char.char) {
                         // (B) (A)
@@ -259,6 +259,9 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                         else => null,
                     },
                     .mouse => |m| {
+                        // Mouse events are consumed here; otherwise readInput returns the same
+                        // buffered event on every poll.
+                        self.keyboard_buffer = null;
                         // handle mouse buttons only on press
                         if (m.is_released) return null;
                         switch (m.button) {

@@ -408,9 +408,10 @@ fn handleInput(self: *Self) g.AllErrors!bool {
                     },
                 },
                 .left, .right, .up, .down => {
-                    return self.actualActionOnMoving(
+                    return self.session.actions.actualActionOnMoving(
                         self.session.registry.getUnsafe(self.session.player, c.Position).place,
                         .{ .direction = btn.toDirection().? },
+                        &self.action_buffer,
                     );
                 },
             }
@@ -453,14 +454,14 @@ fn handleInput(self: *Self) g.AllErrors!bool {
             },
             .turn_light_on => g.visibility.turn_light_on = true,
             .turn_light_off => g.visibility.turn_light_on = false,
-            .level_up => |new_level| {
+            .set_level => |new_level| {
                 const level_before = self.session.registry.getUnsafe(self.session.player, c.Experience).level;
                 if (new_level > level_before) {
                     const exp = g.meta.Levels[new_level - 1];
                     _ = g.meta.addExperience(&self.session.registry, self.session.player, exp);
                 }
             },
-            .set_experience => |exp| {
+            .add_experience => |exp| {
                 _ = g.meta.addExperience(&self.session.registry, self.session.player, exp);
             },
             .set_health => |hp| {
@@ -486,63 +487,6 @@ fn handleInput(self: *Self) g.AllErrors!bool {
                 return true;
             },
         }
-    }
-    return false;
-}
-
-/// Determines the action to perform when moving from `from_place` toward `target`.
-/// Returns `true` and stores the action in `action_buffer` if movement or an interaction is possible.
-/// Returns `false` if the move is blocked or no action is needed.
-fn actualActionOnMoving(self: *Self, from_place: p.Point, target: g.Action.Payload.Move.Target) bool {
-    const place = target.asPlace(from_place);
-    if (from_place.eql(place)) return false;
-
-    switch (self.session.level.cellAt(place)) {
-        .landscape => |cl| if (cl == .floor or cl == .doorway) {
-            self.action_buffer = .action(.move, .{ .target = target });
-            return true;
-        },
-
-        .entities => |entities| {
-            // Check obstacles
-            if (entities[@intFromEnum(c.Position.ZOrder.obstacle)]) |entity| {
-                if (self.session.registry.get(entity, c.Door)) |_| {
-                    self.action_buffer = .action(.open, .{ .id = entity, .place = place });
-                    return true;
-                }
-
-                if (g.meta.getEnemyType(&self.session.registry, entity)) |_| {
-                    self.action_buffer = .action(.hit, entity);
-                    return true;
-                }
-
-                if (self.session.registry.has(entity, c.Shop)) {
-                    self.action_buffer = .action(.trade, entity);
-                    return true;
-                }
-
-                if (self.session.registry.get(entity, c.Description)) |descr| {
-                    if (descr.preset == .scientist) {
-                        self.action_buffer = .action(.modify_recognize, {});
-                        return true;
-                    }
-                }
-
-                // the player should not step on the place with entity with z-order = 2
-                return false;
-            }
-            // Check traps
-            if (entities[@intFromEnum(c.Position.ZOrder.item)]) |entity| {
-                if (self.session.registry.get(entity, c.Trap)) |_| {
-                    self.action_buffer = .action(.step_in_trap, .{ .trap_entity = entity, .moving_target = target });
-                    return true;
-                }
-            }
-            // it's possible to step on the ladder, opened door, teleport, dropped item and
-            // other entities with ZOrder.floor
-            self.action_buffer = .action(.move, .{ .target = target });
-            return true;
-        },
     }
     return false;
 }

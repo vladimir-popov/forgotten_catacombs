@@ -51,7 +51,7 @@ pub const Action = struct {
         /// The id of a food to eat
         eat: g.Entity,
         /// The player moves from the level to another level
-        move_to_level: c.Ladder,
+        move_to_level: g.events.ChangingLevel,
         /// Change the state of the entity to sleep
         go_sleep: g.Entity,
         /// Change the state of the entity to chill
@@ -128,9 +128,10 @@ pub const Action = struct {
             .drink => "Drink",
             .eat => "Eat",
             .hit => "Attack",
-            .move_to_level => switch (act.payload.move_to_level.direction) {
-                .up => "Go up",
-                .down => "Go down",
+            .move_to_level => switch (act.payload.move_to_level.entry_point) {
+                .exit => "Go up",
+                .entrance => "Go down",
+                .teleport => "Teleport",
             },
             .open => "Open",
             .open_inventory => "Inventory",

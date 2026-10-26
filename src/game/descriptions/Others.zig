@@ -44,7 +44,24 @@ gold_pile: Description = .{
 },
 player: Description = .{ .name = "You" },
 scientist: Description = .{ .name = "Scientist" },
-teleport: Description = .{ .name = "Teleport" },
+teleport: Description = .{
+    .name = "Teleport",
+    .description = &.{
+        "A small platform, nearly flush with",
+        "the ground. Worn symbols cover  its",
+        "surface,  but  no one remembers who",
+        "made it or what it  was for.  It is",
+        "an  artifact of  a  forgotten  age,",
+        "outlasting its creators.",
+    },
+    .alt_description = &.{
+        "A cold blue light flows across  the",
+        "platform   and   spills  into  the ",
+        "darkness around it.  Symbols,  once",
+        "nearly erased by time, now  shimmer",
+        "beneath the stone's surface.",
+    },
+},
 traider: Description = .{ .name = "Traider" },
 trap: Description = .{
     .name = "Trap",

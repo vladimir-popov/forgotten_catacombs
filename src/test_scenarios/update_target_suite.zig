@@ -47,7 +47,7 @@ test "Change a target to an atacked enemy" {
     try std.testing.expectEqual(rat_top, test_session.player.target());
 }
 
-test "Lose target on moving away" {
+test "Lose the target on moving away" {
     var test_session: TestSession = undefined;
     try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
     defer test_session.deinit();
@@ -69,7 +69,7 @@ test "Lose target on moving away" {
         \\════════════════════════════════════════
         \\    Closed door     ⇧Explore     Open  ⇧
     , .whole_display);
-    const door = g.Entity{ .id = 13 };
+    const door = g.Entity{ .id = 12 };
     try std.testing.expectEqual(door, test_session.player.target());
 
     std.log.debug("Move the player away from the door", .{});

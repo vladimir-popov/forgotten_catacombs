@@ -26,7 +26,8 @@ pub fn init(session: *g.GameSession) g.SystemError!ExploreLevelMode {
 
 fn draw(session: *g.GameSession) g.SystemError!void {
     try session.render.hideLeftButton();
-    try session.render.drawInfo("Explore the level");
+    var buf: [10]u8 = undefined;
+    try session.render.drawInfo(try std.fmt.bufPrint(&buf, "Depth {d}", .{session.level.depth}));
     try session.render.drawRightButton("Cancel", false);
     if (session.viewport.region.top_left.row > 1)
         session.render.setBorderWithArrow(session.viewport, .up);

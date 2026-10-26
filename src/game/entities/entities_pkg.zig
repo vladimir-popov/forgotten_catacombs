@@ -82,16 +82,16 @@ pub fn closedDoor(place: p.Point) c.Components {
     };
 }
 
-pub fn ladder(l: c.Ladder, place: p.Point) c.Components {
-    return switch (l.direction) {
+pub fn ladder(direction: c.Ladder.Direction, place: p.Point) c.Components {
+    return switch (direction) {
         .up => .{
-            .ladder = l,
+            .ladder = .{ .direction = .up },
             .description = .{ .preset = .ladder_up },
             .position = .{ .zorder = .floor, .place = place },
             .sprite = .{ .codepoint = cp.ladder_up },
         },
         .down => .{
-            .ladder = l,
+            .ladder = .{ .direction = .down },
             .description = .{ .preset = .ladder_down },
             .position = .{ .zorder = .floor, .place = place },
             .sprite = .{ .codepoint = cp.ladder_down },
@@ -99,11 +99,12 @@ pub fn ladder(l: c.Ladder, place: p.Point) c.Components {
     };
 }
 
-pub fn teleport(place: p.Point) c.Components {
+pub fn teleport(place: p.Point, is_active: bool) c.Components {
     return .{
         .position = .{ .place = place, .zorder = .floor },
         .sprite = .{ .codepoint = cp.teleport },
         .description = .{ .preset = .teleport },
+        .teleport = .{ .is_active = is_active },
     };
 }
 

@@ -27,6 +27,8 @@ pub const Cell = union(enum) {
     entities: [c.Position.ZOrder.count]?g.Entity,
 };
 
+pub const EntryPoint = union(enum) { entrance, exit, teleport };
+
 pub const DijkstraMapRegion = p.Region{ .top_left = .{ .row = 1, .col = 1 }, .rows = 12, .cols = 25 };
 
 arena: g.LevelArena,
@@ -42,6 +44,7 @@ entities_on_level: std.ArrayList(g.Entity),
 /// The depth of the current level. The session_seed + depth is unique seed for the level.
 depth: u8 = undefined,
 dungeon: d.Dungeon = undefined,
+teleport: ?g.Entity = null,
 visibility_strategy: *const fn (level: *const g.Level, place: p.Point) g.Render.Visibility = undefined,
 /// Already visited places in the dungeon.
 visited_places: []std.DynamicBitSetUnmanaged = undefined,
@@ -143,17 +146,7 @@ pub fn initAsFirstLevel(
     try self.entities_on_level.append(arena_alloc, entity);
 
     // Add the ladder leads to the bottom dungeons:
-    entity = self.registry.newEntity();
-    try self.registry.setComponentsToEntity(entity, .{
-        .ladder = .{
-            .direction = .down,
-            .id = entity,
-            .target_ladder = self.registry.newEntity(),
-        },
-        .description = .{ .preset = .ladder_down },
-        .sprite = .{ .codepoint = cp.ladder_down },
-        .position = .{ .place = self.dungeon.exit, .zorder = .floor },
-    });
+    entity = try self.registry.addNewEntity(g.entities.ladder(.down, self.dungeon.exit));
     try self.entities_on_level.append(arena_alloc, entity);
 
     // Add the trader
@@ -167,7 +160,7 @@ pub fn initAsFirstLevel(
     try self.entities_on_level.append(arena_alloc, entity);
 
     // Add the teleport
-    entity = try self.registry.addNewEntity(g.entities.teleport(d.FirstLocation.teleport_place));
+    entity = try self.registry.addNewEntity(g.entities.teleport(d.FirstLocation.teleport_place, false));
     try self.entities_on_level.append(arena_alloc, entity);
 
     // Add doors
@@ -180,7 +173,7 @@ pub fn initAsFirstLevel(
             .{ entry.key_ptr.*, entry.value_ptr.door_id.id },
         );
     }
-    try self.completeInitialization(.down);
+    try self.completeInitialization(.entrance);
 }
 
 pub const GeneratingProgress = enum {
@@ -202,7 +195,6 @@ pub fn generateNew(
     rand: std.Random,
     player: g.Entity,
     depth: u8,
-    from_ladder: c.Ladder,
     progress: GeneratingProgress,
 ) (AllocatorError || g.DungeonGenerationError)!GeneratingProgress {
     switch (progress) {
@@ -215,47 +207,31 @@ pub fn generateNew(
                 },
                 else => return err,
             };
-            log.debug("A {s} has been generated on depth {d}.", .{ @tagName(dungeon.type), depth });
             try self.setupDungeon(depth, dungeon, player);
             return .generate_doors_and_ladders;
         },
         .generate_doors_and_ladders => {
-            log.debug("Creating doors and ladders", .{});
             const arena_alloc = self.arena.allocator();
 
-            const init_place = switch (from_ladder.direction) {
-                .down => self.dungeon.entrance,
-                .up => self.dungeon.exit,
-            };
-            const exit_place = switch (from_ladder.direction) {
-                .up => self.dungeon.entrance,
-                .down => self.dungeon.exit,
-            };
-            // Add ladder by which the player has come to this level
-            try self.addLadder(from_ladder.inverted(), init_place);
+            // Add a ladder by which the player has come to this level
+            try self.addLadder(.up, self.dungeon.entrance);
 
-            // Add ladder to the next level
-            try self.addLadder(.{
-                .direction = from_ladder.direction,
-                .id = self.registry.newEntity(),
-                .target_ladder = self.registry.newEntity(),
-            }, exit_place);
-
+            // Add a ladder to the next level
+            if (depth == 6) {
+                try self.addTeleportToStart(self.dungeon.exit);
+            } else {
+                try self.addLadder(.down, self.dungeon.exit);
+            }
             if (self.dungeon.doorways) |doorways| {
                 var doors = doorways.iterator();
                 while (doors.next()) |entry| {
                     entry.value_ptr.door_id = try self.registry.addNewEntity(g.entities.closedDoor(entry.key_ptr.*));
                     try self.entities_on_level.append(arena_alloc, entry.value_ptr.door_id);
-                    log.debug(
-                        "For the doorway on {any} added closed door with id {d}",
-                        .{ entry.key_ptr.*, entry.value_ptr.door_id.id },
-                    );
                 }
             }
             return .generate_enemies;
         },
         .generate_enemies => {
-            log.debug("Generate enemies", .{});
             for (0..rand.uintLessThan(u8, 10) + 10) |_| {
                 if (self.randomEmptyPlace(rand)) |place| {
                     _ = try self.addRandomEnemy(rand, place);
@@ -264,7 +240,6 @@ pub fn generateNew(
             return .generate_items;
         },
         .generate_items => {
-            log.debug("Generate items", .{});
             for (0..rand.uintLessThan(u8, 5) + 1) |_| {
                 if (self.randomEmptyPlace(rand)) |place| {
                     _ = try self.addRandomItem(rand, place);
@@ -273,7 +248,6 @@ pub fn generateNew(
             return .generate_traps;
         },
         .generate_traps => {
-            log.debug("Generate traps", .{});
             for (0..(rand.uintLessThan(u8, 10) + 2 * self.depth)) |_| {
                 if (self.randomEmptyPlace(rand)) |place| {
                     _ = try self.addRandomTrap(rand, place);
@@ -282,8 +256,7 @@ pub fn generateNew(
             return .complete;
         },
         .complete => {
-            log.debug("Complete generating a new level", .{});
-            try self.completeInitialization(from_ladder.direction);
+            try self.completeInitialization(.entrance);
             return .done;
         },
         .done => return .done,
@@ -301,15 +274,22 @@ pub fn bindDoorsWithDoorways(self: *Self) void {
     }
 }
 
-/// Sets up a position for the player if the direction is provided, and remembers the placement with the player.
+/// Sets up a position for the player if the entry point is provided, and remembers the placement with the player.
 /// This is the final step of the initialization process.
-pub fn completeInitialization(self: *Self, moving_direction: ?c.Ladder.Direction) AllocatorError!void {
-    if (moving_direction) |direction| {
-        const init_place = switch (direction) {
-            .down => self.dungeon.entrance,
-            .up => self.dungeon.exit,
+pub fn completeInitialization(self: *Self, entry_point: ?EntryPoint) AllocatorError!void {
+    if (entry_point) |ep| {
+        const init_place = switch (ep) {
+            .entrance => self.dungeon.entrance,
+            .exit => self.dungeon.exit,
+            .teleport => blk: {
+                for (self.entities_on_level.items) |entity| {
+                    if (self.registry.has(entity, c.Teleport)) {
+                        break :blk self.registry.getUnsafe(entity, c.Position).place;
+                    }
+                }
+                std.debug.panic("Level on the depth {d} doesn't have a teleport", .{self.depth});
+            },
         };
-        log.debug("Move the player to the ladder in direction {s}.", .{@tagName(direction)});
         try self.registry.set(self.player, c.Position{ .place = init_place, .zorder = .obstacle });
     }
     self.player_placement = self.dungeon.placementWith(self.playerPosition().place).?;
@@ -568,12 +548,17 @@ fn updatePlacement(self: *Self, player_moved_from: p.Point, player_moved_to: p.P
     log.err("It looks like the player at {any} is outside of any placement", .{player_moved_to});
 }
 
-// Note: next methods are public for test
-
-fn addLadder(self: *g.Level, ladder: c.Ladder, place: p.Point) AllocatorError!void {
-    try self.registry.setComponentsToEntity(ladder.id, g.entities.ladder(ladder, place));
-    try self.entities_on_level.append(self.arena.allocator(), ladder.id);
+fn addLadder(self: *g.Level, direction: c.Ladder.Direction, place: p.Point) AllocatorError!void {
+    const id = try self.registry.addNewEntity(g.entities.ladder(direction, place));
+    try self.entities_on_level.append(self.arena.allocator(), id);
 }
+
+fn addTeleportToStart(self: *g.Level, place: p.Point) AllocatorError!void {
+    const id = try self.registry.addNewEntity(g.entities.teleport(place, true));
+    try self.entities_on_level.append(self.arena.allocator(), id);
+}
+
+// Note: next methods are public for test
 
 pub fn addEnemy(self: *g.Level, state: c.EnemyState, enemy: c.Components) AllocatorError!g.Entity {
     const id = try self.registry.addNewEntity(enemy);

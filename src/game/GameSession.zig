@@ -242,8 +242,8 @@ pub inline fn trade(self: *Self, shop: g.Entity) AllocatorError!void {
     try self.sendEvent(.{ .mode_changed = .{ .to_trading = shop } });
 }
 
-pub inline fn movePlayerToLevel(self: *Self, by_ladder: c.Ladder) AllocatorError!void {
-    try self.sendEvent(.{ .level_changed = .{ .by_ladder = by_ladder } });
+pub inline fn movePlayerToLevel(self: *Self, level_changed: g.events.ChangingLevel) AllocatorError!void {
+    try self.sendEvent(.{ .level_changed = level_changed });
 }
 
 pub inline fn removeEntity(self: *Self, entity: g.Entity) g.SystemError!void {
@@ -348,10 +348,14 @@ noinline fn handleEvent(self: *Self, event_idx: usize) g.AllErrors!void {
                 }
             },
         },
-        .level_changed => |lvl| {
+        .level_changed => |changing_level| {
             _ = self.mode_arena.reset(.retain_capacity);
             self.mode = .{ .save_load = try self.mode_arena.allocator().create(SaveLoadMode) };
-            self.mode.save_load.* = SaveLoadMode.loadOrGenerateLevel(self, lvl.by_ladder);
+            self.mode.save_load.* = SaveLoadMode.loadOrGenerateLevel(
+                self,
+                changing_level.to_depth,
+                changing_level.entry_point,
+            );
         },
         .player_moved => |player_moved| {
             try self.level.onPlayerMoved(player_moved);

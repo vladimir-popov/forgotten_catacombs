@@ -35,10 +35,9 @@ pub const Event = union(enum) {
     }
 };
 
-/// Identifies the ladder used to determine the destination level and arrival
-/// position.
 pub const ChangingLevel = struct {
-    by_ladder: c.Ladder,
+    to_depth: u8,
+    entry_point: g.Level.EntryPoint,
 };
 
 /// Describes a player movement so level and viewport state can be updated

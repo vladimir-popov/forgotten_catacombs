@@ -55,27 +55,14 @@ pub fn saveSession(session: *g.GameSession) Self {
     return .{ .process = .{ .saving = .{ .session = session, .next_process = .go_to_welcome_screen } } };
 }
 
-pub fn loadOrGenerateLevel(session: *g.GameSession, from_ladder: c.Ladder) Self {
-    const new_depth = switch (from_ladder.direction) {
-        .up => session.level.depth - 1,
-        .down => session.level.depth + 1,
-    };
-    log.debug(
-        \\
-        \\--------------------
-        \\Moving {s} from the level {d} to {d} (max depth is {d})
-        \\--------------------
-    ,
-        .{ @tagName(from_ladder.direction), session.level.depth, new_depth, session.max_depth },
-    );
+pub fn loadOrGenerateLevel(session: *g.GameSession, new_depth: u8, entry_point: g.Level.EntryPoint) Self {
     const next: Saving.NextProcess = if (new_depth > session.max_depth)
         .{ .generate_level = .{
             .prng = std.Random.DefaultPrng.init(session.seed + new_depth),
             .depth = new_depth,
-            .from_ladder = from_ladder,
         } }
     else
-        .{ .load_level = .{ .depth = new_depth, .direction = from_ladder.direction } };
+        .{ .load_level = .{ .depth = new_depth, .entry_point = entry_point } };
 
     return .{ .process = .{ .saving = .{ .session = session, .next_process = next } } };
 }
@@ -108,14 +95,13 @@ pub noinline fn tick(self: *Self) (g.SystemError || g.GoToMainMenuError)!void {
                                 session,
                                 generate.prng,
                                 generate.depth,
-                                generate.from_ladder,
                             ),
                         };
                     },
                     .load_level => |load| {
                         saving.deinit();
                         self.process = .{
-                            .loading = Loading.loadLevel(session, load.depth, load.direction),
+                            .loading = Loading.loadLevel(session, load.depth, load.entry_point),
                         };
                     },
                     .go_to_welcome_screen => {
@@ -161,7 +147,6 @@ const Generating = struct {
     /// PRNG based on the global game session's seed and level's depth
     prng: std.Random.DefaultPrng,
     level_depth: u8,
-    from_ladder: c.Ladder,
     generating_progress: g.Level.GeneratingProgress = .start,
     generate_level_attempt: u8 = 0,
 
@@ -170,10 +155,9 @@ const Generating = struct {
         /// PRNG based on the global game session's seed and level's depth
         prng: std.Random.DefaultPrng,
         depth: u8,
-        from_ladder: c.Ladder,
     ) Generating {
         session.level.reset();
-        return .{ .session = session, .prng = prng, .level_depth = depth, .from_ladder = from_ladder };
+        return .{ .session = session, .prng = prng, .level_depth = depth };
     }
 
     /// Returns `true` when the generating is completed.
@@ -183,7 +167,6 @@ const Generating = struct {
             self.prng.random(),
             self.session.player,
             self.level_depth,
-            self.from_ladder,
             self.generating_progress,
         );
         if (self.generating_progress == .generate_dungeon) {
@@ -246,25 +229,25 @@ const Loading = struct {
     /// This arena is used to manage memory for the Game.State, including the GameSession.
     /// It have to be initialized only during loading a game session.
     game_session_arena: ?*g.GameStateArena = null,
-    /// Helps to choose a ladder on which the player should appear on the loaded level.
+    /// Helps to choose a place on which the player should appear on the loaded level.
     /// null means that player's position will be loaded together with game session.
-    moving_direction: ?c.Ladder.Direction,
+    entry_point: ?g.Level.EntryPoint,
 
     pub fn loadSession(session: *g.GameSession, game_session_arena: *g.GameStateArena) Loading {
         return .{
             .game_session_arena = game_session_arena,
             .session = session,
             .progress = .load_session,
-            .moving_direction = null,
+            .entry_point = null,
         };
     }
 
-    pub fn loadLevel(session: *g.GameSession, depth: u8, moving_direction: c.Ladder.Direction) Loading {
+    pub fn loadLevel(session: *g.GameSession, depth: u8, entry_point: g.Level.EntryPoint) Loading {
         return .{
             .session = session,
             .progress = .session_loaded,
             .level_depth = depth,
-            .moving_direction = moving_direction,
+            .entry_point = entry_point,
             .game_session_arena = null,
         };
     }
@@ -408,8 +391,8 @@ const Loading = struct {
 
     noinline fn completeLevelInitialization(self: *Loading) g.SystemError!void {
         try self.state.reading.endObject();
-        try self.session.level.completeInitialization(self.moving_direction);
-        if (self.moving_direction == null)
+        try self.session.level.completeInitialization(self.entry_point);
+        if (self.entry_point == null)
             try self.session.completeInitialization();
 
         self.state.reading.deinit();
@@ -456,8 +439,8 @@ const Saving = struct {
     };
 
     const NextProcess = union(enum) {
-        load_level: struct { depth: u8, direction: c.Ladder.Direction },
-        generate_level: struct { prng: std.Random.DefaultPrng, depth: u8, from_ladder: c.Ladder },
+        load_level: struct { depth: u8, entry_point: g.Level.EntryPoint },
+        generate_level: struct { prng: std.Random.DefaultPrng, depth: u8 },
         go_to_welcome_screen,
     };
 
