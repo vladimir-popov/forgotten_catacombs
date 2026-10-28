@@ -290,7 +290,13 @@ pub const KeyboardAndMouse = struct {
         bytes: [16]u8,
         len: usize,
 
+        /// Decodes the input bytes into a typed keyboard or mouse event.
+        ///
+        /// Recognizes single-byte printable and control keys, three-byte cursor-key
+        /// sequences, and SGR mouse reports. Unsupported sequences are returned as
+        /// `.unknown`; malformed numeric fields in a mouse report panic.
         pub fn button(self: @This()) Button {
+            // A one-byte input is either a printable character or a standalone control key.
             if (self.len == 1) {
                 switch (self.bytes[0]) {
                     ControlButton.ESC.code() => return Button{ .control = .ESC },
@@ -301,6 +307,7 @@ pub const KeyboardAndMouse = struct {
                     else => return Button{ .unknown = self },
                 }
             }
+            // Cursor keys are encoded as three-byte escape sequences in this terminal mode.
             if (self.len == 3) {
                 switch (self.bytes[2]) {
                     ControlButton.UP.code() => return Button{ .control = .UP },
@@ -310,11 +317,12 @@ pub const KeyboardAndMouse = struct {
                     else => return Button{ .unknown = self },
                 }
             }
+            // SGR mouse reports begin with ESC [ <, followed by button and position fields.
             if (std.mem.indexOfScalar(u8, &self.bytes, '<') == 2) {
                 var ns: [3]u8 = undefined;
                 var start: usize = 3;
                 var i: u8 = 0;
-                while (std.mem.indexOfAny(u8, self.bytes[start..], ";Mm")) |end| {
+                while (std.mem.indexOfAny(u8, self.bytes[start..self.len], ";Mm")) |end| {
                     ns[i] = std.fmt.parseInt(u8, self.bytes[start..(start + end)], 10) catch
                         std.debug.panic(
                             "Error on parsing [{any}] from {d} to {d} (end == {d})",
@@ -323,15 +331,15 @@ pub const KeyboardAndMouse = struct {
                     i += 1;
                     start += end + 1;
                 }
-                const isr = self.bytes[self.bytes.len - 1] == 'm';
-                switch (ns[0]) {
-                    0 => return Button{ .mouse = .{ .button = .LEFT, .row = ns[2], .col = ns[1], .is_released = isr } },
-                    1 => return Button{ .mouse = .{ .button = .MIDDLE, .row = ns[2], .col = ns[1], .is_released = isr } },
-                    2 => return Button{ .mouse = .{ .button = .RIGHT, .row = ns[2], .col = ns[1], .is_released = isr } },
-                    64 => return Button{ .mouse = .{ .button = .WHEEL_UP, .row = ns[2], .col = ns[1], .is_released = isr } },
-                    65 => return Button{ .mouse = .{ .button = .WHEEL_DOWN, .row = ns[2], .col = ns[1], .is_released = isr } },
-                    else => return Button{ .unknown = self },
-                }
+                const isr = self.bytes[self.len - 1] == 'm';
+                return switch (ns[0]) {
+                    0 => Button{ .mouse = .{ .button = .LEFT, .row = ns[2], .col = ns[1], .is_released = isr } },
+                    1 => Button{ .mouse = .{ .button = .MIDDLE, .row = ns[2], .col = ns[1], .is_released = isr } },
+                    2 => Button{ .mouse = .{ .button = .RIGHT, .row = ns[2], .col = ns[1], .is_released = isr } },
+                    64 => Button{ .mouse = .{ .button = .WHEEL_UP, .row = ns[2], .col = ns[1], .is_released = isr } },
+                    65 => Button{ .mouse = .{ .button = .WHEEL_DOWN, .row = ns[2], .col = ns[1], .is_released = isr } },
+                    else => Button{ .unknown = self },
+                };
             }
             return Button{ .unknown = self };
         }
