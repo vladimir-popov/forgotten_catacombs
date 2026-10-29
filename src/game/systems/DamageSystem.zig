@@ -209,7 +209,7 @@ pub fn applyDamage(
     } else if (target.eql(self.session().player)) {
         return error.GameOver;
     } else {
-        // handle the death
+        // handle the death of a NPC
         try self.session().removeDeadEntity(target);
         return false;
     }

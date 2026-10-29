@@ -6,6 +6,8 @@ const ecs = g.ecs;
 
 const AllocatorError = std.mem.Allocator.Error;
 
+const ActorIsDeadError = error{ActorIsDead};
+
 const log = std.log.scoped(.actions);
 
 const Self = @This();
@@ -13,13 +15,6 @@ const Self = @This();
 inline fn session(self: *Self) *g.GameSession {
     return @alignCast(@fieldParentPtr("actions", self));
 }
-
-pub const ActionResult = enum {
-    /// Action successfully happened and move points were spent
-    done,
-    /// An action lead to the death of the actor
-    actor_is_dead,
-};
 
 pub fn calculateQuickActionForTarget(
     self: *Self,
@@ -111,67 +106,58 @@ pub fn calculateQuickActionForTarget(
 }
 
 /// Determines the action to perform when moving from `from_place` toward `target`.
-/// Returns `true` and stores the action in `action_buffer` if movement or an interaction is possible.
-/// Returns `false` if the move is blocked or no action is needed.
+/// Returns `null` if the move is blocked or no action is needed.
 pub fn actualActionOnMoving(
     self: *Self,
     from_place: p.Point,
     target: g.Action.Payload.Move.Target,
-    action_buffer: *g.Action,
-) bool {
+) ?g.Action {
     const place = target.asPlace(from_place);
-    if (from_place.eql(place)) return false;
+    if (from_place.eql(place)) return null;
 
     const registry = &self.session().registry;
 
     switch (self.session().level.cellAt(place)) {
         .landscape => |cl| if (cl == .floor or cl == .doorway) {
-            action_buffer.* = .action(.move, .{ .target = target });
-            return true;
+            return .action(.move, .{ .target = target });
         },
 
         .entities => |entities| {
             // Check obstacles
             if (entities[@intFromEnum(c.Position.ZOrder.obstacle)]) |entity| {
                 if (registry.get(entity, c.Door)) |_| {
-                    action_buffer.* = .action(.open, .{ .id = entity, .place = place });
-                    return true;
+                    return .action(.open, .{ .id = entity, .place = place });
                 }
 
                 if (g.meta.getEnemyType(registry, entity)) |_| {
-                    action_buffer.* = .action(.hit, entity);
-                    return true;
+                    return .action(.hit, entity);
                 }
 
                 if (registry.has(entity, c.Shop)) {
-                    action_buffer.* = .action(.trade, entity);
-                    return true;
+                    return .action(.trade, entity);
                 }
 
                 if (registry.get(entity, c.Description)) |descr| {
                     if (descr.preset == .scientist) {
-                        action_buffer.* = .action(.modify_recognize, {});
-                        return true;
+                        return .action(.modify_recognize, {});
                     }
                 }
 
                 // the player should not step on the place with entity with z-order = 2
-                return false;
+                return null;
             }
             // Check traps
             if (entities[@intFromEnum(c.Position.ZOrder.item)]) |entity| {
                 if (registry.get(entity, c.Trap)) |_| {
-                    action_buffer.* = .action(.step_in_trap, .{ .trap_entity = entity, .moving_target = target });
-                    return true;
+                    return .action(.step_in_trap, .{ .trap_entity = entity, .moving_target = target });
                 }
             }
             // it's possible to step on the ladder, opened door, teleport, dropped item and
             // other entities with ZOrder.floor
-            action_buffer.* = .action(.move, .{ .target = target });
-            return true;
+            return .action(.move, .{ .target = target });
         },
     }
-    return false;
+    return null;
 }
 
 /// Handles the action.
@@ -179,23 +165,20 @@ pub fn doAction(
     self: *Self,
     actor: g.Entity,
     action: *const g.Action,
-) (g.SystemError || g.GameOverError)!ActionResult {
+) (g.SystemError || ActorIsDeadError || g.GameOverError)!void {
     switch (action.tag) {
         .drink => {
-            return try self.drinkPotion(actor, action.payload.drink);
+            try self.drinkPotion(actor, action.payload.drink);
         },
         .eat => {
             try self.eat(actor, action.payload.eat);
-            return .done;
         },
         .open_inventory => {
             try self.session().manageInventory();
-            return .done;
         },
         .move => {
             const from_position = self.session().registry.getUnsafe(actor, c.Position);
             try self.doMove(actor, from_position, action.payload.move.target);
-            return .done;
         },
         .step_in_trap => {
             return try self.stepInTrap(
@@ -205,54 +188,43 @@ pub fn doAction(
             );
         },
         .disarm_trap => {
-            return try self.tryToDisarmTrap(actor, action.payload.disarm_trap);
+            try self.tryToDisarmTrap(actor, action.payload.disarm_trap);
         },
         .move_to_level => {
             try self.session().movePlayerToLevel(action.payload.move_to_level);
-            return .done;
         },
-        .hit => switch (try self.session().damage.tryToHit(actor, action.payload.hit)) {
-            .target_killed => return .actor_is_dead,
-            .no_ammo, .wrong_ammo, .miss, .hit => return .done,
+        .hit => {
+            _ = try self.session().damage.tryToHit(actor, action.payload.hit);
         },
         .open => {
             try self.openDoor(action.payload.open);
-            return .done;
         },
         .close => {
             try self.closeDoor(action.payload.close);
-            return .done;
         },
         .pickup => {
             try self.pickup(actor, action.payload.pickup);
-            return .done;
         },
         .go_sleep => {
             try self.goSleep(action.payload.go_sleep);
-            return .done;
         },
         .chill => {
             try self.chill(action.payload.chill);
-            return .done;
         },
         .get_angry => {
             try self.getAngry(action.payload.get_angry);
-            return .done;
         },
         .modify_recognize => {
             try self.session().modifyRecognize();
-            return .done;
         },
         .trade => {
             try self.session().trade(action.payload.trade);
-            return .done;
         },
         .wait => {
             try self.session().registry.set(
                 actor,
                 c.Animation.initStatic(.wait, self.session().player.eql(actor)),
             );
-            return .done;
         },
     }
 }
@@ -282,19 +254,18 @@ noinline fn tryToDisarmTrap(
     self: *Self,
     actor: g.Entity,
     trap_id: g.Entity,
-) (g.SystemError || g.GameOverError)!ActionResult {
+) (g.SystemError || ActorIsDeadError || g.GameOverError)!void {
     const rand = self.session().prng.random();
     const trap: *const c.Trap = self.session().registry.getUnsafe(trap_id, c.Trap);
     const dex = self.session().registry.getUnsafe(actor, c.Stats).get(.dexterity);
     const mec = self.session().registry.getUnsafe(actor, c.Skills).values.get(.mechanics);
     const chance: f32 = g.meta.disarmChance(dex, mec, trap.*);
     if (rand.float(f32) < chance) {
-        return try self.handleTrap(actor, trap_id, trap);
+        try self.handleTrap(actor, trap_id, trap);
     } else {
         try self.session().showPopUpNotification(.disarmed_trap);
         try self.session().registry.removeEntity(trap_id);
     }
-    return .done;
 }
 
 /// Moves the actor onto the trap and returns whether the actor survived its effect.
@@ -303,11 +274,11 @@ noinline fn stepInTrap(
     actor: g.Entity,
     trap_id: g.Entity,
     moving_target: g.Action.Payload.Move.Target,
-) (g.SystemError || g.GameOverError)!ActionResult {
+) (g.SystemError || ActorIsDeadError || g.GameOverError)!void {
     const trap: *const c.Trap = self.session().registry.getUnsafe(trap_id, c.Trap);
     const from_position = self.session().registry.get(actor, c.Position).?;
     try self.doMove(actor, from_position, moving_target);
-    return try self.handleTrap(actor, trap_id, trap);
+    try self.handleTrap(actor, trap_id, trap);
 }
 
 /// Applies trap damage and shows a pop-up message.
@@ -316,7 +287,7 @@ fn handleTrap(
     actor: g.Entity,
     trap_id: g.Entity,
     trap: *const c.Trap,
-) (g.SystemError || g.GameOverError)!ActionResult {
+) (g.SystemError || ActorIsDeadError || g.GameOverError)!void {
     log.debug("The entity {d} stepped to the trap {d} {any}", .{ actor.id, trap_id.id, trap });
     try self.session().journal.markTrapAsKnown(trap_id);
     const health = self.session().registry.getUnsafe(actor, c.Health);
@@ -332,11 +303,15 @@ fn handleTrap(
             .{ .trap = .{ .name = name, .damage = health_before - health.current_hp } },
         );
     }
-    return if (is_actor_alive) .done else .actor_is_dead;
+    if (!is_actor_alive) return error.ActorIsDead;
 }
 
 /// Consumes a potion and returns whether the actor survived its effects.
-fn drinkPotion(self: *Self, actor: g.Entity, potion_id: g.Entity) (g.SystemError || g.GameOverError)!ActionResult {
+fn drinkPotion(
+    self: *Self,
+    actor: g.Entity,
+    potion_id: g.Entity,
+) (g.SystemError || ActorIsDeadError || g.GameOverError)!void {
     const registry = &self.session().registry;
     const potion = registry.getUnsafe(potion_id, c.Potion).*;
 
@@ -362,10 +337,8 @@ fn drinkPotion(self: *Self, actor: g.Entity, potion_id: g.Entity) (g.SystemError
             const health = self.session().registry.getUnsafe(actor, c.Health);
             const k: f32 = 0.7;
             const damage: u8 = @intFromFloat(k * g.utils.ff32(health.max));
-            return if (try self.session().damage.applyDamage(potion_id, actor, health, damage))
-                .done
-            else
-                .actor_is_dead;
+            if (!try self.session().damage.applyDamage(potion_id, actor, health, damage))
+                return error.ActorIsDead;
         },
         .poison, .oil => {
             const health = self.session().registry.getUnsafe(actor, c.Health);
@@ -392,7 +365,6 @@ fn drinkPotion(self: *Self, actor: g.Entity, potion_id: g.Entity) (g.SystemError
             // do nothing
         },
     }
-    return .done;
 }
 
 fn eat(self: *Self, actor: g.Entity, food: g.Entity) AllocatorError!void {

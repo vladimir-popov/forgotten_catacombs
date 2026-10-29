@@ -6,8 +6,6 @@ const p = g.primitives;
 const w = g.windows;
 const AllocatorError = std.mem.Allocator.Error;
 
-const ActionResult = g.systems.ActionSystem.ActionResult;
-
 const log = std.log.scoped(.play_mode);
 
 /// How long a notification should be shown by default
@@ -84,36 +82,32 @@ pub fn playerTurn(self: *Self) (g.SystemError || g.GameOverError)!void {
     const initiative = self.session.registry.getUnsafe(self.session.player, c.Initiative);
     const speed = self.session.registry.getUnsafe(self.session.player, c.Speed);
     const action = &self.action_buffer;
-    switch (try self.doTurn(self.session.player, action, speed, initiative)) {
-        .done => {
-            const spent_move_points = action.movePoints(speed);
-            // Force change the target
-            switch (action.tag) {
-                .hit => {
-                    const enemy = action.payload.hit;
-                    if (self.session.registry.contains(enemy)) {
-                        self.setTarget(enemy);
-                    } else {
-                        self.setTarget(null);
-                    }
-                },
-                .open => {
-                    const door = self.action_buffer.payload.open;
-                    self.setTarget(door.id);
-                },
-                else => {},
-            }
-            // Handle Initiative
-            if (spent_move_points > 0) {
-                // Add initiative points to enemies and return them back to the player
-                var itr = self.session.registry.query(c.Initiative);
-                while (itr.next()) |tuple| {
-                    tuple[1].move_points += spent_move_points;
-                }
+    try self.doTurn(self.session.player, action, speed, initiative);
+
+    const spent_move_points = action.movePoints(speed);
+    // Force change the target
+    switch (action.tag) {
+        .hit => {
+            const enemy = action.payload.hit;
+            if (self.session.registry.contains(enemy)) {
+                self.setTarget(enemy);
+            } else {
+                self.setTarget(null);
             }
         },
-        // The death of the player will handled on event
-        .actor_is_dead => {},
+        .open => {
+            const door = self.action_buffer.payload.open;
+            self.setTarget(door.id);
+        },
+        else => {},
+    }
+    // Handle Initiative
+    if (spent_move_points > 0) {
+        // Add initiative points to enemies and return them back to the player
+        var itr = self.session.registry.query(c.Initiative);
+        while (itr.next()) |tuple| {
+            tuple[1].move_points += spent_move_points;
+        }
     }
 }
 
@@ -130,39 +124,36 @@ fn enemiesTurn(self: *Self) (g.SystemError || g.GameOverError)!void {
 
         if (self.session.ai.chooseAction(npc, speed, initiative)) |act| {
             self.action_buffer = act;
-            _ = try self.doTurn(npc, &self.action_buffer, speed, initiative);
+            try self.doTurn(npc, &self.action_buffer, speed, initiative);
         }
     }
 }
 
 /// Trying to do an action.
-/// Returns spent move points.
 fn doTurn(
     self: *Self,
     actor: g.Entity,
     action: *const g.actions.Action,
     speed: *const c.Speed,
     initiative: *c.Initiative,
-) (g.SystemError || g.GameOverError)!ActionResult {
+) (g.SystemError || g.GameOverError)!void {
     log.info("The turn of the entity {d}.", .{actor.id});
     defer log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
 
-    switch (try self.session.actions.doAction(actor, action)) {
-        .done => {
-            const spent_move_points = action.movePoints(speed);
-            log.info("Entity {d} spent {d} move points", .{ actor.id, spent_move_points });
-            initiative.move_points -= spent_move_points;
-            initiative.spent_move_points += spent_move_points;
-            const cycles = initiative.spent_move_points / g.MOVE_POINTS_IN_TURN;
-            initiative.spent_move_points = initiative.spent_move_points % g.MOVE_POINTS_IN_TURN;
-            for (0..cycles) |_| {
-                try self.onCycleCompleted(actor);
-            }
-            return .done;
-        },
-        .actor_is_dead => {
-            return .actor_is_dead;
-        },
+    self.session.actions.doAction(actor, action) catch |err| switch (err) {
+        // Stop the turn if the actor is dead
+        error.ActorIsDead => return,
+        else => return @errorCast(err),
+    };
+
+    const spent_move_points = action.movePoints(speed);
+    log.info("Entity {d} spent {d} move points", .{ actor.id, spent_move_points });
+    initiative.move_points -= spent_move_points;
+    initiative.spent_move_points += spent_move_points;
+    const cycles = initiative.spent_move_points / g.MOVE_POINTS_IN_TURN;
+    initiative.spent_move_points = initiative.spent_move_points % g.MOVE_POINTS_IN_TURN;
+    for (0..cycles) |_| {
+        try self.onCycleCompleted(actor);
     }
 }
 
@@ -408,11 +399,16 @@ fn handleInput(self: *Self) g.AllErrors!bool {
                     },
                 },
                 .left, .right, .up, .down => {
-                    return self.session.actions.actualActionOnMoving(
+                    const maybe_action = self.session.actions.actualActionOnMoving(
                         self.session.registry.getUnsafe(self.session.player, c.Position).place,
                         .{ .direction = btn.toDirection().? },
-                        &self.action_buffer,
                     );
+                    if (maybe_action) |action| {
+                        self.action_buffer = action;
+                        return true;
+                    } else {
+                        return false;
+                    }
                 },
             }
         }
