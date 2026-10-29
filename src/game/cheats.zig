@@ -37,6 +37,9 @@ pub const Cheat = union(enum) {
     /// Moves the player to a ladder lead to an lower level.
     move_player_to_ladder_down,
 
+    /// Moves the player directly to a dungeon depth from 0 through 6.
+    goto_depth: u8,
+
     /// Adds entity id to the journal
     recognize: g.Entity,
 
@@ -108,6 +111,13 @@ pub const Cheat = union(enum) {
                 ,
                     .{args},
                 );
+            },
+            .goto_depth => if (tryParseDecimal(u8, args)) |depth| {
+                if (depth <= 6)
+                    return .{ .goto_depth = depth };
+                log.warn("Depth {d} is outside the supported range 0..6.", .{depth});
+            } else {
+                log.warn("Wrong arguments '{s}' for 'depth' command. It expects a depth from 0 to 6.", .{args});
             },
             .recognize => if (tryParseDecimal(u32, args)) |entity_id| {
                 return .{ .recognize = .{ .id = entity_id } };
@@ -196,6 +206,7 @@ pub const Cheat = union(enum) {
             .get_potion => "get potion",
             .get_weapon => "get weapon",
             .goto => "goto",
+            .goto_depth => "depth",
             .move_player_to_ladder_down => "down ladder",
             .move_player_to_ladder_up => "up ladder",
             .recognize => "recognize",
@@ -251,6 +262,13 @@ pub const Cheat = union(enum) {
                 });
                 return true;
             },
+            .goto_depth => |depth| {
+                action.* = .action(.move_to_level, .{
+                    .to_depth = depth,
+                    .entry_point = .entrance,
+                });
+                return true;
+            },
             else => return false,
         }
         return false;
@@ -294,6 +312,11 @@ test "light on" {
 
 test "goto" {
     try std.testing.expectEqual(Cheat{ .goto = p.Point.point(2, 3) }, Cheat.parse("goto 2 3").?.cheat);
+}
+
+test "goto depth" {
+    try std.testing.expectEqual(Cheat{ .goto_depth = 6 }, Cheat.parse("depth 6").?.cheat);
+    try std.testing.expect(Cheat.parse("depth 7") == null);
 }
 
 test "set health" {
