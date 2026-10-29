@@ -266,9 +266,18 @@ pub fn TtyRuntime(comptime display_rows: u8, comptime display_cols: u8) type {
                         if (m.is_released) return null;
                         switch (m.button) {
                             .LEFT => {
+                                if (m.row < rows_pad or m.col < cols_pad)
+                                    return null;
+
+                                const row = m.row - rows_pad;
+                                const col = m.col - cols_pad;
+
+                                if (row >= display_rows or col >= display_cols)
+                                    return null;
+
                                 self.cheat = .{ .goto = .{
-                                    .row = m.row - rows_pad,
-                                    .col = m.col - cols_pad,
+                                    .row = row,
+                                    .col = col,
                                 } };
                             },
                             .WHEEL_UP => self.cheat = .move_player_to_ladder_up,
