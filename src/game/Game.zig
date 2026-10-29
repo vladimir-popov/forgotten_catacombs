@@ -38,6 +38,7 @@ pub const State = union(enum) {
     /// The current game session
     game_session: *g.GameSession,
     game_over,
+    game_completed,
     manual,
     about,
 };
@@ -77,7 +78,7 @@ pub fn tick(self: *Self) g.AllErrors!void {
             if (btn.game_button.isMove())
                 try self.state.welcome.menu.drawContent(self.render, WelcomeScreen.MENU_REGION, 0);
         },
-        .game_over, .manual, .about => if (try self.runtime.readPushedButtons()) |btn| {
+        .game_completed, .game_over, .manual, .about => if (try self.runtime.readPushedButtons()) |btn| {
             switch (btn.game_button) {
                 .a => if (btn.state == .released) try self.welcome(),
                 else => {},
@@ -91,6 +92,12 @@ pub fn tick(self: *Self) g.AllErrors!void {
                     _ = self.state_arena.reset(.retain_capacity);
                     self.state = .game_over;
                     try self.drawGameOverScreen();
+                },
+                error.EarlyAccessCompleted => {
+                    try self.deleteSessionFileIfExists();
+                    _ = self.state_arena.reset(.retain_capacity);
+                    self.state = .game_over;
+                    try self.drawGameCompletedScreen();
                 },
                 error.GoToMainMenu => {
                     try self.welcome();
@@ -328,6 +335,45 @@ fn drawGameOverScreen(self: Self) g.SystemError!void {
         g.DISPLAY_COLS,
         "You are dead",
         .{ .row = g.DISPLAY_ROWS / 2, .col = 1 },
+        .normal,
+        .center,
+    );
+}
+
+fn drawGameCompletedScreen(self: Self) g.SystemError!void {
+    try self.render.clearDisplay();
+    try self.render.drawTextWithAlign(
+        g.DISPLAY_COLS,
+        "Congratulations!",
+        .{ .row = 4, .col = 1 },
+        .normal,
+        .center,
+    );
+    try self.render.drawTextWithAlign(
+        g.DISPLAY_COLS,
+        "You completed the Early Access",
+        .{ .row = 6, .col = 1 },
+        .normal,
+        .center,
+    );
+    try self.render.drawTextWithAlign(
+        g.DISPLAY_COLS,
+        "version! Follow project updates at:",
+        .{ .row = 7, .col = 1 },
+        .normal,
+        .center,
+    );
+    try self.render.drawTextWithAlign(
+        g.DISPLAY_COLS,
+        "github.com/dokwork/",
+        .{ .row = 9, .col = 1 },
+        .normal,
+        .center,
+    );
+    try self.render.drawTextWithAlign(
+        g.DISPLAY_COLS,
+        "forgotten_catacombs",
+        .{ .row = 10, .col = 1 },
         .normal,
         .center,
     );

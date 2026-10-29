@@ -52,7 +52,7 @@ pub fn tryToHit(
     self: *Self,
     actor: g.Entity,
     target: g.Entity,
-) (g.SystemError || g.GameOverError)!AttackResult {
+) (g.SystemError || g.StopGameError)!AttackResult {
     const registry = &self.session().registry;
     const rand = self.session().prng.random();
 
@@ -188,7 +188,7 @@ pub fn applyDamage(
     target: g.Entity,
     target_health: *c.Health,
     damage_value: u8,
-) (g.SystemError || g.GameOverError)!bool {
+) (g.SystemError || g.StopGameError)!bool {
     if (damage_value == 0)
         return true;
 
@@ -210,7 +210,7 @@ pub fn applyDamage(
         return error.GameOver;
     } else {
         // handle the death of a NPC
-        try self.session().removeDeadEntity(target);
+        try self.session().removeEntity(target);
         return false;
     }
 }

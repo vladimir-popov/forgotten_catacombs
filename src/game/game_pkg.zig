@@ -87,16 +87,18 @@ pub const SystemError = Runtime.Error || persistance.Error || Utf8Error ||
     std.Io.Writer.Error ||
     std.fmt.BufPrintError;
 
-/// Control-flow signal requesting that the game return to its main menu.
-pub const GoToMainMenuError = error{GoToMainMenu};
-
-/// Control-flow signal indicating that the player has died and the game-over
-/// flow should begin.
-pub const GameOverError = error{GameOver};
+pub const StopGameError = error{
+    /// Control-flow signal requesting that the game return to its main menu.
+    GoToMainMenu,
+    /// Control-flow signal indicating that the player has died and the game-over
+    /// flow should begin.
+    GameOver,
+    EarlyAccessCompleted,
+};
 
 /// Union of errors that may escape the top-level game flow. Use narrower sets
 /// for functions that only need to expose a subset of these outcomes.
-pub const AllErrors = SystemError || GameOverError || GoToMainMenuError;
+pub const AllErrors = SystemError || StopGameError;
 
 pub const MAX_DEPTH = 9;
 

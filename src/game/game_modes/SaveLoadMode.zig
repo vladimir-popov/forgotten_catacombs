@@ -77,7 +77,7 @@ pub fn deinit(self: *Self) void {
 
 // Keep mode-specific temporaries out of GameSession.tick's shared stack frame
 // to reduce stack usage in other modes on Playdate.
-pub noinline fn tick(self: *Self) (g.SystemError || g.GoToMainMenuError)!void {
+pub noinline fn tick(self: *Self) (g.SystemError || g.StopGameError)!void {
     switch (self.process) {
         .saving => |*saving| {
             const is_done = saving.tick() catch |err| {

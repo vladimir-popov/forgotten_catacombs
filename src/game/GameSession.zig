@@ -251,13 +251,6 @@ pub inline fn removeEntity(self: *Self, entity: g.Entity) g.SystemError!void {
     self.level.removeEntity(entity);
 }
 
-/// Removes the entity or returns `error.GameOver`.
-pub fn removeDeadEntity(self: *Self, entity: g.Entity) g.SystemError!void {
-    log.debug("NPC {d} is dead", .{entity.id});
-    // Handle death and remove the entity here, within the current tick
-    try self.removeEntity(entity);
-}
-
 pub fn playerMovedToLevel(self: *Self) g.SystemError!void {
     self.max_depth = @max(self.max_depth, self.level.depth);
     self.viewport.centeredAround(self.level.playerPosition().place);
@@ -275,7 +268,7 @@ pub fn showPopUpNotification(self: *Self, notification: g.notifications.Notifica
     try self.notifications.pushBack(self.inner_arena.allocator(), notification);
 }
 
-pub fn tick(self: *Self) g.AllErrors!void {
+pub fn tick(self: *Self) (g.SystemError || g.StopGameError)!void {
     switch (self.mode) {
         .explore => try self.mode.explore.tick(),
         .explore_level => try self.mode.explore_level.tick(),

@@ -58,7 +58,7 @@ fn setTarget(self: *Self, target: ?g.Entity) void {
 
 // Keep mode-specific temporaries out of GameSession.tick's shared stack frame
 // to reduce stack usage in other modes on Playdate.
-pub noinline fn tick(self: *Self) (g.SystemError || g.GameOverError || g.GoToMainMenuError)!void {
+pub noinline fn tick(self: *Self) (g.SystemError || g.StopGameError)!void {
     // TODO draw only after changes and return 1, else 0.
     if (try self.draw()) {
         try self.session.runtime.cleanInputBuffer();
@@ -82,7 +82,7 @@ pub noinline fn tick(self: *Self) (g.SystemError || g.GameOverError || g.GoToMai
 }
 
 /// Can be invoked from the `tick` or as continue of the playing after switching the game mode.
-pub fn playerTurn(self: *Self) (g.SystemError || g.GameOverError)!void {
+pub fn playerTurn(self: *Self) (g.SystemError || g.StopGameError)!void {
     const speed = self.session.registry.getUnsafe(self.session.player, c.Speed);
     const action = &self.action_buffer;
     self.session.actions.doAction(self.session.player, action) catch |err| switch (err) {
@@ -124,7 +124,7 @@ pub fn playerTurn(self: *Self) (g.SystemError || g.GameOverError)!void {
     }
 }
 
-fn enemiesTurn(self: *Self) (g.SystemError || g.GameOverError)!void {
+fn enemiesTurn(self: *Self) (g.SystemError || g.StopGameError)!void {
     var itr = self.session.registry.query2(c.Initiative, c.Speed);
     main_loop: while (itr.next()) |tuple| {
         const npc, const initiative, const speed = tuple;
@@ -144,7 +144,7 @@ fn enemiesTurn(self: *Self) (g.SystemError || g.GameOverError)!void {
     }
 }
 
-fn onCycleCompleted(self: *Self) (g.SystemError || g.GameOverError)!void {
+fn onCycleCompleted(self: *Self) (g.SystemError || g.StopGameError)!void {
     const registry = &self.session.registry;
 
     // Increase the global counter:

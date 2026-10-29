@@ -165,7 +165,7 @@ pub fn doAction(
     self: *Self,
     actor: g.Entity,
     action: *const g.Action,
-) (g.SystemError || ActorIsDeadError || g.GameOverError)!void {
+) (g.SystemError || ActorIsDeadError || g.StopGameError)!void {
     switch (action.tag) {
         .drink => {
             try self.drinkPotion(actor, action.payload.drink);
@@ -191,7 +191,11 @@ pub fn doAction(
             try self.tryToDisarmTrap(actor, action.payload.disarm_trap);
         },
         .move_to_level => {
-            try self.session().movePlayerToLevel(action.payload.move_to_level);
+            if (action.payload.move_to_level.to_depth == 1 and self.session().max_depth == 6) {
+                return error.EarlyAccessCompleted;
+            } else {
+                try self.session().movePlayerToLevel(action.payload.move_to_level);
+            }
         },
         .hit => {
             _ = try self.session().damage.tryToHit(actor, action.payload.hit);
@@ -254,7 +258,7 @@ noinline fn tryToDisarmTrap(
     self: *Self,
     actor: g.Entity,
     trap_id: g.Entity,
-) (g.SystemError || ActorIsDeadError || g.GameOverError)!void {
+) (g.SystemError || ActorIsDeadError || g.StopGameError)!void {
     const rand = self.session().prng.random();
     const trap: *const c.Trap = self.session().registry.getUnsafe(trap_id, c.Trap);
     const dex = self.session().registry.getUnsafe(actor, c.Stats).get(.dexterity);
@@ -274,7 +278,7 @@ noinline fn stepInTrap(
     actor: g.Entity,
     trap_id: g.Entity,
     moving_target: g.Action.Payload.Move.Target,
-) (g.SystemError || ActorIsDeadError || g.GameOverError)!void {
+) (g.SystemError || ActorIsDeadError || g.StopGameError)!void {
     const trap: *const c.Trap = self.session().registry.getUnsafe(trap_id, c.Trap);
     const from_position = self.session().registry.get(actor, c.Position).?;
     try self.doMove(actor, from_position, moving_target);
@@ -287,7 +291,7 @@ fn handleTrap(
     actor: g.Entity,
     trap_id: g.Entity,
     trap: *const c.Trap,
-) (g.SystemError || ActorIsDeadError || g.GameOverError)!void {
+) (g.SystemError || ActorIsDeadError || g.StopGameError)!void {
     log.debug("The entity {d} stepped to the trap {d} {any}", .{ actor.id, trap_id.id, trap });
     try self.session().journal.markTrapAsKnown(trap_id);
     const health = self.session().registry.getUnsafe(actor, c.Health);
@@ -311,7 +315,7 @@ fn drinkPotion(
     self: *Self,
     actor: g.Entity,
     potion_id: g.Entity,
-) (g.SystemError || ActorIsDeadError || g.GameOverError)!void {
+) (g.SystemError || ActorIsDeadError || g.StopGameError)!void {
     const registry = &self.session().registry;
     const potion = registry.getUnsafe(potion_id, c.Potion).*;
 
