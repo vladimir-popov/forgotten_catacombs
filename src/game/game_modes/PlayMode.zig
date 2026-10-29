@@ -25,6 +25,10 @@ notification_to_show: ?NotificationMessage = null,
 // This is a buffer for an action. It should help to avoid putting action on the stack
 action_buffer: g.Action = undefined,
 
+/// How many move points the player spent within the last turn.
+/// We need it to count completed cycles.
+spent_move_points: g.MovePoints = 0,
+
 pub fn init(
     self: *Self,
     session: *g.GameSession,
@@ -79,12 +83,15 @@ pub noinline fn tick(self: *Self) (g.SystemError || g.GameOverError || g.GoToMai
 
 /// Can be invoked from the `tick` or as continue of the playing after switching the game mode.
 pub fn playerTurn(self: *Self) (g.SystemError || g.GameOverError)!void {
-    const initiative = self.session.registry.getUnsafe(self.session.player, c.Initiative);
     const speed = self.session.registry.getUnsafe(self.session.player, c.Speed);
     const action = &self.action_buffer;
-    try self.doTurn(self.session.player, action, speed, initiative);
+    self.session.actions.doAction(self.session.player, action) catch |err| switch (err) {
+        error.ActorIsDead => {},
+        else => return @errorCast(err),
+    };
 
     const spent_move_points = action.movePoints(speed);
+    log.debug("The player spent {d} move points", .{spent_move_points});
     // Force change the target
     switch (action.tag) {
         .hit => {
@@ -103,6 +110,12 @@ pub fn playerTurn(self: *Self) (g.SystemError || g.GameOverError)!void {
     }
     // Handle Initiative
     if (spent_move_points > 0) {
+        self.spent_move_points += spent_move_points;
+        const cycles = self.spent_move_points / g.MOVE_POINTS_IN_TURN;
+        self.spent_move_points = self.spent_move_points % g.MOVE_POINTS_IN_TURN;
+        for (0..cycles) |_| {
+            try self.onCycleCompleted();
+        }
         // Add initiative points to enemies and return them back to the player
         var itr = self.session.registry.query(c.Initiative);
         while (itr.next()) |tuple| {
@@ -113,68 +126,42 @@ pub fn playerTurn(self: *Self) (g.SystemError || g.GameOverError)!void {
 
 fn enemiesTurn(self: *Self) (g.SystemError || g.GameOverError)!void {
     var itr = self.session.registry.query2(c.Initiative, c.Speed);
-    while (itr.next()) |tuple| {
+    main_loop: while (itr.next()) |tuple| {
         const npc, const initiative, const speed = tuple;
         if (npc.eql(self.session.player))
             continue;
 
-        // not enough mp for any action yet
-        if (initiative.move_points < speed.moving_speed and initiative.move_points < speed.atack_speed)
-            continue;
+        while (self.session.ai.chooseAction(npc, speed, initiative)) |*action| {
+            self.session.actions.doAction(npc, action) catch |err| switch (err) {
+                error.ActorIsDead => continue :main_loop,
+                else => return @errorCast(err),
+            };
 
-        if (self.session.ai.chooseAction(npc, speed, initiative)) |act| {
-            self.action_buffer = act;
-            try self.doTurn(npc, &self.action_buffer, speed, initiative);
+            const spent_move_points = action.movePoints(speed);
+            log.info("NPC {d} spent {d} move points on {t}", .{ npc.id, spent_move_points, action.tag });
+            initiative.move_points -= spent_move_points;
         }
     }
 }
 
-/// Trying to do an action.
-fn doTurn(
-    self: *Self,
-    actor: g.Entity,
-    action: *const g.actions.Action,
-    speed: *const c.Speed,
-    initiative: *c.Initiative,
-) (g.SystemError || g.GameOverError)!void {
-    log.info("The turn of the entity {d}.", .{actor.id});
-    defer log.info("The end of the turn of entity {d}\n--------------------", .{actor.id});
-
-    self.session.actions.doAction(actor, action) catch |err| switch (err) {
-        // Stop the turn if the actor is dead
-        error.ActorIsDead => return,
-        else => return @errorCast(err),
-    };
-
-    const spent_move_points = action.movePoints(speed);
-    log.info("Entity {d} spent {d} move points", .{ actor.id, spent_move_points });
-    initiative.move_points -= spent_move_points;
-    initiative.spent_move_points += spent_move_points;
-    const cycles = initiative.spent_move_points / g.MOVE_POINTS_IN_TURN;
-    initiative.spent_move_points = initiative.spent_move_points % g.MOVE_POINTS_IN_TURN;
-    for (0..cycles) |_| {
-        try self.onCycleCompleted(actor);
-    }
-}
-
-fn onCycleCompleted(self: *Self, actor: g.Entity) (g.SystemError || g.GameOverError)!void {
+fn onCycleCompleted(self: *Self) (g.SystemError || g.GameOverError)!void {
     const registry = &self.session.registry;
 
-    if (actor.eql(self.session.player)) {
-        // Increase the global counter:
-        self.session.spent_cycles += 1;
+    // Increase the global counter:
+    self.session.spent_cycles += 1;
 
-        // Update journal
-        try self.session.journal.increaseUsageCounters();
-    }
+    // Update journal
+    try self.session.journal.increaseUsageCounters();
 
     // Regenerate health
-    if (registry.get(actor, c.Regeneration)) |regeneration| {
+    var regen_itr = registry.query(c.Regeneration);
+    while (regen_itr.next()) |tuple| {
+        const entity, const regeneration = tuple;
         regeneration.accumulated_cycles += 1;
         if (regeneration.accumulated_cycles >= regeneration.turns_to_increase) {
             regeneration.accumulated_cycles = 0;
-            const health = registry.get(actor, c.Health) orelse
-                std.debug.panic("Entity {d} has Regeneration, but doesn't have a Health component", .{actor.id});
+            const health = registry.get(entity, c.Health) orelse
+                std.debug.panic("Entity {d} has Regeneration, but doesn't have a Health component", .{entity.id});
             health.add(1);
         }
     }
@@ -198,7 +185,7 @@ fn onCycleCompleted(self: *Self, actor: g.Entity) (g.SystemError || g.GameOverEr
         _ = try self.session.damage.applyDamage(entity, entity, health, 1);
     }
     // Dim the using lights
-    if (registry.get(actor, c.Equipment)) |equipment| {
+    if (registry.get(self.session.player, c.Equipment)) |equipment| {
         if (equipment.light) |light_id| {
             if (g.meta.isLamp(registry, light_id))
                 registry.getUnsafe(light_id, c.SourceOfLight).charge -|= 1;
@@ -211,13 +198,13 @@ fn onCycleCompleted(self: *Self, actor: g.Entity) (g.SystemError || g.GameOverEr
         }
     }
     // Apply damage from poison
-    if (registry.get(actor, c.Poison)) |poison| {
-        const health = registry.get(actor, c.Health) orelse
-            std.debug.panic("Entity {d} has Poison, but doesn't have a Health component", .{actor.id});
-        if (try self.session.damage.applyDamage(actor, actor, health, poison.damage)) {
+    var poison_itr = registry.query2(c.Poison, c.Health);
+    while (poison_itr.next()) |tuple| {
+        const entity, const poison, const health = tuple;
+        if (try self.session.damage.applyDamage(entity, entity, health, poison.damage)) {
             poison.damage /= 2;
             if (poison.damage == 0) {
-                try self.session.registry.remove(actor, c.Poison);
+                try self.session.registry.remove(entity, c.Poison);
             }
         }
     }

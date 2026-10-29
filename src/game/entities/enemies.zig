@@ -278,25 +278,6 @@ mechatron: c.Components = archetype.enemy(.{
     .weapon = .melee(.native, .range(6, 8)),
 }),
 
-turret: c.Components = archetype.enemy(.{
-    .description = .{ .preset = .turret },
-    .tier = .{ .tier = 6 },
-    .experience = .reward(26),
-    .health = .init(82),
-    .initiative = .empty,
-    .regeneration = .regular,
-    .skills = .zeros,
-    .armor = .{
-        .protection = .range(6, 6),
-    },
-    .improvements = .{ .modifications = .init(&.{ .fire, .poison }) },
-    .speed = .@"static; atk+",
-    .sprite = .{ .codepoint = 't' },
-    .state = .sleeping,
-    .stats = .init(0, 0, 0, 0, 0),
-    .weapon = .ranged(.native, .range(5, 7), 5, .bullets),
-}),
-
 robot: c.Components = archetype.enemy(.{
     .description = .{ .preset = .robot },
     .tier = .{ .tier = 6 },

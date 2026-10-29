@@ -44,7 +44,6 @@ pub fn player(
         .experience = .first_level,
         .health = health,
         .hunger = .well_fed,
-        .initiative = .{ .move_points = std.math.maxInt(g.MovePoints) },
         .inventory = try c.Inventory.empty(alloc),
         .regeneration = .regular,
         .skills = skills,

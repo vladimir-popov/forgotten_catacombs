@@ -24,7 +24,7 @@ fn lessThanTier(_: void, x: *const g.components.Components, y: *const g.componen
 /// `end` is the index immediately after the last eligible enemy. The range
 /// can be used as `enemies[start..end]`.
 const enemy_ranges_by_depth: [g.MAX_DEPTH]p.Range(u8) = blk: {
-    const es = &g.entities.presets.Enemies.fields.values;
+    const es = &enemies_sorted_by_tier;
     var ranges: [g.MAX_DEPTH]p.Range(u8) = undefined;
 
     for (0..ranges.len) |depth| {

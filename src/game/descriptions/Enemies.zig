@@ -343,28 +343,6 @@ terminator: Description = .{
     },
 },
 
-turret: Description = .{
-    .name = "Turret",
-    .description = &.{
-        "A  low  heavy  structure built from",
-        "thick metal plates and mounted on a",
-        "massive  rotating  base.  The front",
-        "section   ends  in  a  long  weapon",
-        "barrel  covered  in soot and traces",
-        "of  overheating,  while dim optical",
-        "sensors are mounted nearby.",
-    },
-    .alt_description = &.{
-        "This mechanism barely moves, yet it",
-        "is   capable   of   keeping  entire",
-        "corridors  under fire. Its shots do",
-        "not  appear especially destructive,",
-        "but  the heated projectiles quickly",
-        "turn  any  cover  into  a dangerous",
-        "place.",
-    },
-},
-
 venom_centipede: Description = .{
     .name = "Venom Centipede",
     .description = &.{

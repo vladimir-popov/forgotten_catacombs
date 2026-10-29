@@ -321,9 +321,6 @@ pub const Improvements = struct {
 pub const Initiative = struct {
     /// Accumulated points to spent on actions.
     move_points: g.MovePoints,
-    /// How many move points the player or an enemy spent within the last turn.
-    /// We need it to count completed cycles.
-    spent_move_points: g.MovePoints = 0,
 
     pub const empty: Initiative = .{ .move_points = 0 };
 };
@@ -546,7 +543,6 @@ pub const Speed = struct {
     pub const default: Speed = .{ .moving_speed = g.MOVE_POINTS_IN_TURN, .atack_speed = g.MOVE_POINTS_IN_TURN };
     pub const @"spd+": Speed = .{ .moving_speed = g.MOVE_POINTS_IN_TURN - 2, .atack_speed = g.MOVE_POINTS_IN_TURN };
     pub const @"atk+": Speed = .{ .moving_speed = g.MOVE_POINTS_IN_TURN, .atack_speed = g.MOVE_POINTS_IN_TURN - 2 };
-    pub const @"static; atk+": Speed = .{ .moving_speed = std.math.maxInt(u8), .atack_speed = g.MOVE_POINTS_IN_TURN - 2 };
     pub const @"spd+; atk+": Speed = .{ .moving_speed = g.MOVE_POINTS_IN_TURN - 2, .atack_speed = g.MOVE_POINTS_IN_TURN - 2 };
     pub const @"spd-": Speed = .{ .moving_speed = g.MOVE_POINTS_IN_TURN + 2, .atack_speed = g.MOVE_POINTS_IN_TURN };
     pub const @"atk-": Speed = .{ .moving_speed = g.MOVE_POINTS_IN_TURN, .atack_speed = g.MOVE_POINTS_IN_TURN + 2 };
