@@ -124,9 +124,10 @@ Generated potion entities are sorted alphabetically by `Name`.
 ## Generate Weapon Entities
 
 The `weapons` command generates weapon entity definitions from
-the `Name`, `Stat`, `Damage`, `Ammo`, `Range`, `Effect`, and `Price` columns of
-a CSV file. The optional `Trait` column stores balance metadata such as `VAR`
-and is not emitted into the runtime weapon definition.
+the `Name`, `Tier`, `Stat`, `Damage`, `Ammo`, `Range`, `Effect`, and `Price` columns of
+a CSV file. `Tier` is parsed as an integer and emitted as the `.tier` component.
+The optional `Trait` column stores balance metadata such as `VAR` and is not
+emitted into the runtime weapon definition.
 
 Run it from the project root:
 
@@ -145,7 +146,8 @@ Generated weapon entities are sorted alphabetically by `Name`.
 ## Generate Armor Entities
 
 The `armor` command generates armor entity definitions from the
-`Name`, `Armor`, and `Price` columns of a CSV file.
+`Name`, `Tier`, `Armor`, and `Price` columns of a CSV file. `Tier` is parsed as
+an integer and emitted as the `.tier` component.
 
 Run it from the project root:
 

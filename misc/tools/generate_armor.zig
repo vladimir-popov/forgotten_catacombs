@@ -9,6 +9,7 @@ const Protection = struct {
 
 const ArmorRow = struct {
     name: []const u8,
+    tier: u4,
     protection: Protection,
     price: u16,
 };
@@ -21,6 +22,8 @@ pub fn generate(csv: []const u8, writer: *std.Io.Writer, allocator: std.mem.Allo
     const header_count = splitRow(header, &header_fields) catch return error.TooManyColumns;
     const name_column = findColumn(header_fields[0..header_count], "Name") orelse
         return error.MissingNameColumn;
+    const tier_column = findColumn(header_fields[0..header_count], "Tier") orelse
+        return error.MissingTierColumn;
     const armor_column = findColumn(header_fields[0..header_count], "Armor") orelse
         return error.MissingArmorColumn;
     const price_column = findColumn(header_fields[0..header_count], "Price") orelse
@@ -34,7 +37,7 @@ pub fn generate(csv: []const u8, writer: *std.Io.Writer, allocator: std.mem.Allo
         if (line.len == 0)
             continue;
 
-        const columns = [_]usize{ name_column, armor_column, price_column };
+        const columns = [_]usize{ name_column, tier_column, armor_column, price_column };
         var fields: [max_columns][]const u8 = undefined;
         const field_count = splitRow(line, &fields) catch return error.TooManyColumns;
         if (field_count <= std.mem.max(usize, &columns))
@@ -42,8 +45,11 @@ pub fn generate(csv: []const u8, writer: *std.Io.Writer, allocator: std.mem.Allo
 
         const price = std.fmt.parseInt(u16, fields[price_column], 10) catch
             return error.InvalidPrice;
+        const tier = std.fmt.parseInt(u4, std.mem.trim(u8, fields[tier_column], " \t"), 10) catch
+            return error.InvalidTier;
         try rows.append(allocator, .{
             .name = fields[name_column],
+            .tier = tier,
             .protection = try parseProtection(fields[armor_column]),
             .price = price,
         });
@@ -66,6 +72,7 @@ pub fn generate(csv: []const u8, writer: *std.Io.Writer, allocator: std.mem.Allo
 
         try writeSnakeCase(writer, row.name);
         try writer.writeAll(": c.Components = archetype.armor(.{\n");
+        try writer.print("    .tier = .{{ .tier = {d} }},\n", .{row.tier});
         try writer.print(
             "    .armor = .{{ .protection = .range({d}, {d}) }},\n",
             .{ row.protection.min, row.protection.max },

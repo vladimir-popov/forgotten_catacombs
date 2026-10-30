@@ -680,7 +680,7 @@ test "Describe a bow" {
         \\into the waiting dark.
         \\
         \\This is a tricky weapon.
-        \\Damage: 4-6
+        \\Damage: 1-5
         \\Max range: 3
     );
 }

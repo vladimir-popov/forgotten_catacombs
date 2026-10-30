@@ -9,6 +9,7 @@ const Damage = struct {
 
 const WeaponRow = struct {
     name: []const u8,
+    tier: u4,
     damage: Damage,
     stat: []const u8,
     range: u8,
@@ -29,6 +30,8 @@ pub fn generate(csv: []const u8, writer: *std.Io.Writer, allocator: std.mem.Allo
     const header_count = splitRow(header, &header_fields) catch return error.TooManyColumns;
     const name_column = findColumn(header_fields[0..header_count], "Name") orelse
         return error.MissingNameColumn;
+    const tier_column = findColumn(header_fields[0..header_count], "Tier") orelse
+        return error.MissingTierColumn;
     const damage_column = findColumn(header_fields[0..header_count], "Damage") orelse
         return error.MissingDamageColumn;
     const stat_column = findColumn(header_fields[0..header_count], "Stat") orelse
@@ -52,6 +55,7 @@ pub fn generate(csv: []const u8, writer: *std.Io.Writer, allocator: std.mem.Allo
 
         const columns = [_]usize{
             name_column,
+            tier_column,
             damage_column,
             stat_column,
             range_column,
@@ -66,8 +70,11 @@ pub fn generate(csv: []const u8, writer: *std.Io.Writer, allocator: std.mem.Allo
 
         const price = std.fmt.parseInt(u16, fields[price_column], 10) catch return error.InvalidPrice;
         const range = std.fmt.parseInt(u8, fields[range_column], 10) catch return error.InvalidRange;
+        const tier = std.fmt.parseInt(u4, std.mem.trim(u8, fields[tier_column], " \t"), 10) catch
+            return error.InvalidTier;
         try rows.append(allocator, .{
             .name = fields[name_column],
+            .tier = tier,
             .damage = try parseDamage(fields[damage_column]),
             .stat = fields[stat_column],
             .range = range,
@@ -94,6 +101,7 @@ pub fn generate(csv: []const u8, writer: *std.Io.Writer, allocator: std.mem.Allo
 
         try writeSnakeCase(writer, row.name);
         try writer.writeAll(": c.Components = archetype.weapon(.{\n");
+        try writer.print("    .tier = .{{ .tier = {d} }},\n", .{row.tier});
         try writer.writeAll("    .description = .{ .preset = .");
         try writeSnakeCase(writer, row.name);
         try writer.writeAll(" },\n    .sprite = .{ .codepoint = ");

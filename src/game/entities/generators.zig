@@ -198,8 +198,8 @@ fn generateGoldPile(registry: *g.Registry, rand: std.Random, depth: u8) Allocato
 const GenerateArmorAndWeaponOptions = struct {
     /// Maximal weight for an item on its peak depth.
     ///
-    /// An item is most likely to appear on the depth that matches its average
-    /// damage/protection. This value is used when `depth == peak`.
+    /// An item is most likely to appear on the depth that matches its tier.
+    /// This value is used when `depth == tier`.
     base_weight: u8,
 
     /// Weight penalty for each depth step away from the item peak.
@@ -235,15 +235,7 @@ const GenerateArmorAndWeaponOptions = struct {
 };
 
 /// Calculates the relative spawn weight of an armor or weapon at the given
-/// dungeon depth.
-///
-/// The average value of `range` is converted to the item's peak depth using
-/// the same progression formula for both weapon damage and armor protection:
-///
-/// ```text
-/// power = (range.min + range.max) / 2
-/// peak = 1 + floor(power / 7)
-/// ```
+/// dungeon depth using its explicit tier as its peak depth.
 ///
 /// The weight is `0` when the current depth is outside `ops.radius` from the
 /// peak. Inside the radius, every depth step applies `ops.step_weight` as a
@@ -254,9 +246,8 @@ const GenerateArmorAndWeaponOptions = struct {
 /// The returned value is a relative weight, not a probability. It is passed
 /// to `std.Random.weightedIndex` together with the weights of the other
 /// armor or weapon presets.
-fn armorOrWeaponWeight(range: p.Range(u8), depth: u8, ops: GenerateArmorAndWeaponOptions) u8 {
-    const power: u16 = (@as(u16, range.min) + @as(u16, range.max)) / 2;
-    const peak: u8 = @intCast(1 + power / 7);
+fn armorOrWeaponWeight(tier: u4, depth: u8, ops: GenerateArmorAndWeaponOptions) u8 {
+    const peak: u8 = tier;
     const distance = p.diff(depth, peak);
 
     if (distance > ops.radius) {
@@ -270,11 +261,31 @@ fn armorOrWeaponWeight(range: p.Range(u8), depth: u8, ops: GenerateArmorAndWeapo
     return @max(ops.tail_weight, ops.base_weight - penalty);
 }
 
+fn validateSpawnWeights(comptime presets: anytype, comptime ops: GenerateArmorAndWeaponOptions) void {
+    @setEvalBranchQuota(10_000);
+    for (0..g.MAX_DEPTH) |depth| {
+        var total_weight: u32 = 0;
+        for (presets.fields.values) |components| {
+            if (components.tier == null)
+                @compileError("Every armor and weapon preset must define a Tier component");
+            total_weight += armorOrWeaponWeight(components.tier.?.tier, @intCast(depth), ops);
+        }
+        if (total_weight == 0)
+            @compileError("Armor or weapon spawn weights must be non-zero at every dungeon depth");
+        if (total_weight > std.math.maxInt(u16))
+            @compileError("Armor or weapon spawn weights must fit in u16");
+    }
+}
+
+comptime {
+    validateSpawnWeights(g.entities.presets.Armor, .armor_options);
+    validateSpawnWeights(g.entities.presets.Weapons, .weapons_options);
+}
+
 fn generateArmor(registry: *g.Registry, rand: std.Random, depth: u8) AllocatorError!g.Entity {
     var proportions: [g.entities.presets.Armor.count]u16 = undefined;
     for (g.entities.presets.Armor.fields.values, 0..) |components, i| {
-        const protection = components.armor.?.protection;
-        proportions[i] = armorOrWeaponWeight(protection, depth, .armor_options);
+        proportions[i] = armorOrWeaponWeight(components.tier.?.tier, depth, .armor_options);
     }
     const idx = rand.weightedIndex(u16, &proportions);
 
@@ -284,8 +295,7 @@ fn generateArmor(registry: *g.Registry, rand: std.Random, depth: u8) AllocatorEr
 fn generateWeapon(registry: *g.Registry, rand: std.Random, depth: u8) AllocatorError!g.Entity {
     var proportions: [g.entities.presets.Weapons.count]u16 = undefined;
     for (g.entities.presets.Weapons.fields.values, 0..) |components, i| {
-        const damage = components.weapon.?.damage;
-        proportions[i] = armorOrWeaponWeight(damage, depth, .weapons_options);
+        proportions[i] = armorOrWeaponWeight(components.tier.?.tier, depth, .weapons_options);
     }
     const idx = rand.weightedIndex(u16, &proportions);
 
@@ -382,6 +392,38 @@ test "generateEnemy only chooses enemies allowed on the depth" {
             try std.testing.expect(
                 tier >= expected_tiers.min and tier <= expected_tiers.max,
             );
+        }
+    }
+}
+
+test "armor and weapon spawn weights use explicit tiers" {
+    try std.testing.expectEqual(@as(u8, 100), armorOrWeaponWeight(1, 1, .armor_options));
+    try std.testing.expectEqual(@as(u8, 50), armorOrWeaponWeight(2, 1, .armor_options));
+    try std.testing.expectEqual(@as(u8, 5), armorOrWeaponWeight(3, 1, .armor_options));
+
+    try std.testing.expectEqual(@as(u8, 100), armorOrWeaponWeight(1, 1, .weapons_options));
+    try std.testing.expectEqual(@as(u8, 55), armorOrWeaponWeight(2, 1, .weapons_options));
+    try std.testing.expectEqual(@as(u8, 3), armorOrWeaponWeight(4, 1, .weapons_options));
+    try std.testing.expectEqual(@as(u8, 0), armorOrWeaponWeight(5, 1, .weapons_options));
+}
+
+test "generated armor and weapons stay within their tier spawn radius" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    var registry: g.Registry = try .init(&arena);
+    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
+    const rand = prng.random();
+
+    for (0..g.MAX_DEPTH) |depth| {
+        for (0..32) |_| {
+            const armor = try generateArmor(&registry, rand, @intCast(depth));
+            const armor_tier = registry.getUnsafe(armor, c.Tier).tier;
+            try std.testing.expect(p.diff(@as(u8, @intCast(depth)), @as(u8, armor_tier)) <= GenerateArmorAndWeaponOptions.armor_options.radius);
+
+            const weapon = try generateWeapon(&registry, rand, @intCast(depth));
+            const weapon_tier = registry.getUnsafe(weapon, c.Tier).tier;
+            try std.testing.expect(p.diff(@as(u8, @intCast(depth)), @as(u8, weapon_tier)) <= GenerateArmorAndWeaponOptions.weapons_options.radius);
         }
     }
 }
