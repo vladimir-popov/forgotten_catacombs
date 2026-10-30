@@ -13,13 +13,11 @@ const c = g.components;
 //   F- -> breakages = .@"fire-"
 //   FIRE -> weapon effect via meleeWithEffect/rangedWithEffect(..., .poison/.fire/.acid)
 //   P+ -> .improvements = .{ .modifications = .init(&.{ .poison }) }
-//   PER+ -> stats = .init(perception 1, ...)
+//   PER+ -> stats = .init(perception 2, ...)
+//   PER- -> stats = .init(perception -2, ...)
 //   POISON -> weapon effect via meleeWithEffect/rangedWithEffect(..., .poison/.fire/.acid)
-//   RNG(4) -> weapon = .ranged(..., max_distance, .bullets)
-//   RNG(5) -> weapon = .ranged(..., max_distance, .bullets)
 //   SPD+ -> speed = .@"spd+"
 //   SPD- -> speed = .@"spd-" (or .@"spd-; atk-" with ATK-)
-//   STATIC -> speed = .@"static; atk+" when combined with ATK+
 
 cave_snake: c.Components = archetype.enemy(.{
     .description = .{ .preset = .cave_snake },
@@ -77,7 +75,7 @@ cave_hound: c.Components = archetype.enemy(.{
     .speed = .@"spd+",
     .sprite = .{ .codepoint = 'h' },
     .state = .sleeping,
-    .stats = .init(0, 0, 0, 0, 0),
+    .stats = .init(0, 0, 2, 0, 0),
     .weapon = .melee(.native, .range(2, 4)),
 }),
 
@@ -89,9 +87,7 @@ worm: c.Components = archetype.enemy(.{
     .initiative = .empty,
     .regeneration = .regular,
     .skills = .zeros,
-    .armor = .{
-        .protection = .range(1, 1),
-    },
+    .armor = .{ .protection = .range(1, 1) },
     .speed = .default,
     .sprite = .{ .codepoint = 'w' },
     .state = .sleeping,
@@ -110,7 +106,7 @@ carrion_feeder: c.Components = archetype.enemy(.{
     .speed = .default,
     .sprite = .{ .codepoint = 'f' },
     .state = .sleeping,
-    .stats = .init(0, 0, 0, 0, 0),
+    .stats = .init(0, 0, -2, 0, 0),
     .weapon = .melee(.native, .range(3, 5)),
 }),
 
@@ -122,9 +118,7 @@ armadillo_beast: c.Components = archetype.enemy(.{
     .initiative = .empty,
     .regeneration = .regular,
     .skills = .zeros,
-    .armor = .{
-        .protection = .range(3, 3),
-    },
+    .armor = .{ .protection = .range(3, 3) },
     .speed = .@"spd-",
     .sprite = .{ .codepoint = 'p' },
     .state = .sleeping,
@@ -230,14 +224,12 @@ cave_spider: c.Components = archetype.enemy(.{
     .initiative = .empty,
     .regeneration = .regular,
     .skills = .zeros,
-    .armor = .{
-        .protection = .range(4, 4),
-    },
+    .armor = .{ .protection = .range(4, 4) },
     .speed = .@"spd-; atk-",
     .sprite = .{ .codepoint = 'm' },
     .state = .sleeping,
-    .stats = .init(0, -1, 1, 0, 0),
-    .weapon = .ranged(.native, .range(5, 7), 4, .bullets),
+    .stats = .init(0, -1, 2, 0, 0),
+    .weapon = .meleeWithEffect(.native, .range(5, 7), .acid),
 }),
 
 repair_drone: c.Components = archetype.enemy(.{
@@ -248,14 +240,12 @@ repair_drone: c.Components = archetype.enemy(.{
     .initiative = .empty,
     .regeneration = .regular,
     .skills = .zeros,
-    .armor = .{
-        .protection = .range(4, 4),
-    },
+    .armor = .{ .protection = .range(4, 4) },
     .improvements = .{ .modifications = .init(&.{ .fire, .poison }) },
     .speed = .@"spd+",
     .sprite = .{ .codepoint = 'd' },
     .state = .sleeping,
-    .stats = .init(0, 0, 0, 0, 0),
+    .stats = .init(0, 0, -2, 0, 0),
     .weapon = .melee(.native, .range(6, 8)),
 }),
 
@@ -267,9 +257,7 @@ mechatron: c.Components = archetype.enemy(.{
     .initiative = .empty,
     .regeneration = .regular,
     .skills = .zeros,
-    .armor = .{
-        .protection = .range(4, 4),
-    },
+    .armor = .{ .protection = .range(4, 4) },
     .improvements = .{ .modifications = .init(&.{ .fire, .poison }) },
     .speed = .@"spd-",
     .sprite = .{ .codepoint = 'M' },
@@ -286,9 +274,7 @@ robot: c.Components = archetype.enemy(.{
     .initiative = .empty,
     .regeneration = .regular,
     .skills = .zeros,
-    .armor = .{
-        .protection = .range(6, 6),
-    },
+    .armor = .{ .protection = .range(6, 6) },
     .improvements = .{ .modifications = .init(&.{ .fire, .poison }) },
     .speed = .default,
     .sprite = .{ .codepoint = 'R' },
@@ -305,9 +291,7 @@ cyborg: c.Components = archetype.enemy(.{
     .initiative = .empty,
     .regeneration = .regular,
     .skills = .zeros,
-    .armor = .{
-        .protection = .range(9, 9),
-    },
+    .armor = .{ .protection = .range(9, 9) },
     .improvements = .{ .modifications = .init(&.{ .fire, .poison }) },
     .speed = .@"spd+",
     .sprite = .{ .codepoint = 'C' },
@@ -324,13 +308,11 @@ terminator: c.Components = archetype.enemy(.{
     .initiative = .empty,
     .regeneration = .regular,
     .skills = .zeros,
-    .armor = .{
-        .protection = .range(14, 14),
-    },
+    .armor = .{ .protection = .range(14, 14) },
     .improvements = .{ .modifications = .init(&.{ .fire, .poison }) },
     .speed = .@"spd+",
     .sprite = .{ .codepoint = 'T' },
     .state = .sleeping,
-    .stats = .init(0, 1, 0, 0, 0),
+    .stats = .init(0, 1, 2, 0, 0),
     .weapon = .meleeWithEffect(.native, .range(10, 14), .fire),
 }),

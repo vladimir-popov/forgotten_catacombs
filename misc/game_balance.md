@@ -240,6 +240,7 @@ effects are applied to that physical damage as follows:
 
 ```text
 damage = max(
+    1,
     poison_floor,
     physical_damage x fire_multiplier - enemy_armor x acid_factor
 )
@@ -248,7 +249,9 @@ poison_floor =
     poison_floor_weight x base_damage x poison_resistance_multiplier
 ```
 
-`base_damage` is a random value from the weapon damage range.
+`base_damage` is a random value from the weapon damage range. Round the final
+damage to the nearest integer, with half values rounded up. Every successful
+hit deals at least `1` damage, including hits reduced by armor to zero.
 
 Effect multipliers:
 
@@ -271,6 +274,75 @@ Speed tuning:
 | Normal movement speed | `10 mp`     |
 | High movement speed   | `8 mp`      |
 | Low movement speed    | `12 mp`     |
+
+### Enemy Awareness
+
+An enemy checks whether it notices the player once per player turn. The per-turn probability is
+based on the number of movement steps between them on the Dijkstra map, rather than direct geometric
+distance. This represents the enemy hearing the player. Enemy perception increases the chance, while
+player dexterity decreases it. Sleeping enemies have half the per-turn chance.
+
+The approximate table gives the target cumulative probability that the enemy notices the player at least
+once during five consecutive player turns spent waiting at the same distance.
+
+Approximate targets for an awake enemy over five checks:
+
+| Situation                                                    | Player DEX | Enemy PER | 1 step | 3 steps | 5 steps |
+| ---------                                                    | ---------: | --------: | -----: | ------: | ------: |
+| Most agile player, enemy with `PER = +2`                     | `+5`       | `+2`      | `80%`  | `40%`   | `5%`    |
+| Most agile player, enemy with `PER = 0`                      | `+5`       | `0`       | `70%`  | `30%`   | `1%`    |
+| Zero characteristics                                         | `0`        | `0`       | `90%`  | `50%`   | `10%`   |
+| Player with minimum dexterity                                | `-2`       | `0`       | `100%` | `70%`   | `30%`   |
+| Player with minimum dexterity, enemy with maximum perception | `-2`       | `+2`      | `100%` | `80%`   | `40%`   |
+
+Characteristics range: `-2 .. +5`. Enemy `PER+` and `PER-` traits generated
+from `Enemies.csv` modify perception by `+2` and `-2`, respectively. These are
+target probabilities over five checks, not per-turn chances.
+
+Equivalent per-turn targets for an awake enemy:
+
+| Situation                                                    | Player DEX | Enemy PER | 1 step  | 3 steps | 5 steps |
+| ---------                                                    | ---------: | --------: | -----:  | ------: | ------: |
+| Most agile player, enemy with `PER = +2`                     | `+5`       | `+2`      | `43%`   | `23%`   | `3%`    |
+| Most agile player, enemy with `PER = 0`                      | `+5`       | `0`       | `35%`   | `15%`   | `0%`    |
+| Zero characteristics                                         | `0`        | `0`       | `55%`   | `35%`   | `15%`   |
+| Player with minimum dexterity                                | `-2`       | `0`       | `63%`   | `43%`   | `23%`   |
+| Player with minimum dexterity, enemy with maximum perception | `-2`       | `+2`      | `71%`   | `51%`   | `31%`   |
+
+Per-turn chance, in percent:
+
+```text
+raw_notice_chance =
+    65
+    - 10 x moves_to_player
+    + 4 x enemy_perception
+    - 4 x player_dexterity
+
+notice_chance_per_turn = clamp(raw_notice_chance, 0, 100) / 100
+
+if enemy_state == sleeping:
+    notice_chance_per_turn = notice_chance_per_turn / 2
+```
+
+Calculated cumulative probability over five checks using the formula:
+
+| Situation                                                    | Player DEX | Enemy PER | 1 step  | 3 steps | 5 steps |
+| ---------                                                    | ---------: | --------: | -----:  | ------: | ------: |
+| Most agile player, enemy with `PER = +2`                     | `+5`       | `+2`      | `94%`   | `72.9%` | `14.1%` |
+| Most agile player, enemy with `PER = 0`                      | `+5`       | `0`       | `88.4%` | `55.6%` | `0%`    |
+| Zero characteristics                                         | `0`        | `0`       | `98.2%` | `88.4%` | `55.6%` |
+| Player with minimum dexterity                                | `-2`       | `0`       | `99.3%` | `94%`   | `72.9%` |
+| Player with minimum dexterity, enemy with maximum perception | `-2`       | `+2`      | `99.8%` | `97.2%` | `84.4%` |
+
+Calculated per-turn probability using the formula:
+
+| Situation                                                    | Player DEX | Enemy PER | 1 step  | 3 steps | 5 steps |
+| ---------                                                    | ---------: | --------: | -----:  | ------: | ------: |
+| Most agile player, enemy with `PER = +2`                     | `+5`       | `+2`      | `43%`   | `23%`   | `3%`    |
+| Most agile player, enemy with `PER = 0`                      | `+5`       | `0`       | `35%`   | `15%`   | `0%`    |
+| Zero characteristics                                         | `0`        | `0`       | `55%`   | `35%`   | `15%`   |
+| Player with minimum dexterity                                | `-2`       | `0`       | `63%`   | `43%`   | `23%`   |
+| Player with minimum dexterity, enemy with maximum perception | `-2`       | `+2`      | `71%`   | `51%`   | `31%`   |
 
 ## 7. Character Identity
 

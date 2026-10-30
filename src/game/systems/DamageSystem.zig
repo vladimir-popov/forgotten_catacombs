@@ -260,5 +260,6 @@ fn calculateDamage(
 
     const physical_damage: f32 = base_damage * (1 + 0.1 * stat + 0.05 * str);
 
-    return @intFromFloat(@max(poison_min, physical_damage * fire_multiplier - enemy_protection * acid_factor));
+    const damage = @max(poison_min, physical_damage * fire_multiplier - enemy_protection * acid_factor);
+    return @intFromFloat(@max(1.0, @round(damage)));
 }

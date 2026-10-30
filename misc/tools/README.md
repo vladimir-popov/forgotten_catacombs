@@ -43,7 +43,7 @@ Run it from the project root:
 
 ```sh
 zig run misc/tools/main.zig -- enemies misc/entities/Enemies.csv \
-  > /tmp/enemies.zig
+  > src/game/entities/enemies.zig
 ```
 
 The CSV must contain the `Symbol`, `Name`, `Tier`, `Trait`, `Damage`, `Armor`,

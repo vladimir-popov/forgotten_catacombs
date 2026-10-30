@@ -90,7 +90,7 @@ pub fn generate(csv: []const u8, writer: *std.Io.Writer, diagnostic_writer: *std
         if (row.armor.len > 0) {
             try writer.writeAll("    .armor = .{ .protection = .range(");
             try writeArmor(writer, row.armor);
-            try writer.writeAll("), },\n");
+            try writer.writeAll(") },\n");
         }
         try writeImprovements(writer, row.traits);
         try writer.writeAll("    .speed = ");
@@ -143,7 +143,12 @@ fn writeTraitMapping(writer: *std.Io.Writer, trait: []const u8) !void {
     if (std.mem.eql(u8, trait, "ARM")) return writer.writeAll("armor.protection uses the numeric Armor column");
     if (std.mem.eql(u8, trait, "DEX+") or std.mem.eql(u8, trait, "DEX-") or std.mem.eql(u8, trait, "PER+") or std.mem.eql(u8, trait, "PER-") or std.mem.eql(u8, trait, "STR+") or std.mem.eql(u8, trait, "STR-") or std.mem.eql(u8, trait, "INT+") or std.mem.eql(u8, trait, "INT-")) {
         const stat = if (std.mem.indexOf(u8, trait, "STR") != null) "strength" else if (std.mem.indexOf(u8, trait, "DEX") != null) "dexterity" else if (std.mem.indexOf(u8, trait, "PER") != null) "perception" else "intelligence";
-        const sign: i8 = if (trait[trait.len - 1] == '+') 1 else -1;
+        const sign: i8 = if (trait[trait.len - 1] == '+')
+            (if (std.mem.startsWith(u8, trait, "PER")) 2 else 1)
+        else if (std.mem.startsWith(u8, trait, "PER"))
+            -2
+        else
+            -1;
         try writer.print("stats = .init({s} {d}, ...)", .{ stat, sign });
         return;
     }
@@ -181,7 +186,7 @@ fn writeSpeed(writer: *std.Io.Writer, trait_list: []const u8) !void {
 fn writeStats(writer: *std.Io.Writer, trait_list: []const u8) !void {
     const strength: i8 = if (hasTrait(trait_list, "STR+")) 1 else if (hasTrait(trait_list, "STR-")) -1 else 0;
     const dexterity: i8 = if (hasTrait(trait_list, "DEX+")) 1 else if (hasTrait(trait_list, "DEX-")) -1 else 0;
-    const perception: i8 = if (hasTrait(trait_list, "PER+")) 1 else if (hasTrait(trait_list, "PER-")) -1 else 0;
+    const perception: i8 = if (hasTrait(trait_list, "PER+")) 2 else if (hasTrait(trait_list, "PER-")) -2 else 0;
     const intelligence: i8 = if (hasTrait(trait_list, "INT+")) 1 else if (hasTrait(trait_list, "INT-")) -1 else 0;
     return writer.print(".init({d}, {d}, {d}, {d}, 0)", .{ strength, dexterity, perception, intelligence });
 }

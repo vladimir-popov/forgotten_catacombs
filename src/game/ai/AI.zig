@@ -126,9 +126,9 @@ fn actionForAggressiveEnemy(context: anytype) ?g.Action {
 /// This models hearing: more steps reduce the chance, while enemy perception
 /// and player dexterity adjust it. Sleeping enemies have half the chance.
 fn noticePlayerChance(enemy_state: c.EnemyState, enemy_perception: i4, moves_to_player: u8, player_dexterity: i4) u8 {
-    const base: i16 = 110 - 20 * @as(i16, moves_to_player);
-    const perception: i16 = 10 * @as(i16, enemy_perception);
-    const dexterity: i16 = 10 * @as(i16, player_dexterity);
+    const base: i16 = 65 - 10 * @as(i16, moves_to_player);
+    const perception: i16 = 4 * @as(i16, enemy_perception);
+    const dexterity: i16 = 4 * @as(i16, player_dexterity);
 
     var chance = base + perception - dexterity;
     if (enemy_state == .sleeping)
