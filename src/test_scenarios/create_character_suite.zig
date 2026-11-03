@@ -102,10 +102,10 @@ test "Create a new character" {
         \\      Distribute the skill points:     ¶
         \\                                       ¶
         \\                                       ¶
-        \\ Echo of knowledge                  0  ¶
-        \\ Mechanics                          0  ¶
-        \\ Stealth                            0  ¶
         \\ Weapon Mastery                     0  ¶
+        \\ Stealth                            0  ¶
+        \\ Mechanics                          0  ¶
+        \\ Echo of knowledge                  0  ¶
         \\                                       ¶
         \\                                       ¶
         \\                                       ¶
@@ -116,15 +116,15 @@ test "Create a new character" {
     // Check a description:
     try test_game.pressButton(.a);
     try test_game.runtime.display.expectLooksLike(
-        \\┌──────────Echo of knowledge───────────┐
-        \\│ This  is  more of an innate ability  │
-        \\│ than an acquired skill. A character  │
-        \\│ with  this  skill  has an intuitive  │
-        \\│ understanding  of  the sciences and  │
-        \\│ technologies of past civilizations,  │
-        \\│ allowing them to understand and use  │
-        \\│ their devices and artifacts.         │
+        \\                                       ¶
+        \\                                       ¶
+        \\┌────────────Weapon Mastery────────────┐
+        \\│ This  skill  helps  a character use  │
+        \\│ any  weapon  more  effectively  and  │
+        \\│ miss less often.                     │
         \\└──────────────────────────────────────┘
+        \\                                       ¶
+        \\                                       ¶
         \\                                       ¶
         \\                                       ¶
         \\                       Back     Close  ¶
@@ -139,10 +139,10 @@ test "Create a new character" {
         \\      Distribute the skill points:     ¶
         \\                                       ¶
         \\                                       ¶
-        \\ Echo of knowledge                  2  ¶
-        \\ Mechanics                          0  ¶
+        \\ Weapon Mastery                     2  ¶
         \\ Stealth                            0  ¶
-        \\ Weapon Mastery                     0  ¶
+        \\ Mechanics                          0  ¶
+        \\ Echo of knowledge                  0  ¶
         \\                                       ¶
         \\                                       ¶
         \\                                       ¶
@@ -161,7 +161,7 @@ test "Create a new character" {
         \\  Health: ����������                   ░
         \\                                       ░
         \\  Skills:                              ░
-        \\    Weapon Mastery:     0              ░
+        \\    Weapon Mastery:     2              ░
         \\    Mechanics:          0              ░
         \\                                       ¶
         \\                       Back      Play  ¶
@@ -173,7 +173,7 @@ test "Create a new character" {
         \\     Continue with this character?     ¶
         \\                                       ¶
         \\    Stealth:            0              ░
-        \\    Echo of knowledge:  2              ░
+        \\    Echo of knowledge:  0              ░
         \\                                       ░
         \\  Stats:                               ░
         \\    Strength:           1              ░

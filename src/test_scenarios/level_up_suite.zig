@@ -126,10 +126,10 @@ test "Up one level" {
         \\      Distribute the skill points:     ¶
         \\                                       ¶
         \\                                       ¶
-        \\ Echo of knowledge                  0  ¶
-        \\ Mechanics                          0  ¶
-        \\ Stealth                            0  ¶
         \\ Weapon Mastery                     0  ¶
+        \\ Stealth                            0  ¶
+        \\ Mechanics                          0  ¶
+        \\ Echo of knowledge                  0  ¶
         \\                                       ¶
         \\                                       ¶
         \\                                       ¶
