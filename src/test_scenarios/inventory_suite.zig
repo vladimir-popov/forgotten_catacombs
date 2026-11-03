@@ -90,10 +90,10 @@ test "Trying to unequip a broken weapon" {
         \\║              Inventory               ║
         \\║                                      ║
         \\║┌───────────────Oops!────────────────┐║
-        \\║│ Looks like it is broken and stuck. │║
-        \\║│ You will need to repair  it first. │║
+        \\║│ Looks like  the  equipped  item is │║
+        \\║│ broken and stuck. You will need to │║
+        \\║│ repair  it first.                  │║
         \\║└────────────────────────────────────┘║
-        \\║                                      ║
         \\║                                      ║
         \\╚══════════════════════════════════════╝
     , .game_area);
@@ -105,6 +105,61 @@ test "Trying to unequip a broken weapon" {
         \\║                                      ║
         \\║\ Pickaxe                      weapon ║
         \\║¡ Torch                         light ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+}
+
+test "Trying to change a broken weapon" {
+    var test_session: TestSession = undefined;
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
+    defer test_session.deinit();
+
+    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
+
+    const pickaxe_id = test_session.player.equipment().weapon.?;
+    try std.testing.expect(try g.meta.breakItem(&test_session.session.registry, prng.random(), pickaxe_id, null));
+
+    test_session.player.equipment().light = null;
+    var inventory = try test_session.openInventory();
+    const modal_windows = try inventory.chooseItemByName("Torch");
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║┌────────────────────────────────────┐║
+        \\║│           Use as a light           │║
+        \\║│          Use as a weapon           │║
+        \\║│                Drop                │║
+        \\║│              Describe              │║
+        \\║└────────────────────────────────────┘║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+
+    try modal_windows.options(g.Entity).choose("Use as a weapon");
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║                                      ║
+        \\║┌───────────────Oops!────────────────┐║
+        \\║│ Looks like  the  equipped  item is │║
+        \\║│ broken and stuck. You will need to │║
+        \\║│ repair  it first.                  │║
+        \\║└────────────────────────────────────┘║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+
+    try test_session.pressButton(.a);
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║                                      ║
+        \\║\ Pickaxe                      weapon ║
+        \\║¡ Torch                               ║
         \\║                                      ║
         \\║                                      ║
         \\║                                      ║
@@ -561,10 +616,10 @@ test "Trying to unequip a broken armor" {
         \\║              Inventory               ║
         \\║                                      ║
         \\║┌───────────────Oops!────────────────┐║
-        \\║│ Looks like it is broken and stuck. │║
-        \\║│ You will need to repair  it first. │║
+        \\║│ Looks like  the  equipped  item is │║
+        \\║│ broken and stuck. You will need to │║
+        \\║│ repair  it first.                  │║
         \\║└────────────────────────────────────┘║
-        \\║                                      ║
         \\║                                      ║
         \\╚══════════════════════════════════════╝
     , .game_area);
@@ -578,6 +633,63 @@ test "Trying to unequip a broken armor" {
         \\║[ Riveted leather jacket        armor ║
         \\║¡ Torch                         light ║
         \\║                                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+}
+
+test "Trying to change a broken armor" {
+    var test_session: TestSession = undefined;
+    try test_session.initOnFirstLevel(std.testing.allocator, std.testing.io);
+    defer test_session.deinit();
+
+    var prng = std.Random.DefaultPrng.init(std.testing.random_seed);
+
+    var inventory = try test_session.openInventory();
+    const jacket_id = try inventory.add(g.entities.presets.Armor.get(.riveted_leather_jacket));
+    try std.testing.expect(try g.meta.breakItem(&test_session.session.registry, prng.random(), jacket_id, null));
+    const leather_jerkin_id = try inventory.add(g.entities.presets.Armor.get(.leather_jerkin));
+
+    var modal_windows = try inventory.chooseItemById(jacket_id);
+    try modal_windows.options(g.Entity).choose("Wear");
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║                                      ║
+        \\║/ Pickaxe                      weapon ║
+        \\║[ Riveted leather jacket        armor ║
+        \\║¡ Torch                         light ║
+        \\║] Leather jerkin                      ║
+        \\║                                      ║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+
+    modal_windows = try inventory.chooseItemById(leather_jerkin_id);
+    try modal_windows.options(g.Entity).choose("Wear");
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║                                      ║
+        \\║┌───────────────Oops!────────────────┐║
+        \\║│ Looks like  the  equipped  item is │║
+        \\║│ broken and stuck. You will need to │║
+        \\║│ repair  it first.                  │║
+        \\║└────────────────────────────────────┘║
+        \\║                                      ║
+        \\╚══════════════════════════════════════╝
+    , .game_area);
+
+    try test_session.pressButton(.a);
+    try test_session.runtime.display.expectLooksLike(
+        \\╔══════════════════════════════════════╗
+        \\║              Inventory               ║
+        \\║                                      ║
+        \\║/ Pickaxe                      weapon ║
+        \\║[ Riveted leather jacket        armor ║
+        \\║¡ Torch                         light ║
+        \\║] Leather jerkin                      ║
         \\║                                      ║
         \\║                                      ║
         \\╚══════════════════════════════════════╝

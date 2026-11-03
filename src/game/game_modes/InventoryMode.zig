@@ -226,8 +226,9 @@ fn unequipItem(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.Handle
         try self.compositor.showNotification(
             self.allocator(),
             "Oops!",
-            \\Looks like it is broken and stuck.
-            \\You will need to repair  it first.
+            \\Looks like  the  equipped  item is 
+            \\broken and stuck. You will need to
+            \\repair  it first.                 
             ,
         );
     } else {
@@ -249,19 +250,44 @@ fn useAsLight(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleB
 
 fn useAsWeapon(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
+    if (self.equipment.weapon) |weapon| {
+        if (g.meta.isBroken(&self.session.registry, weapon)) {
+            try self.compositor.showNotification(
+                self.allocator(),
+                "Oops!",
+                \\Looks like  the  equipped  item is 
+                \\broken and stuck. You will need to
+                \\repair  it first.                 
+                ,
+            );
+            return .close_window;
+        }
+    }
     self.equipment.weapon = item;
     if (self.equipment.light == null) {
         if (self.session.registry.get(item, c.SourceOfLight)) |_| {
             self.equipment.light = item;
         }
     }
-
     try self.updateInventoryTab();
     return .close_window;
 }
 
 fn useAsArmor(ptr: *anyopaque, _: usize, item: g.Entity) g.SystemError!w.HandleButtonResult {
     const self: *Self = @ptrCast(@alignCast(ptr));
+    if (self.equipment.armor) |armor| {
+        if (g.meta.isBroken(&self.session.registry, armor)) {
+            try self.compositor.showNotification(
+                self.allocator(),
+                "Oops!",
+                \\Looks like  the  equipped  item is 
+                \\broken and stuck. You will need to
+                \\repair  it first.                 
+                ,
+            );
+            return .close_window;
+        }
+    }
     self.equipment.armor = item;
     try self.updateInventoryTab();
     return .close_window;
